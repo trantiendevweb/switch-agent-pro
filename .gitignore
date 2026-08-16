@@ -1,0 +1,11 @@
+# bản sao lưu do tk dong-bo sinh ra
+*.bak-*
+*.tmp
+
+# rác Windows
+Thumbs.db
+desktop.ini
+
+# python
+__pycache__/
+*.pyc
