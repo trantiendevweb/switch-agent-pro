@@ -3,11 +3,12 @@
 cfg.py — phan lam viec voi .claude.json cua cong cu tk.
 
 Vi sao tach ra Python thay vi lam thang trong PowerShell:
-PowerShell 5.1 (ban co san tren may nay) NEM LOI khi JSON co hai khoa chi khac
-nhau hoa/thuong. File .claude.json that co dung loi do:
-    "C:\\Users\\Administrator\\SEO Project"  va  "c:\\users\\administrator\\seo project"
-Neu de PowerShell doc, cong cu se chet ngay tren may nay. Python thi doc duoc
-(khoa trung thi lay cai cuoi).
+PowerShell 5.1 (ban co san tren Windows) NEM LOI khi JSON co hai khoa chi khac
+nhau hoa/thuong. File .claude.json that hay dinh dung loi do, vi duong dan
+project duoc ghi ca hai kieu:
+    "C:\\Users\\ban\\Du An"  va  "c:\\users\\ban\\du an"
+Neu de PowerShell doc, cong cu chet ngay tren nhung may nhu vay. Python thi doc
+duoc (khoa trung thi lay cai cuoi).
 
 Lenh:
     python cfg.py gieo    <nguon.json> <dich.json>

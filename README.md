@@ -99,7 +99,7 @@ Chạy `.\kiem-tra.ps1` để đo lại trên máy bạn. Bộ kiểm thoát v�
 
 1. **`Remove-Item -Recurse` có thể xuyên qua junction xoá luôn dữ liệu thật.** Thư mục tài khoản toàn junction trỏ về `.claude` gốc. Nên `tk xoa` gỡ từng link trước, kiểm không còn link nào, rồi mới xoá phần còn lại. Bộ kiểm có phép đo riêng cho việc này: đặt một file mồi trong `.claude`, xoá tài khoản, rồi đếm lại.
 
-2. **PowerShell 5.1 chết khi JSON có khoá trùng hoa/thường.** File `.claude.json` thật chứa cả `C:\Users\...\SEO Project` lẫn `c:\users\...\seo project`; `ConvertFrom-Json` ném lỗi ngay. Vì vậy toàn bộ phần JSON giao cho `src/cfg.py` bằng Python (khoá trùng thì lấy cái cuối). Đây là lý do công cụ cần Python.
+2. **PowerShell 5.1 chết khi JSON có khoá trùng hoa/thường.** File `.claude.json` thật hay chứa cùng một đường dẫn viết hai kiểu, ví dụ `C:\Users\ban\Du An` và `c:\users\ban\du an`; `ConvertFrom-Json` ném lỗi ngay. Vì vậy toàn bộ phần JSON giao cho `src/cfg.py` bằng Python (khoá trùng thì lấy cái cuối). Đây là lý do công cụ cần Python.
 
 3. **Đừng đặt tên hàm PowerShell trùng tên lệnh cần gọi.** Hàm tên `Python` gọi `Get-Command python` sẽ nhận về **chính nó** — PowerShell ưu tiên Function hơn Application — `.Source` rỗng, và lỗi báo ra là `expression after '&' ... not valid`, không hề nhắc gì tới đệ quy.
 
