@@ -1,5 +1,5 @@
 <#
-  cai-dat.ps1 (v2) — build & cài binary Go `ccswitch` cho Windows.
+  cai-dat.ps1 (v2) — build & cài binary Go `sagent` cho Windows.
 
   Không cần quyền quản trị. Cần Go: ưu tiên ~/go-sdk (bản giải nén), hoặc `go`
   trong PATH. Cài binary vào %USERPROFILE%\bin (nơi v1 cũng dùng cho `tk`).
@@ -19,7 +19,7 @@ function Ok($m)  { Write-Host "  ✓ $m" -ForegroundColor Green }
 function Loi($m) { Write-Host "  ✗ $m" -ForegroundColor Red; exit 1 }
 
 Write-Host ''
-Write-Host '  Cài ccswitch (v2, Go)' -ForegroundColor Cyan
+Write-Host '  Cài sagent (v2, Go)' -ForegroundColor Cyan
 Write-Host ''
 
 # --- tìm Go ---
@@ -32,10 +32,10 @@ Ok "Go: $go"
 
 # --- build ---
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
-$exe = Join-Path $Bin 'ccswitch.exe'
+$exe = Join-Path $Bin 'sagent.exe'
 Write-Host '  Đang build...' -ForegroundColor Cyan
 Push-Location $Repo
-try { & $go build -o $exe ./cmd/ccswitch } finally { Pop-Location }
+try { & $go build -o $exe ./cmd/sagent } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { Loi 'build thất bại' }
 Ok "Đã cài: $exe"
 
@@ -54,7 +54,7 @@ if (($u -split ';' | Where-Object { $_.TrimEnd('\') -eq $Bin.TrimEnd('\') }).Cou
 
 Write-Host ''
 Write-Host '  Xong. Thử:' -ForegroundColor Cyan
-Write-Host '    ccswitch                    bảng tài khoản'
-Write-Host '    ccswitch them claude:phu1   thêm tài khoản rồi đăng nhập'
-Write-Host '    ccswitch verify claude      chạy bộ "đã đo"'
+Write-Host '    sagent                    bảng tài khoản'
+Write-Host '    sagent them claude:phu1   thêm tài khoản rồi đăng nhập'
+Write-Host '    sagent verify claude      chạy bộ "đã đo"'
 Write-Host ''

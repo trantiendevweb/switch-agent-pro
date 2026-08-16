@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/trantiendevweb/ccswitch/internal/jsonutil"
-	"github.com/trantiendevweb/ccswitch/internal/link"
-	"github.com/trantiendevweb/ccswitch/internal/paths"
-	"github.com/trantiendevweb/ccswitch/internal/provider"
+	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
+	"github.com/trantiendevweb/switch-agent-pro/internal/link"
+	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
+	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
 // Dir là thư mục config biệt lập của một hồ sơ.

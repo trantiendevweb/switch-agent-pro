@@ -12,5 +12,5 @@ __pycache__/
 
 # go build artifacts
 *.exe
-/ccswitch
+/sagent
 /dist/

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cai-dat.sh (v2) — build & cài `ccswitch` trên Linux.
+# cai-dat.sh (v2) — build & cài `sagent` trên Linux.
 #
 # ⚠ CHƯA ĐO trên Linux: Pha 0 Linux chưa chạy (token nằm ở file hay keyring
 #   chưa xác minh). Dùng script này khi bạn có môi trường Linux để thử; phần
@@ -18,12 +18,12 @@ echo "  ✓ Go: $go"
 
 mkdir -p "$bin"
 echo "  Đang build..."
-( cd "$repo" && "$go" build -o "$bin/ccswitch" ./cmd/ccswitch )
-echo "  ✓ Đã cài: $bin/ccswitch"
+( cd "$repo" && "$go" build -o "$bin/sagent" ./cmd/sagent )
+echo "  ✓ Đã cài: $bin/sagent"
 
 case ":$PATH:" in
   *":$bin:"*) : ;;
   *) echo "  ! $bin chưa nằm trong PATH — thêm 'export PATH=\$HOME/.local/bin:\$PATH' vào ~/.profile" ;;
 esac
 
-echo "  Thử: ccswitch  ·  ccswitch them claude:phu1"
+echo "  Thử: sagent  ·  sagent them claude:phu1"

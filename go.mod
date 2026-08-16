@@ -1,3 +1,3 @@
-module github.com/trantiendevweb/ccswitch
+module github.com/trantiendevweb/switch-agent-pro
 
 go 1.23

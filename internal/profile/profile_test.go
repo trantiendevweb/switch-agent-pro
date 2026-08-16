@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/trantiendevweb/ccswitch/internal/provider"
+	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
 // fakeAdapter đủ để test link + remove mà không cần Claude thật.

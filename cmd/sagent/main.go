@@ -1,8 +1,8 @@
-// Command ccswitch — quản lý & chạy nhiều tài khoản AI (v2, Go).
+// Command sagent — quản lý & chạy nhiều tài khoản AI (v2, Go).
 //
 // Địa chỉ hoá hồ sơ: "provider:account" (mặc định provider "claude"), nên
 //
-//	ccswitch phu   ==  ccswitch claude:phu
+//	sagent phu   ==  sagent claude:phu
 package main
 
 import (
@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/trantiendevweb/ccswitch/internal/jsonutil"
-	"github.com/trantiendevweb/ccswitch/internal/profile"
-	"github.com/trantiendevweb/ccswitch/internal/provider"
+	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
+	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
+	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
 func main() {
@@ -90,14 +90,14 @@ func cmdList() {
 		fmt.Printf("  %s %2d  %-7s %-12s %-34s %s\n", mark, i+1, a.Provider, a.Name, email, tok)
 	}
 	if len(accs) == 0 {
-		fmt.Println("  Chưa có tài khoản nào. Thêm: ccswitch them claude:phu1")
+		fmt.Println("  Chưa có tài khoản nào. Thêm: sagent them claude:phu1")
 	}
 	fmt.Println()
 }
 
 func cmdAdd(args []string) {
 	if len(args) == 0 {
-		fail(fmt.Errorf("thiếu tên. Ví dụ: ccswitch them claude:phu1"))
+		fail(fmt.Errorf("thiếu tên. Ví dụ: sagent them claude:phu1"))
 	}
 	prov, acc := parseAddr(args[0])
 	if acc == "" {
@@ -109,7 +109,7 @@ func cmdAdd(args []string) {
 		fail(err)
 	}
 	fmt.Printf("  ✓ Đã tạo %s:%s (nối %d mục dùng chung, gieo %d khoá)\n", prov, acc, linked, seeded)
-	fmt.Printf("  Đăng nhập: ccswitch %s:%s  (xong gõ /exit)\n", prov, acc)
+	fmt.Printf("  Đăng nhập: sagent %s:%s  (xong gõ /exit)\n", prov, acc)
 }
 
 func cmdRun(prov, acc string, args []string) {
@@ -122,7 +122,7 @@ func cmdRun(prov, acc string, args []string) {
 	a := adapterOf(prov)
 	dir := profile.Dir(prov, acc)
 	if _, err := os.Stat(dir); err != nil {
-		fail(fmt.Errorf("không có %s:%s. Tạo: ccswitch them %s:%s", prov, acc, prov, acc))
+		fail(fmt.Errorf("không có %s:%s. Tạo: sagent them %s:%s", prov, acc, prov, acc))
 	}
 	if err := profile.Run(a, dir, args); err != nil {
 		os.Exit(1)
@@ -173,7 +173,7 @@ func cmdSync(args []string) {
 
 func cmdRemove(args []string) {
 	if len(args) == 0 {
-		fail(fmt.Errorf("thiếu tên. Ví dụ: ccswitch xoa claude:phu1"))
+		fail(fmt.Errorf("thiếu tên. Ví dụ: sagent xoa claude:phu1"))
 	}
 	prov, acc := parseAddr(args[0])
 	dir := profile.Dir(prov, acc)
@@ -213,16 +213,16 @@ func cmdVerify(args []string) {
 
 func cmdHelp() {
 	fmt.Print(`
-  ccswitch — quản lý & chạy nhiều tài khoản AI
+  sagent — quản lý & chạy nhiều tài khoản AI
 
-    ccswitch                      bảng tài khoản
-    ccswitch <provider:tên>       chạy CLI bằng tài khoản đó (mặc định provider claude)
-    ccswitch goc                  chạy Claude bằng tài khoản gốc
-    ccswitch them <provider:tên>  tạo tài khoản mới
-    ccswitch ds                   liệt kê
-    ccswitch dong-bo [--dry-run]  đồng bộ cấu hình dùng chung
-    ccswitch xoa <provider:tên>   xoá tài khoản (an toàn)
-    ccswitch verify [provider]    chạy bộ "đã đo"
+    sagent                      bảng tài khoản
+    sagent <provider:tên>       chạy CLI bằng tài khoản đó (mặc định provider claude)
+    sagent goc                  chạy Claude bằng tài khoản gốc
+    sagent them <provider:tên>  tạo tài khoản mới
+    sagent ds                   liệt kê
+    sagent dong-bo [--dry-run]  đồng bộ cấu hình dùng chung
+    sagent xoa <provider:tên>   xoá tài khoản (an toàn)
+    sagent verify [provider]    chạy bộ "đã đo"
 
 `)
 }

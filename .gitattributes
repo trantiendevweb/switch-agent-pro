@@ -1,0 +1,2 @@
+# Script Linux phải giữ LF, nếu không sẽ "bad interpreter" khi chạy trên Linux.
+*.sh text eol=lf

@@ -1,5 +1,9 @@
 # ccswitch v2 — Kế hoạch thực thi chi tiết
 
+> ⚠ **Bị thay thế bởi [`docs/MASTER-PLAN.md`](MASTER-PLAN.md)** (2026-08-17) — bản
+> hợp nhất với kế hoạch control-plane v1.1 và đổi tên dự án thành **Switch-Agent-Pro**.
+> File này giữ lại làm nhật ký thực thi Pha 1 (đã chạy trên Windows).
+
 > Tài liệu này là **bản đồ thi công**, đi kèm bản thiết kế `docs/THIET-KE.md`.
 > Thiết kế trả lời "làm cái gì và vì sao"; plan này trả lời "làm theo bước nào,
 > xong thì kiểm ra sao". Mỗi bước có **việc cụ thể**, **sản phẩm**, và **tiêu chí

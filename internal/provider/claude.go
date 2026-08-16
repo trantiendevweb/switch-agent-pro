@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/trantiendevweb/ccswitch/internal/paths"
+	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 )
 
 // claude là adapter cho Claude Code — port từ v1 (tk.ps1 + cfg.py).
