@@ -218,7 +218,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào <code>docs/OPEN
 <tbody>
 <tr>
 <td>Lõi Go đổi tài khoản Claude (Windows)</td>
-<td><code>cmd/ccswitch</code>, <code>internal/{paths,provider,jsonutil,link,profile}</code></td>
+<td><code>cmd/sagent</code>, <code>internal/{paths,provider,jsonutil,link,profile}</code></td>
 <td><strong>Phần của Pha 1</strong> (vertical slice Claude subscription) — cần <strong>tách domain</strong> + <strong>đổi tên</strong></td>
 </tr>
 <tr>
@@ -233,12 +233,12 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào <code>docs/OPEN
 </tr>
 <tr>
 <td><code>running.json</code> + fleet prototype</td>
-<td><code>internal/{registry,fleet}</code></td>
-<td><strong>Prototype — sẽ thay bằng SQLite SSOT + daemon</strong> (PID chỉ là runtime attribute)</td>
+<td>~~<code>internal/{registry,fleet}</code>~~ <strong>đã gỡ</strong></td>
+<td>Làm lại trên <strong>SQLite SSOT + daemon</strong> ở Pha 2 (PID chỉ là runtime attribute)</td>
 </tr>
 <tr>
 <td>Design tokens + dashboard 3D + mascot</td>
-<td><code>design-system/</code>, <code>dashboard-preview.html</code>, <code>plan.html</code></td>
+<td><code>design-system/switch-agent-pro/</code>, <code>index.html</code>, <code>plan.html</code></td>
 <td><strong>Nguyên mẫu Pha 6</strong> — biến thành client của event API</td>
 </tr>
 <tr>
@@ -261,7 +261,8 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   → <code>cmd/sagent</code> (git mv); cập nhật mọi import; <strong>build + vet + test xanh</strong>; <code>sagent ds</code> chạy đúng.</li>
 <li class="task done"><span class="box"></span>Cập nhật <code>install/cai-dat.{ps1,sh}</code>, CI, <code>.gitignore</code> sang <code>sagent</code>.</li>
 <li class="task"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code> (làm khi viết installer phát hành).</li>
-<li class="task"><span class="box"></span>Rà tên trong docs cũ (README/HDSD/SKILL/THIET-KE vẫn ghi ccswitch — pass thẩm mỹ sau).</li>
+<li class="task done"><span class="box"></span>Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
+  <code>legacy/v1-powershell/</code>; <code>design-system/switch-agent-pro/</code>; 3 trang HTML sạch tên cũ.</li>
 </ul>
 <h3>Pha 0 — Đo giả định &amp; lập hợp đồng</h3>
 <p>🎯 Chứng minh cơ chế của <strong>cả hai đường</strong> trước khi khoá interface.</p>
@@ -376,7 +377,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li>Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, <strong>fallback 2D</strong>.</li>
 <li>Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.</li>
 <li>Performance budget + test trên điện thoại tầm trung.</li>
-<li><strong>Trạng thái:</strong> đã có nguyên mẫu tĩnh (<code>dashboard-preview.html</code>, mascot robot biết đi,
+<li><strong>Trạng thái:</strong> đã có nguyên mẫu tĩnh (<code>index.html</code>, mascot robot biết đi,
   responsive mobile) — Pha này nối nó vào event API thật.</li>
 </ul>
 <h3>Pha 7 — Hardening &amp; phát hành</h3>

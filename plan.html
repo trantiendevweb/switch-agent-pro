@@ -2,100 +2,137 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ccswitch v2 — Kế hoạch phát triển</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Switch-Agent-Pro — Kế hoạch phát triển</title>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+ href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
 <style>
   :root{
-    --bg:#0F172A; --primary:#1E293B; --secondary:#334155; --muted:#272F42;
-    --fg:#F8FAFC; --sub:#94A3B8; --border:#475569;
-    --run:#22C55E; --warn:#F59E0B; --limit:#EF4444; --idle:#64748B;
-    --panel:rgba(30,41,59,.55); --ease:cubic-bezier(0.16,1,0.3,1);
+    --bg:#0F172A;--primary:#1E293B;--secondary:#334155;--muted:#272F42;
+    --fg:#F8FAFC;--sub:#94A3B8;--border:#475569;
+    --run:#22C55E;--warn:#F59E0B;--limit:#EF4444;--idle:#64748B;--api:#4285F4;
+    --panel:rgba(30,41,59,.55);--ease:cubic-bezier(0.16,1,0.3,1);
+    --safe-b:env(safe-area-inset-bottom,0px);
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
   body{margin:0;background:
-      radial-gradient(1200px 600px at 50% -10%, rgba(34,197,94,.10), transparent 60%),
-      radial-gradient(900px 500px at 100% 10%, rgba(66,133,244,.08), transparent 55%),
+      radial-gradient(1200px 600px at 50% -10%,rgba(34,197,94,.10),transparent 60%),
+      radial-gradient(900px 500px at 100% 8%,rgba(66,133,244,.09),transparent 55%),
       var(--bg);
-    color:var(--fg);font-family:Inter,system-ui,sans-serif;line-height:1.6;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:880px;margin:0 auto;padding:0 20px 96px}
+    color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+    line-height:1.62;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+  .wrap{max-width:900px;margin:0 auto;padding:0 18px calc(90px + var(--safe-b))}
   /* nav */
-  .nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;
-    padding:14px 20px;margin:0 -20px 0;backdrop-filter:blur(16px);
-    background:rgba(15,23,42,.72);border-bottom:1px solid rgba(71,85,105,.4)}
-  .nav .b{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px}
-  .nav a{margin-left:auto;text-decoration:none;color:var(--fg);border:1px solid var(--border);
-    border-radius:8px;padding:8px 13px;font-size:13px;font-weight:600;transition:all .2s var(--ease)}
+  .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;
+    padding:12px 18px;margin:0 -18px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    background:rgba(15,23,42,.85);border-bottom:1px solid rgba(71,85,105,.45)}
+  .nav .b{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;white-space:nowrap}
+  .nav .sp{margin-left:auto;display:flex;gap:7px}
+  .nav a{text-decoration:none;color:var(--fg);border:1px solid var(--border);border-radius:8px;
+    padding:7px 11px;font-size:12px;font-weight:600;transition:all .2s var(--ease);white-space:nowrap}
   .nav a:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
   /* hero */
-  .hero{padding:56px 0 28px;text-align:center}
+  .hero{padding:52px 0 26px;text-align:center}
   .tag{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--run);
-    border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.08);border-radius:999px;padding:6px 14px;margin-bottom:22px}
-  h1{font-size:clamp(30px,7vw,52px);line-height:1.08;margin:0 0 14px;font-weight:800;letter-spacing:-.02em}
+    border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.09);border-radius:999px;
+    padding:6px 14px;margin-bottom:20px}
+  h1{font-size:clamp(29px,7vw,50px);line-height:1.08;margin:0 0 14px;font-weight:800;letter-spacing:-.025em}
   h1 .g{background:linear-gradient(120deg,#22C55E,#4285F4);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .lead{font-size:clamp(15px,2.4vw,18px);color:var(--sub);max-width:620px;margin:0 auto}
+  .lead{font-size:clamp(15px,2.4vw,18px);color:var(--sub);max-width:640px;margin:0 auto}
+  .cmd{display:inline-block;margin-top:18px;font-family:ui-monospace,Consolas,monospace;font-size:13px;
+    background:rgba(15,23,42,.8);border:1px solid var(--border);border-radius:10px;padding:9px 15px;color:#e2e8f0}
+  .cmd b{color:var(--run)}
   /* sections */
-  section{margin-top:52px}
+  section{margin-top:52px;scroll-margin-top:64px}
   .eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--run);margin:0 0 6px}
-  h2{font-size:clamp(22px,4vw,30px);margin:0 0 8px;font-weight:700;letter-spacing:-.01em}
-  .sub{color:var(--sub);margin:0 0 22px;max-width:640px}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;
-    backdrop-filter:blur(20px);transition:transform .3s var(--ease),border-color .3s var(--ease)}
-  .card:hover{transform:translateY(-3px);border-color:rgba(34,197,94,.5)}
-  .grid{display:grid;gap:14px}
-  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
-  @media(max-width:680px){.g2,.g3{grid-template-columns:1fr}}
-  .num{font-size:12px;font-weight:700;color:var(--run);font-variant-numeric:tabular-nums}
+  h2{font-size:clamp(22px,4vw,30px);margin:0 0 8px;font-weight:700;letter-spacing:-.015em}
+  .sub{color:var(--sub);margin:0 0 22px;max-width:660px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:border-color .3s var(--ease)}
+  .card:hover{border-color:rgba(34,197,94,.5)}
+  .grid{display:grid;gap:13px}
+  .g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:700px){.g2,.g3{grid-template-columns:1fr}}
   .card h3{margin:10px 0 6px;font-size:16px;font-weight:600}
   .card p{margin:0;color:var(--sub);font-size:14px}
-  .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+  .ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
     background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3)}
-  /* principle */
-  .principle{background:linear-gradient(120deg,rgba(34,197,94,.10),rgba(66,133,244,.06));
-    border:1px solid rgba(34,197,94,.35);border-radius:16px;padding:26px 24px}
-  .principle .q{font-size:clamp(17px,3vw,22px);font-weight:600;line-height:1.45}
-  .principle .q b{color:var(--run)}
-  /* flow columns */
-  .arrow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:10px}
-  @media(max-width:680px){.arrow{grid-template-columns:1fr;text-align:center}.arrow .ar{transform:rotate(90deg)}}
-  .ar{color:var(--run);font-size:22px;font-weight:700}
+  .ico.b{background:rgba(66,133,244,.13);border-color:rgba(66,133,244,.35)}
+  /* two paths */
+  .paths{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  @media(max-width:700px){.paths{grid-template-columns:1fr}}
+  .path{border-radius:14px;padding:18px;border:1px solid var(--border);background:var(--panel)}
+  .path.sub-p{border-color:rgba(34,197,94,.45);background:linear-gradient(160deg,rgba(34,197,94,.09),rgba(30,41,59,.5))}
+  .path.api-p{border-color:rgba(66,133,244,.45);background:linear-gradient(160deg,rgba(66,133,244,.09),rgba(30,41,59,.5))}
+  .path .t{font-weight:700;font-size:17px;display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .path .d{color:var(--sub);font-size:13.5px;margin-bottom:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;
+    background:rgba(148,163,184,.12);color:#cbd5e1;border:1px solid rgba(71,85,105,.5)}
+  .shared{margin-top:13px;text-align:center;color:var(--sub);font-size:13px;
+    border:1px dashed rgba(71,85,105,.7);border-radius:12px;padding:11px}
+  .shared b{color:var(--fg)}
+  /* principle list */
+  .prin{display:grid;gap:9px}
+  .prin .p{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:11px;
+    background:rgba(30,41,59,.4);border:1px solid rgba(71,85,105,.45)}
+  .prin .n{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+    background:rgba(34,197,94,.15);color:var(--run);font-weight:700;font-size:12px}
+  .prin b{display:block;font-size:14.5px}
+  .prin span{color:var(--sub);font-size:13.5px}
   /* providers */
-  .prov{display:flex;align-items:center;gap:16px;padding:16px 18px}
-  .prov canvas{width:64px;height:64px;flex:none}
-  .prov .step{font-size:12px;font-weight:700;color:var(--sub);border:1px solid var(--border);border-radius:999px;padding:3px 10px}
-  .prov .nm{font-weight:600;font-size:17px} .prov .ds{color:var(--sub);font-size:13px}
-  .prov .state{margin-left:auto;font-size:12px;font-weight:600;padding:4px 11px;border-radius:999px}
-  .ready{color:var(--run);background:rgba(34,197,94,.12)} .todo{color:var(--warn);background:rgba(245,158,11,.12)}
+  .prov{display:flex;align-items:center;gap:14px;padding:14px 16px}
+  .prov canvas{width:56px;height:56px;flex:none}
+  .prov .nm{font-weight:600;font-size:16px}
+  .prov .ds{color:var(--sub);font-size:12.5px}
+  .prov .state{margin-left:auto;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px;white-space:nowrap}
+  .ready{color:var(--run);background:rgba(34,197,94,.13)}
+  .todo{color:var(--warn);background:rgba(245,158,11,.13)}
+  .unk{color:var(--sub);background:rgba(148,163,184,.12)}
+  .kind{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    padding:2px 7px;border-radius:5px;margin-right:7px;vertical-align:2px}
+  .kind.h{color:var(--run);background:rgba(34,197,94,.14)}
+  .kind.a{color:var(--api);background:rgba(66,133,244,.15)}
   /* timeline */
-  .tl{position:relative;padding-left:30px}
-  .tl::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--run),var(--border))}
-  .tl .it{position:relative;padding:0 0 22px}
-  .tl .it::before{content:"";position:absolute;left:-26px;top:4px;width:14px;height:14px;border-radius:50%;
-    background:var(--bg);border:3px solid var(--run);box-shadow:0 0 10px rgba(34,197,94,.5)}
-  .tl .ph{font-weight:700;font-size:15px} .tl .ph small{color:var(--run);font-weight:600}
-  .tl .de{color:var(--sub);font-size:14px}
-  .tl .steps{margin:8px 0 0;padding-left:17px;color:var(--sub);font-size:13px}
+  .tl{position:relative;padding-left:28px}
+  .tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;
+    background:linear-gradient(var(--run) 0%,var(--run) 22%,var(--border) 60%)}
+  .tl .it{position:relative;padding:0 0 20px}
+  .tl .it::before{content:"";position:absolute;left:-25px;top:5px;width:13px;height:13px;border-radius:50%;
+    background:var(--bg);border:3px solid var(--border)}
+  .tl .it.done::before{border-color:var(--run);background:var(--run);box-shadow:0 0 10px rgba(34,197,94,.55)}
+  .tl .it.now::before{border-color:var(--run);box-shadow:0 0 10px rgba(34,197,94,.45)}
+  .tl .ph{font-weight:700;font-size:15.5px} .tl .ph small{color:var(--run);font-weight:600}
+  .tl .de{color:var(--sub);font-size:14px;margin-top:2px}
+  .tl .steps{margin:7px 0 0;padding-left:17px;color:var(--sub);font-size:13px}
   .tl .steps li{margin:3px 0}
-  .tl .steps code{font-size:.86em}
-  .dod{margin-top:9px;font-size:12.5px;color:var(--run);display:flex;gap:7px;align-items:flex-start;font-weight:500}
-  .dod svg{flex:none;margin-top:2px}
-  .st{margin-left:8px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;vertical-align:middle}
-  .st.now{color:var(--run);background:rgba(34,197,94,.14)} .st.next{color:var(--warn);background:rgba(245,158,11,.14)}
-  .st.later{color:var(--sub);background:rgba(148,163,184,.12)}
-  .pill{display:inline-block;font-size:11px;font-weight:600;color:var(--sub);border:1px solid var(--border);
-    border-radius:999px;padding:2px 9px;margin-top:5px}
-  /* risk */
-  .risk{border-left:3px solid var(--warn);padding:12px 16px;background:rgba(245,158,11,.06);border-radius:0 10px 10px 0;margin-bottom:12px}
+  .dod{margin-top:8px;font-size:12.5px;color:var(--run);display:flex;gap:7px;align-items:flex-start;font-weight:500}
+  .dod svg{flex:none;margin-top:3px}
+  .st{margin-left:7px;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;vertical-align:2px;
+    text-transform:uppercase;letter-spacing:.05em}
+  .st.ok{color:var(--run);background:rgba(34,197,94,.16)}
+  .st.now{color:var(--warn);background:rgba(245,158,11,.16)}
+  .st.next{color:var(--sub);background:rgba(148,163,184,.13)}
+  /* status table */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:min(100%,460px)}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid rgba(71,85,105,.35)}
+  th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.08em;white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  .ok-i{color:var(--run);font-weight:700}.no-i{color:var(--sub)}
+  /* blockers */
+  .risk{border-left:3px solid var(--warn);padding:12px 16px;background:rgba(245,158,11,.07);
+    border-radius:0 10px 10px 0;margin-bottom:11px;font-size:14px}
   .risk b{color:var(--warn)}
-  .foot{margin-top:56px;text-align:center;color:var(--sub);font-size:13px;border-top:1px solid rgba(71,85,105,.4);padding-top:24px}
-  code{background:var(--muted);padding:1px 6px;border-radius:5px;font-size:.9em;color:#e2e8f0}
-  /* reveal */
-  .rv{opacity:0;transform:translateY(18px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+  .foot{margin-top:54px;text-align:center;color:var(--sub);font-size:13px;
+    border-top:1px solid rgba(71,85,105,.4);padding-top:22px}
+  code{background:var(--muted);padding:1.5px 6px;border-radius:5px;font-size:.88em;color:#e2e8f0;
+    font-family:ui-monospace,Consolas,monospace}
+  a{color:#7dd3fc}
+  .rv{opacity:0;transform:translateY(16px);transition:opacity .55s var(--ease),transform .55s var(--ease)}
   .rv.in{opacity:1;transform:none}
-  @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.card:hover{transform:none}}
+  @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
@@ -103,191 +140,247 @@
 
   <nav class="nav">
     <div class="b">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
-      ccswitch
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
+      Switch-Agent-Pro
     </div>
-    <a href="index.html">Dashboard 3D ↗</a>
+    <div class="sp">
+      <a href="master-plan.html">Master Plan</a>
+      <a href="index.html">3D</a>
+    </div>
   </nav>
 
   <header class="hero">
     <span class="tag">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-      Đã duyệt hướng · kế hoạch chi tiết · sẵn sàng Pha 0
+      Bước 0 xong · Pha 1 đang chạy
     </span>
-    <h1>Từ đổi tài khoản<br>tới <span class="g">điều phối đội AI</span></h1>
-    <p class="lead">Kế hoạch nâng <b>ccswitch</b> từ công cụ đổi tài khoản Claude Code trên Windows thành nền tảng quản lý &amp; chạy song song nhiều tài khoản, nhiều nhà cung cấp AI — có dashboard 3D theo dõi trực quan.</p>
+    <h1>Control plane<br>cho <span class="g">đội AI của bạn</span></h1>
+    <p class="lead">Điều phối nhiều <b>coding agent</b> và nhiều <b>AI API</b> từ một chỗ. Local-first, một binary, chạy native trên Windows &amp; Linux — có dashboard 3D quan sát realtime.</p>
+    <div class="cmd">$ <b>sagent</b> fleet fanout claude:phu --copies 4</div>
   </header>
 
-  <!-- MỤC TIÊU -->
+  <!-- HAI ĐƯỜNG -->
   <section>
-    <p class="eyebrow">Mục tiêu</p>
-    <h2>Sáu đích đến</h2>
-    <p class="sub">Điều thú vị: cả sáu chỉ là những cách ghép lại của <em>một</em> nguyên lý cốt lõi bên dưới.</p>
+    <p class="eyebrow">Ý tưởng cốt lõi</p>
+    <h2>Hai đường, một hạ tầng</h2>
+    <p class="sub">Khác biệt lớn nhất so với công cụ đổi tài khoản đời đầu: subscription và API là <em>hai đường thực thi</em>, nhưng dùng chung mọi thứ phía trên.</p>
+    <div class="paths rv">
+      <div class="path sub-p">
+        <div class="t"><span class="kind h">Harness</span>Subscription</div>
+        <div class="d">Chạy CLI chính thức bằng credential/config do chính nó sở hữu — đúng phạm vi của v1.</div>
+        <div class="chips">
+          <span class="chip">Claude Code</span><span class="chip">Codex CLI</span>
+          <span class="chip">Gemini CLI</span><span class="chip">Cursor</span>
+        </div>
+      </div>
+      <div class="path api-p">
+        <div class="t"><span class="kind a">API</span>Gọi thẳng model</div>
+        <div class="d">Gọi trực tiếp API nhà cung cấp bằng API key riêng, có model route + fallback + theo dõi chi phí.</div>
+        <div class="chips">
+          <span class="chip">Anthropic</span><span class="chip">OpenAI</span><span class="chip">Gemini</span>
+          <span class="chip">Grok</span><span class="chip">DeepSeek</span><span class="chip">OpenAI-compatible</span>
+        </div>
+      </div>
+    </div>
+    <div class="shared rv">Dùng chung: <b>Project · Task · Workspace · Flow · Scheduler · Event · Dashboard</b><br>
+      <span style="font-size:12.5px">Chỉ khác ở auth, protocol và cách agent/model được thực thi.</span></div>
+  </section>
+
+  <!-- NGUYÊN TẮC -->
+  <section>
+    <p class="eyebrow">Linh hồn</p>
+    <h2>Sáu nguyên tắc không đổi</h2>
+    <div class="prin rv">
+      <div class="p"><span class="n">1</span><div><b>Đã đo — không suy luận</b><span>Vị trí token, biến env, refresh, resume: chưa có thí nghiệm tái lập thì chưa được coi là đúng.</span></div></div>
+      <div class="p"><span class="n">2</span><div><b>Whitelist — không blacklist</b><span>Chỉ chia sẻ file/khoá config đã biết là an toàn. Blacklist sẽ âm thầm rò khoá mới.</span></div></div>
+      <div class="p"><span class="n">3</span><div><b>Xoá an toàn</b><span>Không bao giờ xoá credential/dữ liệu/project gốc chỉ vì một session bị xoá.</span></div></div>
+      <div class="p"><span class="n">4</span><div><b>Ghi nguyên tử</b><span>State quan trọng: temp + rename, hoặc transaction DB. Không để lại file nửa vời.</span></div></div>
+      <div class="p"><span class="n">5</span><div><b>Local-first, một binary</b><span>Lõi chạy độc lập Windows + Linux; dashboard chỉ là client, tắt đi lõi vẫn chạy.</span></div></div>
+      <div class="p"><span class="n">6</span><div><b>Trung thực về năng lực</b><span>Gắn nhãn stable / experimental / unsupported / unknown dựa trên bằng chứng.</span></div></div>
+    </div>
+  </section>
+
+  <!-- KIẾN TRÚC -->
+  <section>
+    <p class="eyebrow">Kiến trúc</p>
+    <h2>Tách bạch, không gộp</h2>
+    <p class="sub">Bài học đắt nhất: không được nhét mọi thứ vào một struct "provider" duy nhất.</p>
     <div class="grid g3">
-      <div class="card rv"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></div><h3>1 · Đa nhà cung cấp</h3><p>Claude, Codex (GPT), Gemini, Cursor… mỗi cái một adapter.</p></div>
-      <div class="card rv"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h10"/></svg></div><h3>2 · Nhiều phiên / 1 tài khoản</h3><p>Clone credential ra N config dir để chạy agent song song.</p></div>
-      <div class="card rv"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></div><h3>3 · Nhiều tài khoản song song</h3><p>Mỗi phiên một danh tính, điều phối &amp; theo dõi tập trung.</p></div>
-      <div class="card rv"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div><h3>4 · Đa nền tảng</h3><p>Một binary Go cho Windows + Linux (bỏ macOS).</p></div>
-      <div class="card rv"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6"/><path d="M18 6a9 9 0 0 1-9 9"/><circle cx="18" cy="6" r="3"/></svg></div><h3>5 · Ghép được thành flow</h3><p>Primitive nhỏ → người dùng tự dựng luồng theo ý mình.</p></div>
-      <div class="card rv"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V16a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div><h3>6 · Giao diện 3D</h3><p>Dashboard "phòng điều khiển đội agent", theo dõi realtime.</p></div>
+      <div class="card rv"><div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 20h10M12 18v2M7 9l2 2-2 2M12 13h4"/></svg></div>
+        <h3>Agent Harness</h3><p>CLI chính thức: Claude Code, Codex, Gemini CLI, Cursor. Giao tiếp qua ACP hoặc PTY.</p></div>
+      <div class="card rv"><div class="ico b"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4285F4" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg></div>
+        <h3>AI Provider + Model</h3><p>API trực tiếp; model và capability lưu riêng, không hardcode theo tên provider.</p></div>
+      <div class="card rv"><div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <h3>Auth Profile</h3><p>subscription · oauth · api_key · service_account · local. Secret lưu tách khỏi config thường.</p></div>
+      <div class="card rv"><div class="ico b"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4285F4" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h6l4 6h6M4 18h6l2-3"/><path d="M17 3l3 3-3 3M17 15l3 3-3 3"/></svg></div>
+        <h3>Model Route</h3><p>provider + model + auth + chính sách fallback / health / chi phí.</p></div>
+      <div class="card rv"><div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"><path d="M3 7h18M3 12h18M3 17h18"/><circle cx="7" cy="7" r="1.6" fill="#22C55E"/><circle cx="14" cy="12" r="1.6" fill="#22C55E"/><circle cx="10" cy="17" r="1.6" fill="#22C55E"/></svg></div>
+        <h3>Flow DAG</h3><p>Khai báo được, resume sau restart, có approval gate không thể bỏ qua.</p></div>
+      <div class="card rv"><div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"><path d="M21 8v8a2 2 0 0 1-1 1.7l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.7l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></div>
+        <h3>Workspace</h3><p>thư mục · Git worktree · sandbox — mỗi session một chỗ làm riêng, không giẫm nhau.</p></div>
+    </div>
+    <div class="shared rv" style="border-color:rgba(239,68,68,.45);color:#fca5a5">
+      <b style="color:#fecaca">Luật bất khả xâm phạm:</b> dashboard <b style="color:#fecaca">không đọc</b> token/API key ·
+      workflow chỉ cầm <code>auth_profile_id</code>/<code>route_id</code> · harness không biết dashboard tồn tại.
     </div>
   </section>
 
-  <!-- NGUYÊN LÝ -->
+  <!-- LINH VẬT / PROVIDER -->
   <section>
-    <p class="eyebrow">Xương sống</p>
-    <h2>Nguyên lý cốt lõi</h2>
-    <div class="principle rv">
-      <div class="q">Trỏ một CLI vào <b>một thư mục config biệt lập</b> qua <b>một biến môi trường</b>, và biết file nào là <b>token/danh tính</b> (riêng) — file nào là <b>thói quen máy</b> (chung).</div>
-      <p style="margin:14px 0 0;color:var(--sub);font-size:14px">Claude: biến <code>CLAUDE_CONFIG_DIR</code> · riêng <code>.credentials.json</code> + <code>.claude.json</code> · chung nối link + 19 khoá whitelist. Mọi mục tiêu chỉ là tổ hợp lại primitive này.</p>
-    </div>
-  </section>
-
-  <!-- KIẾN TRÚC / FLOW -->
-  <section>
-    <p class="eyebrow">Cách ghép</p>
-    <h2>Primitive → Adapter → Flow</h2>
-    <p class="sub">Verb là API, flow là công thức. Ba tầng để người dùng tự dựng luồng — đúng yêu cầu "build thành nhiều flow theo ý người dùng".</p>
-    <div class="arrow">
-      <div class="card rv"><h3>Verb nguyên thuỷ</h3><p><code>create · run · clone · link · sync · fleet · remove</code> — nhỏ &amp; trực giao.</p></div>
-      <div class="ar rv">→</div>
-      <div class="card rv"><h3>Adapter provider</h3><p>Mỗi AI khai báo biến env, file riêng/chung, và <em>verify</em> "đã đo".</p></div>
-      <div class="ar rv">→</div>
-      <div class="card rv"><h3>Flow người dùng</h3><p>CLI script / <code>flows.toml</code> / adapter plugin — tự đặt tên luồng.</p></div>
-    </div>
-  </section>
-
-  <!-- PROVIDERS + MASCOT -->
-  <section>
-    <p class="eyebrow">Nhà cung cấp</p>
+    <p class="eyebrow">Tích hợp</p>
     <h2>Mỗi AI, một linh vật</h2>
-    <p class="sub">Thứ tự thêm adapter. Mỗi provider có mascot riêng trong dashboard (màu thương hiệu + dấu nhận diện).</p>
-    <div class="grid" style="gap:12px">
-      <div class="card prov rv"><canvas data-m="claude"></canvas><div><div class="nm">Claude Code</div><div class="ds">CLAUDE_CONFIG_DIR · đã đo trên Windows</div></div><span class="state ready">đã có</span></div>
-      <div class="card prov rv"><canvas data-m="codex"></canvas><div><span class="step">bước 1</span> <span class="nm">OpenAI Codex</span><div class="ds">CODEX_HOME — cần đo cơ chế token</div></div><span class="state todo">sắp làm</span></div>
-      <div class="card prov rv"><canvas data-m="gemini"></canvas><div><span class="step">bước 2</span> <span class="nm">Gemini CLI</span><div class="ds">Cơ chế thư mục config cần đo</div></div><span class="state todo">sắp làm</span></div>
-      <div class="card prov rv"><canvas data-m="cursor"></canvas><div><span class="step">bước 3</span> <span class="nm">Cursor</span><div class="ds">Kiểm tra có CLI + config dir</div></div><span class="state todo">sắp làm</span></div>
+    <p class="sub">Dashboard 3D phân biệt rõ <span style="color:var(--run)">harness (CLI)</span> và <span style="color:var(--api)">API provider</span> — chúng là hai loại khác nhau, không được trộn.</p>
+    <div class="grid" style="gap:11px">
+      <div class="card prov rv"><canvas data-m="claude" data-k="h"></canvas><div><span class="kind h">Harness</span><span class="nm">Claude Code</span><div class="ds">CLAUDE_CONFIG_DIR · đã đo &amp; chạy thật trên Windows</div></div><span class="state ready">stable · Win</span></div>
+      <div class="card prov rv"><canvas data-m="codex" data-k="h"></canvas><div><span class="kind h">Harness</span><span class="nm">OpenAI Codex</span><div class="ds">CODEX_HOME — cần đo cơ chế token</div></div><span class="state todo">Pha 2.5</span></div>
+      <div class="card prov rv"><canvas data-m="gemini" data-k="h"></canvas><div><span class="kind h">Harness</span><span class="nm">Gemini CLI</span><div class="ds">Cơ chế thư mục config cần đo</div></div><span class="state unk">Pha 4</span></div>
+      <div class="card prov rv"><canvas data-m="cursor" data-k="h"></canvas><div><span class="kind h">Harness</span><span class="nm">Cursor</span><div class="ds">Kiểm tra có CLI headless + config dir không</div></div><span class="state unk">Pha 4</span></div>
+      <div class="card prov rv"><canvas data-m="anthropic" data-k="a"></canvas><div><span class="kind a">API</span><span class="nm">Anthropic API</span><div class="ds">Lát cắt API đầu tiên — stream + usage, không lộ key</div></div><span class="state todo">Pha 1</span></div>
+      <div class="card prov rv"><canvas data-m="openai" data-k="a"></canvas><div><span class="kind a">API</span><span class="nm">OpenAI-compatible</span><div class="ds">Chứng minh abstraction không đo ni theo Anthropic</div></div><span class="state todo">Pha 2.5</span></div>
+      <div class="card prov rv"><canvas data-m="grok" data-k="a"></canvas><div><span class="kind a">API</span><span class="nm">Grok · DeepSeek · OpenRouter…</span><div class="ds">Thêm bằng manifest khi chỉ khác endpoint/model</div></div><span class="state unk">Pha 4</span></div>
     </div>
   </section>
 
   <!-- LỘ TRÌNH -->
   <section>
     <p class="eyebrow">Lộ trình</p>
-    <h2>Tám pha, mỗi pha ra được một bản dùng thật</h2>
-    <p class="sub" style="margin-top:-8px">Mỗi pha ra được một bản dùng thật, và chỉ đóng khi đạt hết <b>Định nghĩa Hoàn thành (DoD)</b>. Chi tiết đầy đủ ở <code>docs/PLAN.md</code>.</p>
+    <h2>Tám pha, mỗi pha một bản dùng được</h2>
+    <p class="sub">Pha chỉ đóng khi đạt hết <b>Định nghĩa Hoàn thành (DoD)</b>. Chi tiết đầy đủ ở <a href="master-plan.html">Master Plan</a>.</p>
     <div class="tl" style="margin-top:14px">
 
-      <div class="it rv"><div class="ph"><small>Pha 0</small> · Đo giả định <span class="st now">bắt đầu ở đây</span></div>
-        <div class="de">"Đã đo — không suy luận": biết primitive có đứng vững trước khi viết Go.</div>
-        <ul class="steps">
-          <li>Đo token <b>Linux</b> nằm ở file hay keyring <span style="color:var(--warn)">(rủi ro #1)</span></li>
-          <li>Đo cơ chế <code>CODEX_HOME</code> / Gemini / Cursor</li>
-          <li>Đo tạo junction (Win) &amp; symlink (Linux) từ Go, không cần admin</li>
-        </ul>
-        <div class="dod"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Mọi ô có kết luận đo được; mỗi provider gắn nhãn stable/experimental/unsupported.</div>
+      <div class="it done rv"><div class="ph"><small>Bước 0</small> · Đổi tên <span class="st ok">xong</span></div>
+        <div class="de">Module <code>switch-agent-pro</code>, lệnh <code>sagent</code>, mọi import + CI + script cài. Build/vet/test xanh.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 1</small> · Lõi Go + adapter Claude <span class="st next">kế tiếp</span></div>
-        <div class="de">Thay thế trọn vẹn <code>tk</code> v1, chạy Windows+Linux, bỏ Python.</div>
+      <div class="it now rv"><div class="ph"><small>Pha 0</small> · Đo giả định <span class="st now">đang chạy</span></div>
+        <div class="de">Chứng minh cơ chế cả hai đường trước khi khoá interface.</div>
         <ul class="steps">
-          <li>Khung Go + CI 2 OS · trừu tượng <code>link</code> (junction/symlink)</li>
-          <li><code>jsonutil</code>: khoá JSON trùng hoa/thường + ghi nguyên tử</li>
-          <li>Adapter interface + Claude (whitelist 19 khoá)</li>
-          <li>Verb: <code>create · run · list · sync · remove</code> (xoá an toàn)</li>
+          <li>✅ Windows/Claude: junction không cần admin · token là file · xoá an toàn</li>
+          <li>⬜ Linux: token ở file hay keyring <span style="color:var(--warn)">(rủi ro #1)</span></li>
+          <li>⬜ Codex / Gemini CLI / Cursor · ⬜ 6 API provider · ⬜ threat model</li>
         </ul>
-        <div class="dod"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Cả 2 OS: tạo/đổi tài khoản không đăng nhập lại; remove không đụng dữ liệu gốc; hết phụ thuộc Python.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Mỗi kết luận có command + OS + output đã redaction; chưa đo = <code>unknown</code>.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 2</small> · Chạy song song <span class="st later">mục tiêu 2·3</span></div>
-        <div class="de">Nhiều phiên / 1 tài khoản và nhiều tài khoản song song.</div>
+      <div class="it now rv"><div class="ph"><small>Pha 1</small> · Domain + SQLite + 2 lát cắt <span class="st now">một phần</span></div>
+        <div class="de">Lõi có domain rõ, storage an toàn, một lát cắt subscription + một lát cắt API.</div>
         <ul class="steps">
-          <li><code>clone --into N</code>: N config dir riêng, né đua ghi <code>.claude.json</code></li>
-          <li><code>fleet</code> + registry PID + <code>status</code></li>
-          <li>Cảnh báo hạn mức "tiêu gấp N"</li>
+          <li>✅ Đổi/chạy tài khoản Claude trên Windows · bỏ Python · xoá an toàn có test</li>
+          <li>⬜ <code>internal/domain</code> + <code>internal/store</code> (SQLite là nguồn sự thật)</li>
+          <li>⬜ Claude thành Harness Adapter + conformance · ⬜ lát cắt API đầu tiên</li>
         </ul>
-        <div class="dod"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>4 phiên/1 account + 3 account song song chạy ổn; test 10 phiên đồng thời JSON vẫn hợp lệ.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>CI Win+Linux xanh · đổi profile không đăng nhập lại · fault injection không tạo DB dở.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 3</small> · Flow ghép được <span class="st later">mục tiêu 5</span></div>
-        <div class="de">Người dùng tự dựng luồng, ba tầng.</div>
-        <ul class="steps">
-          <li><code>flows.toml</code> (khai báo) + adapter plugin TOML</li>
-          <li>3 flow mẫu: <code>fanout · squad · agents</code></li>
-        </ul>
-        <div class="dod"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Viết flow mới không cần sửa mã Go; thêm provider giả bằng plugin TOML.</div>
+      <div class="it rv"><div class="ph"><small>Pha 2</small> · Daemon + Workspace + song song <span class="st next">kế tiếp</span></div>
+        <div class="de"><code>sagentd</code> + API versioned; CLI thành client; SQLite SSOT (PID chỉ là runtime).</div>
+        <ul class="steps"><li>Git worktree · process backend native · recovery khi daemon chết</li>
+          <li>Cảnh báo hạn mức: N phiên trên một tài khoản = tiêu gấp N</li></ul>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>10 session đồng thời không hỏng state · restart daemon phục hồi đúng.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 3b</small> · UI Dashboard 3D <span class="st later">mục tiêu 6</span></div>
-        <div class="de"><code>tk dash</code>: web cục bộ (Go embed) đọc dữ liệu sống của fleet.</div>
-        <ul class="steps">
-          <li>Server localhost + WebSocket; front React Three Fiber</li>
-          <li>Mascot 3D biết đi/biểu diễn hoạt động · orb theo trạng thái</li>
-          <li>Responsive điện thoại + fallback 2D</li>
-        </ul>
-        <div class="dod"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Phản ánh đúng fleet đang chạy; mượt trên điện thoại; tắt UI không ảnh hưởng lõi.</div>
+      <div class="it rv"><div class="ph"><small>Pha 2.5</small> · Codex + OpenAI-compatible</div>
+        <div class="de">Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Hai harness dùng chung session API; hai protocol dùng chung route API.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 4–6</small> · Codex → Gemini → Cursor <span class="st later">mục tiêu 1</span></div>
-        <div class="de">Mỗi provider lặp cùng quy trình dựa trên số liệu Pha 0.</div>
-        <ul class="steps">
-          <li>Viết adapter + <code>verify</code> "tách thật" trên 2 OS</li>
-          <li>Identity/token đúng định dạng + mascot thương hiệu</li>
-        </ul>
-        <div class="dod"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>create/run/list/remove/verify đúng; đổi qua lại không lẫn token; trạng thái gắn nhãn trung thực.</div>
+      <div class="it rv"><div class="ph"><small>Pha 3</small> · Flow DAG ghép được</div>
+        <div class="de">Người dùng định nghĩa workflow mới mà <b>không sửa mã Go</b>.</div>
+        <ul class="steps"><li>Node: <code>agent · model · shell · test · review · approve · merge · notify</code></li>
+          <li>3 flow mẫu: <code>fanout</code> · <code>squad</code> · <code>agents</code></li></ul>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Flow đang chạy tiếp tục sau restart · approval không thể bị bỏ qua.</div>
+      </div>
+
+      <div class="it rv"><div class="ph"><small>Pha 4</small> · Mở rộng harness + AI API</div>
+        <div class="de">Gemini CLI, Cursor · Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Thêm provider chỉ khác endpoint bằng manifest · fallback không mất usage/error gốc.</div>
+      </div>
+
+      <div class="it rv"><div class="ph"><small>Pha 5–7</small> · Dashboard 2D → 3D → phát hành</div>
+        <div class="de">2D vận hành chính xác trước, 3D là <em>projection của cùng event model</em>. Rồi hardening: migration, ACL, symlink escape, SBOM, signed release.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>UI phản ánh event thật, không đoán bằng animation timer.</div>
       </div>
     </div>
   </section>
 
-  <!-- UI -->
+  <!-- TRẠNG THÁI -->
   <section>
-    <p class="eyebrow">Giao diện</p>
-    <h2>Phòng điều khiển đội agent</h2>
-    <p class="sub">Web dashboard cục bộ do chính binary Go phục vụ (Go embed — vẫn một file). 3D bằng React Three Fiber, fallback 2D.</p>
-    <div class="grid g2">
-      <div class="card rv"><h3>Trực quan hoá</h3><p>Mỗi provider một cụm có linh vật; mỗi phiên một orb — màu theo trạng thái (<span style="color:var(--run)">chạy</span> / <span style="color:var(--warn)">gần cạn</span> / <span style="color:var(--limit)">hết hạn mức</span> / <span style="color:var(--idle)">nghỉ</span>).</p></div>
-      <div class="card rv"><h3>Quy tắc render thật</h3><p>InstancedMesh (đội orb = 1 draw call), FogExp2 (chiều sâu), ACES + antialias lúc khởi tạo. Tôn trọng <code>prefers-reduced-motion</code>.</p></div>
+    <p class="eyebrow">Thực tế</p>
+    <h2>Đã chạy được gì</h2>
+    <p class="sub">Không tô hồng — đây là những gì đã build và verify bằng chạy thật.</p>
+    <div class="tw rv">
+      <table>
+        <thead><tr><th>Hạng mục</th><th>Windows</th><th>Linux</th></tr></thead>
+        <tbody>
+          <tr><td>Đổi/chạy tài khoản Claude, không đăng nhập lại</td><td class="ok-i">✓ chạy thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Junction/symlink phần dùng chung, không cần admin</td><td class="ok-i">✓ 17 mục</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Xoá an toàn (không đụng dữ liệu gốc)</td><td class="ok-i">✓ test + thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Bỏ phụ thuộc Python (khoá JSON trùng hoa/thường)</td><td class="ok-i">✓ có test</td><td class="ok-i">✓ CI</td></tr>
+          <tr><td>Di trú tài khoản từ v1</td><td class="ok-i">✓</td><td class="no-i">—</td></tr>
+          <tr><td>Domain layer · SQLite · daemon · flow · API path</td><td class="no-i">chưa làm</td><td class="no-i">chưa làm</td></tr>
+        </tbody>
+      </table>
     </div>
-    <p style="margin-top:14px;color:var(--sub);font-size:13px">Hệ màu &amp; typography sinh từ skill <b>ui-ux-pro-max</b> (Modern Dark, Inter) — lưu ở <code>design-system/ccswitch-dashboard/MASTER.md</code>.</p>
   </section>
 
-  <!-- RỦI RO -->
+  <!-- BLOCKER -->
   <section>
     <p class="eyebrow">Sòng phẳng</p>
-    <h2>Rủi ro đã ghi rõ</h2>
+    <h2>Đang bị chặn bởi</h2>
     <div class="rv">
-      <div class="risk"><b>Hạn mức khi song song:</b> N phiên trên một tài khoản tiêu hạn mức gấp N — công cụ cảnh báo, không giấu.</div>
-      <div class="risk"><b>Điều khoản dịch vụ:</b> dùng nhiều tài khoản để vượt hạn mức có thể đi ngược ToS nhà cung cấp; cái mất là tài khoản. Bạn tự cân.</div>
-      <div class="risk"><b>Cơ chế provider đổi nhanh:</b> vì vậy mỗi adapter tách rời + có <code>verify</code> chạy được — đo lại rẻ hơn đoán sai.</div>
+      <div class="risk"><b>Chưa có máy/VM Linux:</b> không đo được token Linux nằm ở file hay keyring — nếu là keyring thì nguyên lý "tách thư mục = tách tài khoản" gãy trên Linux. Nhãn Linux giữ <code>experimental</code>.</div>
+      <div class="risk"><b>Chưa có API key để đo:</b> toàn bộ đường API (route, streaming, usage/cost, fallback) chưa verify được. Cần key local-only, output redaction.</div>
+      <div class="risk"><b>Hạn mức khi chạy song song:</b> N phiên trên một tài khoản tiêu hạn mức gấp N — công cụ cảnh báo rõ, không giấu. Dùng nhiều tài khoản để vượt hạn mức có thể đi ngược ToS; bạn tự cân.</div>
     </div>
   </section>
 
   <div class="foot">
-    Giữ nguyên linh hồn v1: <b>whitelist không blacklist</b> · <b>"đã đo — không suy luận"</b> · <b>xoá an toàn</b> · ghi nguyên tử.<br>
-    Chi tiết đầy đủ ở <code>docs/THIET-KE.md</code> · Nguồn: github.com/trantiendevweb/ccswitch
+    <b>Switch-Agent-Pro</b> · giữ linh hồn v1: whitelist · "đã đo — không suy luận" · xoá an toàn · ghi nguyên tử<br>
+    <a href="https://github.com/trantiendevweb/switch-agent-pro">github.com/trantiendevweb/switch-agent-pro</a>
   </div>
 </div>
 
 <script>
-// Reveal on scroll
-const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.14});
+// reveal khi cuộn
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12});
 document.querySelectorAll('.rv').forEach(el=>io.observe(el));
 
-// Vẽ mascot (cùng phong cách với dashboard 3D)
-const TINT={claude:'#D97757',codex:'#10A37F',gemini:'#4285F4',cursor:'#8B5CF6'};
+// ===== Linh vật: robot (harness) vs chip (API provider) =====
+const TINT={claude:'#D97757',codex:'#10A37F',gemini:'#4285F4',cursor:'#8B5CF6',
+            anthropic:'#D97757',openai:'#10A37F',grok:'#94A3B8'};
 function rr(x,X,Y,w,h,r){x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath();}
-function mark(x,key,bh){x.strokeStyle=bh;x.fillStyle=bh;x.lineWidth=7;const cx=128,cy=96;
-  if(key==='claude'){for(let a=0;a<8;a++){const an=a*Math.PI/4;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+Math.cos(an)*15,cy+Math.sin(an)*15);x.stroke();}}
-  else if(key==='codex'){x.beginPath();for(let a=0;a<6;a++){const an=a*Math.PI/3-Math.PI/6,px=cx+Math.cos(an)*15,py=cy+Math.sin(an)*15;a?x.lineTo(px,py):x.moveTo(px,py);}x.closePath();x.stroke();}
-  else if(key==='gemini'){x.beginPath();for(let a=0;a<4;a++){const an=a*Math.PI/2;x.lineTo(cx+Math.cos(an)*16,cy+Math.sin(an)*16);x.lineTo(cx+Math.cos(an+Math.PI/4)*6,cy+Math.sin(an+Math.PI/4)*6);}x.closePath();x.fill();}
-  else{x.beginPath();x.moveTo(cx-11,cy-13);x.lineTo(cx+14,cy+3);x.lineTo(cx+1,cy+5);x.lineTo(cx+7,cy+16);x.lineTo(cx-3,cy+9);x.closePath();x.fill();}}
-function draw(cv,key){const bh=TINT[key];cv.width=cv.height=128;const x=cv.getContext('2d');x.scale(0.5,0.5);
-  const g=x.createRadialGradient(128,150,8,128,150,132);g.addColorStop(0,bh+'55');g.addColorStop(1,bh+'00');x.fillStyle=g;x.fillRect(0,0,256,256);
-  x.strokeStyle=bh;x.lineWidth=8;x.beginPath();x.moveTo(128,74);x.lineTo(128,52);x.stroke();x.fillStyle=bh;x.beginPath();x.arc(128,48,7,0,7);x.fill();
+function mark(x,key,bh,cx,cy,S){x.strokeStyle=bh;x.fillStyle=bh;x.lineWidth=S*0.22;
+  if(key==='claude'||key==='anthropic'){for(let a=0;a<8;a++){const an=a*Math.PI/4;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+Math.cos(an)*S,cy+Math.sin(an)*S);x.stroke();}}
+  else if(key==='codex'||key==='openai'){x.beginPath();for(let a=0;a<6;a++){const an=a*Math.PI/3-Math.PI/6,px=cx+Math.cos(an)*S,py=cy+Math.sin(an)*S;a?x.lineTo(px,py):x.moveTo(px,py);}x.closePath();x.stroke();}
+  else if(key==='gemini'){x.beginPath();for(let a=0;a<4;a++){const an=a*Math.PI/2;x.lineTo(cx+Math.cos(an)*S,cy+Math.sin(an)*S);x.lineTo(cx+Math.cos(an+Math.PI/4)*S*.38,cy+Math.sin(an+Math.PI/4)*S*.38);}x.closePath();x.fill();}
+  else if(key==='grok'){x.lineWidth=S*.2;x.beginPath();x.moveTo(cx-S*.7,cy-S*.7);x.lineTo(cx+S*.7,cy+S*.7);x.moveTo(cx+S*.7,cy-S*.7);x.lineTo(cx-S*.7,cy+S*.7);x.stroke();}
+  else{const s=S*.9;x.beginPath();x.moveTo(cx-s*.7,cy-s*.8);x.lineTo(cx+s*.9,cy+s*.2);x.lineTo(cx+s*.05,cy+s*.32);x.lineTo(cx+s*.5,cy+s);x.lineTo(cx-s*.15,cy+s*.55);x.closePath();x.fill();}}
+function robot(x,key,bh){
+  const g=x.createRadialGradient(128,150,8,128,150,132);g.addColorStop(0,bh+'55');g.addColorStop(1,bh+'00');
+  x.fillStyle=g;x.fillRect(0,0,256,256);
+  x.strokeStyle=bh;x.lineWidth=8;x.beginPath();x.moveTo(128,74);x.lineTo(128,52);x.stroke();
+  x.fillStyle=bh;x.beginPath();x.arc(128,48,7,0,7);x.fill();
   x.fillStyle='#0F172A';rr(x,64,74,128,106,30);x.fill();x.strokeStyle=bh;x.lineWidth=6;x.stroke();
   x.fillStyle=bh;x.beginPath();x.arc(104,150,13,0,7);x.arc(152,150,13,0,7);x.fill();
   x.fillStyle='#0F172A';x.beginPath();x.arc(108,150,5,0,7);x.arc(156,150,5,0,7);x.fill();
-  x.strokeStyle=bh;x.lineWidth=5;x.beginPath();x.arc(128,166,13,0.15*Math.PI,0.85*Math.PI);x.stroke();mark(x,key,bh);}
-document.querySelectorAll('canvas[data-m]').forEach(cv=>draw(cv,cv.dataset.m));
+  x.strokeStyle=bh;x.lineWidth=5;x.beginPath();x.arc(128,166,13,.15*Math.PI,.85*Math.PI);x.stroke();
+  mark(x,key,bh,128,96,14);
+}
+function chip(x,key,bh){
+  const g=x.createRadialGradient(128,128,8,128,128,130);g.addColorStop(0,bh+'44');g.addColorStop(1,bh+'00');
+  x.fillStyle=g;x.fillRect(0,0,256,256);
+  x.strokeStyle=bh;x.lineWidth=7;                       // chân chip
+  for(let i=0;i<4;i++){const p=76+i*34;
+    x.beginPath();x.moveTo(p,60);x.lineTo(p,40);x.moveTo(p,196);x.lineTo(p,216);
+    x.moveTo(60,p);x.lineTo(40,p);x.moveTo(196,p);x.lineTo(216,p);x.stroke();}
+  x.fillStyle='#0F172A';rr(x,60,60,136,136,26);x.fill();x.strokeStyle=bh;x.lineWidth=7;x.stroke();
+  mark(x,key,bh,128,128,30);
+}
+document.querySelectorAll('canvas[data-m]').forEach(cv=>{
+  const key=cv.dataset.m, bh=TINT[key]||'#94A3B8';
+  cv.width=cv.height=112; const x=cv.getContext('2d'); x.scale(112/256,112/256);
+  (cv.dataset.k==='a'?chip:robot)(x,key,bh);
+});
 </script>
 </body>
 </html>

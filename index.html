@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>ccswitch — phòng điều khiển đội agent (xem trước)</title>
+<title>Switch-Agent-Pro — phòng điều khiển đội agent (xem trước)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <style>
@@ -103,7 +103,7 @@
 <div id="topbar" class="panel">
   <div class="brand">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
-    <div>ccswitch <small>phòng điều khiển đội agent · xem trước</small></div>
+    <div>Switch-Agent-Pro <small>phòng điều khiển đội agent · xem trước</small></div>
   </div>
   <div class="legend">
     <span class="lg"><i class="dot" style="background:var(--run)"></i>chạy</span>
@@ -112,10 +112,15 @@
     <span class="lg"><i class="dot" style="background:var(--idle)"></i>nghỉ</span>
   </div>
   <a class="btn" href="plan.html" style="text-decoration:none">Plan ↗</a>
+  <a class="btn" href="master-plan.html" style="text-decoration:none">Master ↗</a>
   <button class="btn" id="toggle2d" aria-pressed="false">2D</button>
 </div>
 
-<div id="left" class="panel"><p class="h">Nhà cung cấp</p><div id="plist"></div></div>
+<div id="left" class="panel"><p class="h">Agent harness · CLI</p><div id="plist"></div>
+  <p style="margin:12px 0 0;font-size:11px;color:var(--sub);line-height:1.5;border-top:1px solid rgba(71,85,105,.4);padding-top:10px">
+    Đường <b style="color:var(--run)">subscription</b>. Đường <b style="color:#4285F4">API</b> (model route)
+    hiện ở Pha 1 — sẽ có cụm riêng, không trộn với harness.</p>
+</div>
 
 <div id="right" class="panel"><p class="h">Chi tiết</p>
   <div id="detail"><div class="empty">Bấm một orb (phiên) hoặc một linh vật (provider) để xem chi tiết.<br><br>Kéo để xoay · cuộn để phóng.</div></div>
@@ -139,7 +144,7 @@
 </div>
 <div id="sheet"><span class="x" id="sheetClose">✕</span><div class="grip"></div><div id="sheetBody"></div></div>
 
-<div class="hint">Mô phỏng dữ liệu · chưa nối lõi thật — dựng để bạn duyệt hình khối &amp; hệ màu</div>
+<div class="hint">Nguyên mẫu Pha 6 · dữ liệu mô phỏng — Pha 3b sẽ nối vào event thật của <code style="color:#e2e8f0">sagentd</code></div>
 <div id="tip"></div>
 
 <div id="twod" class="panel"><p class="h">Bảng phiên (fallback 2D)</p>
@@ -340,7 +345,7 @@ function overviewHTML(){ let ph='';
       <div class="stat"><b style="color:var(--limit);font-size:20px">${lim}</b> <span>hết hạn mức</span></div>
       <div class="stat"><b style="font-size:20px">${SESSIONS.length}</b> <span>phiên</span></div>
       <div class="stat"><b style="color:var(--warn);font-size:20px">${avg}%</b> <span>TB</span></div></div>
-    <p class="h">Nhà cung cấp</p>${ph}`;
+    <p class="h">Agent harness · CLI</p>${ph}`;
 }
 window.__sel = id => showDetail(detailHTML(SESSIONS[id]));
 window.__prov = key => showProvider(key);

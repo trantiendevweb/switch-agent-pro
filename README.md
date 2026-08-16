@@ -1,122 +1,120 @@
-# ccswitch
+# Switch-Agent-Pro
 
-Đổi qua lại nhiều tài khoản Claude Code trên **Windows**, không phải đăng nhập lại mỗi lần.
-
-Không cần WSL. Không cần Node. Không cài thêm gói npm nào.
+**Local-first control plane điều phối nhiều coding agent và nhiều AI API.**
+Một binary, chạy native trên Windows và Linux, có dashboard quan sát realtime.
 
 ```
-  Tài khoản Claude Code trên máy này
+$ sagent ds
 
-     1  phu          ban@gmail.com                      sẵn sàng
-   * 0  gốc          chu@gmail.com                      sẵn sàng
+  Tài khoản AI trên máy này
 
-   Gõ số để mở  ·  t thêm  ·  d đồng bộ  ·  x xoá  ·  ? trợ giúp  ·  Enter thoát
-
-   Chọn:
+  *  1  claude  phu          ban@gmail.com                      sẵn sàng
+     2  claude  cong-ty      cty@congty.com                     sẵn sàng
 ```
 
-## Nó hoạt động thế nào
+> Trước đây dự án tên `ccswitch` — chỉ để đổi tài khoản Claude Code trên Windows.
+> Nay mở rộng thành control plane cho cả đội AI, và đổi tên để không trùng
+> [`farion1231/cc-switch`](https://github.com/farion1231/cc-switch).
+> Bộ công cụ PowerShell v1 vẫn còn ở [`legacy/v1-powershell/`](legacy/v1-powershell/).
 
-Không có phép thuật gì. Claude Code đọc biến môi trường `CLAUDE_CONFIG_DIR` để biết lấy cấu hình và token ở thư mục nào.
+## Nó giải bài gì
 
-`ccswitch` tạo cho mỗi tài khoản một thư mục riêng trong `%USERPROFILE%\.claude-accounts\<tên>`, rồi trỏ biến đó vào trước khi chạy `claude`. Hết.
+Một máy, nhiều tài khoản AI, nhiều dự án. Bạn muốn:
 
-Hệ quả: mỗi tài khoản đăng nhập **một lần**, đổi qua lại không phải đăng nhập lại, và không tài khoản nào thấy token của tài khoản khác.
+- đổi qua lại giữa các tài khoản **không phải đăng nhập lại**;
+- chạy **nhiều phiên song song** — nhiều tài khoản, hoặc nhiều phiên trên một tài khoản;
+- dùng cả **CLI đăng nhập bằng gói cước** lẫn **API key gọi thẳng model**;
+- và **nhìn thấy** cả đội đang làm gì.
 
-Phần còn lại của công cụ chỉ là làm cho việc đó đỡ phiền: nối những thứ dùng chung (skill, plugin, settings, lịch sử phiên) về một chỗ, và chép sang tài khoản mới đúng những khoá cấu hình thuộc về *cái máy* chứ không thuộc về *tài khoản*.
+## Nguyên lý cốt lõi
+
+> Trỏ một CLI vào **một thư mục config biệt lập** qua **một biến môi trường**, và biết
+> trong đó file nào là *token/danh tính* (riêng) còn file nào là *thói quen máy* (chung).
+
+Với Claude Code: biến `CLAUDE_CONFIG_DIR`; riêng `.credentials.json` + `.claude.json`;
+phần còn lại nối link về `~/.claude` nên sửa một chỗ mọi tài khoản thấy.
+
+## Hai đường sử dụng
+
+| | Subscription | API trực tiếp |
+|---|---|---|
+| Chạy cái gì | Claude Code, Codex CLI, Gemini CLI, Cursor | Anthropic, OpenAI, Gemini, Grok, DeepSeek, OpenAI-compatible |
+| Xác thực bằng | credential của chính CLI đó | API key riêng |
+
+Hai đường **dùng chung** Project · Task · Workspace · Flow · Scheduler · Event · Dashboard —
+chỉ khác ở auth, protocol và cách agent/model được thực thi.
 
 ## Cài
 
-Tải repo về rồi chạy trong PowerShell (**không** cần quyền quản trị):
+Cần [Go](https://go.dev/dl) ≥ 1.23. Không cần quyền quản trị.
 
 ```powershell
-git clone https://github.com/trantiendevweb/ccswitch.git
-cd ccswitch
-.\cai-dat.ps1
+git clone https://github.com/trantiendevweb/switch-agent-pro
+cd switch-agent-pro
+.\install\cai-dat.ps1        # Windows
 ```
 
-Nó chép script vào `%USERPROFILE%\.claude\skills\ccswitch\`, tạo lệnh `tk` ở `%USERPROFILE%\bin\tk.cmd`, và nhắc bạn nếu thư mục đó chưa nằm trong `PATH`.
-
-Yêu cầu: Windows, Claude Code đã cài, và Python 3 (dùng để đọc `.claude.json` — lý do ở phần *Ba bẫy* bên dưới).
+```bash
+./install/cai-dat.sh         # Linux (đang experimental — xem docs/DO-LUONG.md)
+```
 
 ## Dùng
 
-Gõ `tk` là ra bảng chọn, gõ số là vào. Ai thích gõ lệnh thẳng thì:
-
 | Lệnh | Làm gì |
 |---|---|
-| `tk` | Bảng chọn có đánh số. Dấu `*` là tài khoản đang dùng |
-| `tk <tên>` | Chạy Claude Code bằng tài khoản đó |
-| `tk goc` | Chạy bằng tài khoản gốc (thư mục `.claude` mặc định) |
-| `tk them <tên>` | Tạo tài khoản mới rồi mở luồng đăng nhập |
-| `tk ds` | Liệt kê |
-| `tk dong-bo [-XemTruoc]` | Chép cấu hình dùng chung sang mọi tài khoản |
-| `tk xoa <tên>` | Xoá tài khoản kèm token của nó |
+| `sagent` | Bảng tài khoản |
+| `sagent <provider:tên>` | Chạy CLI bằng tài khoản đó (mặc định provider `claude`) |
+| `sagent goc` | Chạy bằng tài khoản gốc |
+| `sagent them <provider:tên>` | Tạo tài khoản mới rồi đăng nhập |
+| `sagent dong-bo [--dry-run]` | Đồng bộ cấu hình dùng chung sang mọi tài khoản |
+| `sagent xoa <provider:tên>` | Xoá tài khoản (an toàn) |
+| `sagent verify [provider]` | Chạy bộ "đã đo" trên máy bạn |
 
-Lần đầu:
+Địa chỉ hoá `provider:account`, nên `sagent phu` == `sagent claude:phu`.
+Claude Code lấy **thư mục hiện tại** làm nơi làm việc — `cd` vào dự án rồi mới gọi.
 
-```powershell
-tk them phu1      # đăng nhập tài khoản thứ hai, xong gõ /exit
-tk                # chọn số để đổi qua lại
-```
+## Trạng thái thật
 
-> Trình duyệt đang đăng nhập sẵn tài khoản cũ thì luồng đăng nhập nối thẳng lại vào tài khoản cũ, và bạn có hai thư mục cùng một tài khoản mà nhìn bảng không biết. Đăng xuất claude.ai trước, hoặc mở link đăng nhập bằng cửa sổ ẩn danh.
+Không tô hồng:
 
-Claude Code lấy **thư mục hiện tại** làm nơi làm việc, nên `cd` vào dự án rồi mới gõ `tk <tên>`.
+| Hạng mục | Windows | Linux |
+|---|---|---|
+| Đổi/chạy tài khoản Claude, không đăng nhập lại | ✅ chạy thật | ⬜ chưa đo |
+| Junction/symlink phần dùng chung, không cần admin | ✅ | ⬜ chưa đo |
+| Xoá an toàn (không đụng dữ liệu gốc) | ✅ test + thật | ⬜ chưa đo |
+| Bỏ phụ thuộc Python | ✅ | ✅ CI |
+| Domain layer · SQLite · daemon · flow · đường API | ⬜ đang làm (Pha 1–2) | ⬜ |
 
-## Cái gì dùng chung, cái gì riêng
+**Đang bị chặn:** chưa có máy Linux để đo token nằm ở file hay keyring; chưa có API key
+để verify đường API. Nhãn Linux và mọi provider ngoài Claude/Windows giữ `experimental`.
 
-**Riêng từng tài khoản** — có vậy mới gọi là tách:
+## Tài liệu
 
-- `.credentials.json` (token)
-- `.claude.json` (danh tính)
+| File | Nội dung |
+|---|---|
+| [`docs/MASTER-PLAN.md`](docs/MASTER-PLAN.md) | **Lộ trình chính** — kiến trúc, 8 pha, DoD |
+| [`docs/THIET-KE.md`](docs/THIET-KE.md) | Vì sao thiết kế như vậy |
+| [`docs/DO-LUONG.md`](docs/DO-LUONG.md) | Báo cáo đo — cái gì đã chứng minh, cái gì chưa |
+| [`docs/PLAN.md`](docs/PLAN.md) | Nhật ký thực thi Pha 1 (đã bị MASTER-PLAN thay thế) |
+| `plan.html` · `master-plan.html` · `index.html` | Trang xem kế hoạch + nguyên mẫu dashboard 3D |
 
-**Dùng chung** — nối bằng junction/symlink về `%USERPROFILE%\.claude`, sửa một chỗ mọi tài khoản thấy: `skills`, `plugins`, `projects`, `settings.json`, `sessions`, `cache`, `tasks`…
+## Bốn nguyên tắc đã trả giá để có
 
-**Chép sang lúc tạo và mỗi lần `tk dong-bo`** — 19 khoá trong `.claude.json` thuộc về *cái máy* và *thói quen làm việc*: trust dialog từng project, `allowedTools`, MCP theo project, đã qua onboarding, `skillUsage`, `pluginUsage`…
+1. **Whitelist, không blacklist.** Mai sau provider thêm khoá gói cước mới, blacklist sẽ
+   lặng lẽ để nó lọt sang tài khoản khác.
+2. **Xoá an toàn.** `RemoveAll` có thể xuyên junction xoá luôn dữ liệu thật — nên gỡ từng
+   link, kiểm sạch, rồi mới xoá.
+3. **Ghi nguyên tử.** File `.claude.json` chứa trust dialog; hỏng là bấm lại từ đầu.
+4. **Đã đo — không suy luận.** `sagent verify` chạy lại các phép đo trên máy bạn.
 
-**Cố ý KHÔNG chép**: `oauthAccount`, `userID`, và cả nhóm khoá gắn với gói cước hoặc tổ chức (`modelAccessCache`, `passesEligibilityCache`, `penguinModeOrgEnabled`…).
+## Một câu sòng phẳng
 
-Dùng **danh sách trắng** chứ không phải danh sách đen. Làm ngược lại là kiểu dễ rò: mai sau Claude Code thêm một khoá gói cước mới, danh sách đen sẽ lặng lẽ để nó lọt sang, rồi tài khoản B tưởng mình có quyền của A và báo lỗi khó hiểu lúc dùng. Danh sách nằm ở `src/cfg.py`, sửa được.
-
-## Hai thứ phải cấp lại cho từng tài khoản
-
-- **Claude Code Remote** (điều khiển từ điện thoại)
-- **MCP connector claude.ai**: Miro, Gmail, Google Drive
-
-Chúng gắn với tài khoản claude.ai chứ không gắn với máy. Đăng xuất rồi đăng nhập tay cũng vậy thôi — không phải thiếu sót của công cụ. Bù lại chỉ phải làm **một lần cho mỗi tài khoản**.
-
-## Bốn điều đã đo, không phải suy luận
-
-Chạy `.\kiem-tra.ps1` để đo lại trên máy bạn. Bộ kiểm thoát với mã khác 0 nếu có mục đỏ.
-
-1. `claude.exe` **có** đọc `CLAUDE_CONFIG_DIR`.
-2. Đặt `CLAUDE_CONFIG_DIR=X` thì Claude ghi `X\.claude.json`, và `claude mcp list` ở đó không thấy MCP của tài khoản khác — **tách thật**, không phải tách trên giấy.
-3. Token nằm ở `.credentials.json` trong thư mục cấu hình, không nằm trong Windows Credential Manager. Vì vậy tách thư mục là tách được tài khoản.
-4. Khi **không** đặt biến, Claude dùng `%USERPROFILE%\.claude.json`, **không** phải `%USERPROFILE%\.claude\.claude.json`. Trên máy viết công cụ này tồn tại cả hai, file trong `.claude` là file lạc có 1 project chưa trust cái nào — gieo nhầm nó là mất sạch trust dialog mà không có gì báo. Vì vậy `tk goc` **xoá** biến chứ không trỏ vào `.claude`.
-
-## Ba bẫy đã trả giá khi viết
-
-1. **`Remove-Item -Recurse` có thể xuyên qua junction xoá luôn dữ liệu thật.** Thư mục tài khoản toàn junction trỏ về `.claude` gốc. Nên `tk xoa` gỡ từng link trước, kiểm không còn link nào, rồi mới xoá phần còn lại. Bộ kiểm có phép đo riêng cho việc này: đặt một file mồi trong `.claude`, xoá tài khoản, rồi đếm lại.
-
-2. **PowerShell 5.1 chết khi JSON có khoá trùng hoa/thường.** File `.claude.json` thật hay chứa cùng một đường dẫn viết hai kiểu, ví dụ `C:\Users\ban\Du An` và `c:\users\ban\du an`; `ConvertFrom-Json` ném lỗi ngay. Vì vậy toàn bộ phần JSON giao cho `src/cfg.py` bằng Python (khoá trùng thì lấy cái cuối). Đây là lý do công cụ cần Python.
-
-3. **Đừng đặt tên hàm PowerShell trùng tên lệnh cần gọi.** Hàm tên `Python` gọi `Get-Command python` sẽ nhận về **chính nó** — PowerShell ưu tiên Function hơn Application — `.Source` rỗng, và lỗi báo ra là `expression after '&' ... not valid`, không hề nhắc gì tới đệ quy.
-
-## Gỡ
-
-```powershell
-.\go-bo.ps1
-```
-
-Xoá lệnh `tk` và thư mục skill. Thư mục `%USERPROFILE%\.claude-accounts` chỉ bị xoá nếu bạn đồng ý — trong đó có token, xoá là phải đăng nhập lại. Thư mục `.claude` gốc **không** bị đụng tới.
-
-## Một câu nói cho sòng phẳng
-
-Công cụ này chạy cục bộ, không gửi gì đi đâu, không đụng tới token của bạn ngoài việc để chúng ở các thư mục khác nhau.
-
-Nhưng dùng nhiều tài khoản để vượt hạn mức nhiều khả năng đi ngược điều khoản dịch vụ của nhà cung cấp, và cái mất nếu bị phát hiện là tài khoản. Có những lý do dùng hoàn toàn bình thường — tài khoản cá nhân và tài khoản công ty trên cùng một máy, hoặc một máy nhiều người dùng chung. Bạn tự cân, đây chỉ là ghi lại cho rõ.
+Công cụ chạy cục bộ, không gửi gì đi đâu, không đụng token ngoài việc để chúng ở các thư
+mục khác nhau. Nhưng dùng nhiều tài khoản để vượt hạn mức nhiều khả năng đi ngược điều
+khoản dịch vụ, và cái mất nếu bị phát hiện là tài khoản. Có những lý do dùng hoàn toàn
+bình thường — tài khoản cá nhân và tài khoản công ty trên cùng một máy, nhiều nhà cung
+cấp để so sánh. Bạn tự cân.
 
 ## Giấy phép
 
-MIT. Xem `LICENSE`.
+MIT. Xem [`LICENSE`](LICENSE).

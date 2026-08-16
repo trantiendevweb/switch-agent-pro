@@ -6,7 +6,7 @@
 
 ---
 
-**Project:** ccswitch dashboard
+**Project:** Switch-Agent-Pro dashboard
 **Generated:** 2026-08-16 23:23:54
 **Category:** Developer Tool / IDE
 **Design Dials:** Motion 6/10 (Standard) | Density 8/10 (Dense / Dashboard)

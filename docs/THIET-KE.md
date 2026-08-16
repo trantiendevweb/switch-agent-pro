@@ -1,4 +1,4 @@
-# ccswitch v2 — Thiết kế
+# Switch-Agent-Pro — Thiết kế (v2)
 
 > Trạng thái: **bản thiết kế, chưa code.** Mục tiêu của tài liệu này là chốt
 > kiến trúc trước khi viết dòng Go đầu tiên. Nó giữ nguyên linh hồn của v1
@@ -252,7 +252,7 @@ triết lý "một binary":
 3D; app native phá "một binary" và nặng. Web cục bộ được cả 3D lẫn gọn.
 
 **Hệ thiết kế (do skill `ui-ux-pro-max` sinh, đã lưu):** phong cách **Modern
-Dark (Cinema Mobile)** — nguồn sự thật ở `design-system/ccswitch-dashboard/
+Dark (Cinema Mobile)** — nguồn sự thật ở `design-system/switch-agent-pro/
 MASTER.md`. Token chính:
 
 | Vai trò | Giá trị | Dùng cho |
@@ -298,7 +298,7 @@ lõi. Đây là điều kiện để giữ tinh thần CLI-first.
 Quy trình dùng khi dựng UI: `--design-system` (đã chạy, đã lưu MASTER.md) → khi
 build từng trang thì đọc MASTER.md trước → `--stack threejs`/`--domain chart` để
 tra chi tiết. Nên **cài nó thành skill dùng chung** trong `~/.claude/skills/`
-(xem mục 13) để mọi tài khoản ccswitch đều gọi được.
+(xem mục 13) để mọi tài khoản đều gọi được.
 
 ---
 
@@ -310,8 +310,8 @@ gọn (lấy khoá cuối, không ném lỗi) — đúng cái làm PowerShell 5.
 trong ba phụ thuộc của v1 tự tan.
 
 ```
-ccswitch/                     (binary tên: ccswitch, alias: tk)
-  cmd/ccswitch/main.go        điểm vào, phân giải verb
+switch-agent-pro/             (binary tên: sagent)
+  cmd/sagent/main.go          điểm vào, phân giải verb
   internal/
     profile/                  create / link / seed / remove (xoá an toàn)
     provider/
@@ -415,5 +415,5 @@ tự đo lại trên máy họ như `kiem-tra.ps1` hiện nay.
 - **UI: web dashboard cục bộ** do binary phục vụ (Go embed), 3D bằng React Three
   Fiber, fallback 2D. Không app native, không đám mây.
 - **Skill UI = `ui-ux-pro-max`** (bạn đã gửi). Hệ thiết kế đã sinh & lưu ở
-  `design-system/ccswitch-dashboard/MASTER.md`. Đề xuất cài thành skill dùng
+  `design-system/switch-agent-pro/MASTER.md`. Đề xuất cài thành skill dùng
   chung ở `~/.claude/skills/` (chờ bạn đồng ý — xem câu hỏi cuối).

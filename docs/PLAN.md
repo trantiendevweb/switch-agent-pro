@@ -162,13 +162,13 @@ sửa mã Go; thêm một provider giả bằng plugin TOML và `list` thấy n�
   mức, đẩy cập nhật; assets nhúng bằng Go `embed` (vẫn một binary).
 - [ ] **3b.2** Front-end React Three Fiber: cụm provider + **mascot 3D biết đi/biểu
   diễn hoạt động** + orb phiên màu-theo-trạng-thái; panel kính mờ.
-- [ ] **3b.3** Áp `design-system/ccswitch-dashboard/MASTER.md`: token màu/Inter; quy tắc
+- [ ] **3b.3** Áp `design-system/switch-agent-pro/MASTER.md`: token màu/Inter; quy tắc
   threejs (InstancedMesh, FogExp2, ACES, antialias lúc khởi tạo); tôn trọng `prefers-reduced-motion`.
 - [ ] **3b.4** **Responsive điện thoại**: panel thành bottom-sheet, điều khiển cảm ứng,
   camera lùi xa hơn trên màn nhỏ.
 - [ ] **3b.5** Fallback 2D: bảng phiên khi máy yếu / reduced-motion.
 
-📦 `tk dash` + web nhúng. (Hai file `plan.html` / `dashboard-preview.html` hiện tại
+📦 `tk dash` + web nhúng. (Hai file `plan.html` / `index.html` hiện tại
 là **nguyên mẫu tĩnh** để duyệt hình khối trước; pha này biến chúng thành app thật đọc dữ liệu sống.)
 ✅ **DoD:** `tk dash` mở dashboard, phản ánh đúng trạng thái `fleet` đang chạy, mượt
 trên điện thoại, tắt UI không ảnh hưởng lõi.

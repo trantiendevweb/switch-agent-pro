@@ -159,11 +159,11 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 
 | Đã có | Vị trí | Trong master plan |
 |---|---|---|
-| Lõi Go đổi tài khoản Claude (Windows) | `cmd/ccswitch`, `internal/{paths,provider,jsonutil,link,profile}` | **Phần của Pha 1** (vertical slice Claude subscription) — cần **tách domain** + **đổi tên** |
+| Lõi Go đổi tài khoản Claude (Windows) | `cmd/sagent`, `internal/{paths,provider,jsonutil,link,profile}` | **Phần của Pha 1** (vertical slice Claude subscription) — cần **tách domain** + **đổi tên** |
 | Bỏ Python, khoá JSON trùng, ghi nguyên tử, xoá an toàn | `jsonutil`, `profile` + test | Giữ, đưa vào `store`/`harness` mới |
 | link junction/symlink đa nền tảng | `internal/link` | Giữ, thành nền `workspace`/materialize |
-| `running.json` + fleet prototype | `internal/{registry,fleet}` | **Prototype — sẽ thay bằng SQLite SSOT + daemon** (PID chỉ là runtime attribute) |
-| Design tokens + dashboard 3D + mascot | `design-system/`, `dashboard-preview.html`, `plan.html` | **Nguyên mẫu Pha 6** — biến thành client của event API |
+| `running.json` + fleet prototype | ~~`internal/{registry,fleet}`~~ **đã gỡ** | Làm lại trên **SQLite SSOT + daemon** ở Pha 2 (PID chỉ là runtime attribute) |
+| Design tokens + dashboard 3D + mascot | `design-system/switch-agent-pro/`, `index.html`, `plan.html` | **Nguyên mẫu Pha 6** — biến thành client của event API |
 | Đo Windows/Claude (junction, token file, safe remove) | `docs/DO-LUONG.md` | Bằng chứng Pha 0 (Windows/Claude subscription) |
 
 > **Nợ kỹ thuật đã biết:** (1) `provider` hiện gộp mọi thứ — phải tách harness/
@@ -179,7 +179,8 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   → `cmd/sagent` (git mv); cập nhật mọi import; **build + vet + test xanh**; `sagent ds` chạy đúng.
 - [x] Cập nhật `install/cai-dat.{ps1,sh}`, CI, `.gitignore` sang `sagent`.
 - [ ] Alias tương thích `tk`/`ccswitch` → `sagent` (làm khi viết installer phát hành).
-- [ ] Rà tên trong docs cũ (README/HDSD/SKILL/THIET-KE vẫn ghi ccswitch — pass thẩm mỹ sau).
+- [x] Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
+  `legacy/v1-powershell/`; `design-system/switch-agent-pro/`; 3 trang HTML sạch tên cũ.
 
 ### Pha 0 — Đo giả định & lập hợp đồng
 🎯 Chứng minh cơ chế của **cả hai đường** trước khi khoá interface.
@@ -286,7 +287,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, **fallback 2D**.
 - Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.
 - Performance budget + test trên điện thoại tầm trung.
-- **Trạng thái:** đã có nguyên mẫu tĩnh (`dashboard-preview.html`, mascot robot biết đi,
+- **Trạng thái:** đã có nguyên mẫu tĩnh (`index.html`, mascot robot biết đi,
   responsive mobile) — Pha này nối nó vào event API thật.
 
 ### Pha 7 — Hardening & phát hành
