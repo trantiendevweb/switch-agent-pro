@@ -4,104 +4,448 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Switch-Agent-Pro — Master Plan</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<!-- font tai kieu KHONG CHAN: hong font van doc duoc -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+ href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
 <style>
-  :root{
-    --bg:#0F172A; --primary:#1E293B; --muted:#272F42; --fg:#F8FAFC; --sub:#94A3B8;
-    --border:#475569; --run:#22C55E; --warn:#F59E0B; --limit:#EF4444;
-    --panel:rgba(30,41,59,.55); --ease:cubic-bezier(0.16,1,0.3,1);
-    --safe-b:env(safe-area-inset-bottom,0px);
-  }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{margin:0;background:
-      radial-gradient(1100px 520px at 50% -8%,rgba(34,197,94,.10),transparent 60%),
-      radial-gradient(800px 460px at 100% 6%,rgba(66,133,244,.07),transparent 55%),
-      var(--bg);
-    color:var(--fg);font-family:Inter,system-ui,sans-serif;line-height:1.65;
-    -webkit-font-smoothing:antialiased;word-wrap:break-word}
-  .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;
-    padding:12px 16px;backdrop-filter:blur(18px);background:rgba(15,23,42,.8);
-    border-bottom:1px solid rgba(71,85,105,.45)}
-  .nav .b{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
-  .nav .sp{margin-left:auto;display:flex;gap:8px}
-  .nav a{text-decoration:none;color:var(--fg);border:1px solid var(--border);border-radius:8px;
-    padding:7px 11px;font-size:12px;font-weight:600;transition:all .2s var(--ease);white-space:nowrap}
-  .nav a:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
-  .nav a.p{border-color:var(--run);background:rgba(34,197,94,.14);color:var(--run)}
-  main{max-width:860px;margin:0 auto;padding:22px 18px calc(80px + var(--safe-b))}
-  #md h1{font-size:clamp(26px,6vw,40px);line-height:1.14;font-weight:800;letter-spacing:-.02em;
-    margin:6px 0 14px;background:linear-gradient(120deg,#22C55E,#4285F4);-webkit-background-clip:text;
-    background-clip:text;color:transparent}
-  #md h2{font-size:clamp(19px,4vw,26px);font-weight:700;margin:38px 0 10px;padding-top:14px;
-    border-top:1px solid rgba(71,85,105,.4);letter-spacing:-.01em}
-  #md h3{font-size:clamp(16px,3vw,19px);font-weight:600;margin:24px 0 8px;color:var(--run)}
-  #md h4{font-size:15px;font-weight:600;margin:18px 0 6px;color:var(--sub)}
-  #md p{margin:10px 0;color:#dbe3ee}
-  #md a{color:#7dd3fc}
-  #md ul,#md ol{padding-left:22px;margin:10px 0}
-  #md li{margin:5px 0;color:#dbe3ee}
-  #md li::marker{color:var(--run)}
-  #md strong{color:var(--fg);font-weight:600}
-  #md em{color:var(--sub)}
-  #md code{background:var(--muted);padding:2px 6px;border-radius:5px;font-size:.87em;
-    color:#e2e8f0;font-family:ui-monospace,Consolas,monospace}
-  #md pre{background:rgba(15,23,42,.75);border:1px solid var(--border);border-radius:12px;
-    padding:14px;overflow-x:auto;margin:14px 0}
-  #md pre code{background:none;padding:0;font-size:12.5px;line-height:1.6}
-  #md blockquote{margin:14px 0;padding:12px 16px;border-left:3px solid var(--run);
-    background:rgba(34,197,94,.07);border-radius:0 10px 10px 0;color:#cbd5e1}
-  #md blockquote strong{color:var(--run)}
-  #md table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;display:block;overflow-x:auto}
-  #md th,#md td{text-align:left;padding:9px 11px;border-bottom:1px solid rgba(71,85,105,.4);vertical-align:top}
-  #md th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.07em;white-space:nowrap}
-  #md hr{border:0;border-top:1px solid rgba(71,85,105,.35);margin:26px 0}
-  /* checkbox list */
-  #md li input[type=checkbox]{accent-color:var(--run);margin-right:7px;transform:translateY(1px)}
-  #md li:has(input:checked){color:var(--sub)}
-  .load{color:var(--sub);padding:40px 0;text-align:center}
-  .top{position:fixed;right:16px;bottom:calc(16px + var(--safe-b));z-index:15;
-    background:var(--panel);border:1px solid var(--border);color:var(--fg);border-radius:999px;
-    width:44px;height:44px;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(14px);
-    opacity:0;pointer-events:none;transition:opacity .3s var(--ease)}
-  .top.show{opacity:1;pointer-events:auto}
-  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.top{transition:none}}
+:root{--bg:#0F172A;--primary:#1E293B;--muted:#272F42;--fg:#F8FAFC;--sub:#94A3B8;
+--border:#475569;--run:#22C55E;--warn:#F59E0B;--limit:#EF4444;
+--panel:rgba(30,41,59,.55);--ease:cubic-bezier(0.16,1,0.3,1);
+--safe-b:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:
+radial-gradient(1100px 520px at 50% -8%,rgba(34,197,94,.10),transparent 60%),
+radial-gradient(800px 460px at 100% 6%,rgba(66,133,244,.07),transparent 55%),var(--bg);
+color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+line-height:1.65;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+.nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:12px 16px;
+backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);background:rgba(15,23,42,.85);
+border-bottom:1px solid rgba(71,85,105,.45)}
+.nav .b{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.nav .sp{margin-left:auto;display:flex;gap:8px}
+.nav a{text-decoration:none;color:var(--fg);border:1px solid var(--border);border-radius:8px;
+padding:7px 11px;font-size:12px;font-weight:600;transition:all .2s var(--ease);white-space:nowrap}
+.nav a:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
+.nav a.p{border-color:var(--run);background:rgba(34,197,94,.14);color:var(--run)}
+main{max-width:860px;margin:0 auto;padding:22px 18px calc(80px + var(--safe-b))}
+h1{font-size:clamp(26px,6vw,40px);line-height:1.14;font-weight:800;letter-spacing:-.02em;margin:6px 0 14px;
+background:linear-gradient(120deg,#22C55E,#4285F4);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:clamp(19px,4vw,26px);font-weight:700;margin:38px 0 10px;padding-top:14px;
+border-top:1px solid rgba(71,85,105,.4);letter-spacing:-.01em;scroll-margin-top:64px}
+h3{font-size:clamp(16px,3vw,19px);font-weight:600;margin:24px 0 8px;color:var(--run);scroll-margin-top:64px}
+h4{font-size:15px;font-weight:600;margin:18px 0 6px;color:var(--sub)}
+p{margin:10px 0;color:#dbe3ee}
+a{color:#7dd3fc}
+ul,ol{padding-left:22px;margin:10px 0}
+li{margin:5px 0;color:#dbe3ee}
+li::marker{color:var(--run)}
+strong{color:var(--fg);font-weight:600}
+em{color:var(--sub)}
+code{background:var(--muted);padding:2px 6px;border-radius:5px;font-size:.87em;color:#e2e8f0;
+font-family:ui-monospace,Consolas,monospace}
+pre{background:rgba(15,23,42,.8);border:1px solid var(--border);border-radius:12px;padding:14px;
+overflow-x:auto;margin:14px 0}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.6}
+blockquote{margin:14px 0;padding:12px 16px;border-left:3px solid var(--run);
+background:rgba(34,197,94,.07);border-radius:0 10px 10px 0;color:#cbd5e1}
+blockquote strong{color:var(--run)}
+.tw{overflow-x:auto;margin:14px 0;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:min(100%,520px)}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid rgba(71,85,105,.4);vertical-align:top}
+th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.07em;white-space:nowrap}
+hr{border:0;border-top:1px solid rgba(71,85,105,.35);margin:26px 0}
+.task{list-style:none;margin-left:-16px}
+.task .box{display:inline-block;width:15px;height:15px;border:1.5px solid var(--border);border-radius:4px;
+margin-right:8px;vertical-align:-2px}
+.task.done{color:var(--sub)}
+.task.done .box{background:var(--run);border-color:var(--run);position:relative}
+.task.done .box::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+border:solid #0F172A;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.top{position:fixed;right:16px;bottom:calc(16px + var(--safe-b));z-index:15;background:var(--panel);
+border:1px solid var(--border);color:var(--fg);border-radius:999px;width:44px;height:44px;display:grid;
+place-items:center;cursor:pointer;backdrop-filter:blur(14px);text-decoration:none}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
-<body>
+<body id="top">
 <nav class="nav">
   <div class="b">
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
     Switch-Agent-Pro
   </div>
-  <div class="sp">
-    <a class="p" href="MASTER-PLAN.md">.md</a>
-    <a href="plan.html">Plan</a>
-    <a href="index.html">3D</a>
-  </div>
+  <div class="sp"><a class="p" href="MASTER-PLAN.md">.md</a><a href="plan.html">Plan</a><a href="index.html">3D</a></div>
 </nav>
-<main><div id="md"><div class="load">Đang tải master plan…</div></div></main>
-<button class="top" id="top" aria-label="Lên đầu trang">
+<main><h1>Switch-Agent-Pro — Master Plan (hợp nhất)</h1>
+<blockquote>
+<p>Phiên bản: 2.0 · Cập nhật: 2026-08-17
+Tài liệu này <strong>hợp nhất</strong> hai nguồn thành một lộ trình duy nhất:
+- <code>CCSWITCH_CLAUDE_DEVELOPMENT_PLAN.md</code> (v1.1) — kiến trúc control plane, hai đường
+  subscription/API, daemon + SQLite, ACP, workflow DAG, security, học từ OSS.
+- <code>docs/PLAN.md</code> + <code>docs/THIET-KE.md</code> (của tôi) — phong cách DoD + bẫy + "đã đo",
+  và phần <strong>đã build thật</strong> (lõi Go Pha 1 chạy trên Windows).</p>
+<p>Nó thay thế <code>docs/PLAN.md</code> làm lộ trình chính. <code>docs/THIET-KE.md</code> giữ vai trò
+"vì sao"; <code>docs/DO-LUONG.md</code> giữ vai trò báo cáo đo.</p>
+</blockquote>
+<hr>
+<h2>0. Danh tính dự án</h2>
+<ul>
+<li><strong>Tên</strong>: <strong>Switch-Agent-Pro</strong> (đổi từ <code>ccswitch</code> — trùng <code>farion1231/cc-switch</code>).</li>
+<li><strong>Module Go</strong>: <code>github.com/trantiendevweb/switch-agent-pro</code></li>
+<li><strong>CLI</strong>: <code>sagent</code> · <strong>Daemon</strong>: <code>sagentd</code> · <strong>Config project</strong>: <code>.sagent/project.toml</code></li>
+<li><strong>Một câu</strong>: <em>local-first control plane điều phối nhiều coding agent và nhiều AI API,
+  chạy native trên Windows + Linux, một binary, có dashboard quan sát realtime.</em></li>
+</ul>
+<p>Đích không phải "mở nhiều terminal", mà là: dùng <strong>cả subscription profile lẫn API
+profile</strong>, gắn vào <strong>agent harness</strong> hoặc <strong>model route</strong> phù hợp, chạy trong
+<strong>workspace biệt lập của từng project</strong>, điều phối bằng <strong>flow khai báo được</strong>, lưu
+<strong>trạng thái bền vững</strong>, và <strong>quan sát realtime</strong>.</p>
+<hr>
+<h2>1. Sáu nguyên tắc (linh hồn, không đổi)</h2>
+<ol>
+<li><strong>Đã đo — không suy luận.</strong> Vị trí token, biến env, refresh, session resume,
+   trạng thái CLI: chưa có thí nghiệm tái lập thì chưa được coi là đúng.</li>
+<li><strong>Whitelist — không blacklist.</strong> Chỉ chia sẻ file/khoá config đã biết là an toàn.</li>
+<li><strong>Xoá an toàn.</strong> Không bao giờ xoá credential/dữ liệu/project gốc vì một session bị xoá.</li>
+<li><strong>Ghi nguyên tử.</strong> State quan trọng: temp + fsync + rename, hoặc transaction DB.</li>
+<li><strong>Local-first, một binary.</strong> Lõi chạy độc lập Windows + Linux; dashboard chỉ là client.</li>
+<li><strong>Trung thực về năng lực.</strong> Mỗi provider/harness gắn <code>stable</code> / <code>experimental</code> /
+   <code>unsupported</code> / <code>unknown</code> dựa trên <strong>bằng chứng</strong>, không "ước chừng".</li>
+</ol>
+<hr>
+<h2>2. Hai đường sử dụng (khác biệt cốt lõi so với plan cũ của tôi)</h2>
+<ol>
+<li><strong>Subscription path</strong> — chạy Claude Code, Codex CLI, Gemini CLI, Cursor… bằng
+   credential/config do CLI chính thức sở hữu (đây là toàn bộ phạm vi v1).</li>
+<li><strong>API path</strong> — gọi thẳng Anthropic, OpenAI, Google Gemini, xAI/Grok, DeepSeek,
+   OpenRouter, Mistral, Groq, Ollama/LocalAI hoặc endpoint OpenAI-compatible.</li>
+</ol>
+<p>Hai đường <strong>dùng chung</strong> Project, Task, Workspace, Flow, Scheduler, Event, Dashboard.
+Chúng chỉ khác ở <strong>auth, protocol, cách agent/model được thực thi</strong>.</p>
+<blockquote>
+<p>Bài học: plan cũ của tôi gộp mọi thứ vào một "provider". Master plan này <strong>tách</strong>:
+harness ≠ AI provider ≠ model ≠ auth profile ≠ route.</p>
+</blockquote>
+<hr>
+<h2>3. Kiến trúc đích</h2>
+<pre><code>CLI (sagent) · Dashboard 2D/3D
+        │  (chỉ dùng public API, không đọc secret)
+Local daemon (sagentd) · versioned API · WebSocket/SSE
+        │
+DAG scheduler · durable events
+        │
+Project · Task · Workspace · Session
+   ├── Agent Harness  (ACP/PTY)  ── Auth Profile (subscription/API)
+   └── Model Route    (direct API) ─┘
+</code></pre>
+<h3>Domain object (tách bạch, không gộp)</h3>
+<p><code>AgentHarness</code> · <code>AIProvider</code> · <code>Model</code> · <code>AuthProfile</code> (mode: subscription/oauth/
+api_key/service_account/local) · <code>SubscriptionProfile</code> · <code>APIProfile</code> (key/base URL/
+headers, secret lưu tách) · <code>HarnessAdapter</code> · <code>AIProviderAdapter</code> · <code>AgentDriver</code>
+(start/prompt/cancel/resume/stream/permission) · <code>ModelClient</code> · <code>ModelRoute</code>
+(provider+model+auth+fallback/health/cost) · <code>ProcessBackend</code> (Windows ConPTY / Linux
+PTY; tmux/container tuỳ chọn) · <code>Project</code> · <code>Workspace</code> (dir/worktree/sandbox) · <code>Task</code>
+· <code>Session</code> · <code>FlowDefinition</code> · <code>FlowRun</code> · <code>Artifact</code> · <code>Approval</code>.</p>
+<pre><code>Session = AuthProfile + (AgentHarness | ModelRoute) + Project + Workspace + Policy
+FlowRun = DAG&lt;Task/Action&gt; + State + Events + Artifacts + Approvals
+</code></pre>
+<h3>10 boundary interface</h3>
+<p>Harness Adapter · AI Provider Adapter · Agent Driver · Model Client · Route Engine ·
+Process Backend · Workspace Backend · State Store · Event Bus · Workflow Node.</p>
+<p><strong>Luật boundary bất khả xâm phạm:</strong> harness/provider <strong>không biết</strong> dashboard;
+dashboard <strong>không đọc</strong> token/API key; workflow chỉ tham chiếu <code>auth_profile_id</code> /
+<code>route_id</code>, <strong>không</strong> thao tác secret trực tiếp.</p>
+<h3>Capability thay vì suy đoán</h3>
+<p>Mỗi adapter/driver khai báo capability <strong>có version</strong>; capability không có bằng chứng
+mặc định <code>false</code>/<code>unknown</code>. Ví dụ: <code>config_root_isolation</code>, <code>credential_safe_clone</code>,
+<code>concurrent_refresh</code>, <code>auth_subscription</code>, <code>auth_api_key</code>, <code>headless_execution</code>,
+<code>structured_events</code>, <code>session_resume</code>, <code>usage_reporting</code>, <code>rate_limit_reporting</code>,
+<code>acp_transport</code>, <code>protocol_anthropic_messages</code>, <code>protocol_chat_completions</code>,
+<code>streaming</code>, <code>tool_calling</code>, <code>structured_output</code>, <code>vision</code>, <code>reasoning</code>,
+<code>model_discovery</code>, <code>health_check</code>…</p>
+<hr>
+<h2>4. Cấu trúc Go đích</h2>
+<pre><code>cmd/sagent/                  # CLI client
+cmd/sagentd/                 # daemon (đóng gói chung binary được)
+internal/domain/          # pure types + state machines (KHÔNG import provider/db/http/ui)
+internal/harness/         # Claude Code / Codex / Gemini CLI / Cursor adapters
+internal/provider/        # Anthropic / OpenAI / Gemini / xAI / DeepSeek… API adapters
+internal/model/           # normalized request/response/capability
+internal/routing/         # route · fallback · health · usage/cost
+internal/auth/            # subscription/API profiles + secret references
+internal/agent/           # ACP / PTY drivers + direct-model agents
+internal/process/         # Windows ConPTY / Linux PTY backends
+internal/project/         # discovery + .sagent/project.toml
+internal/workspace/       # dir / git worktree / sandbox
+internal/workflow/        # DAG validate / scheduler / nodes
+internal/store/           # SQLite + migrations + repositories (SSOT)
+internal/events/          # versioned event envelopes
+internal/api/             # local HTTP/IPC + WebSocket/SSE
+internal/security/        # redaction · path policy · credential handling
+internal/testkit/         # fake provider/agent/clock/process
+web/                      # React UI (chỉ dùng public API)
+docs/{adr,research,knowledge}/
+</code></pre>
+<p><code>domain</code> không import provider/database/HTTP/UI. Tránh phụ thuộc vòng.</p>
+<hr>
+<h2>5. Học từ mã nguồn mở (có kỷ luật)</h2>
+<p>Chu trình cho phần quan trọng/rủi ro cao: <strong>Study → Pin → Extract → Evaluate →
+Decide → Adapt → Verify → Compound</strong>. Chỉ tạo hồ sơ đầy đủ (<code>docs/research/&lt;topic&gt;/</code>
+với SOURCES/FINDINGS/DECISION/TEST-EVIDENCE) khi nghiên cứu lớn hoặc port mã trực tiếp.</p>
+<p><strong>Giấy phép:</strong> học nguyên lý từ mọi dự án; <strong>chỉ</strong> đưa mã trực tiếp vào sản phẩm khi
+license tương thích + giữ attribution; AGPL/GPL chỉ để học hành vi trừ khi chủ động
+chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào <code>docs/OPEN_SOURCE_LEDGER.md</code>.</p>
+<p><strong>Bản đồ tham khảo</strong> (chọn theo boundary, không theo số sao):</p>
+<ul>
+<li><strong>Nhóm A (lõi):</strong> cc-switch (SQLite SSOT, atomic, live config), Agent Deck (Go
+  fleet/worktree/fork-resume), multiclaude (daemon, IPC, recovery), Agent Client
+  Protocol + ACP Go SDK (session/prompt/cancel/streaming/permission).</li>
+<li><strong>Nhóm B (orchestration):</strong> Gas Town, Beads (dependency graph/durable memory),
+  Compound Engineering, CCPM (PRD→epic→task, parallel).</li>
+<li><strong>Nhóm C (dashboard/sandbox):</strong> Agent of Empires, OpenHands, CCManager (PTY không tmux).</li>
+<li><strong>Nhóm D (API gateway/routing):</strong> LiteLLM, LocalAI, New API (AGPL — chỉ học), cc-switch proxy.</li>
+</ul>
+<hr>
+<h2>6. Trạng thái hiện tại &amp; ánh xạ (2026-08-17)</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Đã có</th>
+<th>Vị trí</th>
+<th>Trong master plan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lõi Go đổi tài khoản Claude (Windows)</td>
+<td><code>cmd/ccswitch</code>, <code>internal/{paths,provider,jsonutil,link,profile}</code></td>
+<td><strong>Phần của Pha 1</strong> (vertical slice Claude subscription) — cần <strong>tách domain</strong> + <strong>đổi tên</strong></td>
+</tr>
+<tr>
+<td>Bỏ Python, khoá JSON trùng, ghi nguyên tử, xoá an toàn</td>
+<td><code>jsonutil</code>, <code>profile</code> + test</td>
+<td>Giữ, đưa vào <code>store</code>/<code>harness</code> mới</td>
+</tr>
+<tr>
+<td>link junction/symlink đa nền tảng</td>
+<td><code>internal/link</code></td>
+<td>Giữ, thành nền <code>workspace</code>/materialize</td>
+</tr>
+<tr>
+<td><code>running.json</code> + fleet prototype</td>
+<td><code>internal/{registry,fleet}</code></td>
+<td><strong>Prototype — sẽ thay bằng SQLite SSOT + daemon</strong> (PID chỉ là runtime attribute)</td>
+</tr>
+<tr>
+<td>Design tokens + dashboard 3D + mascot</td>
+<td><code>design-system/</code>, <code>dashboard-preview.html</code>, <code>plan.html</code></td>
+<td><strong>Nguyên mẫu Pha 6</strong> — biến thành client của event API</td>
+</tr>
+<tr>
+<td>Đo Windows/Claude (junction, token file, safe remove)</td>
+<td><code>docs/DO-LUONG.md</code></td>
+<td>Bằng chứng Pha 0 (Windows/Claude subscription)</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>Nợ kỹ thuật đã biết:</strong> (1) <code>provider</code> hiện gộp mọi thứ — phải tách harness/
+provider/model/auth/route. (2) <code>running.json</code> không phải durable state — chuyển SSOT
+sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa có Linux.</p>
+</blockquote>
+<hr>
+<h2>7. Lộ trình (8 pha, mỗi pha ra 1 bản dùng được)</h2>
+<h3>Bước 0 — Đổi tên ✅ XONG (2026-08-17)</h3>
+<ul>
+<li class="task done"><span class="box"></span><code>go.mod</code> module → <code>github.com/trantiendevweb/switch-agent-pro</code>; <code>cmd/ccswitch</code>
+  → <code>cmd/sagent</code> (git mv); cập nhật mọi import; <strong>build + vet + test xanh</strong>; <code>sagent ds</code> chạy đúng.</li>
+<li class="task done"><span class="box"></span>Cập nhật <code>install/cai-dat.{ps1,sh}</code>, CI, <code>.gitignore</code> sang <code>sagent</code>.</li>
+<li class="task"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code> (làm khi viết installer phát hành).</li>
+<li class="task"><span class="box"></span>Rà tên trong docs cũ (README/HDSD/SKILL/THIET-KE vẫn ghi ccswitch — pass thẩm mỹ sau).</li>
+</ul>
+<h3>Pha 0 — Đo giả định &amp; lập hợp đồng</h3>
+<p>🎯 Chứng minh cơ chế của <strong>cả hai đường</strong> trước khi khoá interface.</p>
+<ul>
+<li class="task"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.</li>
+<li class="task"><span class="box"></span><strong>Subscription</strong> (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
+  root override có bao trùm config/session/auth? token ở file/env/keyring? file nào
+  đọc/ghi lúc login/prompt/refresh/exit? <strong>concurrent refresh</strong> khi 2 process chung
+  credential? copy token có tạo session hợp lệ, bao lâu? headless/JSON/stream/ACP/
+  resume/cancel? state máy dùng chung ngoài config root?</li>
+<li class="task"><span class="box"></span><strong>API</strong> (Anthropic, OpenAI, Gemini, xAI/Grok, DeepSeek, OpenAI-compatible): auth
+  mode, base URL, model naming, headers; protocol (Responses/Chat Completions/Anthropic
+  Messages/Gemini native); streaming/tool/reasoning/vision/structured-output/usage;
+  error+rate-limit schema, retry headers, health, model discovery.</li>
+<li class="task"><span class="box"></span>Junction Windows ✓ / symlink Linux từ Go, không admin.</li>
+<li class="task"><span class="box"></span>Behavior khi stream/process ngắt, reboot, config ghi dở.</li>
+<li class="task"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).</li>
+<li class="task"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.</li>
+<li><strong>Artifact:</strong> <code>docs/research/phase0/*</code> (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
+  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <code>docs/security/THREAT-MODEL.md</code>,
+  <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
+<li><strong>DoD:</strong> mỗi kết luận có command/OS/output-redacted; <strong>không token thật</strong> ở đâu;
+  capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.</li>
+<li>⚠ <strong>Blocker cần bạn:</strong> máy/VM <strong>Linux</strong>; <strong>API key</strong> thật (local-only, redaction) cho phần API path.</li>
+<li><strong>Trạng thái:</strong> Windows/Claude subscription + junction đã đo (<code>docs/DO-LUONG.md</code>); còn lại chưa.</li>
+</ul>
+<h3>Pha 1 — Lõi domain + storage + Claude slice + 1 API slice</h3>
+<p>🎯 Thay chức năng v1 bằng lõi có domain rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
+<ul>
+<li class="task"><span class="box"></span><code>internal/domain</code>: types + state machines (không phụ thuộc hạ tầng).</li>
+<li class="task"><span class="box"></span><code>internal/store</code>: <strong>SQLite</strong> schema/migration cho auth profile, harness, provider,
+  route, project, session, event.</li>
+<li class="task"><span class="box"></span><code>jsonutil</code> (đã có) + atomic replace + preservation test (giữ).</li>
+<li class="task"><span class="box"></span>link abstraction (đã có) → materialize config root cho harness.</li>
+<li class="task"><span class="box"></span><strong>Claude Harness Adapter</strong> + subscription capability report + conformance test
+  (nâng từ <code>provider/claude.go</code> hiện tại).</li>
+<li class="task"><span class="box"></span><strong>1 direct-API vertical slice</strong> (provider Pha 0 xác nhận phù hợp, vd Anthropic API):
+  stream response, ghi usage/error, <strong>không lộ key</strong>.</li>
+<li class="task"><span class="box"></span>Verb: <code>profile create/list/verify/remove</code>, <code>route create/list/test</code>,
+  <code>session run/list/stop</code>.</li>
+<li class="task"><span class="box"></span>Safe delete: chỉ xoá <strong>materialized session directory</strong> mà registry sở hữu.</li>
+<li><strong>DoD:</strong> CI Windows+Linux xanh; đổi Claude subscription không đăng nhập lại; API route
+  stream + ghi usage/error không lộ key; xoá session không đụng credential/project gốc;
+  fault injection không tạo JSON/DB dở; <strong>hết Python</strong>.</li>
+<li><strong>Trạng thái:</strong> phần subscription-switch đã chạy trên Windows; còn thiếu domain layer,
+  SQLite, API slice.</li>
+</ul>
+<h3>Pha 2 — Daemon + Project/Workspace + chạy song song</h3>
+<p>🎯 Biến công cụ profile thành <strong>runtime manager</strong> đa project.</p>
+<ul>
+<li class="task"><span class="box"></span><code>sagentd</code> daemon + versioned API; CLI thành client.</li>
+<li class="task"><span class="box"></span><strong>SQLite là SSOT</strong>; PID chỉ là thuộc tính runtime (thay <code>running.json</code>).</li>
+<li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
+<li class="task"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong>.</li>
+<li class="task"><span class="box"></span>Process backend native Windows/Linux; tmux tuỳ chọn (Linux).</li>
+<li class="task"><span class="box"></span>Session state machine + event stream.</li>
+<li class="task"><span class="box"></span>Route engine cơ bản: chọn provider/model/profile, health, fallback, usage/cost event.</li>
+<li class="task"><span class="box"></span>Recovery khi daemon/process chết; cleanup orphan an toàn.</li>
+<li><strong>DoD:</strong> 4 session cùng profile + 3 profile khác chạy đúng policy; 10 session đồng thời
+  không hỏng config/state; restart daemon phục hồi đúng; ≥2 repo khác stack; không session
+  nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.</li>
+<li><strong>Ánh xạ:</strong> thay thế prototype <code>registry</code>/<code>fleet</code> hiện tại.</li>
+</ul>
+<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)</h3>
+<p>🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</p>
+<ul>
+<li><strong>DoD:</strong> Claude &amp; Codex dùng chung domain/session API (subscription); Anthropic API &amp;
+  OpenAI-compatible dùng chung route API (direct); khác biệt auth/config nằm trong adapter,
+  khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</li>
+<li>2 API protocol; capability không hỗ trợ báo trung thực.</li>
+</ul>
+<h3>Pha 3 — Flow DAG ghép được</h3>
+<p>🎯 Người dùng định nghĩa workflow mới <strong>không sửa mã Go</strong>.</p>
+<ul>
+<li class="task"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
+  retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
+  theo capability/model/giá/health/fallback; <strong>approval gate</strong>; <strong>resume sau restart</strong>;
+  idempotency key; failure policy (stop/continue/fallback/compensate).</li>
+<li class="task"><span class="box"></span>Node built-in: <code>agent · model · route · shell · test · lint · review · approve · merge · notify</code>.</li>
+<li class="task"><span class="box"></span>3 flow mẫu: <code>fanout</code> (nhiều agent → review → chọn), <code>squad</code> (API planner → agent
+  implementer → reviewer → test → approval), <code>agents</code> (danh sách task theo concurrency).</li>
+<li class="task"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
+  JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.</li>
+<li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
+  đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>
+</ul>
+<h3>Pha 4 — Mở rộng harness + AI API</h3>
+<ul>
+<li>Subscription: <strong>Gemini CLI, Cursor</strong>, OpenCode (nếu đo được).</li>
+<li>API: <strong>Google Gemini, xAI/Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI</strong>,
+  generic OpenAI-compatible; Azure/Bedrock/Vertex ở lớp plugin/enterprise nếu cần.</li>
+<li>Mỗi tích hợp lặp: measurement → adapter → conformance → streaming/tool/error/usage → capability label.</li>
+<li><strong>DoD:</strong> Grok &amp; DeepSeek chạy qua API profile riêng, chọn model + stream; generic
+  OpenAI-compatible hoạt động với custom base URL/model/headers; fallback không mất
+  correlation ID/usage/error gốc; thêm model/provider chỉ khác endpoint bằng manifest;
+  chưa xác minh giữ <code>experimental</code>/<code>unknown</code>.</li>
+</ul>
+<h3>Pha 5 — Dashboard vận hành 2D</h3>
+<p>🎯 Giao diện vận hành chính xác <strong>trước</strong> khi trang trí 3D.</p>
+<ul>
+<li>Trạng thái chuẩn: <code>queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost</code>.</li>
+<li>Bảo mật: <strong>chỉ bind loopback</strong> mặc định; random auth token; Origin validation + CSRF;
+  không đưa credential/env/secret-path lên WebSocket; <strong>log redaction</strong>; mutation có audit event.</li>
+<li><strong>DoD:</strong> tắt dashboard không ảnh hưởng daemon/session; UI phản ánh <strong>event thật</strong>, không
+  đoán bằng animation timer; mobile dùng được cho status/approval/stop/log-redacted; tách
+  bạch harness/model/API provider/auth profile/route/latency/token/cost khi có dữ liệu.</li>
+</ul>
+<h3>Pha 6 — Dashboard 3D</h3>
+<p>🎯 3D là <strong>projection của cùng event model</strong>, không có business logic riêng.</p>
+<ul>
+<li>Mascot đại diện agent harness <strong>hoặc</strong> AI provider — UI phân biệt rõ hai loại.</li>
+<li>Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, <strong>fallback 2D</strong>.</li>
+<li>Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.</li>
+<li>Performance budget + test trên điện thoại tầm trung.</li>
+<li><strong>Trạng thái:</strong> đã có nguyên mẫu tĩnh (<code>dashboard-preview.html</code>, mascot robot biết đi,
+  responsive mobile) — Pha này nối nó vào event API thật.</li>
+</ul>
+<h3>Pha 7 — Hardening &amp; phát hành</h3>
+<ul>
+<li>DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
+  symlink-escape test Linux; process-tree cancel + orphan cleanup; upgrade/provider-drift
+  verify; SBOM/license notices/dependency scan; signed + reproducible build; <strong>migration
+  guide từ tk v1 / ccswitch</strong>.</li>
+</ul>
+<hr>
+<h2>8. Project config <code>.sagent/project.toml</code> (không chứa secret)</h2>
+<pre><code class="language-toml">version = 1
+name = &quot;example-app&quot;
+[project]      root=&quot;.&quot;;  default_branch=&quot;main&quot;;  workspace=&quot;worktree&quot;
+[commands]     setup=[&quot;npm ci&quot;]; lint=[&quot;npm run lint&quot;]; test=[&quot;npm test&quot;]; build=[&quot;npm run build&quot;]
+[instructions] files=[&quot;AGENTS.md&quot;,&quot;CLAUDE.md&quot;]
+[policy]       max_parallel_sessions=4;  require_approval_for=[&quot;merge&quot;,&quot;deploy&quot;,&quot;destructive_shell&quot;]
+[ai]           default_route=&quot;coding-primary&quot;;  fallback_routes=[&quot;coding-secondary&quot;,&quot;local-fallback&quot;]
+[ai.requirements] capabilities=[&quot;tool_calling&quot;,&quot;streaming&quot;];  preferred_models=[&quot;provider/model-id&quot;]
+[workspace]    copy=[&quot;.env.example&quot;];  link=[&quot;node_modules&quot;];  deny=[&quot;.env&quot;,&quot;*.pem&quot;,&quot;secrets/**&quot;]
+</code></pre>
+<p>Route chỉ chứa <strong>ID tham chiếu</strong>; key/token <strong>không</strong> nằm trong project config. Schema
+versioned, validation chặt, xử lý đúng Windows path/monorepo/command-có-khoảng-trắng; ưu
+tiên <strong>argv</strong> thay vì nối chuỗi shell.</p>
+<hr>
+<h2>9. Chiến lược test bắt buộc</h2>
+<ul>
+<li><strong>Unit:</strong> state transitions · DAG validation · path-ownership/safe-delete · JSON
+  case-insensitive duplicate · redaction · capability negotiation.</li>
+<li><strong>Contract/conformance:</strong> mọi Harness Adapter/Agent Driver chạy cùng bộ test (isolated
+  roots, verify capability đúng, start/stop/cancel idempotent, không log secret, behavior
+  khi binary/version thiếu). Mọi AI Provider Adapter/Model Client chạy API conformance
+  (auth/base-URL/header, streaming lifecycle + cancel, tool/structured/reasoning theo
+  capability, error/rate-limit/retry normalize, usage/token/cost, <strong>không rò key</strong>).</li>
+<li><strong>Integration:</strong> native Win + Linux; worktree create/cleanup; daemon restart/crash;
+  SQLite migration + concurrent writes; ACP agent thật khi có + fake PTY cho CI; fake
+  HTTP/SSE cho CI + opt-in smoke với API thật; route fallback/circuit-breaker/reconnect.</li>
+<li><strong>Security:</strong> path traversal, symlink/junction escape, malicious project-config/plugin,
+  dashboard cross-origin, command injection, credential trong log/event/error.</li>
+<li><strong>Performance/reliability:</strong> 10 session baseline, event burst + reconnect, long-run flow
+  resume, dashboard 2D/3D budget.</li>
+</ul>
+<p>Test dùng fake credentials; test cần credential thật phải <strong>opt-in, local-only, redaction</strong>.</p>
+<hr>
+<h2>10. Definition of Done toàn cục</h2>
+<p>Một feature xong khi: (1) có spec + acceptance; (2) mã port trực tiếp thì có
+source/license/attribution (ADR chỉ bắt buộc cho quyết định kiến trúc lớn); (3) có test
+chạy trên OS liên quan; (4) error message hướng dẫn bước tiếp; (5) telemetry/event không
+lộ secret; (6) có quyết định migration/tương thích; (7) docs + example cập nhật; (8)
+<code>go test</code>/lint/race xanh; (9) không làm yếu permission/security để test qua; (10) không
+tự gắn <code>stable</code> khi chưa có evidence matrix.</p>
+<h2>11. Nhịp làm việc</h2>
+<p><code>Understand → Research khi hữu ích → Thin vertical slice → Tests/fault-injection →
+Self-review → Docs → Compound knowledge</code>. Chia PR nhỏ (mỗi PR một quyết định chính); không
+refactor rộng ngoài phạm vi; không thêm dependency khi stdlib đủ; ghi giả định mới vào
+research backlog; <strong>dừng và báo blocker</strong> nếu cần credential thật, xoá dữ liệu, hoặc mở
+dashboard ra mạng ngoài. Sau mỗi pha: <code>docs/knowledge/PHASE-&lt;n&gt;-RETROSPECTIVE.md</code>.</p>
+<hr>
+<h2>12. Việc còn treo cần bạn quyết/cung cấp</h2>
+<ol>
+<li>✅ Tên đã chốt: <strong>Switch-Agent-Pro</strong>, lệnh <code>sagent</code> (code đã đổi tên, build xanh).</li>
+<li><strong>Máy/VM Linux</strong> — chặn Pha 0 Linux + đa nền tảng.</li>
+<li><strong>API key thật</strong> (local-only, redaction) để đo + làm API path — hoặc hoãn API path,
+   giữ nhãn <code>experimental</code>, làm subscription path trước.</li>
+<li>Mức độ dùng <strong>daemon + SQLite</strong> ngay từ Pha 2 (đúng plan) hay giữ prototype nhẹ thêm
+   một nhịp — khuyến nghị: theo plan (SQLite SSOT) để không phải viết lại.</li>
+</ol></main>
+<a class="top" href="#top" aria-label="Len dau trang">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-</button>
-
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
-<script>
-const el = document.getElementById('md');
-fetch('MASTER-PLAN.md?' + Date.now())
-  .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-  .then(t => {
-    marked.setOptions({ gfm:true, breaks:false });
-    el.innerHTML = marked.parse(t);
-    // biến "- [ ] / - [x]" thành checkbox thật (marked gfm đã làm, đảm bảo disabled)
-    el.querySelectorAll('input[type=checkbox]').forEach(c => c.disabled = true);
-  })
-  .catch(e => { el.innerHTML = '<p style="color:var(--limit)">Không tải được MASTER-PLAN.md — ' + e.message + '</p>'; });
-
-const top = document.getElementById('top');
-addEventListener('scroll', () => top.classList.toggle('show', scrollY > 600), {passive:true});
-top.onclick = () => scrollTo({top:0, behavior:'smooth'});
-</script>
+</a>
 </body>
 </html>
