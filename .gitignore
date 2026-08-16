@@ -9,3 +9,8 @@ desktop.ini
 # python
 __pycache__/
 *.pyc
+
+# go build artifacts
+*.exe
+/ccswitch
+/dist/
