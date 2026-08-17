@@ -564,7 +564,7 @@ Origin validation + CSRF; <strong>không</strong> đưa credential/env/secret-pa
 log redaction; mọi mutation có audit event.</p>
 <p><em>DoD chung:</em> tắt mặt nào lõi vẫn chạy · UI phản ánh <strong>event thật</strong>, không đoán bằng
 animation timer · mobile dùng được cho status/approval/stop/log.</p>
-<h3>Pha 6 — Mặt thứ tư: 3D</h3>
+<h3>Pha 6 — Mặt thứ tư: 3D  ✅ nền tảng xong</h3>
 <p>🎯 3D là <strong>projection của cùng event model</strong>, không có business logic riêng —
 và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (bấm orb → dừng/duyệt phiên đó).</p>
 <ul>
@@ -572,8 +572,11 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <li>Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, <strong>fallback 2D</strong>.</li>
 <li>Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.</li>
 <li>Performance budget + test trên điện thoại tầm trung.</li>
-<li><strong>Trạng thái:</strong> đã có nguyên mẫu tĩnh (<code>index.html</code>, mascot robot biết đi,
-  responsive mobile) — Pha này nối nó vào event API thật.</li>
+<li><strong>Trạng thái:</strong> ✅ view 3D thật ở <code>internal/dash/web/3d.html</code> — đọc cùng
+  <code>/api/state</code> + SSE như 2D, orb = phiên THẬT (màu theo trạng thái), mascot theo
+  provider, bấm orb → dừng phiên đó. Nav 2D↔3D giữ token. Không tải được Three.js
+  (offline) thì <strong>tự rơi về 2D</strong> thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
+  root <code>index.html</code> giữ làm bản trình diễn.</li>
 </ul>
 <h3>Pha 7 — Hardening &amp; phát hành</h3>
 <ul>

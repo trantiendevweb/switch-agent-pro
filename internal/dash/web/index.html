@@ -70,6 +70,10 @@
       Switch-Agent-Pro
     </div>
     <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
+    <nav style="display:flex;gap:8px">
+      <a class="btn" href="./" style="text-decoration:none;border-color:var(--run);background:rgba(34,197,94,.14);color:var(--run)">2D</a>
+      <a class="btn" id="to3d" href="3d.html" style="text-decoration:none">3D</a>
+    </nav>
   </header>
 
   <div id="err" class="banner"></div>
@@ -128,6 +132,8 @@
 const TOKEN = new URLSearchParams(location.search).get('t') || '';
 const H = { 'X-Sagent-Token': TOKEN, 'Content-Type': 'application/json' };
 const $ = id => document.getElementById(id);
+// Giữ token khi chuyển sang 3D (token nằm trong URL, không mang theo là mất).
+$('to3d').href = '3d.html?t=' + encodeURIComponent(TOKEN);
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({ headers: H }, opts||{}));

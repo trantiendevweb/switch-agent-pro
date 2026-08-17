@@ -432,15 +432,18 @@ log redaction; mọi mutation có audit event.
 *DoD chung:* tắt mặt nào lõi vẫn chạy · UI phản ánh **event thật**, không đoán bằng
 animation timer · mobile dùng được cho status/approval/stop/log.
 
-### Pha 6 — Mặt thứ tư: 3D
+### Pha 6 — Mặt thứ tư: 3D  ✅ nền tảng xong
 🎯 3D là **projection của cùng event model**, không có business logic riêng —
 và cũng **điều khiển được**, không chỉ để ngắm (bấm orb → dừng/duyệt phiên đó).
 - Mascot đại diện agent harness **hoặc** AI provider — UI phân biệt rõ hai loại.
 - Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, **fallback 2D**.
 - Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.
 - Performance budget + test trên điện thoại tầm trung.
-- **Trạng thái:** đã có nguyên mẫu tĩnh (`index.html`, mascot robot biết đi,
-  responsive mobile) — Pha này nối nó vào event API thật.
+- **Trạng thái:** ✅ view 3D thật ở `internal/dash/web/3d.html` — đọc cùng
+  `/api/state` + SSE như 2D, orb = phiên THẬT (màu theo trạng thái), mascot theo
+  provider, bấm orb → dừng phiên đó. Nav 2D↔3D giữ token. Không tải được Three.js
+  (offline) thì **tự rơi về 2D** thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
+  root `index.html` giữ làm bản trình diễn.
 
 ### Pha 7 — Hardening & phát hành
 - DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
