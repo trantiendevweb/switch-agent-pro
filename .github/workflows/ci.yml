@@ -6,17 +6,17 @@ on:
 
 jobs:
   build-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    # CHỈ Windows. Mọi thứ khiến công cụ này đáng dùng đều là chi tiết Windows
+    # (junction, ACL, taskkill, tên thiết bị NUL/COM1) và mọi phép đo trong
+    # docs/DO-LUONG.md đều là phép đo Windows. Chạy CI trên Linux cho một sản
+    # phẩm không hỗ trợ Linux chỉ tạo cảm giác an toàn giả.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           # Đọc thẳng từ go.mod (gồm cả dòng `toolchain`) để CI và máy dev dùng
-          # ĐÚNG một phiên bản. Ghim '1.25' như trước thì CI có thể build bằng
+          # ĐÚNG một phiên bản. Ghim '1.25' kiểu cũ thì CI có thể build bằng
           # toolchain khác với thứ đã quét lỗ hổng ở dưới.
           go-version-file: go.mod
       - name: go vet
@@ -27,17 +27,15 @@ jobs:
         run: go build ./cmd/sagent
 
   vuln:
-    # Quét lỗ hổng phụ thuộc (Pha 7). Chạy riêng và KHÔNG fail-fast cùng job trên:
-    # một lỗ hổng mới công bố không nên chặn việc test code đang viết.
-    runs-on: ubuntu-latest
+    # Quét lỗ hổng phụ thuộc (Pha 7). Chạy riêng và KHÔNG chặn job trên: một lỗ
+    # hổng mới công bố không nên chặn việc test code đang viết.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - name: govulncheck
-        # Chỉ báo lỗi khi có ĐƯỜNG GỌI thật tới lỗ hổng, không phải khi chỉ
-        # "có mặt trong go.sum" — mặc định của govulncheck đã đúng như vậy.
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...

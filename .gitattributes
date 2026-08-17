@@ -1,2 +1,8 @@
-# Script Linux phải giữ LF, nếu không sẽ "bad interpreter" khi chạy trên Linux.
+# PowerShell 5.1 (bản có sẵn trên mọi Windows 10/11) đọc file .ps1 KHÔNG có BOM
+# theo bảng mã ANSI. Chữ tiếng Việt mã UTF-8 khi đó biến thành dấu nháy cong và
+# script VỠ CÚ PHÁP — đã dẫm đúng lỗi này một lần. Nên .ps1 phải là UTF-8 có BOM
+# và CRLF; đừng để git đụng vào.
+*.ps1 text eol=crlf
+
+# tools/sync-docs.sh chạy bằng Git Bash trên Windows, vẫn cần LF.
 *.sh text eol=lf

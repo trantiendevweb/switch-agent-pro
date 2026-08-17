@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,6 +36,15 @@ type command struct {
 	run     func(args []string)
 }
 
+// Ba biến này do khâu phát hành ghi vào lúc link (-ldflags -X). Bản build từ
+// nguồn để nguyên "dev" — nhờ vậy nhìn `sagent version` là biết ngay đang chạy
+// bản tải về hay bản tự build, không phải đoán.
+var (
+	version = "dev"
+	commit  = ""
+	ngay    = ""
+)
+
 var commands map[string]command
 
 func init() {
@@ -53,6 +63,7 @@ func init() {
 		"init":    {"config.init", "tạo .sagent/project.toml", func(a []string) { cmdInit() }},
 		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
 		"db":      {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
+		"version": {"config.version", "phiên bản của binary này", func(a []string) { cmdVersion() }},
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},
@@ -469,6 +480,19 @@ func cmdInit() {
 	}
 	fmt.Printf("  ✓ đã tạo %s\n", path)
 	fmt.Println("  Sửa rồi xem lại bằng: sagent config")
+}
+
+// cmdVersion in ra thứ cần thiết khi báo lỗi: bản nào, dựng từ commit nào.
+func cmdVersion() {
+	fmt.Printf("\n  sagent %s", version)
+	if commit != "" {
+		fmt.Printf(" (%s)", commit)
+	}
+	if ngay != "" {
+		fmt.Printf(" · %s", ngay)
+	}
+	fmt.Printf("\n  windows/%s · go %s\n", runtime.GOARCH, runtime.Version())
+	fmt.Printf("  api version %d · event schema %d\n\n", api.Version, events.SchemaVersion)
 }
 
 func cmdConfig() {

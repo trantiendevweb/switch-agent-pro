@@ -53,6 +53,10 @@ var Actions = []string{
 	"clones.clean",
 	"config.show",
 	"config.init",
+	// Phiên bản binary. Đáng nằm trong hợp đồng chứ không phải một dòng in ở CLI:
+	// khi người dùng báo lỗi, câu hỏi đầu tiên luôn là "bản nào" — và dashboard
+	// nên trả lời được câu đó mà không bắt họ mở terminal.
+	"config.version",
 	"dash.serve",
 	// db.admin cùng loại với dash.serve: có mặt trong hợp đồng, nhưng mặt web
 	// KHÔNG tự làm được phần nặng của nó. `db restore` ghi đè chính file mà

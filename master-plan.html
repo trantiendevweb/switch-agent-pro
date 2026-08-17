@@ -78,6 +78,17 @@ place-items:center;cursor:pointer;backdrop-filter:blur(14px);text-decoration:non
 </nav>
 <main><h1>Switch-Agent-Pro — Master Plan (hợp nhất)</h1>
 <blockquote>
+<h2>Quyết định 2026-08-17 — CHỈ WINDOWS</h2>
+<p>Nhánh Linux <strong>đã bị bỏ</strong>. Mọi dòng nhắc tới Linux bên dưới là <strong>lịch sử</strong>, giữ lại để
+hiểu vì sao từng thiết kế như vậy; khối này đè lên tất cả.</p>
+<p>Lý do, không phải cảm tính: mọi thứ khiến công cụ này đáng dùng đều là chi tiết
+Windows — junction thay symlink, ACL thay bit quyền (<code>0o600</code> ở đó không bảo vệ gì),
+<code>taskkill</code> thay process group, tên thiết bị <code>NUL</code>/<code>COM1</code>, chuyện Windows lặng lẽ cắt
+dấu chấm cuối tên thư mục. <strong>Cả 5 lỗi thật tìm được ở Pha 7 đều là lỗi Windows.</strong>
+Giữ một nhánh Linux không có máy để chạy thì đó không phải hỗ trợ, đó là lời hứa
+suông — đúng thứ <code>docs/DO-LUONG.md</code> lập ra để chống.</p>
+<p>Kéo theo: <code>*_linux.go</code> xoá, <code>install/cai-dat.sh</code> xoá, CI chỉ còn <code>windows-latest</code>,
+build cho <code>GOOS</code> khác dừng ngay với thông điệp đọc được.</p>
 <p>Phiên bản: 2.0 · Cập nhật: 2026-08-17
 Tài liệu này <strong>hợp nhất</strong> hai nguồn thành một lộ trình duy nhất:
 - <code>CCSWITCH_CLAUDE_DEVELOPMENT_PLAN.md</code> (v1.1) — kiến trúc control plane, hai đường
@@ -94,7 +105,7 @@ Tài liệu này <strong>hợp nhất</strong> hai nguồn thành một lộ tr�
 <li><strong>Module Go</strong>: <code>github.com/trantiendevweb/switch-agent-pro</code></li>
 <li><strong>CLI</strong>: <code>sagent</code> · <strong>Daemon</strong>: <code>sagentd</code> · <strong>Config project</strong>: <code>.sagent/project.toml</code></li>
 <li><strong>Một câu</strong>: <em>local-first control plane điều phối nhiều coding agent và nhiều AI API,
-  chạy native trên Windows + Linux, một binary, có dashboard quan sát realtime.</em></li>
+  chạy native trên Windows, một binary, có dashboard quan sát realtime.</em></li>
 </ul>
 <p>Đích không phải "mở nhiều terminal", mà là: dùng <strong>cả subscription profile lẫn API
 profile</strong>, gắn vào <strong>agent harness</strong> hoặc <strong>model route</strong> phù hợp, chạy trong
@@ -121,7 +132,7 @@ profile</strong>, gắn vào <strong>agent harness</strong> hoặc <strong>model
 <li><strong>Whitelist — không blacklist.</strong> Chỉ chia sẻ file/khoá config đã biết là an toàn.</li>
 <li><strong>Xoá an toàn.</strong> Không bao giờ xoá credential/dữ liệu/project gốc vì một session bị xoá.</li>
 <li><strong>Ghi nguyên tử.</strong> State quan trọng: temp + fsync + rename, hoặc transaction DB.</li>
-<li><strong>Local-first, một binary.</strong> Lõi chạy độc lập Windows + Linux; dashboard chỉ là client.</li>
+<li><strong>Local-first, một binary.</strong> Lõi chạy độc lập trên Windows; dashboard chỉ là client.</li>
 <li><strong>Trung thực về năng lực.</strong> Mỗi provider/harness gắn <code>stable</code> / <code>experimental</code> /
    <code>unsupported</code> / <code>unknown</code> dựa trên <strong>bằng chứng</strong>, không "ước chừng".</li>
 </ol>
@@ -416,7 +427,8 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
 <li><strong>DoD:</strong> mỗi kết luận có command/OS/output-redacted; <strong>không token thật</strong> ở đâu;
   capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.</li>
-<li>⚠ <strong>Blocker cần bạn:</strong> máy/VM <strong>Linux</strong>; <strong>API key</strong> thật (local-only, redaction) cho phần API path.</li>
+<li>⚠ <strong>Blocker cần bạn:</strong> <strong>API key</strong> thật (local-only, redaction) cho phần API path.
+  (Blocker "máy/VM Linux" đã bỏ cùng nhánh Linux — xem khối quyết định đầu tài liệu.)</li>
 <li><strong>Trạng thái:</strong> Windows/Claude subscription + junction đã đo (<code>docs/DO-LUONG.md</code>); còn lại chưa.</li>
 </ul>
 <h3>Pha 1 — Storage + Claude slice + 1 API slice</h3>
@@ -434,7 +446,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li class="task"><span class="box"></span>Verb: <code>profile create/list/verify/remove</code>, <code>route create/list/test</code>,
   <code>session run/list/stop</code>.</li>
 <li class="task"><span class="box"></span>Safe delete: chỉ xoá <strong>materialized session directory</strong> mà registry sở hữu.</li>
-<li><strong>DoD:</strong> CI Windows+Linux xanh; đổi Claude subscription không đăng nhập lại; API route
+<li><strong>DoD:</strong> CI Windows xanh; đổi Claude subscription không đăng nhập lại; API route
   stream + ghi usage/error không lộ key; xoá session không đụng credential/project gốc;
   fault injection không tạo JSON/DB dở; <strong>hết Python</strong>.</li>
 <li><strong>Trạng thái:</strong> phần subscription-switch đã chạy trên Windows; còn thiếu domain layer,
@@ -702,10 +714,12 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
     mật khẩu dashboard chỉ kín nhờ MAY MẮN kế thừa từ <code>C:\Users\&lt;tên&gt;</code>. Vá bằng package
     <code>internal/acl</code>: DACL tường minh + cắt kế thừa, nối vào kho hồ sơ / thư mục hồ sơ /
     dash-auth, và <code>sagent verify</code> có ô kiểm nói trạng thái thật. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
-<li>⬜ Còn lại: symlink-escape
-    Linux (<strong>chưa có máy Linux để đo</strong> — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
-    process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license
-    notices · signed + reproducible build · migration guide v1.</li>
+<li>✅ <strong>build phát hành</strong> — <code>-trimpath -ldflags "-s -w"</code>, đo được <strong>16.21 MB → 11.09 MB</strong>;
+    <code>CGO_ENABLED=0</code> nên binary không phụ thuộc DLL nào. Workflow <code>phat-hanh.yml</code> dựng
+    amd64 + arm64 kèm <code>SHA256SUMS.txt</code>. Trình cài một dòng, không cần Go, không cần admin.</li>
+<li>⬜ Còn lại: quét mồ côi của phiên <code>lost</code> · upgrade/provider-drift verify · SBOM +
+    license notices · <strong>ký số</strong> binary (đã có băm, chưa có chữ ký) · migration guide v1.</li>
+<li>~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.</li>
 <li>⚠ <strong>HTTP không mã hoá.</strong> <code>--host 0.0.0.0</code> gửi mật khẩu dạng trần trên đường truyền.
     Chưa có TLS — phải giải quyết trước khi gọi là "phát hành được".</li>
 </ul>

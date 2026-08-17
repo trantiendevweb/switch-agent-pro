@@ -1,0 +1,64 @@
+name: phat-hanh
+
+# Gắn tag `v*` là phát hành. Người dùng KHÔNG cần Go, không cần build, không cần
+# quyền quản trị — chỉ tải một file .exe rồi chạy.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dung:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build amd64 + arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME:-dev}"
+          SHA="$(git rev-parse --short HEAD)"
+          NGAY="$(git log -1 --format=%cs)"
+
+          # -trimpath: bỏ đường dẫn máy build khỏi binary (bớt dung lượng, và là
+          #            điều kiện cần để build tái lập được).
+          # -s -w:     bỏ bảng ký hiệu + DWARF. Đã đo: 16.21 MB -> 11.09 MB.
+          # CGO tắt:   modernc.org/sqlite là SQLite thuần Go, nên binary không
+          #            phụ thuộc DLL nào — chép sang máy khác là chạy.
+          export CGO_ENABLED=0 GOOS=windows
+          FLAGS="-s -w -X main.version=$VER -X main.commit=$SHA -X main.ngay=$NGAY"
+
+          mkdir -p dist
+          for ARCH in amd64 arm64; do
+            GOARCH=$ARCH go build -trimpath -ldflags "$FLAGS" \
+              -o "dist/sagent-windows-$ARCH.exe" ./cmd/sagent
+          done
+          ls -la dist
+
+      - name: Bảng băm
+        shell: bash
+        run: |
+          cd dist
+          # Trình cài đối chiếu file này trước khi chạy binary vừa tải.
+          sha256sum sagent-windows-*.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Kèm luôn trình cài
+        shell: bash
+        run: cp install/cai-dat.ps1 dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sagent-windows-amd64.exe
+            dist/sagent-windows-arm64.exe
+            dist/SHA256SUMS.txt
+            dist/cai-dat.ps1
+          generate_release_notes: true

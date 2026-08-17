@@ -1,7 +1,8 @@
 # Switch-Agent-Pro
 
 **Local-first control plane điều phối nhiều coding agent và nhiều AI API.**
-Một binary, chạy native trên Windows và Linux, có dashboard quan sát realtime.
+Một file `.exe` **11 MB**, không phụ thuộc gì, chạy native trên **Windows**,
+có dashboard quan sát realtime.
 
 ```
 $ sagent ds
@@ -46,17 +47,30 @@ chỉ khác ở auth, protocol và cách agent/model được thực thi.
 
 ## Cài
 
-Cần [Go](https://go.dev/dl) ≥ 1.25 (Go 1.21+ sẽ tự tải toolchain phù hợp). Không cần quyền quản trị.
+Một dòng. **Không cần Go, không cần quyền quản trị, không cần cài gì trước.**
 
 ```powershell
-git clone https://github.com/trantiendevweb/switch-agent-pro
-cd switch-agent-pro
-.\install\cai-dat.ps1        # Windows
+irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/cai-dat.ps1 | iex
 ```
 
-```bash
-./install/cai-dat.sh         # Linux (đang experimental — xem docs/DO-LUONG.md)
+Nó tải một file `.exe` (~11 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
+`%USERPROFILE%\bin` rồi thêm vào PATH của người dùng. Chỉ cần Windows 10 trở lên —
+PowerShell 5.1 có sẵn là đủ. Có bản `amd64` và `arm64`, trình cài tự chọn.
+
+Cài đúng một phiên bản, hoặc build từ nguồn (cần Go, phải đứng trong repo đã clone):
+
+```powershell
+.\install\cai-dat.ps1 -Phien v0.2.0
+.\install\cai-dat.ps1 -TuNguon
 ```
+
+Gỡ: xoá `%USERPROFILE%\bin\sagent.exe`. Dữ liệu nằm ở `~/.ai-accounts` — xoá riêng nếu muốn.
+
+> **Chỉ Windows.** Nhánh Linux đã bị bỏ (2026-08-17). Mọi thứ khiến công cụ này đáng
+> dùng đều là chi tiết Windows — junction thay symlink, ACL thay bit quyền, `taskkill`
+> thay process group — và mọi phép đo trong [`docs/DO-LUONG.md`](docs/DO-LUONG.md) đều
+> là phép đo Windows. Giữ nhánh Linux mà không có máy Linux để chạy thì đó không phải
+> hỗ trợ, đó là lời hứa suông.
 
 ## Dùng
 
@@ -198,16 +212,20 @@ khi tạo kho, và `sagent verify` nói cho bạn biết trạng thái thật:
 
 Không tô hồng:
 
-| Hạng mục | Windows | Linux |
-|---|---|---|
-| Đổi/chạy tài khoản Claude, không đăng nhập lại | ✅ chạy thật | ⬜ chưa đo |
-| Junction/symlink phần dùng chung, không cần admin | ✅ | ⬜ chưa đo |
-| Xoá an toàn (không đụng dữ liệu gốc) | ✅ test + thật | ⬜ chưa đo |
-| Bỏ phụ thuộc Python | ✅ | ✅ CI |
-| Domain layer · SQLite · daemon · flow · đường API | ⬜ đang làm (Pha 1–2) | ⬜ |
+| Hạng mục | Trạng thái |
+|---|---|
+| Đổi/chạy tài khoản Claude, không đăng nhập lại | ✅ chạy thật |
+| Junction phần dùng chung, không cần admin | ✅ |
+| Xoá an toàn (không đụng dữ liệu gốc, không xuyên junction) | ✅ test + đã nổ thật một lần |
+| Quyền truy cập kho token (ACL, không phải `0o600` giả) | ✅ |
+| Dừng phiên kèm cả cây tiến trình con | ✅ |
+| Sao lưu / khôi phục `state.db`, chặn hạ cấp binary | ✅ |
+| Provider Codex | ✅ stable · Gemini/Cursor ⬜ chưa có CLI để đo |
+| Đường API (nhiều AI API) | ⬜ chưa có API key để verify |
+| TLS cho dashboard | ⬜ **chưa có** — `--host 0.0.0.0` gửi mật khẩu dạng trần |
 
-**Đang bị chặn:** chưa có máy Linux để đo token nằm ở file hay keyring; chưa có API key
-để verify đường API. Nhãn Linux và mọi provider ngoài Claude/Windows giữ `experimental`.
+**Đang bị chặn:** chưa có API key thật để verify đường API. Provider ngoài Claude/Codex
+giữ nhãn `experimental` vì chưa có CLI để đo.
 
 ## Tài liệu
 

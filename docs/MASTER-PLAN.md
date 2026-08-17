@@ -1,5 +1,20 @@
 # Switch-Agent-Pro — Master Plan (hợp nhất)
 
+> ## Quyết định 2026-08-17 — CHỈ WINDOWS
+>
+> Nhánh Linux **đã bị bỏ**. Mọi dòng nhắc tới Linux bên dưới là **lịch sử**, giữ lại để
+> hiểu vì sao từng thiết kế như vậy; khối này đè lên tất cả.
+>
+> Lý do, không phải cảm tính: mọi thứ khiến công cụ này đáng dùng đều là chi tiết
+> Windows — junction thay symlink, ACL thay bit quyền (`0o600` ở đó không bảo vệ gì),
+> `taskkill` thay process group, tên thiết bị `NUL`/`COM1`, chuyện Windows lặng lẽ cắt
+> dấu chấm cuối tên thư mục. **Cả 5 lỗi thật tìm được ở Pha 7 đều là lỗi Windows.**
+> Giữ một nhánh Linux không có máy để chạy thì đó không phải hỗ trợ, đó là lời hứa
+> suông — đúng thứ `docs/DO-LUONG.md` lập ra để chống.
+>
+> Kéo theo: `*_linux.go` xoá, `install/cai-dat.sh` xoá, CI chỉ còn `windows-latest`,
+> build cho `GOOS` khác dừng ngay với thông điệp đọc được.
+
 > Phiên bản: 2.0 · Cập nhật: 2026-08-17
 > Tài liệu này **hợp nhất** hai nguồn thành một lộ trình duy nhất:
 > - `CCSWITCH_CLAUDE_DEVELOPMENT_PLAN.md` (v1.1) — kiến trúc control plane, hai đường
@@ -18,7 +33,7 @@
 - **Module Go**: `github.com/trantiendevweb/switch-agent-pro`
 - **CLI**: `sagent` · **Daemon**: `sagentd` · **Config project**: `.sagent/project.toml`
 - **Một câu**: *local-first control plane điều phối nhiều coding agent và nhiều AI API,
-  chạy native trên Windows + Linux, một binary, có dashboard quan sát realtime.*
+  chạy native trên Windows, một binary, có dashboard quan sát realtime.*
 
 Đích không phải "mở nhiều terminal", mà là: dùng **cả subscription profile lẫn API
 profile**, gắn vào **agent harness** hoặc **model route** phù hợp, chạy trong
@@ -48,7 +63,7 @@ profile**, gắn vào **agent harness** hoặc **model route** phù hợp, chạ
 2. **Whitelist — không blacklist.** Chỉ chia sẻ file/khoá config đã biết là an toàn.
 3. **Xoá an toàn.** Không bao giờ xoá credential/dữ liệu/project gốc vì một session bị xoá.
 4. **Ghi nguyên tử.** State quan trọng: temp + fsync + rename, hoặc transaction DB.
-5. **Local-first, một binary.** Lõi chạy độc lập Windows + Linux; dashboard chỉ là client.
+5. **Local-first, một binary.** Lõi chạy độc lập trên Windows; dashboard chỉ là client.
 6. **Trung thực về năng lực.** Mỗi provider/harness gắn `stable` / `experimental` /
    `unsupported` / `unknown` dựa trên **bằng chứng**, không "ước chừng".
 
@@ -286,7 +301,8 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   `docs/adr/0001-domain-boundaries.md`, `docs/OPEN_SOURCE_LEDGER.md`.
 - **DoD:** mỗi kết luận có command/OS/output-redacted; **không token thật** ở đâu;
   capability chưa đo = `unknown`; interface nháp suy ra từ **≥2 harness và ≥2 API protocol**.
-- ⚠ **Blocker cần bạn:** máy/VM **Linux**; **API key** thật (local-only, redaction) cho phần API path.
+- ⚠ **Blocker cần bạn:** **API key** thật (local-only, redaction) cho phần API path.
+  (Blocker "máy/VM Linux" đã bỏ cùng nhánh Linux — xem khối quyết định đầu tài liệu.)
 - **Trạng thái:** Windows/Claude subscription + junction đã đo (`docs/DO-LUONG.md`); còn lại chưa.
 
 ### Pha 1 — Storage + Claude slice + 1 API slice
@@ -303,7 +319,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [ ] Verb: `profile create/list/verify/remove`, `route create/list/test`,
   `session run/list/stop`.
 - [ ] Safe delete: chỉ xoá **materialized session directory** mà registry sở hữu.
-- **DoD:** CI Windows+Linux xanh; đổi Claude subscription không đăng nhập lại; API route
+- **DoD:** CI Windows xanh; đổi Claude subscription không đăng nhập lại; API route
   stream + ghi usage/error không lộ key; xoá session không đụng credential/project gốc;
   fault injection không tạo JSON/DB dở; **hết Python**.
 - **Trạng thái:** phần subscription-switch đã chạy trên Windows; còn thiếu domain layer,
@@ -562,10 +578,12 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
     mật khẩu dashboard chỉ kín nhờ MAY MẮN kế thừa từ `C:\Users\<tên>`. Vá bằng package
     `internal/acl`: DACL tường minh + cắt kế thừa, nối vào kho hồ sơ / thư mục hồ sơ /
     dash-auth, và `sagent verify` có ô kiểm nói trạng thái thật. Số đo ở `docs/DO-LUONG.md`.
-  - ⬜ Còn lại: symlink-escape
-    Linux (**chưa có máy Linux để đo** — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
-    process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license
-    notices · signed + reproducible build · migration guide v1.
+  - ✅ **build phát hành** — `-trimpath -ldflags "-s -w"`, đo được **16.21 MB → 11.09 MB**;
+    `CGO_ENABLED=0` nên binary không phụ thuộc DLL nào. Workflow `phat-hanh.yml` dựng
+    amd64 + arm64 kèm `SHA256SUMS.txt`. Trình cài một dòng, không cần Go, không cần admin.
+  - ⬜ Còn lại: quét mồ côi của phiên `lost` · upgrade/provider-drift verify · SBOM +
+    license notices · **ký số** binary (đã có băm, chưa có chữ ký) · migration guide v1.
+  - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
   - ⚠ **HTTP không mã hoá.** `--host 0.0.0.0` gửi mật khẩu dạng trần trên đường truyền.
     Chưa có TLS — phải giải quyết trước khi gọi là "phát hành được".
 

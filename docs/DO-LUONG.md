@@ -537,6 +537,65 @@ tình cờ chặt.
 `Check` cũng phải chứng minh được là nó đo thật: test nới lỏng ACL rồi khẳng định `Check`
 **nói hỏng** trước khi vá. Một hàm kiểm lúc nào cũng trả "ổn" thì tệ hơn không có.
 
+### Bỏ Linux · nhẹ hơn · cài nhanh hơn — ĐÃ ĐO (2026-08-17)
+
+**Kích thước binary** (`cmd/sagent`, go1.25.13, amd64):
+
+| Cách build | Kích thước |
+|---|---|
+| mặc định | 16.21 MB |
+| `-ldflags "-s -w"` | 11.15 MB |
+| `-trimpath -ldflags "-s -w"` | **11.09 MB** (−31,6%) |
+
+Chỗ béo **không** phải nơi ai cũng đoán. Bóc theo ký hiệu:
+
+```
+runtime                    5 663 KB
+modernc (SQLite)           2 169 KB
+type:*                       699 KB
+net/http                     332 KB
+crypto/tls                   247 KB
+```
+
+SQLite thuần Go chỉ chiếm **2,1 MB** — nên đổi sang SQLite khác, hay bỏ SQLite, gần như
+không được gì. Phần lớn là runtime Go, không cắt được nếu vẫn viết bằng Go. **Kết luận:
+11 MB là đáy hợp lý; đừng đi tối ưu tiếp.**
+
+Khởi động `sagent help`: **328 ms** lần đầu (nguội), **~26 ms** những lần sau. Không có
+gì để sửa ở đây.
+
+**Cài đặt** — đây mới là chỗ chậm thật. Trình cài cũ **đòi Go SDK và build từ nguồn**:
+người dùng phải tải ~100 MB toolchain rồi ngồi đợi. Trình cài mới tải một `.exe` dựng sẵn:
+
+| | Cũ (`-TuNguon`) | Mới (bản dựng sẵn) |
+|---|---|---|
+| Phải cài trước | Go SDK (~100 MB) + Git | **không gì** |
+| Thời gian | 6,9 s *(đã có Go, cache build nóng)* | tải 11 MB + đối chiếu băm |
+| Quyền quản trị | không | không |
+| Kiến trúc | máy nào có Go | amd64 + arm64, tự chọn |
+
+`CGO_ENABLED=0` nên `.exe` không phụ thuộc DLL nào — chép sang máy khác là chạy.
+Trình cài đối chiếu `SHA256SUMS.txt` trước khi đặt binary vào chỗ: một trình cài tải
+`.exe` về rồi chạy ngay mà không kiểm thì chính nó là lỗ hổng nó lẽ ra phải tránh.
+
+**Hai cái bẫy đã dẫm phải khi làm việc này**, ghi lại vì cả hai đều hỏng trong im lặng:
+
+1. **Đặt tên file Go.** Lá chắn "không phải Windows" đặt trong `khong_windows.go` **không
+   bao giờ được biên dịch**: Go áp ràng buộc build ngầm theo hậu tố tên file, nên
+   `*_windows.go` chỉ build TRÊN Windows — mâu thuẫn thẳng với `//go:build !windows` ở
+   đầu file. Không có cảnh báo nào; file chỉ đơn giản biến mất khỏi build. Đổi tên thành
+   `nenttang_khac.go` là xong.
+
+2. **PowerShell 5.1 đọc `.ps1` không có BOM theo bảng mã ANSI.** Byte UTF-8 của tiếng
+   Việt khi đó rơi vào vùng 0x91–0x94 của cp1252 = dấu nháy cong, và script **vỡ cú
+   pháp** ở những dòng chẳng liên quan gì tới tiếng Việt. Trình cài cũ cũng dính, chỉ là
+   chưa ai chạy nó trong PowerShell 5.1 sạch. Bản mới lưu UTF-8 **có BOM** + CRLF, và
+   `.gitattributes` ghim `*.ps1 text eol=crlf` để git không đụng vào.
+
+Một mẹo nhỏ nhưng đáng: `$ProgressPreference = 'SilentlyContinue'` ở đầu trình cài.
+Thanh tiến trình của PowerShell 5.1 vẽ lại sau mỗi khối dữ liệu và làm
+`Invoke-WebRequest` chậm đi nhiều lần.
+
 ---
 
 ## Việc cần bạn hỗ trợ
