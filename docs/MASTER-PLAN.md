@@ -327,7 +327,15 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   trong transaction; test khẳng định mở lại nhiều lần không hỏng.
 - [x] Trả nợ test: `store` (migration, reaping PID chết, SetState) và `clone`
   (file riêng phải là bản sao thật, xoá clone không đụng dữ liệu gốc).
-- [ ] Project discovery + `.sagent/project.toml`.
+- [x] **Project discovery + `.sagent/project.toml`** — tầng cấu hình mặc định →
+  global → project → cờ; `sagent init` / `sagent config`; `fleet` tôn trọng
+  `project.workspace` và `policy.max_parallel_sessions` (trần cứng).
+- [x] **Lá chắn dữ liệu**: `clean` từ chối gỡ worktree còn thay đổi chưa commit
+  (phải `--force` mới bỏ) — trước đó `worktree remove --force` nuốt luôn việc
+  agent làm dở, trái nguyên tắc #3.
+- [x] Sửa bug thật: `clean` đoán số thứ tự worktree nên gặp khoảng trống là dừng,
+  bỏ sót phần còn lại → chuyển sang **quét thư mục thật** (`FindAll`).
+- [x] `docs/OPEN_SOURCE_LEDGER.md` — ghi 2 phụ thuộc trực tiếp + giấy phép.
 - [ ] ~~`sagentd` daemon~~ **bỏ** (xem mục 2b) — `dash` sẽ là server tạm.
 - [ ] Project discovery + `.sagent/project.toml`.
 - [ ] Workspace backend: directory + **Git worktree**.

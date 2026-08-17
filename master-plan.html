@@ -459,7 +459,15 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   trong transaction; test khẳng định mở lại nhiều lần không hỏng.</li>
 <li class="task done"><span class="box"></span>Trả nợ test: <code>store</code> (migration, reaping PID chết, SetState) và <code>clone</code>
   (file riêng phải là bản sao thật, xoá clone không đụng dữ liệu gốc).</li>
-<li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
+<li class="task done"><span class="box"></span><strong>Project discovery + <code>.sagent/project.toml</code></strong> — tầng cấu hình mặc định →
+  global → project → cờ; <code>sagent init</code> / <code>sagent config</code>; <code>fleet</code> tôn trọng
+  <code>project.workspace</code> và <code>policy.max_parallel_sessions</code> (trần cứng).</li>
+<li class="task done"><span class="box"></span><strong>Lá chắn dữ liệu</strong>: <code>clean</code> từ chối gỡ worktree còn thay đổi chưa commit
+  (phải <code>--force</code> mới bỏ) — trước đó <code>worktree remove --force</code> nuốt luôn việc
+  agent làm dở, trái nguyên tắc #3.</li>
+<li class="task done"><span class="box"></span>Sửa bug thật: <code>clean</code> đoán số thứ tự worktree nên gặp khoảng trống là dừng,
+  bỏ sót phần còn lại → chuyển sang <strong>quét thư mục thật</strong> (<code>FindAll</code>).</li>
+<li class="task done"><span class="box"></span><code>docs/OPEN_SOURCE_LEDGER.md</code> — ghi 2 phụ thuộc trực tiếp + giấy phép.</li>
 <li class="task"><span class="box"></span>~~<code>sagentd</code> daemon~~ <strong>bỏ</strong> (xem mục 2b) — <code>dash</code> sẽ là server tạm.</li>
 <li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
 <li class="task"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong>.</li>

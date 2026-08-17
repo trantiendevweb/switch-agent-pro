@@ -67,6 +67,39 @@ func Find(repoRoot, name string) (string, bool) {
 	return dir, true
 }
 
+// FindAll liệt kê mọi worktree của một tài khoản, theo tên thật trên đĩa.
+//
+// Cố ý QUÉT THƯ MỤC chứ không đoán "phu-1, phu-2, …": sau một lần clean dở
+// (giữ lại bản còn thay đổi chưa commit) thì số thứ tự bị khuyết, kiểu đoán sẽ
+// dừng ở lỗ hổng đầu tiên và bỏ sót phần còn lại. Đã dính đúng lỗi này.
+func FindAll(repoRoot, account string) []string {
+	parent := filepath.Dir(dirFor(repoRoot, "x"))
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return nil
+	}
+	prefix := account + "-"
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), prefix) {
+			out = append(out, filepath.Join(parent, e.Name()))
+		}
+	}
+	return out
+}
+
+// IsDirty cho biết worktree còn thay đổi CHƯA COMMIT hay không.
+//
+// Đây là lá chắn cho nguyên tắc "xoá an toàn": `git worktree remove --force`
+// nuốt luôn việc agent làm dở mà không hỏi. Phải kiểm trước khi gỡ.
+func IsDirty(dir string) bool {
+	out, err := run(dir, "status", "--porcelain")
+	if err != nil {
+		return true // không kiểm được thì coi như bẩn, thà giữ lại
+	}
+	return out != ""
+}
+
 // Remove gỡ worktree và dọn sổ của git. Không xoá nhánh: công việc của agent có
 // thể còn nằm trong đó, xoá là mất.
 func Remove(repoRoot, dir string) error {

@@ -1,0 +1,20 @@
+version = 1
+name = "switch-agent-pro"
+
+[project]
+default_branch = "main"
+workspace      = "worktree"   # "dir" = dùng chung thư mục | "worktree" = mỗi phiên một cây
+
+[commands]
+# lint = ["npm run lint"]
+# test = ["npm test"]
+
+[policy]
+max_parallel_sessions = 4
+require_approval_for  = ["merge", "deploy"]
+
+[ui]
+default_surface = "tui"       # tui | dashboard | workflow | 3d
+theme           = "dark"
+
+# LƯU Ý: file này KHÔNG được chứa API key hay token. Chỉ tham chiếu bằng ID.

@@ -8,10 +8,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
@@ -48,6 +50,10 @@ func main() {
 		cmdStatus()
 	case "clean":
 		cmdClean(rest(args))
+	case "init":
+		cmdInit()
+	case "config":
+		cmdConfig()
 	case "stop":
 		cmdStop(rest(args))
 	case "goc":
@@ -294,12 +300,27 @@ func cmdClone(args []string) {
 }
 
 func cmdFleet(args []string) {
+	wd, _ := os.Getwd()
+	cfg, err := config.Load(wd)
+	if err != nil {
+		fail(err)
+	}
+
 	mine, child := splitDashDash(args)
 	worktree, mine := boolFlag(mine, "--worktree")
+	// Không truyền cờ thì lấy theo cấu hình dự án.
+	if !worktree && cfg.Project.Workspace == "worktree" {
+		worktree = true
+	}
 	copies, rest := intFlag(mine, "--copies", 2)
 	if len(rest) == 0 {
 		fail(fmt.Errorf(`thiếu tài khoản. Ví dụ:
   sagent fleet claude:phu --copies 4 --worktree -- -p "tóm tắt repo này"`))
+	}
+	// Chính sách của dự án là trần cứng — tránh lỡ tay đốt hạn mức.
+	if m := cfg.Policy.MaxParallelSessions; m > 0 && copies > m {
+		fmt.Printf("  ! %d vượt policy.max_parallel_sessions=%d của dự án — hạ xuống %d.\n", copies, m, m)
+		copies = m
 	}
 	prov, acc := parseAddr(rest[0])
 	db := openStore()
@@ -310,7 +331,59 @@ func cmdFleet(args []string) {
 	}
 }
 
+// ---------------------- cấu hình theo dự án ----------------------
+
+func cmdInit() {
+	wd, err := os.Getwd()
+	if err != nil {
+		fail(err)
+	}
+	dir := filepath.Join(wd, config.ProjectDirName)
+	path := filepath.Join(dir, "project.toml")
+	if _, err := os.Stat(path); err == nil {
+		fail(fmt.Errorf("đã có %s — sửa tay hoặc xoá rồi chạy lại", path))
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		fail(err)
+	}
+	body := fmt.Sprintf(config.Sample, filepath.Base(wd))
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		fail(err)
+	}
+	fmt.Printf("  ✓ đã tạo %s\n", path)
+	fmt.Println("  Sửa rồi xem lại bằng: sagent config")
+}
+
+func cmdConfig() {
+	wd, _ := os.Getwd()
+	c, err := config.Load(wd)
+	if err != nil {
+		fail(err)
+	}
+	fmt.Println()
+	if len(c.Sources) == 0 {
+		fmt.Println("  Chưa có file cấu hình nào — đang dùng mặc định.")
+		fmt.Println("  Tạo cho dự án này: sagent init")
+	} else {
+		fmt.Println("  Đọc theo thứ tự (dưới đè lên trên):")
+		for _, s := range c.Sources {
+			fmt.Println("    ·", s)
+		}
+	}
+	fmt.Println()
+	fmt.Printf("  name                    %s\n", c.Name)
+	fmt.Printf("  project.workspace       %s\n", c.Project.Workspace)
+	fmt.Printf("  project.default_branch  %s\n", c.Project.DefaultBranch)
+	fmt.Printf("  policy.max_parallel     %d\n", c.Policy.MaxParallelSessions)
+	if len(c.Policy.RequireApprovalFor) > 0 {
+		fmt.Printf("  policy.require_approval %v\n", c.Policy.RequireApprovalFor)
+	}
+	fmt.Printf("  ui.default_surface      %s\n", c.UI.DefaultSurface)
+	fmt.Println()
+}
+
 func cmdClean(args []string) {
+	force, args := boolFlag(args, "--force")
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu tài khoản. Ví dụ: sagent clean claude:phu"))
 	}
@@ -330,11 +403,14 @@ func cmdClean(args []string) {
 	// đụng tới, để lại là git giữ mục chết trong sổ worktree.
 	if wd, err := os.Getwd(); err == nil {
 		if repoRoot, ok := workspace.RepoRoot(wd); ok {
-			gone := 0
-			for i := 1; ; i++ {
-				dir, ok := workspace.Find(repoRoot, fmt.Sprintf("%s-%d", acc, i))
-				if !ok {
-					break
+			gone, kept := 0, 0
+			for _, dir := range workspace.FindAll(repoRoot, acc) {
+				// Việc agent làm dở là DỮ LIỆU THẬT. Không xoá nếu chưa commit.
+				if workspace.IsDirty(dir) && !force {
+					fmt.Printf("  ! giữ lại worktree %s — còn thay đổi chưa commit\n", filepath.Base(dir))
+					fmt.Printf("      xem: git -C %s status\n", dir)
+					kept++
+					continue
 				}
 				if err := workspace.Remove(repoRoot, dir); err == nil {
 					gone++
@@ -342,6 +418,10 @@ func cmdClean(args []string) {
 			}
 			if gone > 0 {
 				fmt.Printf("  ✓ đã gỡ %d worktree (nhánh sagent/%s-* giữ nguyên)\n", gone, acc)
+			}
+			if kept > 0 {
+				fmt.Printf("  → %d worktree được giữ. Commit/stash rồi chạy lại, hoặc `sagent clean %s:%s --force` để bỏ luôn.\n",
+					kept, prov, acc)
 			}
 		}
 	}
@@ -440,7 +520,14 @@ func cmdHelp() {
                                 chỉ tạo N thư mục config, không chạy
     sagent status               phiên nào đang chạy
     sagent stop <số|all>        dừng phiên
-    sagent clean <provider:tên> xoá các bản clone (an toàn, không xuyên link)
+    sagent clean <provider:tên> [--force]
+                                gỡ worktree + xoá clone (an toàn; giữ lại
+                                worktree còn thay đổi chưa commit)
+
+  Cấu hình theo dự án:
+
+    sagent init                 tạo .sagent/project.toml cho repo hiện tại
+    sagent config               xem cấu hình đã gộp + đọc từ file nào
 
   Ví dụ:
 

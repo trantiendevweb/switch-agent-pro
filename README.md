@@ -46,7 +46,7 @@ chỉ khác ở auth, protocol và cách agent/model được thực thi.
 
 ## Cài
 
-Cần [Go](https://go.dev/dl) ≥ 1.23. Không cần quyền quản trị.
+Cần [Go](https://go.dev/dl) ≥ 1.25 (Go 1.21+ sẽ tự tải toolchain phù hợp). Không cần quyền quản trị.
 
 ```powershell
 git clone https://github.com/trantiendevweb/switch-agent-pro
@@ -69,6 +69,7 @@ cd switch-agent-pro
 | `sagent dong-bo [--dry-run]` | Đồng bộ cấu hình dùng chung sang mọi tài khoản |
 | `sagent xoa <provider:tên>` | Xoá tài khoản (an toàn) |
 | `sagent verify [provider]` | Chạy bộ "đã đo" trên máy bạn |
+| `sagent init` · `sagent config` | Tạo/xem cấu hình dự án |
 
 Địa chỉ hoá `provider:account`, nên `sagent phu` == `sagent claude:phu`.
 Claude Code lấy **thư mục hiện tại** làm nơi làm việc — `cd` vào dự án rồi mới gọi.
@@ -90,7 +91,30 @@ Hai lớp tách biệt, mỗi lớp giải một bài:
 | **File đang sửa** | mỗi phiên một **git worktree** + nhánh `sagent/<tên>-<n>` (`--worktree`) | 4 agent sửa đè file của nhau, kết quả không đoán được |
 
 Worktree đặt **ngoài repo** (`~/.ai-accounts/.worktrees/…`) nên `git status` của bạn
-không bị rác. `clean` gỡ worktree nhưng **giữ nhánh** — việc agent làm nằm trong đó.
+không bị rác. `clean` gỡ worktree nhưng **giữ nhánh** — việc agent làm nằm trong đó —
+và **từ chối gỡ** worktree còn thay đổi chưa commit (muốn bỏ thật thì thêm `--force`).
+
+### Cấu hình theo từng dự án
+
+```bash
+sagent init      # tạo .sagent/project.toml cho repo hiện tại
+sagent config    # xem cấu hình đã gộp + đọc từ file nào
+```
+
+Tầng cấu hình, dưới đè lên trên: **mặc định → `~/.ai-accounts/config.toml` →
+`.sagent/project.toml` → cờ dòng lệnh**. Khoá không khai báo thì giữ giá trị tầng trên.
+
+```toml
+[project]
+workspace = "worktree"        # fleet tự bật worktree, khỏi gõ --worktree
+[policy]
+max_parallel_sessions = 4     # trần cứng, gõ --copies 9 cũng bị hạ xuống 4
+require_approval_for  = ["merge", "deploy"]
+[ui]
+default_surface = "tui"       # tui | dashboard | workflow | 3d
+```
+
+> File cấu hình **không bao giờ chứa secret** — API key/token chỉ được tham chiếu bằng ID.
 
 Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite, migration có version), và
 `status` luôn đối chiếu PID thật nên không bao giờ báo sống một phiên đã chết.
