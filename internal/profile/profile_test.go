@@ -17,6 +17,7 @@ type fakeAdapter struct {
 func (f fakeAdapter) Name() string             { return "fake" }
 func (f fakeAdapter) EnvVar() string           { return "FAKE_CONFIG_DIR" }
 func (f fakeAdapter) Command() (string, error) { return "echo", nil }
+func (f fakeAdapter) HeadlessArgs(p string) []string { return []string{"-p", p} }
 func (f fakeAdapter) PrivateFiles() []string   { return []string{".credentials.json", ".claude.json"} }
 func (f fakeAdapter) SharedKeys() []string     { return []string{"projects"} }
 func (f fakeAdapter) BaseDir() string          { return f.base }

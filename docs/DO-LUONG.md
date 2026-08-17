@@ -68,6 +68,14 @@ Bản đo: `@openai/codex` 0.147.0, cài qua npm global.
       - *dùng chung được*: `AGENTS.md`, `config.toml`, `skills/`, `plugins/`,
         `sessions/`, `cache/`, `models_cache.json`, `log/`.
 
+- [x] **Chạy headless**: `codex exec "<prompt>"` (`--help` ghi "Run Codex
+      non-interactively"). **KHÁC hẳn Claude** dùng `-p` — đây là lý do phải để
+      việc này cho adapter thay vì hardcode trong lõi.
+- [x] **Chạy thật qua flow**: bước `agent` với `profile = "codex:thu"` chạy trong
+      git worktree riêng, Codex trả lời đúng, 3.392 token. Log xác nhận
+      `model: gpt-5.6-sol`, `sandbox: read-only`, `approval: never`.
+- [x] **Stdin phải nối vào NUL**, không để nil: Codex thấy stdin là ống dẫn thì
+      ngồi chờ "Reading additional input from stdin…" mãi không tới.
 - [ ] Codex trên **Linux** — chưa đo (cùng blocker VM Linux).
 
 ## Gemini CLI — CHƯA ĐO

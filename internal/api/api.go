@@ -446,9 +446,13 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	if addr.Account == "" {
 		return "", fmt.Errorf("bước agent chưa biết chạy bằng tài khoản nào — đặt `profile` trong flow hoặc truyền --profile")
 	}
+	ad, err := adapterOf(addr.Provider)
+	if err != nil {
+		return "", err
+	}
 	res, err := b.a.FleetStart(FleetRequest{
 		Addr: addr, Copies: copies, Worktree: worktree,
-		Args: []string{"-p", prompt},
+		Args: ad.HeadlessArgs(prompt), // mỗi provider một kiểu, hỏi adapter
 	})
 	if err != nil {
 		return "", err

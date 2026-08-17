@@ -367,6 +367,12 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Chạy thật: `them/ds/dong-bo/xoa` cho `codex:*`; xoá an toàn có file mồi.
 - [x] Sửa hai chỗ hardcode `.claude.json` rò vào lõi chung — giờ lấy theo
   `IdentitySource()` của từng adapter.
+- [x] **`HeadlessArgs()` vào interface adapter** — sửa chỗ Claude rò vào lõi:
+  trước đó `fleet`/`flow` hardcode `-p`, tức là chạy agent bằng Codex sẽ SAI mà
+  không ai biết. Có test khẳng định mỗi provider tự khai kiểu chạy của mình và
+  hai provider không được trùng cách.
+- [x] **Chạy flow thật bằng Codex**: cùng hạ tầng clone/worktree/fleet/flow, chỉ
+  khác adapter → đúng mục đích Pha 2.5 (chứng minh không đo ni theo Claude).
 - [ ] Đường API (OpenAI-compatible) — chờ API key.
 🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.
 - **DoD:** Claude & Codex dùng chung domain/session API (subscription); Anthropic API &

@@ -500,6 +500,12 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li class="task done"><span class="box"></span>Chạy thật: <code>them/ds/dong-bo/xoa</code> cho <code>codex:*</code>; xoá an toàn có file mồi.</li>
 <li class="task done"><span class="box"></span>Sửa hai chỗ hardcode <code>.claude.json</code> rò vào lõi chung — giờ lấy theo
   <code>IdentitySource()</code> của từng adapter.</li>
+<li class="task done"><span class="box"></span><strong><code>HeadlessArgs()</code> vào interface adapter</strong> — sửa chỗ Claude rò vào lõi:
+  trước đó <code>fleet</code>/<code>flow</code> hardcode <code>-p</code>, tức là chạy agent bằng Codex sẽ SAI mà
+  không ai biết. Có test khẳng định mỗi provider tự khai kiểu chạy của mình và
+  hai provider không được trùng cách.</li>
+<li class="task done"><span class="box"></span><strong>Chạy flow thật bằng Codex</strong>: cùng hạ tầng clone/worktree/fleet/flow, chỉ
+  khác adapter → đúng mục đích Pha 2.5 (chứng minh không đo ni theo Claude).</li>
 <li>
 <p>[ ] Đường API (OpenAI-compatible) — chờ API key.
 🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</p>

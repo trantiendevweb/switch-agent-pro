@@ -19,6 +19,15 @@ type Adapter interface {
 	// Command trả về đường dẫn tới CLI để chạy.
 	Command() (string, error)
 
+	// HeadlessArgs là đối số để chạy CLI KHÔNG tương tác với một prompt.
+	//
+	// Mỗi nhà cung cấp một kiểu, và khác nhau thật chứ không chỉ khác tên cờ:
+	//   claude -p "<prompt>"
+	//   codex exec "<prompt>"
+	// Vì vậy nó phải nằm ở adapter. Trước đây lõi hardcode `-p` — tức là Claude
+	// rò vào code dùng chung, và `fleet codex:*` sẽ chạy sai mà không ai biết.
+	HeadlessArgs(prompt string) []string
+
 	// PrivateFiles là các file KHÔNG dùng chung (token + danh tính).
 	PrivateFiles() []string
 

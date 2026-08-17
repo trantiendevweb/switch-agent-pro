@@ -32,6 +32,9 @@ func (claude) Command() (string, error) {
 	return "", errors.New("không tìm thấy lệnh claude — cài Claude Code trước")
 }
 
+// Đã đo: `claude -p "<prompt>"` chạy không tương tác và in kết quả ra stdout.
+func (claude) HeadlessArgs(prompt string) []string { return []string{"-p", prompt} }
+
 func (claude) PrivateFiles() []string { return []string{".credentials.json", ".claude.json"} }
 
 func (claude) BaseDir() string { return filepath.Join(paths.Home(), ".claude") }

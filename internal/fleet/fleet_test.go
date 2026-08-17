@@ -29,6 +29,7 @@ type fakeAgent struct{ base string }
 func (fakeAgent) Name() string             { return "fake" }
 func (fakeAgent) EnvVar() string           { return "FAKE_CONFIG_DIR" }
 func (fakeAgent) Command() (string, error) { return os.Executable() }
+func (fakeAgent) HeadlessArgs(p string) []string { return []string{"-p", p} }
 func (fakeAgent) PrivateFiles() []string   { return []string{".credentials.json", ".claude.json"} }
 func (fakeAgent) SharedKeys() []string     { return []string{"projects"} }
 func (f fakeAgent) BaseDir() string        { return f.base }

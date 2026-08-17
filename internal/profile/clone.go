@@ -113,7 +113,13 @@ func StartDetached(a provider.Adapter, dir string, args []string, logPath, workD
 	}
 	c := exec.Command(cmdPath, args...)
 	c.Stdout, c.Stderr = f, f
-	c.Stdin = nil
+	// Stdin nối vào NUL/dev-null chứ không để nil: Codex thấy stdin là ống dẫn
+	// thì ngồi "Reading additional input from stdin..." chờ dữ liệu không bao
+	// giờ tới. Cho nó EOF ngay.
+	if devNull, err := os.Open(os.DevNull); err == nil {
+		c.Stdin = devNull
+		defer devNull.Close()
+	}
 	c.Env = append(filterEnv(os.Environ(), a.EnvVar()), a.EnvVar()+"="+dir)
 	if workDir != "" {
 		c.Dir = workDir

@@ -41,6 +41,10 @@ func (codex) Command() (string, error) {
 	return "", errors.New("không tìm thấy lệnh codex — cài bằng: npm i -g @openai/codex")
 }
 
+// Đã đo trên 0.147.0: `codex exec "<prompt>"` = "Run Codex non-interactively".
+// KHÁC hẳn Claude (`-p`) — đây chính là lý do phải để việc này cho adapter.
+func (codex) HeadlessArgs(prompt string) []string { return []string{"exec", prompt} }
+
 func (codex) BaseDir() string { return filepath.Join(paths.Home(), ".codex") }
 
 // Codex không có file "cấu hình gộp" kiểu .claude.json để gieo whitelist khoá:
