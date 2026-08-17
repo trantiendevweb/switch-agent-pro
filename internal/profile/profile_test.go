@@ -32,7 +32,7 @@ func (f fakeAdapter) Verify() []provider.Check { return nil }
 // trỏ về base; Remove phải gỡ link trước rồi mới xoá, KHÔNG được xuyên link xoá
 // dữ liệu thật ở base.
 func TestRemoveDoesNotTouchBase(t *testing.T) {
-	tmp := t.TempDir()
+	tmp := homeGia(t)
 	base := filepath.Join(tmp, "base")
 	shared := filepath.Join(base, "shared")
 	if err := os.MkdirAll(shared, 0o755); err != nil {
@@ -43,7 +43,8 @@ func TestRemoveDoesNotTouchBase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prof := filepath.Join(tmp, "profile")
+	// Hồ sơ phải nằm đúng chỗ thật trong kho: Remove từ chối mọi đường dẫn ngoài kho.
+	prof := Dir("fake", "acct")
 	if err := os.MkdirAll(prof, 0o755); err != nil {
 		t.Fatal(err)
 	}

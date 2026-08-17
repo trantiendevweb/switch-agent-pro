@@ -167,6 +167,14 @@ func List() ([]Account, error) {
 // RemoveAll. Đây là chỗ nguy hiểm nhất — RemoveAll có thể xuyên junction xoá
 // dữ liệu thật ở ~/.claude.
 func Remove(dir string) error {
+	// Chốt chặn cuối: chỉ xoá thứ nằm bên trong kho hồ sơ. Tên tài khoản đến từ
+	// người dùng (dòng lệnh và cả form trên dashboard), mà `..` trong tên thì đủ
+	// để trỏ đường dẫn ra ~/.claude — xem internal/profile/name.go.
+	//
+	// Đặt ở đây vì đây là chỗ KHÔNG THỂ quên: mọi lối xoá hồ sơ đều đi qua.
+	if !insideStore(dir) {
+		return fmt.Errorf("từ chối xoá %s — nằm ngoài kho hồ sơ", dir)
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err

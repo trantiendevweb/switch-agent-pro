@@ -102,6 +102,24 @@ func ParseAddr(s string) Addr {
 
 func (ad Addr) String() string { return ad.Provider + ":" + ad.Account }
 
+// Validate chặn tên hồ sơ nguy hiểm ngay ở biên, TRƯỚC khi nó thành đường dẫn.
+//
+// Tên đến từ người dùng ở cả bốn mặt điều khiển, kể cả form trên dashboard đang
+// mở ra internet. Đo được: `claude:../../.claude` cho ra đúng ~/.claude, tức là
+// `sagent xoa` sẽ xoá dữ liệu Claude thật. Chi tiết ở internal/profile/name.go.
+//
+// Đây là lớp 1 — để báo lỗi dễ hiểu. Lớp 2 (profile.Remove từ chối đường dẫn
+// ngoài kho) mới là lớp không thể quên.
+func (ad Addr) Validate() error {
+	if err := profile.ValidName(ad.Provider); err != nil {
+		return fmt.Errorf("tên provider không hợp lệ: %w", err)
+	}
+	if err := profile.ValidName(ad.Account); err != nil {
+		return fmt.Errorf("tên tài khoản không hợp lệ: %w", err)
+	}
+	return nil
+}
+
 func adapterOf(name string) (provider.Adapter, error) {
 	ad, ok := provider.Get(name)
 	if !ok {
@@ -145,6 +163,9 @@ func (a *API) ProfileList() ([]Profile, error) {
 
 // ProfileCreate — action "profile.create".
 func (a *API) ProfileCreate(addr Addr) (linked, seeded int, err error) {
+	if err := addr.Validate(); err != nil {
+		return 0, 0, err
+	}
 	ad, err := adapterOf(addr.Provider)
 	if err != nil {
 		return 0, 0, err
@@ -161,6 +182,9 @@ func (a *API) ProfileCreate(addr Addr) (linked, seeded int, err error) {
 
 // ProfileRemove — action "profile.remove". Xoá an toàn (gỡ link trước).
 func (a *API) ProfileRemove(addr Addr) error {
+	if err := addr.Validate(); err != nil {
+		return err
+	}
 	dir, ok := profile.ResolveDir(addr.Provider, addr.Account)
 	if !ok {
 		return fmt.Errorf("không có %s", addr)
@@ -175,6 +199,9 @@ func (a *API) ProfileRemove(addr Addr) error {
 // ProfileRun — action "profile.run". Chạy CLI tương tác, CHIẾM terminal cho tới
 // khi người dùng thoát. Chỉ mặt terminal gọi được; các mặt khác dùng fleet.
 func (a *API) ProfileRun(addr Addr, args []string) error {
+	if err := addr.Validate(); err != nil {
+		return err
+	}
 	ad, err := adapterOf(addr.Provider)
 	if err != nil {
 		return err
@@ -299,6 +326,9 @@ type FleetRequest struct {
 
 // FleetStart — action "fleet.start". Áp chính sách của dự án TRƯỚC khi chạy.
 func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
+	if err := req.Addr.Validate(); err != nil {
+		return fleet.Result{}, err
+	}
 	ad, err := adapterOf(req.Addr.Provider)
 	if err != nil {
 		return fleet.Result{}, err
@@ -348,6 +378,9 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 
 // ClonesCreate — action "clones.create".
 func (a *API) ClonesCreate(addr Addr, copies int) ([]string, error) {
+	if err := addr.Validate(); err != nil {
+		return nil, err
+	}
 	ad, err := adapterOf(addr.Provider)
 	if err != nil {
 		return nil, err
@@ -375,6 +408,9 @@ type CleanResult struct {
 // dở là dữ liệu thật (nguyên tắc #3).
 func (a *API) ClonesClean(addr Addr, workDir string, force bool) (CleanResult, error) {
 	var res CleanResult
+	if err := addr.Validate(); err != nil {
+		return res, err
+	}
 
 	// Không dọn khi còn phiên đang chạy trên tài khoản đó.
 	if list, err := a.db.Running(); err == nil {

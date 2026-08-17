@@ -145,6 +145,52 @@ không phải phỏng đoán về hành vi nhà cung cấp.
 
 ---
 
+## Tên hồ sơ thoát thư mục — ĐÃ ĐO, ĐÃ VÁ (2026-08-17)
+
+Tên tài khoản đi thẳng từ người dùng vào `filepath.Join`, không qua kiểm tra nào.
+Đo bằng cách in đường dẫn thật ra:
+
+| tên nhập vào | thư mục `sagent xoa` sẽ xoá |
+|---|---|
+| `phu` | `~/.ai-accounts/claude/phu` (đúng) |
+| `../../.claude` | `~/.claude` — **dữ liệu Claude thật, dùng chung cho mọi hồ sơ** |
+| `` (rỗng) | `~/.ai-accounts/claude` — mọi tài khoản claude |
+| `..` | `~/.ai-accounts` — mọi tài khoản, mọi provider |
+
+Không chỉ dòng lệnh nhập được: dashboard cũng có form thêm hồ sơ, mà dashboard
+đang mở ra internet.
+
+Vá hai lớp:
+1. `profile.ValidName` — whitelist ký tự (chữ, số, `-`, `_`, `.`), chặn `.`/`..`,
+   chặn dấu chấm đầu (đụng thư mục nội bộ `.clones`), chặn dấu chấm cuối (Windows
+   lặng lẽ cắt, hai tên hoá một thư mục), chặn tên thiết bị Windows (`NUL`, `COM1`…).
+   Gọi ở 6 action nhận `Addr`, có test liệt kê đủ cả 6.
+2. `profile.Remove` từ chối mọi đường dẫn nằm ngoài kho hồ sơ. Lớp này mới là lớp
+   đáng tin: thêm action mới mà quên gọi `ValidName` thì vẫn không xoá nhầm được.
+
+### Sự cố khi kiểm — mất `~/.claude` thật
+
+Lỗ hổng trên **đã nổ thật một lần**, trong chính lần kiểm thử nó.
+
+`go build` thất bại vì `sagent.exe` đang bị server dash khoá (lỗi cố hữu của
+Windows, đã biết từ trước). Script kiểm không dừng khi build hỏng, nên payload
+tấn công đập vào **binary cũ chưa có bản vá**, và `sagent xoa claude:../../.claude`
+xoá sạch `~/.claude` (21 mục). `os.RemoveAll` không đi qua thùng rác; máy không
+bật shadow copy → **không khôi phục được**.
+
+Mất: `projects/` (lịch sử hội thoại dùng chung), `sessions/`, `cache/`, `chrome/`,
+`plugins/`, `skills/`, `backups/`, `settings.json`, và token của tài khoản gốc.
+Còn: token + `.claude.json` của từng hồ sơ (file THẬT riêng, không phải junction),
+`~/.codex`, `~/.claude.json`, và kho v1 `~/.claude-accounts/`.
+
+Ba bài học, đã thành quy tắc:
+- **Build hỏng thì DỪNG.** Nối `build` với bước sau bằng `&&`, không bằng xuống dòng.
+- **Payload phá hoại chỉ chạy trong HOME giả.** Đặt `USERPROFILE`/`HOME` vào thư
+  mục tạm rồi mới bắn. Không bao giờ chĩa vào máy thật để "xem thử".
+- **Dừng dash trước khi build.** Server đang chạy khoá cả `sagent.exe` lẫn `state.db`.
+
+---
+
 ## Việc cần bạn hỗ trợ
 
 - **Máy/VM Linux** để chạy các ô Linux ở trên. Không có thì phần Linux của
