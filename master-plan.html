@@ -99,7 +99,20 @@ Tài liệu này <strong>hợp nhất</strong> hai nguồn thành một lộ tr�
 <p>Đích không phải "mở nhiều terminal", mà là: dùng <strong>cả subscription profile lẫn API
 profile</strong>, gắn vào <strong>agent harness</strong> hoặc <strong>model route</strong> phù hợp, chạy trong
 <strong>workspace biệt lập của từng project</strong>, điều phối bằng <strong>flow khai báo được</strong>, lưu
-<strong>trạng thái bền vững</strong>, và <strong>quan sát realtime</strong>.</p>
+<strong>trạng thái bền vững</strong>, <strong>quan sát realtime</strong>, và <strong>điều khiển được từ bốn mặt</strong>
+(terminal → 2D → workflow board → 3D) — xem mục 2c.</p>
+<h3>Cam kết mã nguồn mở</h3>
+<p>Đây là tiêu chí sản phẩm, không phải câu khẩu hiệu:</p>
+<ul>
+<li><strong>Giấy phép MIT</strong>, toàn bộ mã nằm trong repo — không có phần lõi đóng.</li>
+<li><strong>Không telemetry, không tài khoản, không dịch vụ đám mây bắt buộc.</strong> Clone về là
+  chạy được offline; thứ duy nhất ra Internet là chính CLI/API của nhà cung cấp AI
+  mà bạn cấu hình.</li>
+<li><strong>Mọi phụ thuộc phải là mã nguồn mở, giấy phép tương thích</strong>, ghi trong
+  <code>docs/OPEN_SOURCE_LEDGER.md</code>. Ưu tiên stdlib; thêm dependency phải có lý do.</li>
+<li><strong>Không có tính năng nào bị khoá sau bản trả phí</strong> — không có "bản pro".</li>
+<li>Dashboard <strong>tự phục vụ tại máy bạn</strong>; không gửi state đi đâu.</li>
+</ul>
 <hr>
 <h2>1. Sáu nguyên tắc (linh hồn, không đổi)</h2>
 <ol>
@@ -169,6 +182,72 @@ clone về chạy trên máy mình</strong>. Cân lại từng món theo tiêu c
 <p><strong>Khi nào xét lại:</strong> cần daemon nếu có tính năng <em>flow chạy dài phải sống sót
 qua reboot</em> hoặc <em>dashboard cần push realtime khi không ai mở terminal</em>. Chưa có
 thì không làm trước.</p>
+<hr>
+<h2>2c. Bốn mặt điều khiển (control surfaces)</h2>
+<p>Hệ thống phải <strong>điều khiển được AI từ bốn mặt</strong>, và cả bốn đều <strong>dùng thật được</strong>
+lẫn <strong>cấu hình được</strong> — không có mặt nào chỉ để ngắm:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Mặt</th>
+<th>Dùng khi</th>
+<th>Điều khiển được gì</th>
+<th>Công nghệ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1 · Terminal</strong> (CLI + TUI)</td>
+<td>Ở trong terminal, SSH, script hoá, CI</td>
+<td>Toàn bộ. CLI là mặt bằng đầy đủ nhất</td>
+<td>Go stdlib; TUI vẽ tay, không kéo framework nặng</td>
+</tr>
+<tr>
+<td><strong>2 · Dashboard 2D</strong></td>
+<td>Muốn nhìn nhanh: phiên nào chạy, hạn mức, log</td>
+<td>Xem · bật/dừng phiên · duyệt approval · đọc log</td>
+<td>Web cục bộ, HTML/CSS/JS tĩnh nhúng bằng Go <code>embed</code></td>
+</tr>
+<tr>
+<td><strong>3 · Workflow board</strong></td>
+<td>Dựng và chạy flow nhiều bước</td>
+<td>Kéo/nối node, sửa <code>flows.toml</code> bằng giao diện, chạy/tạm dừng/resume flow</td>
+<td>Cùng web app với mặt 2, một tab khác</td>
+</tr>
+<tr>
+<td><strong>4 · 3D</strong></td>
+<td>Nhìn toàn cảnh đội agent, trình diễn</td>
+<td>Cùng tập hành động với mặt 2, thể hiện bằng không gian</td>
+<td>React Three Fiber</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Ba luật giữ cho bốn mặt không vỡ</h3>
+<p>Bốn mặt × N tính năng là công thức phình bảo trì. Ba luật sau là thứ giữ nó sống:</p>
+<ol>
+<li><strong>Một hợp đồng duy nhất.</strong> Mọi hành động đi qua <strong>API lõi có version</strong>
+   (<code>internal/api</code>). CLI <strong>không</strong> phải là lõi — CLI chỉ là <em>client đầu tiên</em>.
+   Mọi mặt khác là client ngang hàng. Không mặt nào được gọi thẳng vào <code>store</code>
+   hay <code>profile</code>.</li>
+<li><strong>Ngang quyền (capability parity).</strong> Một tính năng chưa xong nếu <strong>chưa làm
+   được từ CLI</strong>. UI được phép làm việc đó <em>dễ hơn</em>, không được là <em>cách duy nhất</em>.
+   Kiểm bằng test: mỗi hành động của UI phải có lệnh CLI tương đương.</li>
+<li><strong>Sự thật đến từ event, không phải từ đoán.</strong> Cả bốn mặt cùng nghe <strong>một
+   luồng event</strong> có schema/version. Cấm UI tự suy trạng thái bằng timer hay
+   animation — trạng thái nào không có event thì không được hiển thị.</li>
+</ol>
+<h3>Mặt nào cũng bật/tắt được</h3>
+<ul>
+<li>Lõi chạy <strong>không cần mặt nào cả</strong> (headless, cho CI/script).</li>
+<li>3D là <strong>tuỳ chọn</strong>: máy yếu hoặc <code>prefers-reduced-motion</code> thì rơi về 2D; tắt hẳn
+  cũng không ảnh hưởng lõi.</li>
+<li>Web assets nhúng bằng <code>embed</code> nên vẫn <strong>một binary</strong>; không cần Node để chạy.</li>
+</ul>
+<h3>Cấu hình theo từng dự án</h3>
+<p>Tầng cấu hình, dưới đè lên trên: <strong>mặc định của công cụ → global
+(<code>~/.ai-accounts/config.toml</code>) → project (<code>.sagent/project.toml</code>) → cờ dòng lệnh</strong>.
+Mỗi project tự khai báo: mặt mặc định, layout, cột nào hiện, flow nào ghim,
+route AI nào dùng, giới hạn song song, hành động nào cần duyệt. Xem mục 8.</p>
 <hr>
 <h2>3. Kiến trúc đích</h2>
 <pre><code>CLI (sagent) · Dashboard 2D/3D
@@ -340,10 +419,10 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li>⚠ <strong>Blocker cần bạn:</strong> máy/VM <strong>Linux</strong>; <strong>API key</strong> thật (local-only, redaction) cho phần API path.</li>
 <li><strong>Trạng thái:</strong> Windows/Claude subscription + junction đã đo (<code>docs/DO-LUONG.md</code>); còn lại chưa.</li>
 </ul>
-<h3>Pha 1 — Lõi domain + storage + Claude slice + 1 API slice</h3>
-<p>🎯 Thay chức năng v1 bằng lõi có domain rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
+<h3>Pha 1 — Storage + Claude slice + 1 API slice</h3>
+<p>🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
 <ul>
-<li class="task"><span class="box"></span><code>internal/domain</code>: types + state machines (không phụ thuộc hạ tầng).</li>
+<li class="task done"><span class="box"></span>~~<code>internal/domain</code>~~ <strong>bỏ</strong> theo mục 2b — dùng thẳng các package hiện có.</li>
 <li class="task"><span class="box"></span><code>internal/store</code>: <strong>SQLite</strong> schema/migration cho auth profile, harness, provider,
   route, project, session, event.</li>
 <li class="task"><span class="box"></span><code>jsonutil</code> (đã có) + atomic replace + preservation test (giữ).</li>
@@ -418,18 +497,31 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   correlation ID/usage/error gốc; thêm model/provider chỉ khác endpoint bằng manifest;
   chưa xác minh giữ <code>experimental</code>/<code>unknown</code>.</li>
 </ul>
-<h3>Pha 5 — Dashboard vận hành 2D</h3>
-<p>🎯 Giao diện vận hành chính xác <strong>trước</strong> khi trang trí 3D.</p>
-<ul>
-<li>Trạng thái chuẩn: <code>queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost</code>.</li>
-<li>Bảo mật: <strong>chỉ bind loopback</strong> mặc định; random auth token; Origin validation + CSRF;
-  không đưa credential/env/secret-path lên WebSocket; <strong>log redaction</strong>; mutation có audit event.</li>
-<li><strong>DoD:</strong> tắt dashboard không ảnh hưởng daemon/session; UI phản ánh <strong>event thật</strong>, không
-  đoán bằng animation timer; mobile dùng được cho status/approval/stop/log-redacted; tách
-  bạch harness/model/API provider/auth profile/route/latency/token/cost khi có dữ liệu.</li>
-</ul>
-<h3>Pha 6 — Dashboard 3D</h3>
-<p>🎯 3D là <strong>projection của cùng event model</strong>, không có business logic riêng.</p>
+<h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
+<p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
+gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.</p>
+<p><strong>5a · API lõi + Terminal.</strong> <code>internal/api</code> có version + luồng event có schema;
+CLI chuyển sang gọi API thay vì gọi thẳng <code>store</code>/<code>profile</code>; thêm <strong>TUI</strong> (bảng
+chọn đánh số như <code>tk</code> v1, xem/dừng phiên, theo dõi log).
+<em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</p>
+<p><strong>5b · Dashboard 2D.</strong> Trạng thái chuẩn:
+<code>queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost</code>.
+Điều khiển được: bật/dừng phiên, duyệt approval, đọc log đã redaction.
+<em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền).</p>
+<p><strong>5c · Workflow board.</strong> Dựng/sửa flow bằng giao diện, ghi ra <code>flows.toml</code>
+(file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.
+<em>DoD:</em> flow tạo từ board và flow viết tay chạy y hệt nhau.</p>
+<p><strong>5d · Cấu hình theo project.</strong> <code>[ui]</code> trong <code>.sagent/project.toml</code> (mặt mặc định,
+cột, flow ghim, bật/tắt 3D) + tầng global.
+<em>DoD:</em> hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã.</p>
+<p><strong>Bảo mật chung cho mọi mặt web:</strong> chỉ bind loopback mặc định; random auth token;
+Origin validation + CSRF; <strong>không</strong> đưa credential/env/secret-path lên WebSocket;
+log redaction; mọi mutation có audit event.</p>
+<p><em>DoD chung:</em> tắt mặt nào lõi vẫn chạy · UI phản ánh <strong>event thật</strong>, không đoán bằng
+animation timer · mobile dùng được cho status/approval/stop/log.</p>
+<h3>Pha 6 — Mặt thứ tư: 3D</h3>
+<p>🎯 3D là <strong>projection của cùng event model</strong>, không có business logic riêng —
+và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (bấm orb → dừng/duyệt phiên đó).</p>
 <ul>
 <li>Mascot đại diện agent harness <strong>hoặc</strong> AI provider — UI phân biệt rõ hai loại.</li>
 <li>Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, <strong>fallback 2D</strong>.</li>
@@ -456,6 +548,21 @@ name = &quot;example-app&quot;
 [ai]           default_route=&quot;coding-primary&quot;;  fallback_routes=[&quot;coding-secondary&quot;,&quot;local-fallback&quot;]
 [ai.requirements] capabilities=[&quot;tool_calling&quot;,&quot;streaming&quot;];  preferred_models=[&quot;provider/model-id&quot;]
 [workspace]    copy=[&quot;.env.example&quot;];  link=[&quot;node_modules&quot;];  deny=[&quot;.env&quot;,&quot;*.pem&quot;,&quot;secrets/**&quot;]
+
+# Bốn mặt điều khiển: mỗi project tự chọn mặt mặc định và bày biện riêng.
+[ui]
+default_surface = &quot;tui&quot;          # tui | dashboard | workflow | 3d
+theme           = &quot;dark&quot;
+[ui.dashboard]
+columns  = [&quot;session&quot;,&quot;harness&quot;,&quot;model&quot;,&quot;state&quot;,&quot;tokens&quot;,&quot;cost&quot;,&quot;elapsed&quot;]
+group_by = &quot;project&quot;
+[ui.workflow]
+pinned_flows = [&quot;fanout&quot;,&quot;squad&quot;]
+autolayout   = true
+[ui.3d]
+enabled       = true              # tắt được cho máy yếu
+max_orbs      = 200               # vượt ngưỡng thì gộp, tránh tụt khung hình
+reduced_motion = &quot;auto&quot;
 </code></pre>
 <p>Route chỉ chứa <strong>ID tham chiếu</strong>; key/token <strong>không</strong> nằm trong project config. Schema
 versioned, validation chặt, xử lý đúng Windows path/monorepo/command-có-khoảng-trắng; ưu
@@ -465,6 +572,9 @@ tiên <strong>argv</strong> thay vì nối chuỗi shell.</p>
 <ul>
 <li><strong>Unit:</strong> state transitions · DAG validation · path-ownership/safe-delete · JSON
   case-insensitive duplicate · redaction · capability negotiation.</li>
+<li><strong>Ngang quyền giữa bốn mặt (mục 2c luật 2):</strong> test liệt kê mọi hành động API và
+  khẳng định <strong>mỗi hành động đều có lệnh CLI tương đương</strong>. Thêm nút trên UI mà
+  quên lệnh CLI thì test đỏ — đây là thứ giữ cho terminal không bị bỏ rơi.</li>
 <li><strong>Contract/conformance:</strong> mọi Harness Adapter/Agent Driver chạy cùng bộ test (isolated
   roots, verify capability đúng, start/stop/cancel idempotent, không log secret, behavior
   khi binary/version thiếu). Mọi AI Provider Adapter/Model Client chạy API conformance

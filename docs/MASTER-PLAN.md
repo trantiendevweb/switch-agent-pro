@@ -23,7 +23,21 @@
 Đích không phải "mở nhiều terminal", mà là: dùng **cả subscription profile lẫn API
 profile**, gắn vào **agent harness** hoặc **model route** phù hợp, chạy trong
 **workspace biệt lập của từng project**, điều phối bằng **flow khai báo được**, lưu
-**trạng thái bền vững**, và **quan sát realtime**.
+**trạng thái bền vững**, **quan sát realtime**, và **điều khiển được từ bốn mặt**
+(terminal → 2D → workflow board → 3D) — xem mục 2c.
+
+### Cam kết mã nguồn mở
+
+Đây là tiêu chí sản phẩm, không phải câu khẩu hiệu:
+
+- **Giấy phép MIT**, toàn bộ mã nằm trong repo — không có phần lõi đóng.
+- **Không telemetry, không tài khoản, không dịch vụ đám mây bắt buộc.** Clone về là
+  chạy được offline; thứ duy nhất ra Internet là chính CLI/API của nhà cung cấp AI
+  mà bạn cấu hình.
+- **Mọi phụ thuộc phải là mã nguồn mở, giấy phép tương thích**, ghi trong
+  `docs/OPEN_SOURCE_LEDGER.md`. Ưu tiên stdlib; thêm dependency phải có lý do.
+- **Không có tính năng nào bị khoá sau bản trả phí** — không có "bản pro".
+- Dashboard **tự phục vụ tại máy bạn**; không gửi state đi đâu.
 
 ---
 
@@ -71,6 +85,49 @@ clone về chạy trên máy mình**. Cân lại từng món theo tiêu chí "n�
 **Khi nào xét lại:** cần daemon nếu có tính năng *flow chạy dài phải sống sót
 qua reboot* hoặc *dashboard cần push realtime khi không ai mở terminal*. Chưa có
 thì không làm trước.
+
+---
+
+## 2c. Bốn mặt điều khiển (control surfaces)
+
+Hệ thống phải **điều khiển được AI từ bốn mặt**, và cả bốn đều **dùng thật được**
+lẫn **cấu hình được** — không có mặt nào chỉ để ngắm:
+
+| Mặt | Dùng khi | Điều khiển được gì | Công nghệ |
+|---|---|---|---|
+| **1 · Terminal** (CLI + TUI) | Ở trong terminal, SSH, script hoá, CI | Toàn bộ. CLI là mặt bằng đầy đủ nhất | Go stdlib; TUI vẽ tay, không kéo framework nặng |
+| **2 · Dashboard 2D** | Muốn nhìn nhanh: phiên nào chạy, hạn mức, log | Xem · bật/dừng phiên · duyệt approval · đọc log | Web cục bộ, HTML/CSS/JS tĩnh nhúng bằng Go `embed` |
+| **3 · Workflow board** | Dựng và chạy flow nhiều bước | Kéo/nối node, sửa `flows.toml` bằng giao diện, chạy/tạm dừng/resume flow | Cùng web app với mặt 2, một tab khác |
+| **4 · 3D** | Nhìn toàn cảnh đội agent, trình diễn | Cùng tập hành động với mặt 2, thể hiện bằng không gian | React Three Fiber |
+
+### Ba luật giữ cho bốn mặt không vỡ
+
+Bốn mặt × N tính năng là công thức phình bảo trì. Ba luật sau là thứ giữ nó sống:
+
+1. **Một hợp đồng duy nhất.** Mọi hành động đi qua **API lõi có version**
+   (`internal/api`). CLI **không** phải là lõi — CLI chỉ là *client đầu tiên*.
+   Mọi mặt khác là client ngang hàng. Không mặt nào được gọi thẳng vào `store`
+   hay `profile`.
+2. **Ngang quyền (capability parity).** Một tính năng chưa xong nếu **chưa làm
+   được từ CLI**. UI được phép làm việc đó *dễ hơn*, không được là *cách duy nhất*.
+   Kiểm bằng test: mỗi hành động của UI phải có lệnh CLI tương đương.
+3. **Sự thật đến từ event, không phải từ đoán.** Cả bốn mặt cùng nghe **một
+   luồng event** có schema/version. Cấm UI tự suy trạng thái bằng timer hay
+   animation — trạng thái nào không có event thì không được hiển thị.
+
+### Mặt nào cũng bật/tắt được
+
+- Lõi chạy **không cần mặt nào cả** (headless, cho CI/script).
+- 3D là **tuỳ chọn**: máy yếu hoặc `prefers-reduced-motion` thì rơi về 2D; tắt hẳn
+  cũng không ảnh hưởng lõi.
+- Web assets nhúng bằng `embed` nên vẫn **một binary**; không cần Node để chạy.
+
+### Cấu hình theo từng dự án
+
+Tầng cấu hình, dưới đè lên trên: **mặc định của công cụ → global
+(`~/.ai-accounts/config.toml`) → project (`.sagent/project.toml`) → cờ dòng lệnh**.
+Mỗi project tự khai báo: mặt mặc định, layout, cột nào hiện, flow nào ghim,
+route AI nào dùng, giới hạn song song, hành động nào cần duyệt. Xem mục 8.
 
 ---
 
@@ -232,9 +289,9 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - ⚠ **Blocker cần bạn:** máy/VM **Linux**; **API key** thật (local-only, redaction) cho phần API path.
 - **Trạng thái:** Windows/Claude subscription + junction đã đo (`docs/DO-LUONG.md`); còn lại chưa.
 
-### Pha 1 — Lõi domain + storage + Claude slice + 1 API slice
-🎯 Thay chức năng v1 bằng lõi có domain rõ, storage an toàn, và **hai lát cắt dọc**.
-- [ ] `internal/domain`: types + state machines (không phụ thuộc hạ tầng).
+### Pha 1 — Storage + Claude slice + 1 API slice
+🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và **hai lát cắt dọc**.
+- [x] ~~`internal/domain`~~ **bỏ** theo mục 2b — dùng thẳng các package hiện có.
 - [ ] `internal/store`: **SQLite** schema/migration cho auth profile, harness, provider,
   route, project, session, event.
 - [ ] `jsonutil` (đã có) + atomic replace + preservation test (giữ).
@@ -305,17 +362,38 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   correlation ID/usage/error gốc; thêm model/provider chỉ khác endpoint bằng manifest;
   chưa xác minh giữ `experimental`/`unknown`.
 
-### Pha 5 — Dashboard vận hành 2D
-🎯 Giao diện vận hành chính xác **trước** khi trang trí 3D.
-- Trạng thái chuẩn: `queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost`.
-- Bảo mật: **chỉ bind loopback** mặc định; random auth token; Origin validation + CSRF;
-  không đưa credential/env/secret-path lên WebSocket; **log redaction**; mutation có audit event.
-- **DoD:** tắt dashboard không ảnh hưởng daemon/session; UI phản ánh **event thật**, không
-  đoán bằng animation timer; mobile dùng được cho status/approval/stop/log-redacted; tách
-  bạch harness/model/API provider/auth profile/route/latency/token/cost khi có dữ liệu.
+### Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)
+🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
+gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.
 
-### Pha 6 — Dashboard 3D
-🎯 3D là **projection của cùng event model**, không có business logic riêng.
+**5a · API lõi + Terminal.** `internal/api` có version + luồng event có schema;
+CLI chuyển sang gọi API thay vì gọi thẳng `store`/`profile`; thêm **TUI** (bảng
+chọn đánh số như `tk` v1, xem/dừng phiên, theo dõi log).
+*DoD:* mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào `store`.
+
+**5b · Dashboard 2D.** Trạng thái chuẩn:
+`queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost`.
+Điều khiển được: bật/dừng phiên, duyệt approval, đọc log đã redaction.
+*DoD:* mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền).
+
+**5c · Workflow board.** Dựng/sửa flow bằng giao diện, ghi ra `flows.toml`
+(file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.
+*DoD:* flow tạo từ board và flow viết tay chạy y hệt nhau.
+
+**5d · Cấu hình theo project.** `[ui]` trong `.sagent/project.toml` (mặt mặc định,
+cột, flow ghim, bật/tắt 3D) + tầng global.
+*DoD:* hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã.
+
+**Bảo mật chung cho mọi mặt web:** chỉ bind loopback mặc định; random auth token;
+Origin validation + CSRF; **không** đưa credential/env/secret-path lên WebSocket;
+log redaction; mọi mutation có audit event.
+
+*DoD chung:* tắt mặt nào lõi vẫn chạy · UI phản ánh **event thật**, không đoán bằng
+animation timer · mobile dùng được cho status/approval/stop/log.
+
+### Pha 6 — Mặt thứ tư: 3D
+🎯 3D là **projection của cùng event model**, không có business logic riêng —
+và cũng **điều khiển được**, không chỉ để ngắm (bấm orb → dừng/duyệt phiên đó).
 - Mascot đại diện agent harness **hoặc** AI provider — UI phân biệt rõ hai loại.
 - Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, **fallback 2D**.
 - Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.
@@ -343,6 +421,21 @@ name = "example-app"
 [ai]           default_route="coding-primary";  fallback_routes=["coding-secondary","local-fallback"]
 [ai.requirements] capabilities=["tool_calling","streaming"];  preferred_models=["provider/model-id"]
 [workspace]    copy=[".env.example"];  link=["node_modules"];  deny=[".env","*.pem","secrets/**"]
+
+# Bốn mặt điều khiển: mỗi project tự chọn mặt mặc định và bày biện riêng.
+[ui]
+default_surface = "tui"          # tui | dashboard | workflow | 3d
+theme           = "dark"
+[ui.dashboard]
+columns  = ["session","harness","model","state","tokens","cost","elapsed"]
+group_by = "project"
+[ui.workflow]
+pinned_flows = ["fanout","squad"]
+autolayout   = true
+[ui.3d]
+enabled       = true              # tắt được cho máy yếu
+max_orbs      = 200               # vượt ngưỡng thì gộp, tránh tụt khung hình
+reduced_motion = "auto"
 ```
 
 Route chỉ chứa **ID tham chiếu**; key/token **không** nằm trong project config. Schema
@@ -355,6 +448,9 @@ tiên **argv** thay vì nối chuỗi shell.
 
 - **Unit:** state transitions · DAG validation · path-ownership/safe-delete · JSON
   case-insensitive duplicate · redaction · capability negotiation.
+- **Ngang quyền giữa bốn mặt (mục 2c luật 2):** test liệt kê mọi hành động API và
+  khẳng định **mỗi hành động đều có lệnh CLI tương đương**. Thêm nút trên UI mà
+  quên lệnh CLI thì test đỏ — đây là thứ giữ cho terminal không bị bỏ rơi.
 - **Contract/conformance:** mọi Harness Adapter/Agent Driver chạy cùng bộ test (isolated
   roots, verify capability đúng, start/stop/cancel idempotent, không log secret, behavior
   khi binary/version thiếu). Mọi AI Provider Adapter/Model Client chạy API conformance

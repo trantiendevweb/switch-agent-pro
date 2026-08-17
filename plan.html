@@ -186,6 +186,51 @@
       <span style="font-size:12.5px">Chỉ khác ở auth, protocol và cách agent/model được thực thi.</span></div>
   </section>
 
+  <!-- BỐN MẶT ĐIỀU KHIỂN -->
+  <section>
+    <p class="eyebrow">Cách bạn điều khiển</p>
+    <h2>Bốn mặt, cùng một lõi</h2>
+    <p class="sub">Terminal → 2D → workflow board → 3D. Cả bốn đều <b>dùng thật được</b> và <b>cấu hình được</b> — không mặt nào chỉ để ngắm.</p>
+    <div class="grid g2">
+      <div class="card rv"><div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9l3 3-3 3M12 15h5"/></svg></div>
+        <h3>1 · Terminal <span class="kind h">CLI + TUI</span></h3><p>Mặt đầy đủ nhất. Chạy được qua SSH, nhét vào script và CI. Bảng chọn đánh số như thời <code>tk</code>.</p></div>
+      <div class="card rv"><div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <h3>2 · Dashboard 2D</h3><p>Nhìn nhanh phiên nào chạy, hạn mức, chi phí. Bật/dừng phiên, duyệt approval, đọc log đã che secret.</p></div>
+      <div class="card rv"><div class="ico b"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4285F4" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 6h9M6.5 8.2 10.5 16M17.5 8.2 13.5 16"/></svg></div>
+        <h3>3 · Workflow board</h3><p>Kéo nối node dựng flow nhiều bước. Ghi thẳng ra <code>flows.toml</code> — file vẫn là nguồn sự thật, sửa tay được.</p></div>
+      <div class="card rv"><div class="ico b"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4285F4" stroke-width="1.8" stroke-linecap="round"><path d="M21 8v8a2 2 0 0 1-1 1.7l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.7l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></div>
+        <h3>4 · 3D</h3><p>Toàn cảnh đội agent. Cũng <b>điều khiển được</b> — bấm orb để dừng hoặc duyệt đúng phiên đó, không chỉ để ngắm.</p></div>
+    </div>
+    <div class="shared rv" style="text-align:left">
+      <b>Ba luật giữ cho bốn mặt không vỡ:</b><br>
+      <b style="color:var(--run)">1.</b> Một hợp đồng duy nhất — mọi hành động qua API lõi có version; CLI cũng chỉ là <em>client đầu tiên</em>.<br>
+      <b style="color:var(--run)">2.</b> Ngang quyền — tính năng chưa xong nếu chưa làm được từ CLI. UI được phép <em>dễ hơn</em>, không được là <em>cách duy nhất</em>.<br>
+      <b style="color:var(--run)">3.</b> Sự thật đến từ event — cấm UI tự đoán trạng thái bằng timer hay animation.
+    </div>
+  </section>
+
+  <!-- MÃ NGUỒN MỞ -->
+  <section>
+    <p class="eyebrow">Cam kết</p>
+    <h2>Mã nguồn mở, cấu hình theo từng dự án</h2>
+    <div class="grid g2">
+      <div class="card rv"><h3>Mở thật, không có bản pro</h3><p>MIT, toàn bộ mã trong repo. Không telemetry, không tài khoản, không dịch vụ đám mây bắt buộc — clone về chạy offline. Mọi phụ thuộc đều mã nguồn mở, ghi trong ledger.</p></div>
+      <div class="card rv"><h3>Mỗi dự án một kiểu</h3><p>Tầng cấu hình: mặc định → global → <code>.sagent/project.toml</code> → cờ dòng lệnh. Project tự chọn mặt mặc định, cột hiển thị, flow ghim, route AI, giới hạn song song, hành động nào cần duyệt.</p></div>
+    </div>
+    <div class="tw rv" style="margin-top:13px">
+      <table>
+        <thead><tr><th>Cấu hình được</th><th>Ví dụ</th></tr></thead>
+        <tbody>
+          <tr><td>Mặt mặc định khi mở</td><td><code>default_surface = "tui" | "dashboard" | "workflow" | "3d"</code></td></tr>
+          <tr><td>Cột trên dashboard</td><td><code>columns = ["session","model","state","tokens","cost"]</code></td></tr>
+          <tr><td>Bật/tắt 3D cho máy yếu</td><td><code>[ui.3d] enabled = false</code> · <code>max_orbs = 200</code></td></tr>
+          <tr><td>Route AI + fallback</td><td><code>default_route</code> · <code>fallback_routes</code></td></tr>
+          <tr><td>Chặn hành động nguy hiểm</td><td><code>require_approval_for = ["merge","deploy"]</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- NGUYÊN TẮC -->
   <section>
     <p class="eyebrow">Linh hồn</p>
@@ -300,9 +345,20 @@
         <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Thêm provider chỉ khác endpoint bằng manifest · fallback không mất usage/error gốc.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 5–7</small> · Dashboard 2D → 3D → phát hành</div>
-        <div class="de">2D vận hành chính xác trước, 3D là <em>projection của cùng event model</em>. Rồi hardening: migration, ACL, symlink escape, SBOM, signed release.</div>
-        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>UI phản ánh event thật, không đoán bằng animation timer.</div>
+      <div class="it rv"><div class="ph"><small>Pha 5</small> · Bốn mặt điều khiển</div>
+        <div class="de">Làm từ gần lõi ra ngoài, để hợp đồng API được thử lửa trước khi vẽ đẹp.</div>
+        <ul class="steps">
+          <li><b>5a</b> API lõi có version + luồng event + <b>TUI</b> (bảng chọn như <code>tk</code>)</li>
+          <li><b>5b</b> Dashboard 2D — bật/dừng phiên, duyệt approval, log đã che secret</li>
+          <li><b>5c</b> Workflow board — dựng flow bằng giao diện, ghi ra <code>flows.toml</code></li>
+          <li><b>5d</b> Cấu hình <code>[ui]</code> theo từng project</li>
+        </ul>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Mỗi hành động của UI đều có lệnh CLI tương đương — có test bắt buộc.</div>
+      </div>
+
+      <div class="it rv"><div class="ph"><small>Pha 6–7</small> · Mặt 3D → phát hành</div>
+        <div class="de">3D là <em>projection của cùng event model</em>, và cũng điều khiển được (bấm orb để dừng/duyệt). Rồi hardening: migration, ACL, symlink escape, SBOM, signed release.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Tắt mặt nào lõi vẫn chạy · UI phản ánh event thật, không đoán bằng animation timer.</div>
       </div>
     </div>
   </section>
