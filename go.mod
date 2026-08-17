@@ -2,6 +2,12 @@ module github.com/trantiendevweb/switch-agent-pro
 
 go 1.25.0
 
+// Toolchain ghim tường minh: go1.25.0 dính 23 lỗ hổng stdlib mà govulncheck
+// xác nhận là CÓ ĐƯỜNG GỌI TỚI (crypto/tls, crypto/x509, net/http, net/url,
+// net/textproto, encoding/asn1) — hầu hết qua dash.Server.Run → http.Serve.
+// Nâng toolchain là cách sửa duy nhất; không dependency nào phải đổi.
+toolchain go1.25.13
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	modernc.org/sqlite v1.56.0
