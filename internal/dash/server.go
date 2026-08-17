@@ -108,6 +108,23 @@ func (s *Server) authorized(r *http.Request) bool {
 	return s.sess.valid(cookieID(r))
 }
 
+// layNext đọc tham số ?next= và chỉ chấp nhận đường dẫn NỘI BỘ.
+//
+// Kiểm `strings.HasPrefix(next, "/")` là chưa đủ: "//evil.example" cũng bắt đầu
+// bằng "/" nhưng trình duyệt hiểu nó là URL đổi tên miền (protocol-relative), và
+// "/\evil.example" cũng vậy trên phần lớn trình duyệt. Người dùng bấm link đăng
+// nhập rồi bị ném sang trang lừa đảo — mà URL trước đó đúng là dash của họ.
+func layNext(r *http.Request) string {
+	n := r.URL.Query().Get("next")
+	if n == "" || !strings.HasPrefix(n, "/") {
+		return "/"
+	}
+	if strings.HasPrefix(n, "//") || strings.HasPrefix(n, `/\`) {
+		return "/"
+	}
+	return n
+}
+
 // wantsHTML đoán request đến từ thanh địa chỉ trình duyệt (để chuyển hướng tới
 // form) chứ không phải fetch/curl (để trả 401).
 func wantsHTML(r *http.Request) bool {
@@ -121,9 +138,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "chưa đặt mật khẩu — chạy: sagent dash --set-password", http.StatusNotImplemented)
 		return
 	}
-	next := r.URL.Query().Get("next")
-	if next == "" || !strings.HasPrefix(next, "/") {
-		next = "/" // chỉ nhận đường dẫn nội bộ, tránh open-redirect
+	next := layNext(r)
+
+	// Ở chế độ kín, /login cũng phải kiểm Host loopback y như guard. Thiếu chỗ
+	// này thì lớp chống DNS-rebind hở đúng cái cửa quan trọng nhất: tên miền của
+	// kẻ tấn công trỏ về 127.0.0.1, trang của nó POST mật khẩu vào dash nội bộ,
+	// và sameOrigin cho qua vì Origin lẫn Host đều là tên miền đó.
+	if !s.exposed && !loopbackHost(r.Host) {
+		http.Error(w, "chỉ phục vụ ở loopback", http.StatusForbidden)
+		return
 	}
 
 	if r.Method == http.MethodGet {
@@ -163,6 +186,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// Trang lạ điều hướng tới /logout thì cookie SameSite=Lax VẪN được gửi, nên
+	// phiên bị xoá. Hại nhỏ — chỉ là bị đăng xuất — nhưng không có lý do để hở.
+	//
+	// Dùng Sec-Fetch-Site thay vì bắt POST: ba file HTML đang gọi bằng <a href>,
+	// đổi hết sang form chỉ để chặn một trò chọc phá là đánh đổi tồi. Trình duyệt
+	// hiện đại đều gắn header này; curl không gắn và vẫn dùng được như trước.
+	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		http.Error(w, "yêu cầu đến từ trang khác", http.StatusForbidden)
+		return
+	}
 	s.sess.drop(cookieID(r))
 	clearCookie(w, s.dungTLS)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -319,10 +352,21 @@ func (s *Server) Run(host string, port int) error {
 
 	fmt.Println()
 	fmt.Println("  Ctrl+C để dừng.")
-	if s.dungTLS {
-		return http.ServeTLS(ln, s, certFile, keyFile)
+	// http.Serve/ServeTLS dùng http.Server MẶC ĐỊNH: KHÔNG có hạn giờ nào cả.
+	// Kẻ tấn công mở nhiều socket rồi nhỏ từng byte header là giữ mãi goroutine
+	// và file descriptor — Slowloris. Nguy hiểm thật ở chế độ phơi ra mạng.
+	//
+	// ReadHeaderTimeout là cái chặn đúng trò đó. WriteTimeout KHÔNG đặt được:
+	// /api/events là luồng SSE chạy dài, đặt vào là tự cắt tính năng của mình.
+	srv := &http.Server{
+		Handler:           s,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
-	return http.Serve(ln, s)
+	if s.dungTLS {
+		return srv.ServeTLS(ln, certFile, keyFile)
+	}
+	return srv.Serve(ln)
 }
 
 func isLoopbackAddr(host string) bool {
@@ -347,16 +391,20 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Chống dò mật khẩu: sai nhiều lần liên tiếp thì bắt chờ.
-		if wait := s.throttle(); wait > 0 {
-			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
-			http.Error(w, "thử lại sau", http.StatusTooManyRequests)
-			return
-		}
+		// KHÔNG throttle ở đây. Bộ đếm chỉ còn một nhiệm vụ: làm chậm việc DÒ MẬT
+		// KHẨU, và chỗ dò mật khẩu là /login. Để nó ở guard thì kẻ tấn công gõ
+		// sai mật khẩu vài lần là khoá luôn dashboard của người dùng hợp lệ —
+		// biến lá chắn thành vũ khí chĩa vào đúng người nó bảo vệ. Đã đo bằng
+		// TestDoMatKhauNhieuLanBiChan.
 
 		// Một đường vào duy nhất: cookie phiên do form đăng nhập cấp.
+		//
+		// KHÔNG gọi noteFail ở đây. Bộ đếm này để chống DÒ MẬT KHẨU, mà request
+		// không cookie thì chẳng dò gì cả — ID phiên là chuỗi ngẫu nhiên, không
+		// đoán được. Trước đây có gọi, và hậu quả đo được: 8 dòng curl vô danh là
+		// khoá luôn người đang đăng nhập hợp lệ (429). Một lá chắn quay ra đánh
+		// đúng người nó bảo vệ.
 		if !s.authorized(r) {
-			s.noteFail()
 			// Trình duyệt gõ đường dẫn thì đưa tới form đăng nhập cho tử tế;
 			// còn gọi API thì trả 401 để client biết mà xử lý.
 			if s.auth != nil && r.Method == http.MethodGet && wantsHTML(r) {
@@ -366,7 +414,10 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "chưa đăng nhập", http.StatusUnauthorized)
 			return
 		}
-		s.noteOK()
+		// Cũng KHÔNG gọi noteOK ở đây. Dashboard tự poll /api/state 5 giây một
+		// lần, nên reset bộ đếm ở mọi request hợp lệ nghĩa là: chỉ cần có một tab
+		// đang mở thì kẻ dò mật khẩu không bao giờ chạm ngưỡng. Chỉ ĐĂNG NHẬP
+		// THÀNH CÔNG mới được xoá bộ đếm — xem handleLogin.
 
 		// Chống CSRF: mutation phải CÙNG GỐC với chính request (đúng cho cả hai
 		// chế độ). Không có Origin = client dòng lệnh, đã qua cửa token là đủ.

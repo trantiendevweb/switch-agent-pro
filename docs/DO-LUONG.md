@@ -973,6 +973,59 @@ binary tải về là **v0.2.0**, tag trước khi tính năng đó ra đời. K
 rằng bản phát hành và nhánh `main` là hai thứ khác nhau, và lượt chạy thử phải nói rõ mình
 đang thử cái nào.
 
+### Soát dashboard bằng codex — 6 lỗi thật (2026-08-18, phiên tự chạy)
+
+Đưa `internal/dash/server.go` + `session.go` cho `codex exec` soát, yêu cầu mỗi cáo buộc
+phải kèm **kịch bản cụ thể**. Nó trả về 6 mục. Tôi **không tin lời** — đọc lại code và dựng
+test cho từng cái. **Cả 6 đều thật**, 5 cái viết được test và **cả 5 đều đỏ trước khi vá**.
+
+| # | Lỗi | Kịch bản |
+|---|---|---|
+| 1 | `next=//evil.example` lọt qua kiểm | `HasPrefix(next,"/")` cho qua, trình duyệt hiểu `//host` là **đổi tên miền** |
+| 2 | `/login` nằm ngoài `guard` | tên miền kẻ tấn công trỏ về 127.0.0.1 → POST mật khẩu vào dash nội bộ; `sameOrigin` cho qua vì Origin lẫn Host đều là tên miền đó |
+| 3 | `guard` gọi `noteFail()` cho mọi request vô danh | **8 dòng curl** là khoá luôn người đang đăng nhập (429) |
+| 4 | `guard` gọi `noteOK()` cho mọi request hợp lệ | dashboard tự poll 5s/lần → chỉ cần một tab đang mở là chống dò mật khẩu **vô hiệu** |
+| 5 | `/logout` nhận mọi method, không kiểm nguồn | trang lạ điều hướng tới → cookie SameSite=Lax vẫn gửi → phiên bị xoá |
+| 6 | `http.Serve` không hạn giờ | Slowloris: nhỏ từng byte header, giữ mãi goroutine + FD |
+
+**Lỗi 3 và 4 là cùng một gốc:** một bộ đếm đang làm hai việc trái ngược. Nó sinh ra để làm
+chậm việc **dò mật khẩu**, nhưng lại bị nối vào **mọi** request. Hệ quả là nó vừa quá rộng
+(người vô can bị khoá) vừa quá lỏng (poll hợp lệ xoá sạch bộ đếm). Bản vá không phải thêm
+điều kiện mà là **trả nó về đúng một việc**: chỉ `/login` đếm, chỉ đăng nhập thành công mới
+xoá, `guard` không đụng vào.
+
+Vá lỗi 3+4 xong, test mới lòi ra chỗ **vá chưa trọn**: `guard` vẫn gọi `throttle()`, nên kẻ
+dò mật khẩu vẫn khoá được người đang dùng — chỉ đổi đường chứ không bịt. Phải bỏ nốt lệnh
+throttle khỏi `guard`.
+
+Một test cũ, `TestDoNhieuLanBiChan`, **khẳng định đúng cái lỗi số 3 là hành vi mong muốn**:
+5 request không cookie thì người đăng nhập hợp lệ phải nhận 429. Nó ghi một cái lỗi thành
+hợp đồng. Đã viết lại thành `TestDoMatKhauNhieuLanBiChan` — đo đúng thứ bộ đếm sinh ra để
+bảo vệ, và khẳng định thêm rằng người có cookie **không bị vạ lây**.
+
+Lỗi 5 vá bằng `Sec-Fetch-Site` chứ không bắt POST: ba file HTML đang gọi logout bằng
+`<a href>`, đổi hết sang form chỉ để chặn một trò chọc phá là đánh đổi tồi. Trình duyệt
+hiện đại đều gắn header đó; `curl` không gắn và vẫn dùng được như trước.
+
+Lỗi 6: đặt `ReadHeaderTimeout` và `IdleTimeout`. **Không** đặt `WriteTimeout` — `/api/events`
+là luồng SSE chạy dài, đặt vào là tự cắt tính năng của mình.
+
+Đo lại trên cổng thật sau khi vá:
+
+```
+login                  -> 303
+/api/state có cookie   -> 200
+/logout CHÉO TRANG     -> 403      (bị chặn)
+/api/state sau đó      -> 200      (phiên còn sống)
+/logout bình thường    -> 303
+/api/state sau logout  -> 401
+```
+
+Nhận xét về việc dùng agent khác để soát: codex chỉ ra **6/6 đúng**, gồm hai lỗi logic mà
+đọc bằng mắt rất dễ trượt vì chúng nằm ở *chỗ gọi* chứ không ở *thân hàm*. Nhưng nó cũng
+kèm mấy trích dẫn file HTML chẳng liên quan, và không tự biết cái nào nghiêm trọng. Giá trị
+nằm ở chỗ **bắt tôi đi kiểm**, không phải ở chỗ kết luận thay tôi.
+
 ---
 
 ## Việc cần bạn hỗ trợ

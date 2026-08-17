@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -197,22 +196,39 @@ func TestCheDoPhoiVanChanOriginLa(t *testing.T) {
 
 // Dò nhiều lần thì bị bắt chờ (429). Quan trọng gấp bội so với thời còn token:
 // mật khẩu do người đặt nên entropy thấp hơn hẳn 128 bit ngẫu nhiên.
-func TestDoNhieuLanBiChan(t *testing.T) {
+// Bộ đếm chống dò tồn tại để chặn DÒ MẬT KHẨU — nên phải đo đúng việc đó.
+//
+// Bản trước của test này khẳng định: 5 request /api/state KHÔNG cookie thì người
+// đã đăng nhập hợp lệ bị 429. Nó ghi thẳng một cái lỗi thành hợp đồng — bất kỳ ai
+// chạm được cổng cũng khoá được người đang dùng bằng 5 dòng curl, mà chẳng dò gì
+// cả (ID phiên là chuỗi ngẫu nhiên, không đoán được). Xem lachan_test.go.
+func TestDoMatKhauNhieuLanBiChan(t *testing.T) {
 	s := newTestServer(t)
 	s.exposed = true
-	ck := dangNhap(t, s, "103.97.134.90:8788") // lấy cookie TRƯỚC: đăng nhập đúng sẽ reset bộ đếm
-	for i := 0; i < 5; i++ {
-		r := httptest.NewRequest("GET", "/api/state?lan="+strconv.Itoa(i), nil)
-		r.Host = "103.97.134.90:8788"
-		s.ServeHTTP(httptest.NewRecorder(), r)
+	const host = "103.97.134.90:8788"
+
+	for i := 0; i < 6; i++ {
+		postLogin(t, s, host, "", "Admin", "sai-mat-khau")
+	}
+	w := postLogin(t, s, host, "", "Admin", "sai-mat-khau")
+	if !strings.Contains(w.Body.String(), "thử lại sau") {
+		t.Fatal("dò mật khẩu sai 7 lần mà không bị bắt chờ")
+	}
+
+	// Và người có cookie hợp lệ KHÔNG bị vạ lây.
+	s2 := newTestServer(t)
+	s2.exposed = true
+	ck := dangNhap(t, s2, host)
+	for i := 0; i < 6; i++ {
+		postLogin(t, s2, host, "", "Admin", "sai-mat-khau")
 	}
 	r := httptest.NewRequest("GET", "/api/state", nil)
-	r.Host = "103.97.134.90:8788"
+	r.Host = host
 	r.AddCookie(ck)
-	w := httptest.NewRecorder()
-	s.ServeHTTP(w, r)
-	if w.Code != http.StatusTooManyRequests {
-		t.Fatalf("sau 5 lần sai phải bị 429, được %d", w.Code)
+	w2 := httptest.NewRecorder()
+	s2.ServeHTTP(w2, r)
+	if w2.Code == http.StatusTooManyRequests {
+		t.Fatal("người đã đăng nhập bị khoá vì kẻ khác dò mật khẩu")
 	}
 }
 
