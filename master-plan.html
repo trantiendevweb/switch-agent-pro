@@ -522,10 +522,20 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
 <p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
 gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.</p>
-<p><strong>5a · API lõi + Terminal.</strong> <code>internal/api</code> có version + luồng event có schema;
-CLI chuyển sang gọi API thay vì gọi thẳng <code>store</code>/<code>profile</code>; thêm <strong>TUI</strong> (bảng
-chọn đánh số như <code>tk</code> v1, xem/dừng phiên, theo dõi log).
-<em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</p>
+<p><strong>5a · API lõi + Terminal.</strong>  🟡 <em>API xong, TUI chưa</em></p>
+<ul>
+<li class="task done"><span class="box"></span><code>internal/api</code> — hợp đồng duy nhất, <code>api.Version = 1</code>, <code>api.Actions</code> liệt kê
+  mọi hành động hệ thống làm được.</li>
+<li class="task done"><span class="box"></span><code>internal/events</code> — event có <code>SchemaVersion</code>, bus trong tiến trình; <strong>lõi
+  không in stdout nữa</strong>, nó phát event và CLI chỉ là bộ vẽ đầu tiên.</li>
+<li class="task done"><span class="box"></span>CLI viết lại thành client của API; bảng lệnh ánh xạ 1-1 với action.</li>
+<li class="task done"><span class="box"></span><strong>Test ngang quyền</strong> (<code>cmd/sagent/main_test.go</code>): mọi action đều phải có
+  lệnh CLI, và CLI không được có action ngoài hợp đồng. Luật 2 giờ có răng.</li>
+<li class="task done"><span class="box"></span>Trần <code>max_parallel_sessions</code> giờ chặn cả <strong>tổng số phiên đang chạy</strong>, không
+  chỉ <code>--copies</code>.</li>
+<li class="task"><span class="box"></span><strong>TUI</strong> (bảng chọn đánh số như <code>tk</code> v1) — chưa làm.
+<em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</li>
+</ul>
 <p><strong>5b · Dashboard 2D.</strong> Trạng thái chuẩn:
 <code>queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost</code>.
 Điều khiển được: bật/dừng phiên, duyệt approval, đọc log đã redaction.

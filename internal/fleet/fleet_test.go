@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
@@ -37,7 +38,7 @@ func (fakeAgent) HasToken(string) bool     { return true }
 func (fakeAgent) Verify() []provider.Check { return nil }
 
 // setup dựng HOME giả + hồ sơ gốc có token + một store tạm.
-func setup(t *testing.T) (*store.DB, fakeAgent) {
+func setup(t *testing.T) (*store.DB, *events.Bus, fakeAgent) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -69,7 +70,9 @@ func setup(t *testing.T) (*store.DB, fakeAgent) {
 		stopAll(t, db)
 		db.Close()
 	})
-	return db, fakeAgent{base: base}
+	bus := events.NewBus()
+	t.Cleanup(bus.Close)
+	return db, bus, fakeAgent{base: base}
 }
 
 // stopAll giết mọi phiên còn sống VÀ ĐỢI chúng chết hẳn — không đợi thì
@@ -93,9 +96,9 @@ func stopAll(t *testing.T, db *store.DB) {
 }
 
 func TestFanOutStartsAndRecordsSessions(t *testing.T) {
-	db, a := setup(t)
+	db, bus, a := setup(t)
 
-	err := FanOut(db, a, "phu", Opts{Copies: 3}, []string{"-test.run=TestHelperProcess"})
+	_, err := FanOut(db, bus, a, "phu", Opts{Copies: 3}, []string{"-test.run=TestHelperProcess"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,9 +132,9 @@ func TestFanOutStartsAndRecordsSessions(t *testing.T) {
 
 // Dừng phiên thì `status` phải phản ánh ngay, không được báo sống thứ đã chết.
 func TestStoppedSessionDisappearsFromRunning(t *testing.T) {
-	db, a := setup(t)
+	db, bus, a := setup(t)
 
-	if err := FanOut(db, a, "phu", Opts{Copies: 2}, []string{"-test.run=TestHelperProcess"}); err != nil {
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 2}, []string{"-test.run=TestHelperProcess"}); err != nil {
 		t.Fatal(err)
 	}
 	list, _ := db.Running()
@@ -159,8 +162,8 @@ func TestStoppedSessionDisappearsFromRunning(t *testing.T) {
 
 // Thiếu lệnh headless thì phải báo lỗi RÕ RÀNG chứ không bật một đống phiên vô dụng.
 func TestFanOutRefusesWithoutCommand(t *testing.T) {
-	db, a := setup(t)
-	if err := FanOut(db, a, "phu", Opts{Copies: 2}, nil); err == nil {
+	db, bus, a := setup(t)
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 2}, nil); err == nil {
 		t.Fatal("thiếu lệnh mà vẫn chạy")
 	}
 	list, _ := db.Running()
@@ -171,10 +174,10 @@ func TestFanOutRefusesWithoutCommand(t *testing.T) {
 
 // --worktree ở nơi không phải git repo: phải chết SỚM, trước khi bật phiên nào.
 func TestWorktreeRefusesOutsideGitRepo(t *testing.T) {
-	db, a := setup(t)
+	db, bus, a := setup(t)
 	t.Chdir(t.TempDir()) // thư mục trống, không phải repo
 
-	err := FanOut(db, a, "phu", Opts{Copies: 2, Worktree: true}, []string{"-test.run=TestHelperProcess"})
+	_, err := FanOut(db, bus, a, "phu", Opts{Copies: 2, Worktree: true}, []string{"-test.run=TestHelperProcess"})
 	if err == nil {
 		t.Fatal("không phải git repo mà vẫn chạy --worktree")
 	}
