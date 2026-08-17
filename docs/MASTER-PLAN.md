@@ -388,7 +388,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
 gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.
 
-**5a · API lõi + Terminal.**  🟡 *API xong, TUI chưa*
+**5a · API lõi + Terminal.**  ✅ XONG
 - [x] `internal/api` — hợp đồng duy nhất, `api.Version = 1`, `api.Actions` liệt kê
   mọi hành động hệ thống làm được.
 - [x] `internal/events` — event có `SchemaVersion`, bus trong tiến trình; **lõi
@@ -398,7 +398,9 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
   lệnh CLI, và CLI không được có action ngoài hợp đồng. Luật 2 giờ có răng.
 - [x] Trần `max_parallel_sessions` giờ chặn cả **tổng số phiên đang chạy**, không
   chỉ `--copies`.
-- [ ] **TUI** (bảng chọn đánh số như `tk` v1) — chưa làm.
+- [x] **TUI** (`cmd/sagent/tui.go`): gõ `sagent` không tham số ra bảng chọn
+  đánh số như `tk` v1 — số=mở · t=thêm · d=đồng bộ · x=xoá · s=phiên · ?=trợ giúp.
+  Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
 *DoD:* mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào `store`.
 
 **5b · Dashboard 2D.** Trạng thái chuẩn:

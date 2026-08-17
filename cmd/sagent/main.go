@@ -57,7 +57,7 @@ func init() {
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		cmdList()
+		runTUI()
 		return
 	}
 	switch args[0] {
@@ -476,7 +476,7 @@ func cmdHelp() {
 
   Tài khoản:
 
-    sagent                      bảng tài khoản
+    sagent                      bảng chọn tương tác (gõ số để mở tài khoản)
     sagent <provider:tên>       chạy CLI bằng tài khoản đó (mặc định claude)
     sagent goc                  chạy bằng tài khoản gốc
     sagent them <provider:tên>  tạo tài khoản mới

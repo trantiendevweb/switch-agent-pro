@@ -522,7 +522,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
 <p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
 gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.</p>
-<p><strong>5a · API lõi + Terminal.</strong>  🟡 <em>API xong, TUI chưa</em></p>
+<p><strong>5a · API lõi + Terminal.</strong>  ✅ XONG</p>
 <ul>
 <li class="task done"><span class="box"></span><code>internal/api</code> — hợp đồng duy nhất, <code>api.Version = 1</code>, <code>api.Actions</code> liệt kê
   mọi hành động hệ thống làm được.</li>
@@ -533,7 +533,9 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
   lệnh CLI, và CLI không được có action ngoài hợp đồng. Luật 2 giờ có răng.</li>
 <li class="task done"><span class="box"></span>Trần <code>max_parallel_sessions</code> giờ chặn cả <strong>tổng số phiên đang chạy</strong>, không
   chỉ <code>--copies</code>.</li>
-<li class="task"><span class="box"></span><strong>TUI</strong> (bảng chọn đánh số như <code>tk</code> v1) — chưa làm.
+<li class="task done"><span class="box"></span><strong>TUI</strong> (<code>cmd/sagent/tui.go</code>): gõ <code>sagent</code> không tham số ra bảng chọn
+  đánh số như <code>tk</code> v1 — số=mở · t=thêm · d=đồng bộ · x=xoá · s=phiên · ?=trợ giúp.
+  Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
 <em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</li>
 </ul>
 <p><strong>5b · Dashboard 2D.</strong> Trạng thái chuẩn:
