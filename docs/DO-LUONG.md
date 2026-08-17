@@ -749,6 +749,46 @@ giết, thay vì đỏ. Lý do: nó gọi thẳng `s.Run(...)` và chờ lỗi t
 với đúng câu cần đọc. Bài học: test cho một lá chắn phải hỏng **nhanh và ồn**, vì cách nó
 hỏng chính là thứ người ta sẽ nhìn thấy lúc 2 giờ sáng.
 
+### Quét tiến trình mồ côi — ĐÃ BỊT LỖ TỰ KHAI (2026-08-17, Pha 7)
+
+Khi vá `KillTree`, tôi ghi thẳng vào tài liệu một lỗ **chưa bịt**: phiên tự chết bị đánh
+dấu `lost` và biến khỏi bảng `status`, nhưng đám tiến trình con nó đẻ ra **có thể vẫn
+chạy** — vẫn gọi API, vẫn tiêu hạn mức, và không mặt nào nhìn ra chúng. Giờ bịt.
+
+`sagent quet` — liệt kê; `sagent quet --giet` — dừng.
+
+**Mặc định là CHỈ BÁO, không giết.** Lý do nằm ở chính chỗ khó của bài toán: Windows
+**dùng lại PID**. Một tiến trình mới trùng PID với phiên đã chết sẽ kéo cả đám con của
+nó vào danh sách, và một lệnh tự động giết theo suy đoán thì sớm muộn cũng giết nhầm.
+
+Ba lớp lọc, không lớp nào đủ một mình:
+
+1. **Cha phải đã chết.** Cha còn sống thì đó là cây bình thường — im lặng, không thì
+   `quet` sẽ rủ người dùng giết phiên đang chạy của chính họ.
+2. **Con phải bắt đầu SAU khi phiên bắt đầu.** Đây là thứ duy nhất phân biệt được "con
+   của phiên đã chết" với "con của một tiến trình mới tình cờ trùng PID". Đọc bằng
+   `GetProcessTimes` qua `x/sys/windows`.
+3. **Không đọc được thời điểm bắt đầu thì LOẠI, không phải NHẬN.** Khi không biết, mặc
+   định là không giết.
+
+Điều kiện 2 **không đủ để chắc chắn** — nói thẳng thế trong code. Nó chỉ loại phần lớn
+nhầm lẫn; phần còn lại thì người dùng nhìn danh sách mà quyết. Vì vậy danh sách in ra
+kèm **tên tiến trình và thời điểm bắt đầu**, không chỉ số PID: một danh sách toàn số thì
+không ai duyệt được và người ta sẽ bấm đồng ý cho xong.
+
+```
+  Phiên #7 claude:phu (chết, PID cũ 15896, bật lúc 14:20 17/08)
+    · PID 6612    PING.EXE                 bắt đầu 19:08:51 17/08
+```
+
+Test `TestMoCoiLoaiTienTrinhCoTruocMoc` chốt đúng lớp 2 bằng cách đặt mốc ở **tương lai**
+— khi đó mọi tiến trình đều "có trước phiên" và phải bị loại sạch. Đã chứng minh nó bắt
+được lỗi: vô hiệu vế `bd.Before(sau)` thì nó đỏ ngay với đúng tiến trình lọt lưới.
+
+Chạy thật trên máy dev: `✓ Không có tiến trình mồ côi nào` — đúng, vì không có phiên
+`lost` nào còn con sống. Đường **có** mồ côi mới chỉ được test bao, chưa chạy thật trên
+`state.db` thật (dựng phiên `lost` giả trong đó sẽ làm bẩn dữ liệu người dùng).
+
 ---
 
 ## Việc cần bạn hỗ trợ

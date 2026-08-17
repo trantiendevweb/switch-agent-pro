@@ -56,6 +56,7 @@ func init() {
 		"verify":  {"profile.verify", "chạy bộ \"đã đo\"", cmdVerify},
 		"status":  {"session.list", "phiên nào đang chạy", func(a []string) { cmdStatus() }},
 		"stop":    {"session.stop", "dừng phiên", cmdStop},
+		"quet":    {"session.sweep", "tìm tiến trình mồ côi của phiên đã chết", cmdQuet},
 		"fleet":   {"fleet.start", "bật N phiên song song", cmdFleet},
 		"clone":   {"clones.create", "tạo N thư mục cấu hình riêng", cmdClone},
 		"clean":   {"clones.clean", "gỡ worktree + xoá clone", cmdClean},

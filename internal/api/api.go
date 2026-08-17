@@ -57,6 +57,10 @@ var Actions = []string{
 	// khi người dùng báo lỗi, câu hỏi đầu tiên luôn là "bản nào" — và dashboard
 	// nên trả lời được câu đó mà không bắt họ mở terminal.
 	"config.version",
+	// Quét tiến trình mồ côi: phiên tự chết thì `session.list` không còn thấy nó,
+	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
+	// động này thì không mặt nào nhìn ra chúng.
+	"session.sweep",
 	"dash.serve",
 	// db.admin cùng loại với dash.serve: có mặt trong hợp đồng, nhưng mặt web
 	// KHÔNG tự làm được phần nặng của nó. `db restore` ghi đè chính file mà
@@ -350,6 +354,44 @@ func (a *API) SessionStop(id int64) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// MoCoi là một tiến trình còn sống của phiên đã chết.
+type MoCoi struct {
+	Session store.Session
+	Procs   []process.Info
+}
+
+// SessionSweep — action "session.sweep". Tìm tiến trình còn sống thuộc các phiên
+// đã tự chết; chỉ giết khi `giet` = true.
+//
+// MẶC ĐỊNH LÀ CHỈ BÁO, KHÔNG GIẾT. Windows dùng lại PID, nên danh sách này có
+// thể lẫn tiến trình không liên quan — người dùng phải nhìn tên và thời điểm rồi
+// tự quyết. Một lệnh tự động giết theo suy đoán thì sớm muộn cũng giết nhầm.
+func (a *API) SessionSweep(giet bool) ([]MoCoi, error) {
+	lost, err := a.db.Lost()
+	if err != nil {
+		return nil, err
+	}
+	var out []MoCoi
+	for _, s := range lost {
+		ps := process.MoCoi(s.PID, s.Started)
+		if len(ps) == 0 {
+			continue
+		}
+		out = append(out, MoCoi{Session: s, Procs: ps})
+		if !giet {
+			continue
+		}
+		for _, p := range ps {
+			if err := process.KillTree(p.PID); err != nil {
+				a.bus.Failuref("mồ côi PID %d (%s) không dừng được: %v", p.PID, p.Ten, err)
+				continue
+			}
+			a.bus.Infof("đã dừng mồ côi PID %d (%s) của #%d %s", p.PID, p.Ten, s.ID, s.Addr())
+		}
+	}
+	return out, nil
 }
 
 // FleetRequest là yêu cầu bật hạm đội.

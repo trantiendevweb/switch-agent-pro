@@ -110,3 +110,56 @@ func soList(pids []int) string {
 	}
 	return strings.Join(s, ", ")
 }
+
+// Info mô tả một tiến trình đủ để người dùng nhìn ra nó là cái gì trước khi
+// quyết định có giết hay không. Danh sách "sẽ giết" mà chỉ có mấy con số PID thì
+// không ai duyệt được, và người ta sẽ bấm đồng ý cho xong.
+type Info struct {
+	PID    int
+	Ten    string
+	BatDau time.Time // zero = không đọc được (tiến trình của người dùng khác)
+}
+
+// MoCoi tìm tiến trình còn sống là hậu duệ của pid ĐÃ CHẾT, và chỉ nhận những
+// đứa bắt đầu SAU mốc `sau`.
+//
+// Vì sao phải lọc theo thời gian: Windows dùng lại PID. Một tiến trình mới trùng
+// PID với phiên đã chết sẽ kéo cả đám con của nó vào danh sách, và ta sẽ giết
+// nhầm thứ chẳng liên quan. Con thật của phiên BẮT BUỘC phải sinh sau khi phiên
+// bắt đầu — điều kiện đó không đủ để chắc chắn, nhưng đủ để loại phần lớn nhầm
+// lẫn, và phần còn lại thì người dùng nhìn danh sách mà quyết.
+//
+// Tiến trình không đọc được thời điểm bắt đầu thì BỊ LOẠI, không phải được nhận:
+// khi không biết, mặc định là không giết.
+func MoCoi(pid int, sau time.Time) []Info {
+	if IsAlive(pid) {
+		return nil // cha còn sống thì đây là cây bình thường, không phải mồ côi
+	}
+	bang := procTable()
+	con := map[int][]int{}
+	for p, e := range bang {
+		con[e.ppid] = append(con[e.ppid], p)
+	}
+
+	var out []Info
+	seen := map[int]bool{pid: true}
+	queue := []int{pid}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, c := range con[cur] {
+			if seen[c] {
+				continue
+			}
+			seen[c] = true
+			bd, ok := StartTime(c)
+			if !ok || bd.Before(sau) {
+				continue // không biết, hoặc có trước cả phiên -> không phải của ta
+			}
+			out = append(out, Info{PID: c, Ten: bang[c].ten, BatDau: bd})
+			queue = append(queue, c)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].PID < out[j].PID })
+	return out
+}

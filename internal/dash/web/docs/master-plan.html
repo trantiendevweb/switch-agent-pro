@@ -707,8 +707,10 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <li>✅ <strong>process-tree cancel + orphan cleanup (một phần)</strong> — đo ra <strong>lỗi thật</strong>:
     <code>taskkill /T</code> bỏ sót đám con khi tiến trình cha đã thoát; chúng chạy tiếp và tiêu
     hạn mức, còn <code>Kill</code> chỉ trả <code>exit status 128</code>. Vá bằng <code>process.KillTree</code>: chụp hậu
-    duệ trước khi giết, quét lại, rồi mới kết luận. <strong>Chưa bịt:</strong> hậu duệ của phiên tự
-    chết (<code>lost</code>) vẫn không ai quét. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+    duệ trước khi giết, quét lại, rồi mới kết luận. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+<li>✅ <strong>quét mồ côi của phiên <code>lost</code></strong> — <code>sagent quet</code> (và <code>--giet</code>). Mặc định CHỈ BÁO
+    vì Windows dùng lại PID; lọc theo thời điểm khởi tạo tiến trình, không đọc được thì
+    LOẠI chứ không nhận. In kèm tên và thời điểm để người dùng duyệt được.</li>
 <li>✅ <strong>Windows ACL</strong> — đo ra <strong>lỗi thật</strong>: <code>os.WriteFile(..., 0o600)</code> không bảo vệ gì
     trên Windows; file <code>0o600</code> và <code>0o644</code> có ACL y hệt (<code>BUILTIN\Users:(I)(F)</code>). Token và
     mật khẩu dashboard chỉ kín nhờ MAY MẮN kế thừa từ <code>C:\Users\&lt;tên&gt;</code>. Vá bằng package
@@ -717,7 +719,7 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <li>✅ <strong>build phát hành</strong> — <code>-trimpath -ldflags "-s -w"</code>, đo được <strong>16.21 MB → 11.09 MB</strong>;
     <code>CGO_ENABLED=0</code> nên binary không phụ thuộc DLL nào. Workflow <code>phat-hanh.yml</code> dựng
     amd64 + arm64 kèm <code>SHA256SUMS.txt</code>. Trình cài một dòng, không cần Go, không cần admin.</li>
-<li>⬜ Còn lại: quét mồ côi của phiên <code>lost</code> · upgrade/provider-drift verify · SBOM +
+<li>⬜ Còn lại: upgrade/provider-drift verify · SBOM +
     license notices · <strong>ký số</strong> binary (đã có băm, chưa có chữ ký) · migration guide v1.</li>
 <li>~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.</li>
 <li>✅ <strong>TLS cho dashboard</strong> — phơi ra mạng giờ <strong>mặc định HTTPS</strong>, chứng chỉ tự ký sinh

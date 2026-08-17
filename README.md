@@ -101,6 +101,8 @@ Claude Code lấy **thư mục hiện tại** làm nơi làm việc — `cd` và
 sagent fleet claude:phu --copies 4 --worktree -- -p "sửa lỗi trong repo"
 sagent status          # phiên nào đang chạy, PID, worktree/log ở đâu
 sagent stop all        # dừng hết (giết cả cây tiến trình con)
+sagent quet            # tìm tiến trình còn sống của phiên đã tự chết
+sagent quet --giet     # ...và dừng chúng
 sagent clean claude:phu   # gỡ worktree + xoá clone — an toàn, không xuyên junction
 ```
 
@@ -186,6 +188,11 @@ là đừng phơi cổng: `ssh -L 4600:127.0.0.1:4600 user@server` rồi mở `h
 
 Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite, migration có version), và
 `status` luôn đối chiếu PID thật nên không bao giờ báo sống một phiên đã chết.
+
+Phiên tự chết thì biến khỏi `status` — nhưng tiến trình con nó đẻ ra có thể **vẫn chạy
+và vẫn tiêu hạn mức**. `sagent quet` là chỗ nhìn ra chúng. Mặc định chỉ liệt kê kèm tên
+và thời điểm, không tự giết: Windows dùng lại PID nên danh sách có thể lẫn tiến trình
+không liên quan, và bạn phải là người quyết.
 
 > Hai điều công cụ nói thẳng mỗi lần chạy `fleet`: N phiên trên một tài khoản
 > **tiêu hạn mức gấp N**, và hành vi khi nhiều phiên **cùng refresh token thì chưa

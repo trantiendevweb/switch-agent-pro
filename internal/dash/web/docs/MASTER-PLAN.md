@@ -571,8 +571,10 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   - ✅ **process-tree cancel + orphan cleanup (một phần)** — đo ra **lỗi thật**:
     `taskkill /T` bỏ sót đám con khi tiến trình cha đã thoát; chúng chạy tiếp và tiêu
     hạn mức, còn `Kill` chỉ trả `exit status 128`. Vá bằng `process.KillTree`: chụp hậu
-    duệ trước khi giết, quét lại, rồi mới kết luận. **Chưa bịt:** hậu duệ của phiên tự
-    chết (`lost`) vẫn không ai quét. Số đo ở `docs/DO-LUONG.md`.
+    duệ trước khi giết, quét lại, rồi mới kết luận. Số đo ở `docs/DO-LUONG.md`.
+  - ✅ **quét mồ côi của phiên `lost`** — `sagent quet` (và `--giet`). Mặc định CHỈ BÁO
+    vì Windows dùng lại PID; lọc theo thời điểm khởi tạo tiến trình, không đọc được thì
+    LOẠI chứ không nhận. In kèm tên và thời điểm để người dùng duyệt được.
   - ✅ **Windows ACL** — đo ra **lỗi thật**: `os.WriteFile(..., 0o600)` không bảo vệ gì
     trên Windows; file `0o600` và `0o644` có ACL y hệt (`BUILTIN\Users:(I)(F)`). Token và
     mật khẩu dashboard chỉ kín nhờ MAY MẮN kế thừa từ `C:\Users\<tên>`. Vá bằng package
@@ -581,7 +583,7 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   - ✅ **build phát hành** — `-trimpath -ldflags "-s -w"`, đo được **16.21 MB → 11.09 MB**;
     `CGO_ENABLED=0` nên binary không phụ thuộc DLL nào. Workflow `phat-hanh.yml` dựng
     amd64 + arm64 kèm `SHA256SUMS.txt`. Trình cài một dòng, không cần Go, không cần admin.
-  - ⬜ Còn lại: quét mồ côi của phiên `lost` · upgrade/provider-drift verify · SBOM +
+  - ⬜ Còn lại: upgrade/provider-drift verify · SBOM +
     license notices · **ký số** binary (đã có băm, chưa có chữ ký) · migration guide v1.
   - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
   - ✅ **TLS cho dashboard** — phơi ra mạng giờ **mặc định HTTPS**, chứng chỉ tự ký sinh

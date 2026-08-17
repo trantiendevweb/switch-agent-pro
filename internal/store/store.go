@@ -381,6 +381,33 @@ func (d *DB) AddSession(s Session) (int64, error) {
 // PID không phải nguồn sự thật — nó chỉ là thuộc tính runtime. Phiên nào có
 // PID đã chết thì đánh dấu `lost` ngay tại đây, để bảng không bao giờ báo sống
 // một thứ đã chết.
+// Lost trả về các phiên đã tự chết (tiến trình biến mất mà không qua `stop`).
+//
+// Cần riêng hàm này vì hậu duệ của chúng có thể VẪN CHẠY và vẫn tiêu hạn mức —
+// `Running()` cố ý không trả về chúng, nên nếu không có đường nào khác thì đám
+// tiến trình đó không ai nhìn thấy.
+func (d *DB) Lost() ([]Session, error) {
+	rows, err := d.db.Query(
+		`SELECT id,provider,account,clone,dir,pid,COALESCE(log,''),COALESCE(worktree,''),started,state
+		   FROM sessions WHERE state=? ORDER BY id`, StateLost)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Session
+	for rows.Next() {
+		var s Session
+		var started string
+		if err := rows.Scan(&s.ID, &s.Provider, &s.Account, &s.Clone, &s.Dir,
+			&s.PID, &s.Log, &s.Worktree, &started, &s.State); err != nil {
+			return nil, err
+		}
+		s.Started, _ = time.Parse(time.RFC3339, started)
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 func (d *DB) Running() ([]Session, error) {
 	rows, err := d.db.Query(
 		`SELECT id,provider,account,clone,dir,pid,COALESCE(log,''),COALESCE(worktree,''),started,state

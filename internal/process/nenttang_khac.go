@@ -2,6 +2,8 @@
 
 package process
 
+import "time"
+
 // sagent chỉ hỗ trợ Windows. File này cung cấp đủ stub để build DỪNG với một
 // cái tên đọc được, thay vì đổ ra một trang "undefined: parentMap".
 //
@@ -19,3 +21,12 @@ package process
 func IsAlive(int) bool          { return sagentChiHoTroWindows_xemREADME() }
 func Kill(int) error            { sagentChiHoTroWindows_xemREADME(); return nil }
 func parentMap() map[int]int    { sagentChiHoTroWindows_xemREADME(); return nil }
+
+func StartTime(int) (time.Time, bool) { sagentChiHoTroWindows_xemREADME(); return time.Time{}, false }
+
+func procTable() map[int]procEnt { sagentChiHoTroWindows_xemREADME(); return nil }
+
+type procEnt struct {
+	ppid int
+	ten  string
+}
