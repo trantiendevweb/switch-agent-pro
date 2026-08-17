@@ -67,6 +67,28 @@ là `sagent verify claude` (đã chạy: cả 3 phép đo ✓).
   thêm unit test `TestRemoveDoesNotTouchBase` chạy xanh.
 - [ ] Linux: `os.Symlink` (trong `link_linux.go`) — **chưa đo**, cần VM Linux.
 
+## Chạy song song (fleet) · Windows — ĐÃ ĐO ✅
+
+- [x] **Clone tách thật.** `sagent clone claude:phu --copies 2` tạo
+  `~/.ai-accounts/.clones/claude/phu/{1,2}`; kiểm cờ ReparsePoint: mục dùng chung
+  là junction, còn `.claude.json` + `.credentials.json` là **file thật riêng từng
+  bản** → hai phiên không đua ghi cùng một file.
+- [x] **Fleet spawn nền.** Bật 3 phiên `-- --version`: cả 3 có PID riêng, log đổ
+  đúng file (`2.1.229 (Claude Code)`), lệnh cha thoát mà phiên vẫn sống.
+- [x] **Registry tự dọn.** `status` ngay sau khi bật thấy 3 phiên; sau khi chúng
+  thoát, `status` tự đánh dấu `lost` và báo rỗng — không bao giờ báo sống thứ đã chết.
+- [x] **Stop trên phiên sống.** Bật 2 phiên với prompt thật, `status` thấy đang
+  chạy, `sagent stop all` giết cả hai (taskkill /T nên dọn cả cây con), `status`
+  sau đó rỗng.
+- [x] **Xoá clone an toàn.** Đặt mồi `~/.claude/__clean_bait.txt`, chạy
+  `sagent clean claude:phu` → xoá 3 clone, **mồi còn nguyên**, số mục trong
+  `~/.claude` không đổi (20/20).
+- [ ] ⚠ **Concurrent refresh — CHƯA ĐO.** Token bị chép ra N chỗ; khi hết hạn,
+  N tiến trình có thể cùng gọi refresh. Chưa biết nhà cung cấp xử lý thế nào
+  (có thể thu hồi refresh token cũ → các phiên khác văng). `fleet` **in cảnh báo
+  này mỗi lần chạy** thay vì hứa an toàn. Cần một phiên chạy đủ dài qua mốc hết
+  hạn token để đo.
+
 ---
 
 ## Việc cần bạn hỗ trợ

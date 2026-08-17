@@ -55,6 +55,25 @@ Chúng chỉ khác ở **auth, protocol, cách agent/model được thực thi**
 
 ---
 
+## 2b. Quyết định kiến trúc 2026-08-17 — **đường gọn**
+
+Bản v1.1 vẽ kiến trúc của một *service chạy 24/7*. Dự án này là **CLI người ta
+clone về chạy trên máy mình**. Cân lại từng món theo tiêu chí "nó mua được gì":
+
+| Món | Quyết định | Lý do |
+|---|---|---|
+| `internal/domain` (types thuần + state machine) | **BỎ** | Với cỡ codebase này chỉ là thủ tục rườm rà; các package hiện có (`provider`/`profile`/`link`/`jsonutil`) đã tách logic khỏi I/O đủ sạch |
+| **SQLite** làm nơi giữ state | **GIỮ** | Nhiều tiến trình `sagent` cùng ghi (fleet ở terminal này, `status` ở terminal kia). JSON thì phải tự lo khoá; SQLite lo sẵn bằng transaction + WAL. Dùng `modernc.org/sqlite` **thuần Go** nên vẫn một binary, không cần cgo |
+| Daemon `sagentd` | **BỎ khỏi đường chính** | Phiên do `fleet` sinh ra chạy nền độc lập rồi; không cần tiến trình canh. `sagent dash` sẽ bật server **tạm**, chỉ sống khi dashboard đang mở |
+| Tách `harness` ≠ `AIProvider` ≠ `auth profile` ≠ `route` | **GIỮ** | Không phải ceremony — không tách thì lúc thêm Codex hoặc đường API phải viết lại. Giữ ở mức **interface**, không cần package `domain` riêng |
+| `verify` + nhãn stable/experimental | **GIỮ** | Đây là thứ làm công cụ đáng tin |
+
+**Khi nào xét lại:** cần daemon nếu có tính năng *flow chạy dài phải sống sót
+qua reboot* hoặc *dashboard cần push realtime khi không ai mở terminal*. Chưa có
+thì không làm trước.
+
+---
+
 ## 3. Kiến trúc đích
 
 ```
@@ -107,10 +126,17 @@ mặc định `false`/`unknown`. Ví dụ: `config_root_isolation`, `credential_
 
 ## 4. Cấu trúc Go đích
 
+> Cập nhật theo quyết định "đường gọn" ở mục 2b: **không** có `cmd/sagentd`,
+> **không** có `internal/domain`. Dấu ✓ = đã có thật trong repo.
+
 ```
-cmd/sagent/                  # CLI client
-cmd/sagentd/                 # daemon (đóng gói chung binary được)
-internal/domain/          # pure types + state machines (KHÔNG import provider/db/http/ui)
+cmd/sagent/               ✓ CLI (một binary duy nhất)
+internal/store/           ✓ SQLite: sessions + migration (nguồn sự thật)
+internal/process/         ✓ IsAlive / Kill theo nền tảng
+internal/fleet/           ✓ chạy N phiên song song
+internal/profile/         ✓ create · link · clone · run · remove (xoá an toàn)
+internal/link/            ✓ junction (Win) / symlink (Linux)
+internal/jsonutil/        ✓ .claude.json: khoá trùng, ghi nguyên tử, whitelist
 internal/harness/         # Claude Code / Codex / Gemini CLI / Cursor adapters
 internal/provider/        # Anthropic / OpenAI / Gemini / xAI / DeepSeek… API adapters
 internal/model/           # normalized request/response/capability
@@ -226,10 +252,17 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - **Trạng thái:** phần subscription-switch đã chạy trên Windows; còn thiếu domain layer,
   SQLite, API slice.
 
-### Pha 2 — Daemon + Project/Workspace + chạy song song
+### Pha 2 — Chạy song song + Project/Workspace  🟡 một phần
 🎯 Biến công cụ profile thành **runtime manager** đa project.
-- [ ] `sagentd` daemon + versioned API; CLI thành client.
-- [ ] **SQLite là SSOT**; PID chỉ là thuộc tính runtime (thay `running.json`).
+- [x] **SQLite là SSOT** (`~/.ai-accounts/state.db`); PID chỉ là thuộc tính
+  runtime — `status` đối chiếu PID thật và tự đánh dấu `lost` phiên đã chết.
+- [x] `clone` — chép credential ra N config dir riêng (mỗi bản `.claude.json`
+  riêng nên **không đua ghi**); `fleet` — bật N phiên nền, log ra file;
+  `status`; `stop <số|all>`; `clean` — xoá clone **an toàn** (không xuyên junction).
+- [x] Cảnh báo thẳng: tiêu hạn mức gấp N, và **concurrent refresh chưa đo**.
+- [x] Sửa bug thật: tài khoản di trú từ v1 không chạy được vì `Dir()` chỉ trỏ
+  kho mới → thêm `ResolveDir()` dùng chung cho mọi verb.
+- [ ] ~~`sagentd` daemon~~ **bỏ** (xem mục 2b) — `dash` sẽ là server tạm.
 - [ ] Project discovery + `.sagent/project.toml`.
 - [ ] Workspace backend: directory + **Git worktree**.
 - [ ] Process backend native Windows/Linux; tmux tuỳ chọn (Linux).

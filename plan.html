@@ -272,11 +272,15 @@
         <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>CI Win+Linux xanh · đổi profile không đăng nhập lại · fault injection không tạo DB dở.</div>
       </div>
 
-      <div class="it rv"><div class="ph"><small>Pha 2</small> · Daemon + Workspace + song song <span class="st next">kế tiếp</span></div>
-        <div class="de"><code>sagentd</code> + API versioned; CLI thành client; SQLite SSOT (PID chỉ là runtime).</div>
-        <ul class="steps"><li>Git worktree · process backend native · recovery khi daemon chết</li>
-          <li>Cảnh báo hạn mức: N phiên trên một tài khoản = tiêu gấp N</li></ul>
-        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>10 session đồng thời không hỏng state · restart daemon phục hồi đúng.</div>
+      <div class="it now rv"><div class="ph"><small>Pha 2</small> · Chạy song song <span class="st now">một phần</span></div>
+        <div class="de">Kiến trúc <b>đường gọn</b>: một binary, <b>không daemon</b>; SQLite giữ state (PID chỉ là thuộc tính runtime).</div>
+        <ul class="steps">
+          <li>✅ <code>fleet</code> bật N phiên nền · <code>status</code> · <code>stop</code> · <code>clean</code></li>
+          <li>✅ <code>clone</code>: mỗi phiên một config dir riêng → không đua ghi <code>.claude.json</code></li>
+          <li>✅ Cảnh báo thẳng: tiêu hạn mức gấp N · concurrent refresh <b>chưa đo</b></li>
+          <li>⬜ Git worktree cho từng phiên · <code>.sagent/project.toml</code></li>
+        </ul>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Đã đo trên Windows: spawn nền, tự dọn phiên chết, stop giết cả cây con, xoá clone không xuyên junction.</div>
       </div>
 
       <div class="it rv"><div class="ph"><small>Pha 2.5</small> · Codex + OpenAI-compatible</div>
@@ -317,7 +321,9 @@
           <tr><td>Xoá an toàn (không đụng dữ liệu gốc)</td><td class="ok-i">✓ test + thật</td><td class="no-i">chưa đo</td></tr>
           <tr><td>Bỏ phụ thuộc Python (khoá JSON trùng hoa/thường)</td><td class="ok-i">✓ có test</td><td class="ok-i">✓ CI</td></tr>
           <tr><td>Di trú tài khoản từ v1</td><td class="ok-i">✓</td><td class="no-i">—</td></tr>
-          <tr><td>Domain layer · SQLite · daemon · flow · API path</td><td class="no-i">chưa làm</td><td class="no-i">chưa làm</td></tr>
+          <tr><td><b>Chạy N phiên song song</b> (fleet · status · stop · clean)</td><td class="ok-i">✓ chạy thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Lưu trạng thái SQLite, tự dọn phiên chết</td><td class="ok-i">✓</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Git worktree · flow DAG · đường API · dashboard dữ liệu thật</td><td class="no-i">chưa làm</td><td class="no-i">chưa làm</td></tr>
         </tbody>
       </table>
     </div>

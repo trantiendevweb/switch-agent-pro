@@ -16,9 +16,29 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
-// Dir là thư mục config biệt lập của một hồ sơ.
+// Dir là thư mục config biệt lập của một hồ sơ (vị trí chuẩn của v2).
 func Dir(prov, account string) string {
 	return filepath.Join(paths.AccountsRoot(), prov, account)
+}
+
+// ResolveDir tìm thư mục hồ sơ THẬT: chỗ chuẩn trước, không có thì tìm trong
+// kho v1 (~/.claude-accounts/<tên>).
+//
+// Vì sao cần: `List()` đã biết di trú tài khoản v1, nhưng mọi verb khác lại gọi
+// thẳng `Dir()` nên tài khoản cũ hiện ra trong bảng mà chạy thì báo "không có".
+// Dùng hàm này ở mọi chỗ nhận địa chỉ từ người dùng.
+func ResolveDir(prov, account string) (string, bool) {
+	d := Dir(prov, account)
+	if _, err := os.Stat(d); err == nil {
+		return d, true
+	}
+	if prov == "claude" {
+		legacy := filepath.Join(paths.LegacyClaudeAccounts(), account)
+		if _, err := os.Stat(legacy); err == nil {
+			return legacy, true
+		}
+	}
+	return d, false
 }
 
 func contains(ss []string, s string) bool {
@@ -101,7 +121,9 @@ func List() ([]Account, error) {
 	root := paths.AccountsRoot()
 	if provs, err := os.ReadDir(root); err == nil {
 		for _, p := range provs {
-			if !p.IsDir() {
+			// Bỏ qua thư mục nội bộ như .clones (bản sao dùng cho fleet) —
+			// chúng không phải provider.
+			if !p.IsDir() || strings.HasPrefix(p.Name(), ".") {
 				continue
 			}
 			accs, _ := os.ReadDir(filepath.Join(root, p.Name()))

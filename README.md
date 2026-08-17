@@ -73,6 +73,23 @@ cd switch-agent-pro
 Địa chỉ hoá `provider:account`, nên `sagent phu` == `sagent claude:phu`.
 Claude Code lấy **thư mục hiện tại** làm nơi làm việc — `cd` vào dự án rồi mới gọi.
 
+### Chạy nhiều agent song song
+
+```bash
+sagent fleet claude:phu --copies 4 -- -p "tóm tắt repo này"
+sagent status          # phiên nào đang chạy, PID, log ở đâu
+sagent stop all        # dừng hết (giết cả cây tiến trình con)
+sagent clean claude:phu   # xoá các bản clone — an toàn, không xuyên junction
+```
+
+Mỗi phiên có **thư mục config riêng** (credential chép sang, `.claude.json` riêng)
+nên không đua ghi đè nhau. Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite), và
+`status` luôn đối chiếu PID thật nên không bao giờ báo sống một phiên đã chết.
+
+> Hai điều công cụ nói thẳng mỗi lần chạy `fleet`: N phiên trên một tài khoản
+> **tiêu hạn mức gấp N**, và hành vi khi nhiều phiên **cùng refresh token thì chưa
+> đo** — xem [`docs/DO-LUONG.md`](docs/DO-LUONG.md).
+
 ## Trạng thái thật
 
 Không tô hồng:

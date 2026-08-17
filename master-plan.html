@@ -127,6 +127,49 @@ Chúng chỉ khác ở <strong>auth, protocol, cách agent/model được thực
 harness ≠ AI provider ≠ model ≠ auth profile ≠ route.</p>
 </blockquote>
 <hr>
+<h2>2b. Quyết định kiến trúc 2026-08-17 — <strong>đường gọn</strong></h2>
+<p>Bản v1.1 vẽ kiến trúc của một <em>service chạy 24/7</em>. Dự án này là <strong>CLI người ta
+clone về chạy trên máy mình</strong>. Cân lại từng món theo tiêu chí "nó mua được gì":</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Món</th>
+<th>Quyết định</th>
+<th>Lý do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>internal/domain</code> (types thuần + state machine)</td>
+<td><strong>BỎ</strong></td>
+<td>Với cỡ codebase này chỉ là thủ tục rườm rà; các package hiện có (<code>provider</code>/<code>profile</code>/<code>link</code>/<code>jsonutil</code>) đã tách logic khỏi I/O đủ sạch</td>
+</tr>
+<tr>
+<td><strong>SQLite</strong> làm nơi giữ state</td>
+<td><strong>GIỮ</strong></td>
+<td>Nhiều tiến trình <code>sagent</code> cùng ghi (fleet ở terminal này, <code>status</code> ở terminal kia). JSON thì phải tự lo khoá; SQLite lo sẵn bằng transaction + WAL. Dùng <code>modernc.org/sqlite</code> <strong>thuần Go</strong> nên vẫn một binary, không cần cgo</td>
+</tr>
+<tr>
+<td>Daemon <code>sagentd</code></td>
+<td><strong>BỎ khỏi đường chính</strong></td>
+<td>Phiên do <code>fleet</code> sinh ra chạy nền độc lập rồi; không cần tiến trình canh. <code>sagent dash</code> sẽ bật server <strong>tạm</strong>, chỉ sống khi dashboard đang mở</td>
+</tr>
+<tr>
+<td>Tách <code>harness</code> ≠ <code>AIProvider</code> ≠ <code>auth profile</code> ≠ <code>route</code></td>
+<td><strong>GIỮ</strong></td>
+<td>Không phải ceremony — không tách thì lúc thêm Codex hoặc đường API phải viết lại. Giữ ở mức <strong>interface</strong>, không cần package <code>domain</code> riêng</td>
+</tr>
+<tr>
+<td><code>verify</code> + nhãn stable/experimental</td>
+<td><strong>GIỮ</strong></td>
+<td>Đây là thứ làm công cụ đáng tin</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Khi nào xét lại:</strong> cần daemon nếu có tính năng <em>flow chạy dài phải sống sót
+qua reboot</em> hoặc <em>dashboard cần push realtime khi không ai mở terminal</em>. Chưa có
+thì không làm trước.</p>
+<hr>
 <h2>3. Kiến trúc đích</h2>
 <pre><code>CLI (sagent) · Dashboard 2D/3D
         │  (chỉ dùng public API, không đọc secret)
@@ -165,9 +208,17 @@ mặc định <code>false</code>/<code>unknown</code>. Ví dụ: <code>config_ro
 <code>model_discovery</code>, <code>health_check</code>…</p>
 <hr>
 <h2>4. Cấu trúc Go đích</h2>
-<pre><code>cmd/sagent/                  # CLI client
-cmd/sagentd/                 # daemon (đóng gói chung binary được)
-internal/domain/          # pure types + state machines (KHÔNG import provider/db/http/ui)
+<blockquote>
+<p>Cập nhật theo quyết định "đường gọn" ở mục 2b: <strong>không</strong> có <code>cmd/sagentd</code>,
+<strong>không</strong> có <code>internal/domain</code>. Dấu ✓ = đã có thật trong repo.</p>
+</blockquote>
+<pre><code>cmd/sagent/               ✓ CLI (một binary duy nhất)
+internal/store/           ✓ SQLite: sessions + migration (nguồn sự thật)
+internal/process/         ✓ IsAlive / Kill theo nền tảng
+internal/fleet/           ✓ chạy N phiên song song
+internal/profile/         ✓ create · link · clone · run · remove (xoá an toàn)
+internal/link/            ✓ junction (Win) / symlink (Linux)
+internal/jsonutil/        ✓ .claude.json: khoá trùng, ghi nguyên tử, whitelist
 internal/harness/         # Claude Code / Codex / Gemini CLI / Cursor adapters
 internal/provider/        # Anthropic / OpenAI / Gemini / xAI / DeepSeek… API adapters
 internal/model/           # normalized request/response/capability
@@ -310,11 +361,18 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li><strong>Trạng thái:</strong> phần subscription-switch đã chạy trên Windows; còn thiếu domain layer,
   SQLite, API slice.</li>
 </ul>
-<h3>Pha 2 — Daemon + Project/Workspace + chạy song song</h3>
+<h3>Pha 2 — Chạy song song + Project/Workspace  🟡 một phần</h3>
 <p>🎯 Biến công cụ profile thành <strong>runtime manager</strong> đa project.</p>
 <ul>
-<li class="task"><span class="box"></span><code>sagentd</code> daemon + versioned API; CLI thành client.</li>
-<li class="task"><span class="box"></span><strong>SQLite là SSOT</strong>; PID chỉ là thuộc tính runtime (thay <code>running.json</code>).</li>
+<li class="task done"><span class="box"></span><strong>SQLite là SSOT</strong> (<code>~/.ai-accounts/state.db</code>); PID chỉ là thuộc tính
+  runtime — <code>status</code> đối chiếu PID thật và tự đánh dấu <code>lost</code> phiên đã chết.</li>
+<li class="task done"><span class="box"></span><code>clone</code> — chép credential ra N config dir riêng (mỗi bản <code>.claude.json</code>
+  riêng nên <strong>không đua ghi</strong>); <code>fleet</code> — bật N phiên nền, log ra file;
+  <code>status</code>; <code>stop &lt;số|all&gt;</code>; <code>clean</code> — xoá clone <strong>an toàn</strong> (không xuyên junction).</li>
+<li class="task done"><span class="box"></span>Cảnh báo thẳng: tiêu hạn mức gấp N, và <strong>concurrent refresh chưa đo</strong>.</li>
+<li class="task done"><span class="box"></span>Sửa bug thật: tài khoản di trú từ v1 không chạy được vì <code>Dir()</code> chỉ trỏ
+  kho mới → thêm <code>ResolveDir()</code> dùng chung cho mọi verb.</li>
+<li class="task"><span class="box"></span>~~<code>sagentd</code> daemon~~ <strong>bỏ</strong> (xem mục 2b) — <code>dash</code> sẽ là server tạm.</li>
 <li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
 <li class="task"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong>.</li>
 <li class="task"><span class="box"></span>Process backend native Windows/Linux; tmux tuỳ chọn (Linux).</li>

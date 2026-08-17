@@ -8,11 +8,16 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
+	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
+	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
 func main() {
@@ -34,6 +39,16 @@ func main() {
 		cmdRemove(rest(args))
 	case "verify":
 		cmdVerify(rest(args))
+	case "clone":
+		cmdClone(rest(args))
+	case "fleet":
+		cmdFleet(rest(args))
+	case "status":
+		cmdStatus()
+	case "clean":
+		cmdClean(rest(args))
+	case "stop":
+		cmdStop(rest(args))
 	case "goc":
 		cmdRun("", "", rest(args))
 	default:
@@ -120,8 +135,8 @@ func cmdRun(prov, acc string, args []string) {
 		return
 	}
 	a := adapterOf(prov)
-	dir := profile.Dir(prov, acc)
-	if _, err := os.Stat(dir); err != nil {
+	dir, ok := profile.ResolveDir(prov, acc)
+	if !ok {
 		fail(fmt.Errorf("không có %s:%s. Tạo: sagent them %s:%s", prov, acc, prov, acc))
 	}
 	if err := profile.Run(a, dir, args); err != nil {
@@ -176,8 +191,8 @@ func cmdRemove(args []string) {
 		fail(fmt.Errorf("thiếu tên. Ví dụ: sagent xoa claude:phu1"))
 	}
 	prov, acc := parseAddr(args[0])
-	dir := profile.Dir(prov, acc)
-	if _, err := os.Stat(dir); err != nil {
+	dir, ok := profile.ResolveDir(prov, acc)
+	if !ok {
 		fail(fmt.Errorf("không có %s:%s", prov, acc))
 	}
 	if err := profile.Remove(dir); err != nil {
@@ -211,6 +226,156 @@ func cmdVerify(args []string) {
 	os.Exit(code)
 }
 
+// ---------------------- chạy song song (fleet) ----------------------
+
+// splitDashDash tách phần đối số của ta và phần truyền thẳng cho CLI con.
+func splitDashDash(args []string) (mine, child []string) {
+	for i, a := range args {
+		if a == "--" {
+			return args[:i], args[i+1:]
+		}
+	}
+	return args, nil
+}
+
+// intFlag lấy giá trị của cờ dạng `--ten N`, trả về phần còn lại.
+func intFlag(args []string, name string, def int) (int, []string) {
+	out := make([]string, 0, len(args))
+	val := def
+	for i := 0; i < len(args); i++ {
+		if args[i] == name && i+1 < len(args) {
+			if n, err := strconv.Atoi(args[i+1]); err == nil {
+				val = n
+				i++
+				continue
+			}
+		}
+		out = append(out, args[i])
+	}
+	return val, out
+}
+
+func openStore() *store.DB {
+	db, err := store.Open()
+	if err != nil {
+		fail(fmt.Errorf("không mở được sổ trạng thái (%s): %w", store.Path(), err))
+	}
+	return db
+}
+
+func cmdClone(args []string) {
+	copies, rest := intFlag(args, "--copies", 2)
+	if len(rest) == 0 {
+		fail(fmt.Errorf("thiếu tài khoản. Ví dụ: sagent clone claude:phu --copies 4"))
+	}
+	prov, acc := parseAddr(rest[0])
+	dirs, err := profile.Clone(adapterOf(prov), acc, copies)
+	if err != nil {
+		fail(err)
+	}
+	for _, d := range dirs {
+		fmt.Println(d)
+	}
+}
+
+func cmdFleet(args []string) {
+	mine, child := splitDashDash(args)
+	copies, rest := intFlag(mine, "--copies", 2)
+	if len(rest) == 0 {
+		fail(fmt.Errorf(`thiếu tài khoản. Ví dụ:
+  sagent fleet claude:phu --copies 4 -- -p "tóm tắt repo này"`))
+	}
+	prov, acc := parseAddr(rest[0])
+	db := openStore()
+	defer db.Close()
+	if err := fleet.FanOut(db, adapterOf(prov), acc, copies, child); err != nil {
+		fail(err)
+	}
+}
+
+func cmdClean(args []string) {
+	if len(args) == 0 {
+		fail(fmt.Errorf("thiếu tài khoản. Ví dụ: sagent clean claude:phu"))
+	}
+	prov, acc := parseAddr(args[0])
+	// Không xoá bản clone đang có phiên chạy — sẽ giết mất việc đang làm.
+	db := openStore()
+	defer db.Close()
+	if list, err := db.Running(); err == nil {
+		for _, s := range list {
+			if s.Provider == prov && s.Account == acc {
+				fail(fmt.Errorf("còn phiên #%d đang chạy trên %s:%s — dừng trước: sagent stop all",
+					s.ID, prov, acc))
+			}
+		}
+	}
+	n, err := profile.CleanClones(prov, acc)
+	if err != nil {
+		fail(err)
+	}
+	fmt.Printf("  ✓ đã xoá %d bản clone của %s:%s\n", n, prov, acc)
+}
+
+func cmdStatus() {
+	db := openStore()
+	defer db.Close()
+	list, err := db.Running()
+	if err != nil {
+		fail(err)
+	}
+	fmt.Println()
+	if len(list) == 0 {
+		fmt.Println("  Không có phiên nào đang chạy.")
+		fmt.Println("  Bật thử: sagent fleet claude:<tên> --copies 4 -- -p \"...\"")
+		fmt.Println()
+		return
+	}
+	fmt.Println("  Phiên đang chạy")
+	fmt.Println()
+	for _, s := range list {
+		fmt.Printf("   #%-3d %-18s PID %-7d %6s  %s\n",
+			s.ID, s.Addr(), s.PID,
+			time.Since(s.Started).Truncate(time.Second), s.Log)
+	}
+	fmt.Printf("\n  %d phiên. Dừng hết: sagent stop all\n\n", len(list))
+}
+
+func cmdStop(args []string) {
+	if len(args) == 0 {
+		fail(fmt.Errorf("thiếu mục tiêu. Ví dụ: sagent stop all  hoặc  sagent stop 3"))
+	}
+	db := openStore()
+	defer db.Close()
+	list, err := db.Running()
+	if err != nil {
+		fail(err)
+	}
+	want := int64(-1)
+	if args[0] != "all" {
+		n, err := strconv.ParseInt(args[0], 10, 64)
+		if err != nil {
+			fail(fmt.Errorf("không hiểu '%s' — dùng số phiên hoặc 'all'", args[0]))
+		}
+		want = n
+	}
+	n := 0
+	for _, s := range list {
+		if want >= 0 && s.ID != want {
+			continue
+		}
+		if err := process.Kill(s.PID); err != nil {
+			fmt.Printf("  ! #%d (PID %d) không dừng được: %v\n", s.ID, s.PID, err)
+			continue
+		}
+		_ = db.SetState(s.ID, store.StateStopped)
+		fmt.Printf("  ✓ đã dừng #%d %s\n", s.ID, s.Addr())
+		n++
+	}
+	if n == 0 {
+		fmt.Println("  Không có phiên nào khớp.")
+	}
+}
+
 func cmdHelp() {
 	fmt.Print(`
   sagent — quản lý & chạy nhiều tài khoản AI
@@ -223,6 +388,20 @@ func cmdHelp() {
     sagent dong-bo [--dry-run]  đồng bộ cấu hình dùng chung
     sagent xoa <provider:tên>   xoá tài khoản (an toàn)
     sagent verify [provider]    chạy bộ "đã đo"
+
+  Chạy song song (agent headless):
+
+    sagent fleet <provider:tên> --copies N -- <lệnh>
+                                bật N phiên song song trên MỘT tài khoản
+    sagent clone <provider:tên> --copies N
+                                chỉ tạo N thư mục config, không chạy
+    sagent status               phiên nào đang chạy
+    sagent stop <số|all>        dừng phiên
+    sagent clean <provider:tên> xoá các bản clone (an toàn, không xuyên link)
+
+  Ví dụ:
+
+    sagent fleet claude:phu --copies 4 -- -p "tóm tắt repo này"
 
 `)
 }
