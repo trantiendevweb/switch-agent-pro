@@ -60,9 +60,53 @@ func NewWithToken(a *api.API, token string) *Server {
 	m.HandleFunc("/api/events", s.guard(s.handleEvents))
 	m.HandleFunc("/api/fleet", s.guard(s.handleFleet))
 	m.HandleFunc("/api/stop", s.guard(s.handleStop))
-	m.HandleFunc("/", s.guard(files.ServeHTTP))
+
+	// /docs/ là vùng CÔNG KHAI: kế hoạch, thiết kế, master plan — chỉ để đọc.
+	// Cố ý không đòi token để chia sẻ link kế hoạch KHÔNG đồng nghĩa trao quyền
+	// điều khiển agent. Đằng nào nội dung này cũng nằm công khai trên GitHub.
+	m.Handle("/docs/", files)
+
+	// Mọi thứ còn lại (dashboard 2D, 3D) cần token. Riêng trang gốc khi chưa có
+	// token thì hiện trang giới thiệu thay vì ném 401 trần trụi.
+	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" && !s.hasToken(r) {
+			s.landing(w)
+			return
+		}
+		s.guard(files.ServeHTTP)(w, r)
+	})
 	s.mux = m
 	return s
+}
+
+func (s *Server) hasToken(r *http.Request) bool {
+	tok := r.Header.Get("X-Sagent-Token")
+	if tok == "" {
+		tok = r.URL.Query().Get("t")
+	}
+	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1
+}
+
+// landing là trang cho người ghé mà không có token: chỉ đường tới tài liệu công
+// khai, và nói rõ dashboard cần token — chứ không phơi bày gì thêm.
+func (s *Server) landing(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Switch-Agent-Pro</title><style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0F172A;color:#F8FAFC;
+font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;padding:24px}
+.c{max-width:420px;text-align:center}h1{font-size:26px;margin:0 0 6px}
+p{color:#94A3B8;font-size:14px}a{display:inline-block;margin-top:14px;text-decoration:none;color:#22C55E;
+border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);border-radius:9px;padding:9px 16px;font-weight:600}
+code{background:#272F42;padding:2px 6px;border-radius:5px;font-size:.9em;color:#e2e8f0}
+</style></head><body><div class="c">
+<h1>Switch-Agent-Pro</h1>
+<p>Control plane điều phối nhiều coding agent và nhiều AI API.</p>
+<a href="/docs/">Xem kế hoạch &amp; thiết kế →</a>
+<p style="margin-top:22px;font-size:13px">Dashboard điều khiển cần token:<br><code>/?t=&lt;token&gt;</code></p>
+</div></body></html>`)
 }
 
 // Token là mã ngẫu nhiên phải có trong mọi request.

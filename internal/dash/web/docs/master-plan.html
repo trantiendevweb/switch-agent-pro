@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Switch-Agent-Pro — Master Plan</title>
+<!-- font tai kieu KHONG CHAN: hong font van doc duoc -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+ href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{--bg:#0F172A;--primary:#1E293B;--muted:#272F42;--fg:#F8FAFC;--sub:#94A3B8;
+--border:#475569;--run:#22C55E;--warn:#F59E0B;--limit:#EF4444;
+--panel:rgba(30,41,59,.55);--ease:cubic-bezier(0.16,1,0.3,1);
+--safe-b:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:
+radial-gradient(1100px 520px at 50% -8%,rgba(34,197,94,.10),transparent 60%),
+radial-gradient(800px 460px at 100% 6%,rgba(66,133,244,.07),transparent 55%),var(--bg);
+color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+line-height:1.65;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+.nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:12px 16px;
+backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);background:rgba(15,23,42,.85);
+border-bottom:1px solid rgba(71,85,105,.45)}
+.nav .b{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.nav .sp{margin-left:auto;display:flex;gap:8px}
+.nav a{text-decoration:none;color:var(--fg);border:1px solid var(--border);border-radius:8px;
+padding:7px 11px;font-size:12px;font-weight:600;transition:all .2s var(--ease);white-space:nowrap}
+.nav a:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
+.nav a.p{border-color:var(--run);background:rgba(34,197,94,.14);color:var(--run)}
+main{max-width:860px;margin:0 auto;padding:22px 18px calc(80px + var(--safe-b))}
+h1{font-size:clamp(26px,6vw,40px);line-height:1.14;font-weight:800;letter-spacing:-.02em;margin:6px 0 14px;
+background:linear-gradient(120deg,#22C55E,#4285F4);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:clamp(19px,4vw,26px);font-weight:700;margin:38px 0 10px;padding-top:14px;
+border-top:1px solid rgba(71,85,105,.4);letter-spacing:-.01em;scroll-margin-top:64px}
+h3{font-size:clamp(16px,3vw,19px);font-weight:600;margin:24px 0 8px;color:var(--run);scroll-margin-top:64px}
+h4{font-size:15px;font-weight:600;margin:18px 0 6px;color:var(--sub)}
+p{margin:10px 0;color:#dbe3ee}
+a{color:#7dd3fc}
+ul,ol{padding-left:22px;margin:10px 0}
+li{margin:5px 0;color:#dbe3ee}
+li::marker{color:var(--run)}
+strong{color:var(--fg);font-weight:600}
+em{color:var(--sub)}
+code{background:var(--muted);padding:2px 6px;border-radius:5px;font-size:.87em;color:#e2e8f0;
+font-family:ui-monospace,Consolas,monospace}
+pre{background:rgba(15,23,42,.8);border:1px solid var(--border);border-radius:12px;padding:14px;
+overflow-x:auto;margin:14px 0}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.6}
+blockquote{margin:14px 0;padding:12px 16px;border-left:3px solid var(--run);
+background:rgba(34,197,94,.07);border-radius:0 10px 10px 0;color:#cbd5e1}
+blockquote strong{color:var(--run)}
+.tw{overflow-x:auto;margin:14px 0;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:min(100%,520px)}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid rgba(71,85,105,.4);vertical-align:top}
+th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.07em;white-space:nowrap}
+hr{border:0;border-top:1px solid rgba(71,85,105,.35);margin:26px 0}
+.task{list-style:none;margin-left:-16px}
+.task .box{display:inline-block;width:15px;height:15px;border:1.5px solid var(--border);border-radius:4px;
+margin-right:8px;vertical-align:-2px}
+.task.done{color:var(--sub)}
+.task.done .box{background:var(--run);border-color:var(--run);position:relative}
+.task.done .box::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+border:solid #0F172A;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.top{position:fixed;right:16px;bottom:calc(16px + var(--safe-b));z-index:15;background:var(--panel);
+border:1px solid var(--border);color:var(--fg);border-radius:999px;width:44px;height:44px;display:grid;
+place-items:center;cursor:pointer;backdrop-filter:blur(14px);text-decoration:none}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body id="top">
+<nav class="nav">
+  <div class="b">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
+    Switch-Agent-Pro
+  </div>
+  <div class="sp"><a class="p" href="MASTER-PLAN.md">.md</a><a href="./">Plan</a><a href="/">Dashboard ↗</a></div>
+</nav>
+<main><h1>Switch-Agent-Pro — Master Plan (hợp nhất)</h1>
+<blockquote>
+<p>Phiên bản: 2.0 · Cập nhật: 2026-08-17
+Tài liệu này <strong>hợp nhất</strong> hai nguồn thành một lộ trình duy nhất:
+- <code>CCSWITCH_CLAUDE_DEVELOPMENT_PLAN.md</code> (v1.1) — kiến trúc control plane, hai đường
+  subscription/API, daemon + SQLite, ACP, workflow DAG, security, học từ OSS.
+- <code>docs/PLAN.md</code> + <code>docs/THIET-KE.md</code> (của tôi) — phong cách DoD + bẫy + "đã đo",
+  và phần <strong>đã build thật</strong> (lõi Go Pha 1 chạy trên Windows).</p>
+<p>Nó thay thế <code>docs/PLAN.md</code> làm lộ trình chính. <code>docs/THIET-KE.md</code> giữ vai trò
+"vì sao"; <code>docs/DO-LUONG.md</code> giữ vai trò báo cáo đo.</p>
+</blockquote>
+<hr>
+<h2>0. Danh tính dự án</h2>
+<ul>
+<li><strong>Tên</strong>: <strong>Switch-Agent-Pro</strong> (đổi từ <code>ccswitch</code> — trùng <code>farion1231/cc-switch</code>).</li>
+<li><strong>Module Go</strong>: <code>github.com/trantiendevweb/switch-agent-pro</code></li>
+<li><strong>CLI</strong>: <code>sagent</code> · <strong>Daemon</strong>: <code>sagentd</code> · <strong>Config project</strong>: <code>.sagent/project.toml</code></li>
+<li><strong>Một câu</strong>: <em>local-first control plane điều phối nhiều coding agent và nhiều AI API,
+  chạy native trên Windows + Linux, một binary, có dashboard quan sát realtime.</em></li>
+</ul>
+<p>Đích không phải "mở nhiều terminal", mà là: dùng <strong>cả subscription profile lẫn API
+profile</strong>, gắn vào <strong>agent harness</strong> hoặc <strong>model route</strong> phù hợp, chạy trong
+<strong>workspace biệt lập của từng project</strong>, điều phối bằng <strong>flow khai báo được</strong>, lưu
+<strong>trạng thái bền vững</strong>, <strong>quan sát realtime</strong>, và <strong>điều khiển được từ bốn mặt</strong>
+(terminal → 2D → workflow board → 3D) — xem mục 2c.</p>
+<h3>Cam kết mã nguồn mở</h3>
+<p>Đây là tiêu chí sản phẩm, không phải câu khẩu hiệu:</p>
+<ul>
+<li><strong>Giấy phép MIT</strong>, toàn bộ mã nằm trong repo — không có phần lõi đóng.</li>
+<li><strong>Không telemetry, không tài khoản, không dịch vụ đám mây bắt buộc.</strong> Clone về là
+  chạy được offline; thứ duy nhất ra Internet là chính CLI/API của nhà cung cấp AI
+  mà bạn cấu hình.</li>
+<li><strong>Mọi phụ thuộc phải là mã nguồn mở, giấy phép tương thích</strong>, ghi trong
+  <code>docs/OPEN_SOURCE_LEDGER.md</code>. Ưu tiên stdlib; thêm dependency phải có lý do.</li>
+<li><strong>Không có tính năng nào bị khoá sau bản trả phí</strong> — không có "bản pro".</li>
+<li>Dashboard <strong>tự phục vụ tại máy bạn</strong>; không gửi state đi đâu.</li>
+</ul>
+<hr>
+<h2>1. Sáu nguyên tắc (linh hồn, không đổi)</h2>
+<ol>
+<li><strong>Đã đo — không suy luận.</strong> Vị trí token, biến env, refresh, session resume,
+   trạng thái CLI: chưa có thí nghiệm tái lập thì chưa được coi là đúng.</li>
+<li><strong>Whitelist — không blacklist.</strong> Chỉ chia sẻ file/khoá config đã biết là an toàn.</li>
+<li><strong>Xoá an toàn.</strong> Không bao giờ xoá credential/dữ liệu/project gốc vì một session bị xoá.</li>
+<li><strong>Ghi nguyên tử.</strong> State quan trọng: temp + fsync + rename, hoặc transaction DB.</li>
+<li><strong>Local-first, một binary.</strong> Lõi chạy độc lập Windows + Linux; dashboard chỉ là client.</li>
+<li><strong>Trung thực về năng lực.</strong> Mỗi provider/harness gắn <code>stable</code> / <code>experimental</code> /
+   <code>unsupported</code> / <code>unknown</code> dựa trên <strong>bằng chứng</strong>, không "ước chừng".</li>
+</ol>
+<hr>
+<h2>2. Hai đường sử dụng (khác biệt cốt lõi so với plan cũ của tôi)</h2>
+<ol>
+<li><strong>Subscription path</strong> — chạy Claude Code, Codex CLI, Gemini CLI, Cursor… bằng
+   credential/config do CLI chính thức sở hữu (đây là toàn bộ phạm vi v1).</li>
+<li><strong>API path</strong> — gọi thẳng Anthropic, OpenAI, Google Gemini, xAI/Grok, DeepSeek,
+   OpenRouter, Mistral, Groq, Ollama/LocalAI hoặc endpoint OpenAI-compatible.</li>
+</ol>
+<p>Hai đường <strong>dùng chung</strong> Project, Task, Workspace, Flow, Scheduler, Event, Dashboard.
+Chúng chỉ khác ở <strong>auth, protocol, cách agent/model được thực thi</strong>.</p>
+<blockquote>
+<p>Bài học: plan cũ của tôi gộp mọi thứ vào một "provider". Master plan này <strong>tách</strong>:
+harness ≠ AI provider ≠ model ≠ auth profile ≠ route.</p>
+</blockquote>
+<hr>
+<h2>2b. Quyết định kiến trúc 2026-08-17 — <strong>đường gọn</strong></h2>
+<p>Bản v1.1 vẽ kiến trúc của một <em>service chạy 24/7</em>. Dự án này là <strong>CLI người ta
+clone về chạy trên máy mình</strong>. Cân lại từng món theo tiêu chí "nó mua được gì":</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Món</th>
+<th>Quyết định</th>
+<th>Lý do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>internal/domain</code> (types thuần + state machine)</td>
+<td><strong>BỎ</strong></td>
+<td>Với cỡ codebase này chỉ là thủ tục rườm rà; các package hiện có (<code>provider</code>/<code>profile</code>/<code>link</code>/<code>jsonutil</code>) đã tách logic khỏi I/O đủ sạch</td>
+</tr>
+<tr>
+<td><strong>SQLite</strong> làm nơi giữ state</td>
+<td><strong>GIỮ</strong></td>
+<td>Nhiều tiến trình <code>sagent</code> cùng ghi (fleet ở terminal này, <code>status</code> ở terminal kia). JSON thì phải tự lo khoá; SQLite lo sẵn bằng transaction + WAL. Dùng <code>modernc.org/sqlite</code> <strong>thuần Go</strong> nên vẫn một binary, không cần cgo</td>
+</tr>
+<tr>
+<td>Daemon <code>sagentd</code></td>
+<td><strong>BỎ khỏi đường chính</strong></td>
+<td>Phiên do <code>fleet</code> sinh ra chạy nền độc lập rồi; không cần tiến trình canh. <code>sagent dash</code> sẽ bật server <strong>tạm</strong>, chỉ sống khi dashboard đang mở</td>
+</tr>
+<tr>
+<td>Tách <code>harness</code> ≠ <code>AIProvider</code> ≠ <code>auth profile</code> ≠ <code>route</code></td>
+<td><strong>GIỮ</strong></td>
+<td>Không phải ceremony — không tách thì lúc thêm Codex hoặc đường API phải viết lại. Giữ ở mức <strong>interface</strong>, không cần package <code>domain</code> riêng</td>
+</tr>
+<tr>
+<td><code>verify</code> + nhãn stable/experimental</td>
+<td><strong>GIỮ</strong></td>
+<td>Đây là thứ làm công cụ đáng tin</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Khi nào xét lại:</strong> cần daemon nếu có tính năng <em>flow chạy dài phải sống sót
+qua reboot</em> hoặc <em>dashboard cần push realtime khi không ai mở terminal</em>. Chưa có
+thì không làm trước.</p>
+<hr>
+<h2>2c. Bốn mặt điều khiển (control surfaces)</h2>
+<p>Hệ thống phải <strong>điều khiển được AI từ bốn mặt</strong>, và cả bốn đều <strong>dùng thật được</strong>
+lẫn <strong>cấu hình được</strong> — không có mặt nào chỉ để ngắm:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Mặt</th>
+<th>Dùng khi</th>
+<th>Điều khiển được gì</th>
+<th>Công nghệ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1 · Terminal</strong> (CLI + TUI)</td>
+<td>Ở trong terminal, SSH, script hoá, CI</td>
+<td>Toàn bộ. CLI là mặt bằng đầy đủ nhất</td>
+<td>Go stdlib; TUI vẽ tay, không kéo framework nặng</td>
+</tr>
+<tr>
+<td><strong>2 · Dashboard 2D</strong></td>
+<td>Muốn nhìn nhanh: phiên nào chạy, hạn mức, log</td>
+<td>Xem · bật/dừng phiên · duyệt approval · đọc log</td>
+<td>Web cục bộ, HTML/CSS/JS tĩnh nhúng bằng Go <code>embed</code></td>
+</tr>
+<tr>
+<td><strong>3 · Workflow board</strong></td>
+<td>Dựng và chạy flow nhiều bước</td>
+<td>Kéo/nối node, sửa <code>flows.toml</code> bằng giao diện, chạy/tạm dừng/resume flow</td>
+<td>Cùng web app với mặt 2, một tab khác</td>
+</tr>
+<tr>
+<td><strong>4 · 3D</strong></td>
+<td>Nhìn toàn cảnh đội agent, trình diễn</td>
+<td>Cùng tập hành động với mặt 2, thể hiện bằng không gian</td>
+<td>React Three Fiber</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Ba luật giữ cho bốn mặt không vỡ</h3>
+<p>Bốn mặt × N tính năng là công thức phình bảo trì. Ba luật sau là thứ giữ nó sống:</p>
+<ol>
+<li><strong>Một hợp đồng duy nhất.</strong> Mọi hành động đi qua <strong>API lõi có version</strong>
+   (<code>internal/api</code>). CLI <strong>không</strong> phải là lõi — CLI chỉ là <em>client đầu tiên</em>.
+   Mọi mặt khác là client ngang hàng. Không mặt nào được gọi thẳng vào <code>store</code>
+   hay <code>profile</code>.</li>
+<li><strong>Ngang quyền (capability parity).</strong> Một tính năng chưa xong nếu <strong>chưa làm
+   được từ CLI</strong>. UI được phép làm việc đó <em>dễ hơn</em>, không được là <em>cách duy nhất</em>.
+   Kiểm bằng test: mỗi hành động của UI phải có lệnh CLI tương đương.</li>
+<li><strong>Sự thật đến từ event, không phải từ đoán.</strong> Cả bốn mặt cùng nghe <strong>một
+   luồng event</strong> có schema/version. Cấm UI tự suy trạng thái bằng timer hay
+   animation — trạng thái nào không có event thì không được hiển thị.</li>
+</ol>
+<h3>Mặt nào cũng bật/tắt được</h3>
+<ul>
+<li>Lõi chạy <strong>không cần mặt nào cả</strong> (headless, cho CI/script).</li>
+<li>3D là <strong>tuỳ chọn</strong>: máy yếu hoặc <code>prefers-reduced-motion</code> thì rơi về 2D; tắt hẳn
+  cũng không ảnh hưởng lõi.</li>
+<li>Web assets nhúng bằng <code>embed</code> nên vẫn <strong>một binary</strong>; không cần Node để chạy.</li>
+</ul>
+<h3>Cấu hình theo từng dự án</h3>
+<p>Tầng cấu hình, dưới đè lên trên: <strong>mặc định của công cụ → global
+(<code>~/.ai-accounts/config.toml</code>) → project (<code>.sagent/project.toml</code>) → cờ dòng lệnh</strong>.
+Mỗi project tự khai báo: mặt mặc định, layout, cột nào hiện, flow nào ghim,
+route AI nào dùng, giới hạn song song, hành động nào cần duyệt. Xem mục 8.</p>
+<hr>
+<h2>3. Kiến trúc đích</h2>
+<pre><code>CLI (sagent) · Dashboard 2D/3D
+        │  (chỉ dùng public API, không đọc secret)
+Local daemon (sagentd) · versioned API · WebSocket/SSE
+        │
+DAG scheduler · durable events
+        │
+Project · Task · Workspace · Session
+   ├── Agent Harness  (ACP/PTY)  ── Auth Profile (subscription/API)
+   └── Model Route    (direct API) ─┘
+</code></pre>
+<h3>Domain object (tách bạch, không gộp)</h3>
+<p><code>AgentHarness</code> · <code>AIProvider</code> · <code>Model</code> · <code>AuthProfile</code> (mode: subscription/oauth/
+api_key/service_account/local) · <code>SubscriptionProfile</code> · <code>APIProfile</code> (key/base URL/
+headers, secret lưu tách) · <code>HarnessAdapter</code> · <code>AIProviderAdapter</code> · <code>AgentDriver</code>
+(start/prompt/cancel/resume/stream/permission) · <code>ModelClient</code> · <code>ModelRoute</code>
+(provider+model+auth+fallback/health/cost) · <code>ProcessBackend</code> (Windows ConPTY / Linux
+PTY; tmux/container tuỳ chọn) · <code>Project</code> · <code>Workspace</code> (dir/worktree/sandbox) · <code>Task</code>
+· <code>Session</code> · <code>FlowDefinition</code> · <code>FlowRun</code> · <code>Artifact</code> · <code>Approval</code>.</p>
+<pre><code>Session = AuthProfile + (AgentHarness | ModelRoute) + Project + Workspace + Policy
+FlowRun = DAG&lt;Task/Action&gt; + State + Events + Artifacts + Approvals
+</code></pre>
+<h3>10 boundary interface</h3>
+<p>Harness Adapter · AI Provider Adapter · Agent Driver · Model Client · Route Engine ·
+Process Backend · Workspace Backend · State Store · Event Bus · Workflow Node.</p>
+<p><strong>Luật boundary bất khả xâm phạm:</strong> harness/provider <strong>không biết</strong> dashboard;
+dashboard <strong>không đọc</strong> token/API key; workflow chỉ tham chiếu <code>auth_profile_id</code> /
+<code>route_id</code>, <strong>không</strong> thao tác secret trực tiếp.</p>
+<h3>Capability thay vì suy đoán</h3>
+<p>Mỗi adapter/driver khai báo capability <strong>có version</strong>; capability không có bằng chứng
+mặc định <code>false</code>/<code>unknown</code>. Ví dụ: <code>config_root_isolation</code>, <code>credential_safe_clone</code>,
+<code>concurrent_refresh</code>, <code>auth_subscription</code>, <code>auth_api_key</code>, <code>headless_execution</code>,
+<code>structured_events</code>, <code>session_resume</code>, <code>usage_reporting</code>, <code>rate_limit_reporting</code>,
+<code>acp_transport</code>, <code>protocol_anthropic_messages</code>, <code>protocol_chat_completions</code>,
+<code>streaming</code>, <code>tool_calling</code>, <code>structured_output</code>, <code>vision</code>, <code>reasoning</code>,
+<code>model_discovery</code>, <code>health_check</code>…</p>
+<hr>
+<h2>4. Cấu trúc Go đích</h2>
+<blockquote>
+<p>Cập nhật theo quyết định "đường gọn" ở mục 2b: <strong>không</strong> có <code>cmd/sagentd</code>,
+<strong>không</strong> có <code>internal/domain</code>. Dấu ✓ = đã có thật trong repo.</p>
+</blockquote>
+<pre><code>cmd/sagent/               ✓ CLI (một binary duy nhất)
+internal/store/           ✓ SQLite: sessions + migration (nguồn sự thật)
+internal/process/         ✓ IsAlive / Kill theo nền tảng
+internal/fleet/           ✓ chạy N phiên song song
+internal/profile/         ✓ create · link · clone · run · remove (xoá an toàn)
+internal/link/            ✓ junction (Win) / symlink (Linux)
+internal/jsonutil/        ✓ .claude.json: khoá trùng, ghi nguyên tử, whitelist
+internal/harness/         # Claude Code / Codex / Gemini CLI / Cursor adapters
+internal/provider/        # Anthropic / OpenAI / Gemini / xAI / DeepSeek… API adapters
+internal/model/           # normalized request/response/capability
+internal/routing/         # route · fallback · health · usage/cost
+internal/auth/            # subscription/API profiles + secret references
+internal/agent/           # ACP / PTY drivers + direct-model agents
+internal/process/         # Windows ConPTY / Linux PTY backends
+internal/project/         # discovery + .sagent/project.toml
+internal/workspace/       # dir / git worktree / sandbox
+internal/workflow/        # DAG validate / scheduler / nodes
+internal/store/           # SQLite + migrations + repositories (SSOT)
+internal/events/          # versioned event envelopes
+internal/api/             # local HTTP/IPC + WebSocket/SSE
+internal/security/        # redaction · path policy · credential handling
+internal/testkit/         # fake provider/agent/clock/process
+web/                      # React UI (chỉ dùng public API)
+docs/{adr,research,knowledge}/
+</code></pre>
+<p><code>domain</code> không import provider/database/HTTP/UI. Tránh phụ thuộc vòng.</p>
+<hr>
+<h2>5. Học từ mã nguồn mở (có kỷ luật)</h2>
+<p>Chu trình cho phần quan trọng/rủi ro cao: <strong>Study → Pin → Extract → Evaluate →
+Decide → Adapt → Verify → Compound</strong>. Chỉ tạo hồ sơ đầy đủ (<code>docs/research/&lt;topic&gt;/</code>
+với SOURCES/FINDINGS/DECISION/TEST-EVIDENCE) khi nghiên cứu lớn hoặc port mã trực tiếp.</p>
+<p><strong>Giấy phép:</strong> học nguyên lý từ mọi dự án; <strong>chỉ</strong> đưa mã trực tiếp vào sản phẩm khi
+license tương thích + giữ attribution; AGPL/GPL chỉ để học hành vi trừ khi chủ động
+chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào <code>docs/OPEN_SOURCE_LEDGER.md</code>.</p>
+<p><strong>Bản đồ tham khảo</strong> (chọn theo boundary, không theo số sao):</p>
+<ul>
+<li><strong>Nhóm A (lõi):</strong> cc-switch (SQLite SSOT, atomic, live config), Agent Deck (Go
+  fleet/worktree/fork-resume), multiclaude (daemon, IPC, recovery), Agent Client
+  Protocol + ACP Go SDK (session/prompt/cancel/streaming/permission).</li>
+<li><strong>Nhóm B (orchestration):</strong> Gas Town, Beads (dependency graph/durable memory),
+  Compound Engineering, CCPM (PRD→epic→task, parallel).</li>
+<li><strong>Nhóm C (dashboard/sandbox):</strong> Agent of Empires, OpenHands, CCManager (PTY không tmux).</li>
+<li><strong>Nhóm D (API gateway/routing):</strong> LiteLLM, LocalAI, New API (AGPL — chỉ học), cc-switch proxy.</li>
+</ul>
+<hr>
+<h2>6. Trạng thái hiện tại &amp; ánh xạ (2026-08-17)</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Đã có</th>
+<th>Vị trí</th>
+<th>Trong master plan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lõi Go đổi tài khoản Claude (Windows)</td>
+<td><code>cmd/sagent</code>, <code>internal/{paths,provider,jsonutil,link,profile}</code></td>
+<td><strong>Phần của Pha 1</strong> (vertical slice Claude subscription) — cần <strong>tách domain</strong> + <strong>đổi tên</strong></td>
+</tr>
+<tr>
+<td>Bỏ Python, khoá JSON trùng, ghi nguyên tử, xoá an toàn</td>
+<td><code>jsonutil</code>, <code>profile</code> + test</td>
+<td>Giữ, đưa vào <code>store</code>/<code>harness</code> mới</td>
+</tr>
+<tr>
+<td>link junction/symlink đa nền tảng</td>
+<td><code>internal/link</code></td>
+<td>Giữ, thành nền <code>workspace</code>/materialize</td>
+</tr>
+<tr>
+<td><code>running.json</code> + fleet prototype</td>
+<td>~~<code>internal/{registry,fleet}</code>~~ <strong>đã gỡ</strong></td>
+<td>Làm lại trên <strong>SQLite SSOT + daemon</strong> ở Pha 2 (PID chỉ là runtime attribute)</td>
+</tr>
+<tr>
+<td>Design tokens + dashboard 3D + mascot</td>
+<td><code>design-system/switch-agent-pro/</code>, <code>index.html</code>, <code>plan.html</code></td>
+<td><strong>Nguyên mẫu Pha 6</strong> — biến thành client của event API</td>
+</tr>
+<tr>
+<td>Đo Windows/Claude (junction, token file, safe remove)</td>
+<td><code>docs/DO-LUONG.md</code></td>
+<td>Bằng chứng Pha 0 (Windows/Claude subscription)</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>Nợ kỹ thuật đã biết:</strong> (1) <code>provider</code> hiện gộp mọi thứ — phải tách harness/
+provider/model/auth/route. (2) <code>running.json</code> không phải durable state — chuyển SSOT
+sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa có Linux.</p>
+</blockquote>
+<hr>
+<h2>7. Lộ trình (8 pha, mỗi pha ra 1 bản dùng được)</h2>
+<h3>Bước 0 — Đổi tên ✅ XONG (2026-08-17)</h3>
+<ul>
+<li class="task done"><span class="box"></span><code>go.mod</code> module → <code>github.com/trantiendevweb/switch-agent-pro</code>; <code>cmd/ccswitch</code>
+  → <code>cmd/sagent</code> (git mv); cập nhật mọi import; <strong>build + vet + test xanh</strong>; <code>sagent ds</code> chạy đúng.</li>
+<li class="task done"><span class="box"></span>Cập nhật <code>install/cai-dat.{ps1,sh}</code>, CI, <code>.gitignore</code> sang <code>sagent</code>.</li>
+<li class="task"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code> (làm khi viết installer phát hành).</li>
+<li class="task done"><span class="box"></span>Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
+  <code>legacy/v1-powershell/</code>; <code>design-system/switch-agent-pro/</code>; 3 trang HTML sạch tên cũ.</li>
+</ul>
+<h3>Pha 0 — Đo giả định &amp; lập hợp đồng</h3>
+<p>🎯 Chứng minh cơ chế của <strong>cả hai đường</strong> trước khi khoá interface.</p>
+<ul>
+<li class="task"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.</li>
+<li class="task"><span class="box"></span><strong>Subscription</strong> (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
+  root override có bao trùm config/session/auth? token ở file/env/keyring? file nào
+  đọc/ghi lúc login/prompt/refresh/exit? <strong>concurrent refresh</strong> khi 2 process chung
+  credential? copy token có tạo session hợp lệ, bao lâu? headless/JSON/stream/ACP/
+  resume/cancel? state máy dùng chung ngoài config root?</li>
+<li class="task"><span class="box"></span><strong>API</strong> (Anthropic, OpenAI, Gemini, xAI/Grok, DeepSeek, OpenAI-compatible): auth
+  mode, base URL, model naming, headers; protocol (Responses/Chat Completions/Anthropic
+  Messages/Gemini native); streaming/tool/reasoning/vision/structured-output/usage;
+  error+rate-limit schema, retry headers, health, model discovery.</li>
+<li class="task"><span class="box"></span>Junction Windows ✓ / symlink Linux từ Go, không admin.</li>
+<li class="task"><span class="box"></span>Behavior khi stream/process ngắt, reboot, config ghi dở.</li>
+<li class="task"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).</li>
+<li class="task"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.</li>
+<li><strong>Artifact:</strong> <code>docs/research/phase0/*</code> (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
+  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <code>docs/security/THREAT-MODEL.md</code>,
+  <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
+<li><strong>DoD:</strong> mỗi kết luận có command/OS/output-redacted; <strong>không token thật</strong> ở đâu;
+  capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.</li>
+<li>⚠ <strong>Blocker cần bạn:</strong> máy/VM <strong>Linux</strong>; <strong>API key</strong> thật (local-only, redaction) cho phần API path.</li>
+<li><strong>Trạng thái:</strong> Windows/Claude subscription + junction đã đo (<code>docs/DO-LUONG.md</code>); còn lại chưa.</li>
+</ul>
+<h3>Pha 1 — Storage + Claude slice + 1 API slice</h3>
+<p>🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
+<ul>
+<li class="task done"><span class="box"></span>~~<code>internal/domain</code>~~ <strong>bỏ</strong> theo mục 2b — dùng thẳng các package hiện có.</li>
+<li class="task"><span class="box"></span><code>internal/store</code>: <strong>SQLite</strong> schema/migration cho auth profile, harness, provider,
+  route, project, session, event.</li>
+<li class="task"><span class="box"></span><code>jsonutil</code> (đã có) + atomic replace + preservation test (giữ).</li>
+<li class="task"><span class="box"></span>link abstraction (đã có) → materialize config root cho harness.</li>
+<li class="task"><span class="box"></span><strong>Claude Harness Adapter</strong> + subscription capability report + conformance test
+  (nâng từ <code>provider/claude.go</code> hiện tại).</li>
+<li class="task"><span class="box"></span><strong>1 direct-API vertical slice</strong> (provider Pha 0 xác nhận phù hợp, vd Anthropic API):
+  stream response, ghi usage/error, <strong>không lộ key</strong>.</li>
+<li class="task"><span class="box"></span>Verb: <code>profile create/list/verify/remove</code>, <code>route create/list/test</code>,
+  <code>session run/list/stop</code>.</li>
+<li class="task"><span class="box"></span>Safe delete: chỉ xoá <strong>materialized session directory</strong> mà registry sở hữu.</li>
+<li><strong>DoD:</strong> CI Windows+Linux xanh; đổi Claude subscription không đăng nhập lại; API route
+  stream + ghi usage/error không lộ key; xoá session không đụng credential/project gốc;
+  fault injection không tạo JSON/DB dở; <strong>hết Python</strong>.</li>
+<li><strong>Trạng thái:</strong> phần subscription-switch đã chạy trên Windows; còn thiếu domain layer,
+  SQLite, API slice.</li>
+</ul>
+<h3>Pha 2 — Chạy song song + Project/Workspace  🟡 một phần</h3>
+<p>🎯 Biến công cụ profile thành <strong>runtime manager</strong> đa project.</p>
+<ul>
+<li class="task done"><span class="box"></span><strong>SQLite là SSOT</strong> (<code>~/.ai-accounts/state.db</code>); PID chỉ là thuộc tính
+  runtime — <code>status</code> đối chiếu PID thật và tự đánh dấu <code>lost</code> phiên đã chết.</li>
+<li class="task done"><span class="box"></span><code>clone</code> — chép credential ra N config dir riêng (mỗi bản <code>.claude.json</code>
+  riêng nên <strong>không đua ghi</strong>); <code>fleet</code> — bật N phiên nền, log ra file;
+  <code>status</code>; <code>stop &lt;số|all&gt;</code>; <code>clean</code> — xoá clone <strong>an toàn</strong> (không xuyên junction).</li>
+<li class="task done"><span class="box"></span>Cảnh báo thẳng: tiêu hạn mức gấp N, và <strong>concurrent refresh chưa đo</strong>.</li>
+<li class="task done"><span class="box"></span>Sửa bug thật: tài khoản di trú từ v1 không chạy được vì <code>Dir()</code> chỉ trỏ
+  kho mới → thêm <code>ResolveDir()</code> dùng chung cho mọi verb.</li>
+<li class="task done"><span class="box"></span><strong>Workspace backend: git worktree</strong> (<code>--worktree</code>) — mỗi phiên một cây làm
+  việc + nhánh <code>sagent/&lt;tên&gt;-&lt;n&gt;</code>, đặt NGOÀI repo để <code>git status</code> không bị rác;
+  <code>clean</code> gỡ worktree nhưng <strong>giữ nhánh</strong> (việc agent làm nằm trong đó). Không
+  bật cờ thì công cụ <strong>cảnh báo</strong> các phiên dùng chung thư mục.</li>
+<li class="task done"><span class="box"></span>Migration có version cho SQLite (v1 bảng phiên → v2 cột <code>worktree</code>), chạy
+  trong transaction; test khẳng định mở lại nhiều lần không hỏng.</li>
+<li class="task done"><span class="box"></span>Trả nợ test: <code>store</code> (migration, reaping PID chết, SetState) và <code>clone</code>
+  (file riêng phải là bản sao thật, xoá clone không đụng dữ liệu gốc).</li>
+<li class="task done"><span class="box"></span><strong>Project discovery + <code>.sagent/project.toml</code></strong> — tầng cấu hình mặc định →
+  global → project → cờ; <code>sagent init</code> / <code>sagent config</code>; <code>fleet</code> tôn trọng
+  <code>project.workspace</code> và <code>policy.max_parallel_sessions</code> (trần cứng).</li>
+<li class="task done"><span class="box"></span><strong>Lá chắn dữ liệu</strong>: <code>clean</code> từ chối gỡ worktree còn thay đổi chưa commit
+  (phải <code>--force</code> mới bỏ) — trước đó <code>worktree remove --force</code> nuốt luôn việc
+  agent làm dở, trái nguyên tắc #3.</li>
+<li class="task done"><span class="box"></span>Sửa bug thật: <code>clean</code> đoán số thứ tự worktree nên gặp khoảng trống là dừng,
+  bỏ sót phần còn lại → chuyển sang <strong>quét thư mục thật</strong> (<code>FindAll</code>).</li>
+<li class="task done"><span class="box"></span><code>docs/OPEN_SOURCE_LEDGER.md</code> — ghi 2 phụ thuộc trực tiếp + giấy phép.</li>
+<li class="task done"><span class="box"></span><strong>Integration test cho <code>fleet</code> + <code>workspace</code></strong> (29 test toàn dự án): dùng
+  git thật và tiến trình con thật. Bắt được <strong>rò file descriptor</strong> trong
+  <code>StartDetached</code> — tiến trình cha mở file log rồi không đóng, mỗi lần <code>fleet</code>
+  rò một handle và trên Windows khoá luôn file. Có test hồi quy cho bug
+  "đoán số thứ tự worktree".</li>
+<li class="task"><span class="box"></span>~~<code>sagentd</code> daemon~~ <strong>bỏ</strong> (xem mục 2b) — <code>dash</code> sẽ là server tạm.</li>
+<li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
+<li class="task"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong>.</li>
+<li class="task"><span class="box"></span>Process backend native Windows/Linux; tmux tuỳ chọn (Linux).</li>
+<li class="task"><span class="box"></span>Session state machine + event stream.</li>
+<li class="task"><span class="box"></span>Route engine cơ bản: chọn provider/model/profile, health, fallback, usage/cost event.</li>
+<li class="task"><span class="box"></span>Recovery khi daemon/process chết; cleanup orphan an toàn.</li>
+<li><strong>DoD:</strong> 4 session cùng profile + 3 profile khác chạy đúng policy; 10 session đồng thời
+  không hỏng config/state; restart daemon phục hồi đúng; ≥2 repo khác stack; không session
+  nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.</li>
+<li><strong>Ánh xạ:</strong> thay thế prototype <code>registry</code>/<code>fleet</code> hiện tại.</li>
+</ul>
+<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)</h3>
+<p>🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</p>
+<ul>
+<li><strong>DoD:</strong> Claude &amp; Codex dùng chung domain/session API (subscription); Anthropic API &amp;
+  OpenAI-compatible dùng chung route API (direct); khác biệt auth/config nằm trong adapter,
+  khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</li>
+<li>2 API protocol; capability không hỗ trợ báo trung thực.</li>
+</ul>
+<h3>Pha 3 — Flow DAG ghép được</h3>
+<p>🎯 Người dùng định nghĩa workflow mới <strong>không sửa mã Go</strong>.</p>
+<ul>
+<li class="task"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
+  retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
+  theo capability/model/giá/health/fallback; <strong>approval gate</strong>; <strong>resume sau restart</strong>;
+  idempotency key; failure policy (stop/continue/fallback/compensate).</li>
+<li class="task"><span class="box"></span>Node built-in: <code>agent · model · route · shell · test · lint · review · approve · merge · notify</code>.</li>
+<li class="task"><span class="box"></span>3 flow mẫu: <code>fanout</code> (nhiều agent → review → chọn), <code>squad</code> (API planner → agent
+  implementer → reviewer → test → approval), <code>agents</code> (danh sách task theo concurrency).</li>
+<li class="task"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
+  JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.</li>
+<li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
+  đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>
+</ul>
+<h3>Pha 4 — Mở rộng harness + AI API</h3>
+<ul>
+<li>Subscription: <strong>Gemini CLI, Cursor</strong>, OpenCode (nếu đo được).</li>
+<li>API: <strong>Google Gemini, xAI/Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI</strong>,
+  generic OpenAI-compatible; Azure/Bedrock/Vertex ở lớp plugin/enterprise nếu cần.</li>
+<li>Mỗi tích hợp lặp: measurement → adapter → conformance → streaming/tool/error/usage → capability label.</li>
+<li><strong>DoD:</strong> Grok &amp; DeepSeek chạy qua API profile riêng, chọn model + stream; generic
+  OpenAI-compatible hoạt động với custom base URL/model/headers; fallback không mất
+  correlation ID/usage/error gốc; thêm model/provider chỉ khác endpoint bằng manifest;
+  chưa xác minh giữ <code>experimental</code>/<code>unknown</code>.</li>
+</ul>
+<h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
+<p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
+gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.</p>
+<p><strong>5a · API lõi + Terminal.</strong>  ✅ XONG</p>
+<ul>
+<li class="task done"><span class="box"></span><code>internal/api</code> — hợp đồng duy nhất, <code>api.Version = 1</code>, <code>api.Actions</code> liệt kê
+  mọi hành động hệ thống làm được.</li>
+<li class="task done"><span class="box"></span><code>internal/events</code> — event có <code>SchemaVersion</code>, bus trong tiến trình; <strong>lõi
+  không in stdout nữa</strong>, nó phát event và CLI chỉ là bộ vẽ đầu tiên.</li>
+<li class="task done"><span class="box"></span>CLI viết lại thành client của API; bảng lệnh ánh xạ 1-1 với action.</li>
+<li class="task done"><span class="box"></span><strong>Test ngang quyền</strong> (<code>cmd/sagent/main_test.go</code>): mọi action đều phải có
+  lệnh CLI, và CLI không được có action ngoài hợp đồng. Luật 2 giờ có răng.</li>
+<li class="task done"><span class="box"></span>Trần <code>max_parallel_sessions</code> giờ chặn cả <strong>tổng số phiên đang chạy</strong>, không
+  chỉ <code>--copies</code>.</li>
+<li class="task done"><span class="box"></span><strong>TUI</strong> (<code>cmd/sagent/tui.go</code>): gõ <code>sagent</code> không tham số ra bảng chọn
+  đánh số như <code>tk</code> v1 — số=mở · t=thêm · d=đồng bộ · x=xoá · s=phiên · ?=trợ giúp.
+  Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
+<em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</li>
+</ul>
+<p><strong>5b · Dashboard 2D.</strong>  ✅ nền tảng xong</p>
+<ul>
+<li class="task done"><span class="box"></span><code>internal/dash</code>: server localhost bọc <code>internal/api</code> (không mở đường riêng
+  vào store). Assets nhúng bằng Go <code>embed</code> — vẫn một binary.</li>
+<li class="task done"><span class="box"></span><code>sagent dash [--port N]</code>: in URL kèm token, mở trình duyệt là thấy.</li>
+<li class="task done"><span class="box"></span>Realtime bằng <strong>SSE</strong> (thuần stdlib, KHÔNG thêm dependency WebSocket).</li>
+<li class="task done"><span class="box"></span>Dashboard đọc <strong>ảnh chụp đầy đủ</strong> từ <code>/api/state</code> khi kết nối rồi mới dùng
+  event cập nhật (không dựng UI chỉ từ event — người nghe chậm có thể lỡ).</li>
+<li class="task done"><span class="box"></span>Điều khiển: bật hạm đội + dừng phiên qua POST; đã chạy thật.</li>
+<li class="task done"><span class="box"></span><strong>Bảo mật</strong>: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
+  · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.</li>
+<li class="task"><span class="box"></span>Trạng thái phiên chi tiết (queued/blocked/rate_limited…) — hiện mới running/stopped/lost.</li>
+<li class="task"><span class="box"></span>Approval gate (chờ Pha 3 flow).
+<em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.</li>
+</ul>
+<p><strong>5c · Workflow board.</strong> Dựng/sửa flow bằng giao diện, ghi ra <code>flows.toml</code>
+(file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.
+<em>DoD:</em> flow tạo từ board và flow viết tay chạy y hệt nhau.</p>
+<p><strong>5d · Cấu hình theo project.</strong> <code>[ui]</code> trong <code>.sagent/project.toml</code> (mặt mặc định,
+cột, flow ghim, bật/tắt 3D) + tầng global.
+<em>DoD:</em> hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã.</p>
+<p><strong>Bảo mật chung cho mọi mặt web:</strong> chỉ bind loopback mặc định; random auth token;
+Origin validation + CSRF; <strong>không</strong> đưa credential/env/secret-path lên WebSocket;
+log redaction; mọi mutation có audit event.</p>
+<p><em>DoD chung:</em> tắt mặt nào lõi vẫn chạy · UI phản ánh <strong>event thật</strong>, không đoán bằng
+animation timer · mobile dùng được cho status/approval/stop/log.</p>
+<h3>Pha 6 — Mặt thứ tư: 3D  ✅ nền tảng xong</h3>
+<p>🎯 3D là <strong>projection của cùng event model</strong>, không có business logic riêng —
+và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (bấm orb → dừng/duyệt phiên đó).</p>
+<ul>
+<li>Mascot đại diện agent harness <strong>hoặc</strong> AI provider — UI phân biệt rõ hai loại.</li>
+<li>Orb = session thật; InstancedMesh, FogExp2, ACES, reduced-motion, <strong>fallback 2D</strong>.</li>
+<li>Subscription usage vs API token/cost vs rate-limit là chỉ số riêng; chỉ hiện khi có dữ liệu.</li>
+<li>Performance budget + test trên điện thoại tầm trung.</li>
+<li><strong>Trạng thái:</strong> ✅ view 3D thật ở <code>internal/dash/web/3d.html</code> — đọc cùng
+  <code>/api/state</code> + SSE như 2D, orb = phiên THẬT (màu theo trạng thái), mascot theo
+  provider, bấm orb → dừng phiên đó. Nav 2D↔3D giữ token. Không tải được Three.js
+  (offline) thì <strong>tự rơi về 2D</strong> thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
+  root <code>index.html</code> giữ làm bản trình diễn.</li>
+</ul>
+<h3>Pha 7 — Hardening &amp; phát hành</h3>
+<ul>
+<li>DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
+  symlink-escape test Linux; process-tree cancel + orphan cleanup; upgrade/provider-drift
+  verify; SBOM/license notices/dependency scan; signed + reproducible build; <strong>migration
+  guide từ tk v1 / ccswitch</strong>.</li>
+</ul>
+<hr>
+<h2>8. Project config <code>.sagent/project.toml</code> (không chứa secret)</h2>
+<pre><code class="language-toml">version = 1
+name = &quot;example-app&quot;
+[project]      root=&quot;.&quot;;  default_branch=&quot;main&quot;;  workspace=&quot;worktree&quot;
+[commands]     setup=[&quot;npm ci&quot;]; lint=[&quot;npm run lint&quot;]; test=[&quot;npm test&quot;]; build=[&quot;npm run build&quot;]
+[instructions] files=[&quot;AGENTS.md&quot;,&quot;CLAUDE.md&quot;]
+[policy]       max_parallel_sessions=4;  require_approval_for=[&quot;merge&quot;,&quot;deploy&quot;,&quot;destructive_shell&quot;]
+[ai]           default_route=&quot;coding-primary&quot;;  fallback_routes=[&quot;coding-secondary&quot;,&quot;local-fallback&quot;]
+[ai.requirements] capabilities=[&quot;tool_calling&quot;,&quot;streaming&quot;];  preferred_models=[&quot;provider/model-id&quot;]
+[workspace]    copy=[&quot;.env.example&quot;];  link=[&quot;node_modules&quot;];  deny=[&quot;.env&quot;,&quot;*.pem&quot;,&quot;secrets/**&quot;]
+
+# Bốn mặt điều khiển: mỗi project tự chọn mặt mặc định và bày biện riêng.
+[ui]
+default_surface = &quot;tui&quot;          # tui | dashboard | workflow | 3d
+theme           = &quot;dark&quot;
+[ui.dashboard]
+columns  = [&quot;session&quot;,&quot;harness&quot;,&quot;model&quot;,&quot;state&quot;,&quot;tokens&quot;,&quot;cost&quot;,&quot;elapsed&quot;]
+group_by = &quot;project&quot;
+[ui.workflow]
+pinned_flows = [&quot;fanout&quot;,&quot;squad&quot;]
+autolayout   = true
+[ui.3d]
+enabled       = true              # tắt được cho máy yếu
+max_orbs      = 200               # vượt ngưỡng thì gộp, tránh tụt khung hình
+reduced_motion = &quot;auto&quot;
+</code></pre>
+<p>Route chỉ chứa <strong>ID tham chiếu</strong>; key/token <strong>không</strong> nằm trong project config. Schema
+versioned, validation chặt, xử lý đúng Windows path/monorepo/command-có-khoảng-trắng; ưu
+tiên <strong>argv</strong> thay vì nối chuỗi shell.</p>
+<hr>
+<h2>9. Chiến lược test bắt buộc</h2>
+<ul>
+<li><strong>Unit:</strong> state transitions · DAG validation · path-ownership/safe-delete · JSON
+  case-insensitive duplicate · redaction · capability negotiation.</li>
+<li><strong>Ngang quyền giữa bốn mặt (mục 2c luật 2):</strong> test liệt kê mọi hành động API và
+  khẳng định <strong>mỗi hành động đều có lệnh CLI tương đương</strong>. Thêm nút trên UI mà
+  quên lệnh CLI thì test đỏ — đây là thứ giữ cho terminal không bị bỏ rơi.</li>
+<li><strong>Contract/conformance:</strong> mọi Harness Adapter/Agent Driver chạy cùng bộ test (isolated
+  roots, verify capability đúng, start/stop/cancel idempotent, không log secret, behavior
+  khi binary/version thiếu). Mọi AI Provider Adapter/Model Client chạy API conformance
+  (auth/base-URL/header, streaming lifecycle + cancel, tool/structured/reasoning theo
+  capability, error/rate-limit/retry normalize, usage/token/cost, <strong>không rò key</strong>).</li>
+<li><strong>Integration:</strong> native Win + Linux; worktree create/cleanup; daemon restart/crash;
+  SQLite migration + concurrent writes; ACP agent thật khi có + fake PTY cho CI; fake
+  HTTP/SSE cho CI + opt-in smoke với API thật; route fallback/circuit-breaker/reconnect.</li>
+<li><strong>Security:</strong> path traversal, symlink/junction escape, malicious project-config/plugin,
+  dashboard cross-origin, command injection, credential trong log/event/error.</li>
+<li><strong>Performance/reliability:</strong> 10 session baseline, event burst + reconnect, long-run flow
+  resume, dashboard 2D/3D budget.</li>
+</ul>
+<p>Test dùng fake credentials; test cần credential thật phải <strong>opt-in, local-only, redaction</strong>.</p>
+<hr>
+<h2>10. Definition of Done toàn cục</h2>
+<p>Một feature xong khi: (1) có spec + acceptance; (2) mã port trực tiếp thì có
+source/license/attribution (ADR chỉ bắt buộc cho quyết định kiến trúc lớn); (3) có test
+chạy trên OS liên quan; (4) error message hướng dẫn bước tiếp; (5) telemetry/event không
+lộ secret; (6) có quyết định migration/tương thích; (7) docs + example cập nhật; (8)
+<code>go test</code>/lint/race xanh; (9) không làm yếu permission/security để test qua; (10) không
+tự gắn <code>stable</code> khi chưa có evidence matrix.</p>
+<h2>11. Nhịp làm việc</h2>
+<p><code>Understand → Research khi hữu ích → Thin vertical slice → Tests/fault-injection →
+Self-review → Docs → Compound knowledge</code>. Chia PR nhỏ (mỗi PR một quyết định chính); không
+refactor rộng ngoài phạm vi; không thêm dependency khi stdlib đủ; ghi giả định mới vào
+research backlog; <strong>dừng và báo blocker</strong> nếu cần credential thật, xoá dữ liệu, hoặc mở
+dashboard ra mạng ngoài. Sau mỗi pha: <code>docs/knowledge/PHASE-&lt;n&gt;-RETROSPECTIVE.md</code>.</p>
+<hr>
+<h2>12. Việc còn treo cần bạn quyết/cung cấp</h2>
+<ol>
+<li>✅ Tên đã chốt: <strong>Switch-Agent-Pro</strong>, lệnh <code>sagent</code> (code đã đổi tên, build xanh).</li>
+<li><strong>Máy/VM Linux</strong> — chặn Pha 0 Linux + đa nền tảng.</li>
+<li><strong>API key thật</strong> (local-only, redaction) để đo + làm API path — hoặc hoãn API path,
+   giữ nhãn <code>experimental</code>, làm subscription path trước.</li>
+<li>Mức độ dùng <strong>daemon + SQLite</strong> ngay từ Pha 2 (đúng plan) hay giữ prototype nhẹ thêm
+   một nhịp — khuyến nghị: theo plan (SQLite SSOT) để không phải viết lại.</li>
+</ol></main>
+<a class="top" href="#top" aria-label="Len dau trang">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</a>
+</body>
+</html>
