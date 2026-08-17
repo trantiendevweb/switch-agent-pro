@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -105,6 +106,61 @@ func TestPOSTcungGocQua(t *testing.T) {
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("POST cùng gốc phải 200, được %d — %s", w.Code, w.Body.String())
+	}
+}
+
+// Chế độ phơi ra mạng: Host là IP thật thì phải QUA, nhưng token vẫn bắt buộc.
+func TestCheDoPhoiChoHostThatNhungVanDoiToken(t *testing.T) {
+	s := newTestServer(t)
+	s.exposed = true // như khi chạy --host 0.0.0.0
+
+	r := httptest.NewRequest("GET", "/api/state?t="+s.Token(), nil)
+	r.Host = "103.97.134.90:8788"
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("phơi ra mạng + đúng token phải 200, được %d", w.Code)
+	}
+
+	r2 := httptest.NewRequest("GET", "/api/state", nil)
+	r2.Host = "103.97.134.90:8788"
+	w2 := httptest.NewRecorder()
+	s.ServeHTTP(w2, r2)
+	if w2.Code != http.StatusUnauthorized {
+		t.Fatalf("phơi ra mạng mà thiếu token phải 401, được %d", w2.Code)
+	}
+}
+
+// CSRF vẫn phải chặn khi phơi ra mạng: Origin lạ không được POST.
+func TestCheDoPhoiVanChanOriginLa(t *testing.T) {
+	s := newTestServer(t)
+	s.exposed = true
+	r := httptest.NewRequest("POST", "/api/stop?t="+s.Token(), strings.NewReader(`{"all":true}`))
+	r.Host = "103.97.134.90:8788"
+	r.Header.Set("Origin", "http://evil.example.com")
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("Origin lạ phải 403 kể cả khi phơi, được %d", w.Code)
+	}
+}
+
+// Dò token nhiều lần thì bị bắt chờ (429) — token 128-bit vốn đã khó dò, đây là
+// lớp phòng thủ thêm khi cổng nằm ngoài internet.
+func TestDoTokenNhieuLanBiChan(t *testing.T) {
+	s := newTestServer(t)
+	s.exposed = true
+	for i := 0; i < 5; i++ {
+		r := httptest.NewRequest("GET", "/api/state?t=sai"+strconv.Itoa(i), nil)
+		r.Host = "103.97.134.90:8788"
+		s.ServeHTTP(httptest.NewRecorder(), r)
+	}
+	r := httptest.NewRequest("GET", "/api/state?t="+s.Token(), nil)
+	r.Host = "103.97.134.90:8788"
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("sau 5 lần sai phải bị 429, được %d", w.Code)
 	}
 }
 

@@ -120,9 +120,22 @@ default_surface = "tui"       # tui | dashboard | workflow | 3d
 sagent dash            # in ra URL kèm token, mở trên trình duyệt (cùng máy)
 ```
 
-Dashboard 2D xem phiên đang chạy, bật/dừng hạm đội, và nhật ký sự kiện realtime.
-Chỉ nghe ở `127.0.0.1`, mỗi lần chạy một token ngẫu nhiên, chặn Host/Origin lạ —
-không gửi token hay API key ra trình duyệt. Assets nhúng trong binary (không cần Node).
+Dashboard 2D xem phiên đang chạy, bật/dừng hạm đội, nhật ký sự kiện realtime; bấm
+nút **3D** để xem dạng không gian (orb = phiên thật, bấm orb để dừng đúng phiên đó).
+Mặc định chỉ nghe `127.0.0.1`, mỗi lần chạy một token ngẫu nhiên, chặn Host/Origin
+lạ, DTO allowlist nên không gửi token/API key ra trình duyệt. Assets nhúng trong
+binary (không cần Node).
+
+**Xem từ máy khác / điện thoại** — khi bạn làm việc trên server không có màn hình:
+
+```bash
+sagent dash --host 0.0.0.0 --port 8788 --token <chuỗi-bí-mật-≥16-ký-tự>
+```
+
+> ⚠ Lúc này **token là hàng rào duy nhất**: ai có link đều bật/dừng được agent của
+> bạn và tiêu hạn mức. Đừng dán link vào chat công khai hay ảnh chụp màn hình, và
+> đóng cổng khi xong. An toàn hơn thì dùng SSH tunnel:
+> `ssh -L 4600:127.0.0.1:4600 user@server` rồi mở `http://127.0.0.1:4600` ở máy bạn.
 
 > File cấu hình **không bao giờ chứa secret** — API key/token chỉ được tham chiếu bằng ID.
 

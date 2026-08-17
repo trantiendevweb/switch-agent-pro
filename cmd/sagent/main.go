@@ -387,7 +387,16 @@ func cmdClean(args []string) {
 // ---------------------------- dashboard ----------------------------
 
 func cmdDash(args []string) {
-	port, _ := intFlag(args, "--port", 4600)
+	port, args := intFlag(args, "--port", 4600)
+	host, args := strFlag(args, "--host", "127.0.0.1")
+	token, _ := strFlag(args, "--token", os.Getenv("SAGENT_DASH_TOKEN"))
+
+	// Phơi ra mạng thì token là hàng rào DUY NHẤT — không cho đặt token yếu.
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" &&
+		token != "" && len(token) < 16 {
+		fail(fmt.Errorf("--token quá ngắn (%d ký tự) cho chế độ phơi ra mạng — cần ≥16, hoặc bỏ cờ để tự sinh", len(token)))
+	}
+
 	// Mở API TRỰC TIẾP (không gắn bộ vẽ terminal): dashboard tiêu thụ event qua
 	// SSE, terminal chỉ cần in URL. Nếu dùng open() thì event sẽ đổ ra cả terminal.
 	wd, _ := os.Getwd()
@@ -396,7 +405,7 @@ func cmdDash(args []string) {
 		fail(err)
 	}
 	defer a.Close()
-	if err := dash.New(a).Run("127.0.0.1", port); err != nil {
+	if err := dash.NewWithToken(a, token).Run(host, port); err != nil {
 		fail(err)
 	}
 }
@@ -473,6 +482,20 @@ func boolFlag(args []string, name string) (bool, []string) {
 	return found, out
 }
 
+func strFlag(args []string, name, def string) (string, []string) {
+	out := make([]string, 0, len(args))
+	val := def
+	for i := 0; i < len(args); i++ {
+		if args[i] == name && i+1 < len(args) {
+			val = args[i+1]
+			i++
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return val, out
+}
+
 func intFlag(args []string, name string, def int) (int, []string) {
 	out := make([]string, 0, len(args))
 	val := def
@@ -524,7 +547,11 @@ func cmdHelp() {
 
   Dashboard:
 
-    sagent dash [--port N]      mở dashboard 2D ở trình duyệt (chỉ loopback)
+    sagent dash [--port N]      mở dashboard ở trình duyệt (mặc định chỉ loopback)
+      --host 0.0.0.0            PHƠI RA MẠNG để xem từ máy/điện thoại khác.
+                                Ai có link đều bật/dừng được agent của bạn.
+      --token <chuỗi ≥16>       token cố định, khỏi phải lấy lại link mỗi lần
+                                (hoặc đặt biến SAGENT_DASH_TOKEN)
 
   Ví dụ:
 

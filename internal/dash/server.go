@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
@@ -31,14 +32,26 @@ var webFS embed.FS
 
 // Server phục vụ dashboard. Tạo bằng New, chạy bằng Run.
 type Server struct {
-	api   *api.API
-	token string
-	mux   *http.ServeMux
+	api     *api.API
+	token   string
+	mux     *http.ServeMux
+	exposed bool // true = nghe ngoài loopback (phải chủ động bật)
+
+	failMu sync.Mutex
+	fails  int       // số lần sai token liên tiếp
+	failAt time.Time // lần sai gần nhất
 }
 
 // New dựng server với token ngẫu nhiên mới.
-func New(a *api.API) *Server {
-	s := &Server{api: a, token: randToken()}
+func New(a *api.API) *Server { return NewWithToken(a, "") }
+
+// NewWithToken cho phép đặt token cố định (để dán link vào điện thoại mà không
+// phải lấy lại mỗi lần khởi động). Rỗng = sinh ngẫu nhiên.
+func NewWithToken(a *api.API, token string) *Server {
+	if token == "" {
+		token = randToken()
+	}
+	s := &Server{api: a, token: token}
 	sub, _ := fs.Sub(webFS, "web")
 	files := http.FileServer(http.FS(sub))
 
@@ -58,46 +71,117 @@ func (s *Server) Token() string { return s.token }
 // ServeHTTP để test dùng httptest mà không cần mở cổng thật.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
 
-// Run bind loopback, in URL kèm token, rồi phục vụ tới khi tiến trình dừng.
+// Run bind vào host:port, in URL kèm token, rồi phục vụ tới khi tiến trình dừng.
+//
+// host ngoài loopback = CHẾ ĐỘ PHƠI RA MẠNG. Lúc đó token là hàng rào DUY NHẤT,
+// nên phải in cảnh báo thật rõ chứ không được để người dùng tưởng nó vẫn kín.
 func (s *Server) Run(host string, port int) error {
+	s.exposed = !isLoopbackAddr(host)
+
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return fmt.Errorf("không mở được cổng %d: %w (thử --port khác)", port, err)
 	}
-	u := fmt.Sprintf("http://%s/?t=%s", ln.Addr().String(), s.token)
+
 	fmt.Println()
-	fmt.Println("  Dashboard đang chạy — mở link này trên trình duyệt (cùng máy):")
-	fmt.Println("    " + u)
+	if s.exposed {
+		fmt.Println("  ╔══════════════════════════════════════════════════════════════╗")
+		fmt.Println("  ║  ⚠  DASHBOARD ĐANG PHƠI RA MẠNG                              ║")
+		fmt.Println("  ╚══════════════════════════════════════════════════════════════╝")
+		fmt.Println("  Ai có link này đều BẬT/DỪNG được agent của bạn và tiêu hạn mức.")
+		fmt.Println("  Token trong URL là hàng rào duy nhất — đừng dán vào chat công khai,")
+		fmt.Println("  ảnh chụp màn hình hay issue. Xong việc thì Ctrl+C để đóng cổng.")
+		fmt.Println()
+		fmt.Printf("  Mở trên điện thoại/máy khác:\n    http://<IP-máy-này>:%d/?t=%s\n", port, s.token)
+	} else {
+		fmt.Println("  Dashboard đang chạy — mở link này trên trình duyệt (cùng máy):")
+		fmt.Printf("    http://%s/?t=%s\n", ln.Addr().String(), s.token)
+		fmt.Println()
+		fmt.Println("  Chỉ nghe ở loopback; link có token ngẫu nhiên.")
+	}
 	fmt.Println()
-	fmt.Println("  Chỉ nghe ở loopback; link có token ngẫu nhiên. Ctrl+C để dừng.")
+	fmt.Println("  Ctrl+C để dừng.")
 	return http.Serve(ln, s)
+}
+
+func isLoopbackAddr(host string) bool {
+	if host == "" {
+		return false // rỗng = nghe mọi giao diện
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return host == "localhost"
 }
 
 // ---------------------------- lá chắn ----------------------------
 
 func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Chống DNS-rebind: Host phải là loopback, không nhận tên miền lạ trỏ về 127.0.0.1.
-		if !loopbackHost(r.Host) {
+		// Ở chế độ kín, Host phải là loopback (chống DNS-rebind: tên miền lạ trỏ
+		// về 127.0.0.1). Ở chế độ phơi ra mạng thì Host là IP/tên miền thật nên
+		// không kiểm được — lúc đó token mới là hàng rào, và vì token nằm ở URL
+		// (không phải cookie) nên rebinding cũng chẳng lấy được gì.
+		if !s.exposed && !loopbackHost(r.Host) {
 			http.Error(w, "chỉ phục vụ ở loopback", http.StatusForbidden)
 			return
 		}
+
+		// Chống dò token: sai nhiều lần liên tiếp thì bắt chờ.
+		if wait := s.throttle(); wait > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+			http.Error(w, "thử lại sau", http.StatusTooManyRequests)
+			return
+		}
+
 		// Token: header trước (JS đặt), hoặc query (lần mở link đầu tiên).
 		tok := r.Header.Get("X-Sagent-Token")
 		if tok == "" {
 			tok = r.URL.Query().Get("t")
 		}
 		if subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) != 1 {
+			s.noteFail()
 			http.Error(w, "token sai hoặc thiếu", http.StatusUnauthorized)
 			return
 		}
-		// Chống CSRF: mutation phải cùng gốc loopback (hoặc không có Origin = client dòng lệnh).
-		if r.Method == http.MethodPost && !sameLoopbackOrigin(r) {
+		s.noteOK()
+
+		// Chống CSRF: mutation phải CÙNG GỐC với chính request (đúng cho cả hai
+		// chế độ). Không có Origin = client dòng lệnh, đã qua cửa token là đủ.
+		if r.Method == http.MethodPost && !sameOrigin(r) {
 			http.Error(w, "origin không hợp lệ", http.StatusForbidden)
 			return
 		}
 		h(w, r)
 	}
+}
+
+// throttle trả về thời gian còn phải chờ, sau khi đã sai token nhiều lần.
+func (s *Server) throttle() time.Duration {
+	s.failMu.Lock()
+	defer s.failMu.Unlock()
+	if s.fails < 5 {
+		return 0
+	}
+	// sai 5 lần trở lên: khoá 2 giây, tăng dần tới tối đa 30 giây
+	d := time.Duration(min(s.fails-4, 15)) * 2 * time.Second
+	if left := d - time.Since(s.failAt); left > 0 {
+		return left
+	}
+	return 0
+}
+
+func (s *Server) noteFail() {
+	s.failMu.Lock()
+	s.fails++
+	s.failAt = time.Now()
+	s.failMu.Unlock()
+}
+
+func (s *Server) noteOK() {
+	s.failMu.Lock()
+	s.fails = 0
+	s.failMu.Unlock()
 }
 
 func loopbackHost(host string) bool {
@@ -113,7 +197,9 @@ func loopbackHost(host string) bool {
 	return false
 }
 
-func sameLoopbackOrigin(r *http.Request) bool {
+// sameOrigin: Origin (nếu có) phải trùng đúng Host của chính request này.
+// Đúng cho cả chế độ kín lẫn phơi ra mạng.
+func sameOrigin(r *http.Request) bool {
 	o := r.Header.Get("Origin")
 	if o == "" {
 		return true // curl / client dòng lệnh: đã qua cửa token là đủ
@@ -122,7 +208,7 @@ func sameLoopbackOrigin(r *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	return loopbackHost(u.Host) && u.Host == r.Host
+	return u.Host == r.Host
 }
 
 // ---------------------------- DTO (allowlist, không secret) ----------------------------
