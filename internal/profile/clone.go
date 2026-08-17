@@ -100,8 +100,9 @@ func CleanClones(prov, account string) (int, error) {
 }
 
 // StartDetached chạy CLI ở chế độ nền, log đổ vào file, không chiếm terminal.
+// workDir là chỗ agent làm việc (git worktree riêng, hoặc rỗng = thư mục hiện tại).
 // Trả về PID. Cố ý KHÔNG Wait() — phiên phải sống tiếp sau khi lệnh này thoát.
-func StartDetached(a provider.Adapter, dir string, args []string, logPath string) (int, error) {
+func StartDetached(a provider.Adapter, dir string, args []string, logPath, workDir string) (int, error) {
 	cmdPath, err := a.Command()
 	if err != nil {
 		return 0, err
@@ -114,8 +115,10 @@ func StartDetached(a provider.Adapter, dir string, args []string, logPath string
 	c.Stdout, c.Stderr = f, f
 	c.Stdin = nil
 	c.Env = append(filterEnv(os.Environ(), a.EnvVar()), a.EnvVar()+"="+dir)
-	// Chạy trong thư mục hiện tại: agent làm việc trên đúng project bạn đang đứng.
-	if wd, err := os.Getwd(); err == nil {
+	if workDir != "" {
+		c.Dir = workDir
+	} else if wd, err := os.Getwd(); err == nil {
+		// Mặc định: thư mục hiện tại — agent làm trên đúng project bạn đang đứng.
 		c.Dir = wd
 	}
 	if err := c.Start(); err != nil {

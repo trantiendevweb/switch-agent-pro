@@ -18,6 +18,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
+	"github.com/trantiendevweb/switch-agent-pro/internal/workspace"
 )
 
 func main() {
@@ -238,6 +239,20 @@ func splitDashDash(args []string) (mine, child []string) {
 	return args, nil
 }
 
+// boolFlag rút cờ không tham số, trả về có/không + phần còn lại.
+func boolFlag(args []string, name string) (bool, []string) {
+	out := make([]string, 0, len(args))
+	found := false
+	for _, a := range args {
+		if a == name {
+			found = true
+			continue
+		}
+		out = append(out, a)
+	}
+	return found, out
+}
+
 // intFlag lấy giá trị của cờ dạng `--ten N`, trả về phần còn lại.
 func intFlag(args []string, name string, def int) (int, []string) {
 	out := make([]string, 0, len(args))
@@ -280,15 +295,17 @@ func cmdClone(args []string) {
 
 func cmdFleet(args []string) {
 	mine, child := splitDashDash(args)
+	worktree, mine := boolFlag(mine, "--worktree")
 	copies, rest := intFlag(mine, "--copies", 2)
 	if len(rest) == 0 {
 		fail(fmt.Errorf(`thiếu tài khoản. Ví dụ:
-  sagent fleet claude:phu --copies 4 -- -p "tóm tắt repo này"`))
+  sagent fleet claude:phu --copies 4 --worktree -- -p "tóm tắt repo này"`))
 	}
 	prov, acc := parseAddr(rest[0])
 	db := openStore()
 	defer db.Close()
-	if err := fleet.FanOut(db, adapterOf(prov), acc, copies, child); err != nil {
+	opts := fleet.Opts{Copies: copies, Worktree: worktree}
+	if err := fleet.FanOut(db, adapterOf(prov), acc, opts, child); err != nil {
 		fail(err)
 	}
 }
@@ -306,6 +323,25 @@ func cmdClean(args []string) {
 			if s.Provider == prov && s.Account == acc {
 				fail(fmt.Errorf("còn phiên #%d đang chạy trên %s:%s — dừng trước: sagent stop all",
 					s.ID, prov, acc))
+			}
+		}
+	}
+	// Dọn worktree trước: chúng nằm ngoài thư mục clone nên xoá clone không
+	// đụng tới, để lại là git giữ mục chết trong sổ worktree.
+	if wd, err := os.Getwd(); err == nil {
+		if repoRoot, ok := workspace.RepoRoot(wd); ok {
+			gone := 0
+			for i := 1; ; i++ {
+				dir, ok := workspace.Find(repoRoot, fmt.Sprintf("%s-%d", acc, i))
+				if !ok {
+					break
+				}
+				if err := workspace.Remove(repoRoot, dir); err == nil {
+					gone++
+				}
+			}
+			if gone > 0 {
+				fmt.Printf("  ✓ đã gỡ %d worktree (nhánh sagent/%s-* giữ nguyên)\n", gone, acc)
 			}
 		}
 	}
@@ -333,9 +369,13 @@ func cmdStatus() {
 	fmt.Println("  Phiên đang chạy")
 	fmt.Println()
 	for _, s := range list {
+		where := s.Log
+		if s.Worktree != "" {
+			where = "worktree: " + s.Worktree
+		}
 		fmt.Printf("   #%-3d %-18s PID %-7d %6s  %s\n",
 			s.ID, s.Addr(), s.PID,
-			time.Since(s.Started).Truncate(time.Second), s.Log)
+			time.Since(s.Started).Truncate(time.Second), where)
 	}
 	fmt.Printf("\n  %d phiên. Dừng hết: sagent stop all\n\n", len(list))
 }
@@ -391,8 +431,11 @@ func cmdHelp() {
 
   Chạy song song (agent headless):
 
-    sagent fleet <provider:tên> --copies N -- <lệnh>
+    sagent fleet <provider:tên> --copies N [--worktree] -- <lệnh>
                                 bật N phiên song song trên MỘT tài khoản
+                                --worktree: mỗi phiên một git worktree riêng
+                                (không có thì các phiên dùng chung thư mục
+                                 hiện tại và có thể sửa đè file của nhau)
     sagent clone <provider:tên> --copies N
                                 chỉ tạo N thư mục config, không chạy
     sagent status               phiên nào đang chạy
@@ -401,7 +444,7 @@ func cmdHelp() {
 
   Ví dụ:
 
-    sagent fleet claude:phu --copies 4 -- -p "tóm tắt repo này"
+    sagent fleet claude:phu --copies 4 --worktree -- -p "sửa lỗi trong repo"
 
 `)
 }

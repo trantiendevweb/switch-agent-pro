@@ -8,8 +8,11 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
-// fakeAdapter đủ để test link + remove mà không cần Claude thật.
-type fakeAdapter struct{ base string }
+// fakeAdapter đủ để test link + clone + remove mà không cần Claude thật.
+type fakeAdapter struct {
+	base     string
+	hasToken bool
+}
 
 func (f fakeAdapter) Name() string             { return "fake" }
 func (f fakeAdapter) EnvVar() string           { return "FAKE_CONFIG_DIR" }
@@ -19,7 +22,7 @@ func (f fakeAdapter) SharedKeys() []string     { return []string{"projects"} }
 func (f fakeAdapter) BaseDir() string          { return f.base }
 func (f fakeAdapter) IdentitySource() string   { return "" }
 func (f fakeAdapter) Identity(string) string   { return "" }
-func (f fakeAdapter) HasToken(string) bool     { return false }
+func (f fakeAdapter) HasToken(string) bool     { return f.hasToken }
 func (f fakeAdapter) Verify() []provider.Check { return nil }
 
 // Phép đo an toàn quan trọng nhất (DoD Pha 1): thư mục hồ sơ toàn junction/symlink

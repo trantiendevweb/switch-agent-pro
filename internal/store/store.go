@@ -10,8 +10,10 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -36,6 +38,7 @@ type Session struct {
 	Dir      string
 	PID      int
 	Log      string
+	Worktree string // git worktree riêng của phiên, rỗng = chạy thẳng thư mục hiện tại
 	Started  time.Time
 	State    string
 }
@@ -67,14 +70,17 @@ type DB struct{ db *sql.DB }
 // Path là đường dẫn file cơ sở dữ liệu.
 func Path() string { return filepath.Join(paths.AccountsRoot(), "state.db") }
 
-// Open mở (và tạo nếu chưa có) cơ sở dữ liệu, chạy migration.
-func Open() (*DB, error) {
-	if err := os.MkdirAll(paths.AccountsRoot(), 0o755); err != nil {
+// Open mở (và tạo nếu chưa có) cơ sở dữ liệu ở vị trí chuẩn.
+func Open() (*DB, error) { return OpenAt(Path()) }
+
+// OpenAt mở cơ sở dữ liệu ở một đường dẫn cụ thể (test dùng đường dẫn tạm).
+func OpenAt(path string) (*DB, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
 	// busy_timeout: chờ thay vì lỗi ngay khi tiến trình khác đang ghi.
 	// WAL: cho đọc và ghi song song.
-	dsn := "file:" + Path() + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	dsn := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -88,38 +94,67 @@ func Open() (*DB, error) {
 
 func (d *DB) Close() error { return d.db.Close() }
 
-// migrate tạo schema. Mỗi bước chỉ chạy một lần, ghi lại ở bảng meta.
+// migrations chạy theo thứ tự; chỉ số + 1 là số phiên bản schema.
+//
+// THÊM BƯỚC MỚI THÌ CHỈ ĐƯỢC NỐI VÀO CUỐI. Sửa hay chèn giữa sẽ làm máy đã
+// chạy bản cũ bỏ qua mất bước đó.
+var migrations = []string{
+	// v1 — bảng phiên
+	`CREATE TABLE IF NOT EXISTS sessions (
+		id       INTEGER PRIMARY KEY AUTOINCREMENT,
+		provider TEXT    NOT NULL,
+		account  TEXT    NOT NULL,
+		clone    INTEGER NOT NULL DEFAULT 0,
+		dir      TEXT    NOT NULL,
+		pid      INTEGER NOT NULL,
+		log      TEXT,
+		started  TEXT    NOT NULL,
+		state    TEXT    NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state);`,
+
+	// v2 — mỗi phiên có thể chạy trong git worktree riêng
+	`ALTER TABLE sessions ADD COLUMN worktree TEXT;`,
+}
+
+// migrate đưa schema lên phiên bản mới nhất, chạy trong transaction để không
+// bao giờ để lại nửa vời.
 func migrate(db *sql.DB) error {
-	steps := []string{
-		`CREATE TABLE IF NOT EXISTS sessions (
-			id       INTEGER PRIMARY KEY AUTOINCREMENT,
-			provider TEXT    NOT NULL,
-			account  TEXT    NOT NULL,
-			clone    INTEGER NOT NULL DEFAULT 0,
-			dir      TEXT    NOT NULL,
-			pid      INTEGER NOT NULL,
-			log      TEXT,
-			started  TEXT    NOT NULL,
-			state    TEXT    NOT NULL
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state)`,
-		`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
+		return err
 	}
-	for _, s := range steps {
-		if _, err := db.Exec(s); err != nil {
+	cur := 0
+	var s string
+	if err := db.QueryRow(`SELECT value FROM meta WHERE key='schema_version'`).Scan(&s); err == nil {
+		cur, _ = strconv.Atoi(s)
+	}
+	for i := cur; i < len(migrations); i++ {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(migrations[i]); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migration v%d hỏng: %w", i+1, err)
+		}
+		if _, err := tx.Exec(`INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version',?)`,
+			strconv.Itoa(i+1)); err != nil {
+			tx.Rollback()
+			return err
+		}
+		if err := tx.Commit(); err != nil {
 			return err
 		}
 	}
-	_, err := db.Exec(`INSERT OR REPLACE INTO meta(key,value) VALUES('schema_version','1')`)
-	return err
+	return nil
 }
 
 // AddSession ghi lại một phiên vừa khởi chạy.
 func (d *DB) AddSession(s Session) (int64, error) {
 	res, err := d.db.Exec(
-		`INSERT INTO sessions(provider,account,clone,dir,pid,log,started,state)
-		 VALUES(?,?,?,?,?,?,?,?)`,
-		s.Provider, s.Account, s.Clone, s.Dir, s.PID, s.Log,
+		`INSERT INTO sessions(provider,account,clone,dir,pid,log,worktree,started,state)
+		 VALUES(?,?,?,?,?,?,?,?,?)`,
+		s.Provider, s.Account, s.Clone, s.Dir, s.PID, s.Log, s.Worktree,
 		time.Now().Format(time.RFC3339), StateRunning)
 	if err != nil {
 		return 0, err
@@ -134,7 +169,7 @@ func (d *DB) AddSession(s Session) (int64, error) {
 // một thứ đã chết.
 func (d *DB) Running() ([]Session, error) {
 	rows, err := d.db.Query(
-		`SELECT id,provider,account,clone,dir,pid,COALESCE(log,''),started,state
+		`SELECT id,provider,account,clone,dir,pid,COALESCE(log,''),COALESCE(worktree,''),started,state
 		   FROM sessions WHERE state=? ORDER BY id`, StateRunning)
 	if err != nil {
 		return nil, err
@@ -147,7 +182,7 @@ func (d *DB) Running() ([]Session, error) {
 		var s Session
 		var started string
 		if err := rows.Scan(&s.ID, &s.Provider, &s.Account, &s.Clone, &s.Dir,
-			&s.PID, &s.Log, &started, &s.State); err != nil {
+			&s.PID, &s.Log, &s.Worktree, &started, &s.State); err != nil {
 			return nil, err
 		}
 		s.Started, _ = time.Parse(time.RFC3339, started)

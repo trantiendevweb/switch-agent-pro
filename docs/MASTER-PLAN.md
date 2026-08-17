@@ -319,6 +319,15 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Cảnh báo thẳng: tiêu hạn mức gấp N, và **concurrent refresh chưa đo**.
 - [x] Sửa bug thật: tài khoản di trú từ v1 không chạy được vì `Dir()` chỉ trỏ
   kho mới → thêm `ResolveDir()` dùng chung cho mọi verb.
+- [x] **Workspace backend: git worktree** (`--worktree`) — mỗi phiên một cây làm
+  việc + nhánh `sagent/<tên>-<n>`, đặt NGOÀI repo để `git status` không bị rác;
+  `clean` gỡ worktree nhưng **giữ nhánh** (việc agent làm nằm trong đó). Không
+  bật cờ thì công cụ **cảnh báo** các phiên dùng chung thư mục.
+- [x] Migration có version cho SQLite (v1 bảng phiên → v2 cột `worktree`), chạy
+  trong transaction; test khẳng định mở lại nhiều lần không hỏng.
+- [x] Trả nợ test: `store` (migration, reaping PID chết, SetState) và `clone`
+  (file riêng phải là bản sao thật, xoá clone không đụng dữ liệu gốc).
+- [ ] Project discovery + `.sagent/project.toml`.
 - [ ] ~~`sagentd` daemon~~ **bỏ** (xem mục 2b) — `dash` sẽ là server tạm.
 - [ ] Project discovery + `.sagent/project.toml`.
 - [ ] Workspace backend: directory + **Git worktree**.

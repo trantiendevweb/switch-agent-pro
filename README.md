@@ -76,14 +76,23 @@ Claude Code lấy **thư mục hiện tại** làm nơi làm việc — `cd` và
 ### Chạy nhiều agent song song
 
 ```bash
-sagent fleet claude:phu --copies 4 -- -p "tóm tắt repo này"
-sagent status          # phiên nào đang chạy, PID, log ở đâu
+sagent fleet claude:phu --copies 4 --worktree -- -p "sửa lỗi trong repo"
+sagent status          # phiên nào đang chạy, PID, worktree/log ở đâu
 sagent stop all        # dừng hết (giết cả cây tiến trình con)
-sagent clean claude:phu   # xoá các bản clone — an toàn, không xuyên junction
+sagent clean claude:phu   # gỡ worktree + xoá clone — an toàn, không xuyên junction
 ```
 
-Mỗi phiên có **thư mục config riêng** (credential chép sang, `.claude.json` riêng)
-nên không đua ghi đè nhau. Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite), và
+Hai lớp tách biệt, mỗi lớp giải một bài:
+
+| Tách cái gì | Bằng cách nào | Nếu không có thì sao |
+|---|---|---|
+| **Cấu hình/token** | mỗi phiên một config dir riêng (`clone`) | N tiến trình đua ghi `.claude.json`, hỏng trust dialog |
+| **File đang sửa** | mỗi phiên một **git worktree** + nhánh `sagent/<tên>-<n>` (`--worktree`) | 4 agent sửa đè file của nhau, kết quả không đoán được |
+
+Worktree đặt **ngoài repo** (`~/.ai-accounts/.worktrees/…`) nên `git status` của bạn
+không bị rác. `clean` gỡ worktree nhưng **giữ nhánh** — việc agent làm nằm trong đó.
+
+Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite, migration có version), và
 `status` luôn đối chiếu PID thật nên không bao giờ báo sống một phiên đã chết.
 
 > Hai điều công cụ nói thẳng mỗi lần chạy `fleet`: N phiên trên một tài khoản

@@ -451,6 +451,15 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li class="task done"><span class="box"></span>Cảnh báo thẳng: tiêu hạn mức gấp N, và <strong>concurrent refresh chưa đo</strong>.</li>
 <li class="task done"><span class="box"></span>Sửa bug thật: tài khoản di trú từ v1 không chạy được vì <code>Dir()</code> chỉ trỏ
   kho mới → thêm <code>ResolveDir()</code> dùng chung cho mọi verb.</li>
+<li class="task done"><span class="box"></span><strong>Workspace backend: git worktree</strong> (<code>--worktree</code>) — mỗi phiên một cây làm
+  việc + nhánh <code>sagent/&lt;tên&gt;-&lt;n&gt;</code>, đặt NGOÀI repo để <code>git status</code> không bị rác;
+  <code>clean</code> gỡ worktree nhưng <strong>giữ nhánh</strong> (việc agent làm nằm trong đó). Không
+  bật cờ thì công cụ <strong>cảnh báo</strong> các phiên dùng chung thư mục.</li>
+<li class="task done"><span class="box"></span>Migration có version cho SQLite (v1 bảng phiên → v2 cột <code>worktree</code>), chạy
+  trong transaction; test khẳng định mở lại nhiều lần không hỏng.</li>
+<li class="task done"><span class="box"></span>Trả nợ test: <code>store</code> (migration, reaping PID chết, SetState) và <code>clone</code>
+  (file riêng phải là bản sao thật, xoá clone không đụng dữ liệu gốc).</li>
+<li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
 <li class="task"><span class="box"></span>~~<code>sagentd</code> daemon~~ <strong>bỏ</strong> (xem mục 2b) — <code>dash</code> sẽ là server tạm.</li>
 <li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
 <li class="task"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong>.</li>
