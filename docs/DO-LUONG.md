@@ -9,10 +9,13 @@
 
 | Provider | Windows | Linux | Nhãn |
 |---|---|---|---|
-| Claude | ✅ đo (v1) | ⬜ chưa đo | Windows `stable`, Linux `experimental` |
-| Codex  | ⬜ chưa đo | ⬜ chưa đo | `experimental` |
-| Gemini | ⬜ chưa đo | ⬜ chưa đo | `experimental` |
-| Cursor | ⬜ chưa đo | ⬜ chưa đo | `unsupported` cho tới khi đo |
+| Claude | ✅ đo | ⬜ chưa đo | Windows `stable`, Linux `experimental` |
+| Codex  | ✅ đo | ⬜ chưa đo | Windows `stable`, Linux `experimental` |
+| Gemini | ⬜ chưa đo | ⬜ chưa đo | `unknown` — CLI chưa có trên máy đo |
+| Cursor | ⬜ chưa đo | ⬜ chưa đo | `unknown` — CLI chưa có trên máy đo |
+
+> Đã kiểm ngày 2026-08-17: máy đo chỉ có `claude` và `codex`; `gemini`, `cursor`,
+> `opencode`, `aider` đều không cài. Không đo được thì để `unknown`, không đoán.
 
 ---
 
