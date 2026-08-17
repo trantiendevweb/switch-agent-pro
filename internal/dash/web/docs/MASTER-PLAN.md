@@ -97,7 +97,7 @@ lẫn **cấu hình được** — không có mặt nào chỉ để ngắm:
 |---|---|---|---|
 | **1 · Terminal** (CLI + TUI) | Ở trong terminal, SSH, script hoá, CI | Toàn bộ. CLI là mặt bằng đầy đủ nhất | Go stdlib; TUI vẽ tay, không kéo framework nặng |
 | **2 · Dashboard 2D** | Muốn nhìn nhanh: phiên nào chạy, hạn mức, log | Xem · bật/dừng phiên · duyệt approval · đọc log | Web cục bộ, HTML/CSS/JS tĩnh nhúng bằng Go `embed` |
-| **3 · Workflow board** | Dựng và chạy flow nhiều bước | Kéo/nối node, sửa `flows.toml` bằng giao diện, chạy/tạm dừng/resume flow | Cùng web app với mặt 2, một tab khác |
+| **3 · Workflow board** ✅ | Dựng và chạy flow nhiều bước | Chạy flow, xem từng bước, **duyệt/từ chối**; dựng flow bằng kéo-nối còn để sau | Cùng web app với mặt 2, một tab khác |
 | **4 · 3D** | Nhìn toàn cảnh đội agent, trình diễn | Cùng tập hành động với mặt 2, thể hiện bằng không gian | React Three Fiber |
 
 ### Ba luật giữ cho bốn mặt không vỡ
@@ -439,8 +439,17 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 - [ ] Approval gate (chờ Pha 3 flow).
 *DoD:* mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.
 
-**5c · Workflow board.** Dựng/sửa flow bằng giao diện, ghi ra `flows.toml`
-(file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.
+**5c · Workflow board.**  ✅ bản vận hành xong
+- [x] `/flow.html`: chọn flow + tài khoản + biến rồi **chạy**; xem lịch sử; mở
+  một lần chạy thấy **từng bước và trạng thái** (done/running/waiting/failed/skipped).
+- [x] **Duyệt / từ chối ngay trên web** — cùng đường `Approve()` với CLI, nên
+  approval gate vẫn không thể bị bỏ qua.
+- [x] Endpoint chạy flow **trả ngay** rồi làm ở nền: bước agent có thể mất hàng
+  chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.
+- [x] Đã chạy thật qua HTTP: `shell → approve → shell`, dừng đúng ở gate, duyệt
+  trên web thì chạy nốt và về `completed`.
+- [ ] Kéo/nối node để **dựng** flow mới bằng giao diện (hiện mới chạy + duyệt;
+  sửa flow vẫn bằng cách sửa `flows.toml`).
 *DoD:* flow tạo từ board và flow viết tay chạy y hệt nhau.
 
 **5d · Cấu hình theo project.** `[ui]` trong `.sagent/project.toml` (mặt mặc định,

@@ -209,9 +209,9 @@ lẫn <strong>cấu hình được</strong> — không có mặt nào chỉ đ�
 <td>Web cục bộ, HTML/CSS/JS tĩnh nhúng bằng Go <code>embed</code></td>
 </tr>
 <tr>
-<td><strong>3 · Workflow board</strong></td>
+<td><strong>3 · Workflow board</strong> ✅</td>
 <td>Dựng và chạy flow nhiều bước</td>
-<td>Kéo/nối node, sửa <code>flows.toml</code> bằng giao diện, chạy/tạm dừng/resume flow</td>
+<td>Chạy flow, xem từng bước, <strong>duyệt/từ chối</strong>; dựng flow bằng kéo-nối còn để sau</td>
 <td>Cùng web app với mặt 2, một tab khác</td>
 </tr>
 <tr>
@@ -575,9 +575,20 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 <li class="task"><span class="box"></span>Approval gate (chờ Pha 3 flow).
 <em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.</li>
 </ul>
-<p><strong>5c · Workflow board.</strong> Dựng/sửa flow bằng giao diện, ghi ra <code>flows.toml</code>
-(file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.
-<em>DoD:</em> flow tạo từ board và flow viết tay chạy y hệt nhau.</p>
+<p><strong>5c · Workflow board.</strong>  ✅ bản vận hành xong</p>
+<ul>
+<li class="task done"><span class="box"></span><code>/flow.html</code>: chọn flow + tài khoản + biến rồi <strong>chạy</strong>; xem lịch sử; mở
+  một lần chạy thấy <strong>từng bước và trạng thái</strong> (done/running/waiting/failed/skipped).</li>
+<li class="task done"><span class="box"></span><strong>Duyệt / từ chối ngay trên web</strong> — cùng đường <code>Approve()</code> với CLI, nên
+  approval gate vẫn không thể bị bỏ qua.</li>
+<li class="task done"><span class="box"></span>Endpoint chạy flow <strong>trả ngay</strong> rồi làm ở nền: bước agent có thể mất hàng
+  chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.</li>
+<li class="task done"><span class="box"></span>Đã chạy thật qua HTTP: <code>shell → approve → shell</code>, dừng đúng ở gate, duyệt
+  trên web thì chạy nốt và về <code>completed</code>.</li>
+<li class="task"><span class="box"></span>Kéo/nối node để <strong>dựng</strong> flow mới bằng giao diện (hiện mới chạy + duyệt;
+  sửa flow vẫn bằng cách sửa <code>flows.toml</code>).
+<em>DoD:</em> flow tạo từ board và flow viết tay chạy y hệt nhau.</li>
+</ul>
 <p><strong>5d · Cấu hình theo project.</strong> <code>[ui]</code> trong <code>.sagent/project.toml</code> (mặt mặc định,
 cột, flow ghim, bật/tắt 3D) + tầng global.
 <em>DoD:</em> hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã.</p>

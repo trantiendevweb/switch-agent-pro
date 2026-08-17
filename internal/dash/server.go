@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -65,6 +66,11 @@ func NewWithToken(a *api.API, token string) *Server {
 	m.HandleFunc("/api/fleet", s.guard(s.handleFleet))
 	m.HandleFunc("/api/stop", s.guard(s.handleStop))
 
+	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
+	m.HandleFunc("/api/run", s.guard(s.handleRun))
+	m.HandleFunc("/api/flow/run", s.guard(s.handleFlowRun))
+	m.HandleFunc("/api/flow/decide", s.guard(s.handleFlowDecide))
+
 	m.HandleFunc("/login", s.handleLogin)
 	m.HandleFunc("/logout", s.handleLogout)
 
@@ -88,6 +94,15 @@ func NewWithToken(a *api.API, token string) *Server {
 	})
 	s.mux = m
 	return s
+}
+
+// workDir là thư mục server được khởi động — cũng là gốc để tìm flows.toml.
+func (s *Server) workDir() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return wd
 }
 
 func (s *Server) hasToken(r *http.Request) bool {

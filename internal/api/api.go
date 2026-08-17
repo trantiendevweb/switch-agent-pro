@@ -516,6 +516,26 @@ func (a *API) FlowResume(ctx context.Context, runID int64, defaultProfile Addr) 
 	return a.runner(defaultProfile).Resume(ctx, runID, f)
 }
 
+// FlowRunDetail trả về lần chạy + trạng thái từng bước + định nghĩa flow.
+func (a *API) FlowRunDetail(runID int64) (store.Run, map[string]store.StepRun, flow.Flow, error) {
+	run, err := a.db.GetRun(runID)
+	if err != nil {
+		return store.Run{}, nil, flow.Flow{}, fmt.Errorf("không có lần chạy #%d", runID)
+	}
+	steps, err := a.db.Steps(runID)
+	if err != nil {
+		return run, nil, flow.Flow{}, err
+	}
+	def, _, err := a.FlowShow(run.Dir, run.Flow)
+	return run, steps, def, err
+}
+
+// FlowApproveOnly chỉ đánh dấu đã duyệt, KHÔNG chạy tiếp — để mặt web trả lời
+// người bấm nút ngay rồi mới chạy phần còn lại ở nền.
+func (a *API) FlowApproveOnly(runID int64, stepID, by string) error {
+	return a.runner(Addr{}).Approve(runID, stepID, by)
+}
+
 // FlowRuns — action "flow.runs". Lịch sử các lần chạy.
 func (a *API) FlowRuns(limit int) ([]store.Run, error) { return a.db.ListRuns(limit) }
 
