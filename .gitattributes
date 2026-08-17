@@ -4,5 +4,9 @@
 # và CRLF; đừng để git đụng vào.
 *.ps1 text eol=crlf
 
+# NGOẠI LỆ: install/get.ps1 phải là ASCII THUẦN và KHÔNG có BOM — nó chạy qua
+# `irm | iex`, mà Invoke-Expression không parse được ký tự U+FEFF đứng đầu.
+# Hai ràng buộc ngược nhau, nên phải là hai file. Xem đầu install/get.ps1.
+
 # tools/sync-docs.sh chạy bằng Git Bash trên Windows, vẫn cần LF.
 *.sh text eol=lf

@@ -52,7 +52,7 @@ jobs:
 
       - name: Kèm luôn trình cài
         shell: bash
-        run: cp install/cai-dat.ps1 dist/
+        run: cp install/cai-dat.ps1 install/get.ps1 dist/
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -61,4 +61,5 @@ jobs:
             dist/sagent-windows-arm64.exe
             dist/SHA256SUMS.txt
             dist/cai-dat.ps1
+            dist/get.ps1
           generate_release_notes: true

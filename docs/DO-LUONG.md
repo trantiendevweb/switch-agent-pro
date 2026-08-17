@@ -596,6 +596,46 @@ Một mẹo nhỏ nhưng đáng: `$ProgressPreference = 'SilentlyContinue'` ở 
 Thanh tiến trình của PowerShell 5.1 vẽ lại sau mỗi khối dữ liệu và làm
 `Invoke-WebRequest` chậm đi nhiều lần.
 
+#### Cái bẫy thứ ba: BOM vừa bắt buộc vừa cấm
+
+Phát hiện khi **chạy thật lệnh một dòng** sau khi đã phát hành v0.1.0 — không phải khi
+đọc lại code. Bản vá cho bẫy số 2 (thêm BOM) đã **làm hỏng** đường cài chính:
+
+```
+$ irm .../cai-dat.ps1 | iex
+iex : Unexpected attribute 'CmdletBinding'.
+      Unexpected token 'param' in expression or statement.
+```
+
+Đo để tìm thủ phạm, không đoán:
+
+```
+iex (script khong BOM)   ->  chay
+iex (BOM + script)       ->  hong
+irm <raw url> -> ky tu dau = U+FEFF
+```
+
+Hai ràng buộc ngược chiều nhau, không file nào thoả cả hai:
+
+| | chạy **file** `.\cai-dat.ps1` (PS 5.1) | `irm ... \| iex` |
+|---|---|---|
+| **Có** BOM | ✅ tiếng Việt đúng | ❌ `iex` không parse nổi U+FEFF |
+| **Không** BOM | ❌ tiếng Việt vỡ cú pháp | ✅ |
+
+Nên phải là **hai file**, và lý do đó viết thẳng vào đầu mỗi file để người sau không
+"dọn dẹp" cho gọn rồi làm hỏng lại:
+
+- `install/cai-dat.ps1` — UTF-8 **có BOM**, tiếng Việt đầy đủ, có `param()`. Dành cho
+  `.\install\cai-dat.ps1` và đính kèm release.
+- `install/get.ps1` — **ASCII thuần, không BOM, không `param()`**. Chỉ làm một việc: tải
+  `cai-dat.ps1` về file tạm rồi gọi bằng `&` — lúc đó đọc từ file nên BOM lại là thứ
+  *cần*. Tham số truyền qua biến môi trường (`SAGENT_PHIEN`, `SAGENT_TU_NGUON`).
+
+Bài học chung cho cả ba cái bẫy trong mục này: **cả ba đều là "code trông đúng, chạy mới
+biết"** — file Go biến mất khỏi build, script vỡ cú pháp ở dòng không liên quan, lệnh cài
+chết ngay dòng đầu. Không cái nào lộ ra khi đọc lại, và cái thứ ba chỉ lộ vì đã bấm chạy
+đúng cái lệnh mà người dùng sẽ bấm.
+
 ---
 
 ## Việc cần bạn hỗ trợ

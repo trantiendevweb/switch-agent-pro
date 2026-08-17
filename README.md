@@ -50,7 +50,7 @@ chỉ khác ở auth, protocol và cách agent/model được thực thi.
 Một dòng. **Không cần Go, không cần quyền quản trị, không cần cài gì trước.**
 
 ```powershell
-irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/cai-dat.ps1 | iex
+irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1 | iex
 ```
 
 Nó tải một file `.exe` (~11 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
@@ -62,6 +62,13 @@ Cài đúng một phiên bản, hoặc build từ nguồn (cần Go, phải đ�
 ```powershell
 .\install\cai-dat.ps1 -Phien v0.2.0
 .\install\cai-dat.ps1 -TuNguon
+```
+
+Qua lệnh một dòng thì không truyền được tham số, nên dùng biến môi trường:
+
+```powershell
+$env:SAGENT_PHIEN = 'v0.2.0'
+irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1 | iex
 ```
 
 Gỡ: xoá `%USERPROFILE%\bin\sagent.exe`. Dữ liệu nằm ở `~/.ai-accounts` — xoá riêng nếu muốn.
