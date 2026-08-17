@@ -309,7 +309,10 @@ func (a *API) SessionStop(id int64) (int, error) {
 		if id >= 0 && s.ID != id {
 			continue
 		}
-		if err := process.Kill(s.PID); err != nil {
+		// KillTree chứ không Kill: agent sinh tiến trình con, và đã đo được là
+		// `taskkill /T` bỏ sót đám con khi tiến trình cha thoát trước. Con sót
+		// lại vẫn tiêu hạn mức của bạn — im lặng.
+		if err := process.KillTree(s.PID); err != nil {
 			a.bus.Failuref("#%d (PID %d) không dừng được: %v", s.ID, s.PID, err)
 			continue
 		}

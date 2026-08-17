@@ -692,6 +692,11 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
     <code>state.db</code> của binary mới thì đọc được VÀ ghi được, im lặng. Vá: chặn hạ cấp, tự sao
     lưu trước khi nâng schema, và lệnh <code>sagent db info|backup|restore</code>. Sao lưu bằng
     <code>VACUUM INTO</code> chứ không chép file (WAL). Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+<li>✅ <strong>process-tree cancel + orphan cleanup (một phần)</strong> — đo ra <strong>lỗi thật</strong>:
+    <code>taskkill /T</code> bỏ sót đám con khi tiến trình cha đã thoát; chúng chạy tiếp và tiêu
+    hạn mức, còn <code>Kill</code> chỉ trả <code>exit status 128</code>. Vá bằng <code>process.KillTree</code>: chụp hậu
+    duệ trước khi giết, quét lại, rồi mới kết luận. <strong>Chưa bịt:</strong> hậu duệ của phiên tự
+    chết (<code>lost</code>) vẫn không ai quét. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
 <li>⬜ Còn lại: Windows ACL · symlink-escape
     Linux (<strong>chưa có máy Linux để đo</strong> — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
     process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license

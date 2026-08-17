@@ -425,6 +425,55 @@ lệnh CLI đều có action. Nó cùng loại với `dash.serve` — có trong 
 không tự làm được phần nặng: `db restore` ghi đè chính file mà server đang mở. Xem và sao
 lưu thì mặt khác làm được và nên làm; khôi phục thì phải đứng ngoài mà làm.
 
+### Process-tree cancel + orphan cleanup — ĐÃ ĐO, TÌM RA LỖI THẬT, ĐÃ VÁ (2026-08-17, Pha 7)
+
+`process.Kill` trên Windows là `taskkill /PID <n> /T /F`. Cờ `/T` nghe như "giết cả
+cây", nên trước nay không ai hỏi lại. Đo hai kịch bản:
+
+| Kịch bản | Trước `Kill` | Sau `Kill` | `Kill` trả về |
+|---|---|---|---|
+| Cha còn sống | `PING.EXE` 8600 chạy | chết ✅ | `nil` |
+| **Cha đã thoát (mồ côi)** | `PING.EXE` 1380 chạy | **vẫn chạy** ❌ | `exit status 128` |
+
+`/T` đi theo quan hệ cha-con của các tiến trình **CÒN SỐNG**. Cha thoát trước — agent tự
+chết, hoặc nó chỉ là cái vỏ khởi động rồi nhường chỗ cho con — thì đám con thành mồ côi
+và `taskkill` không còn đường tìm ra chúng. Chúng **vẫn tiêu hạn mức của bạn**, không ai
+biết, vì thứ duy nhất báo về là chuỗi `exit status 128`.
+
+Đây không phải tình huống hiếm với dự án này: mục tiêu của nó là bật N agent headless.
+Mỗi agent CLI đều sinh tiến trình con.
+
+Bản vá — `process.KillTree`:
+
+1. **Chụp danh sách hậu duệ TRƯỚC khi giết.** Sau khi cha chết, quan hệ cha-con còn đọc
+   được trên Windows nhưng **mất hẳn trên Linux** (init nhận nuôi, `PPid` đổi thành 1).
+   Chụp trước thì cả hai nền tảng cùng dùng được một logic.
+2. Giết cây, rồi **quét lại** và giết thẳng từng đứa còn sống.
+3. **Kiểm rồi mới trả về.** Một hàm dừng tiến trình mà trả `nil` trong khi tiến trình vẫn
+   chạy thì tệ hơn là không có — người dùng tin là đã dừng rồi đi làm việc khác. Còn sót
+   thì trả lỗi kèm đúng danh sách PID.
+
+`parentMap` đọc bảng pid→ppid bằng syscall thẳng (Toolhelp32 snapshot trên Windows,
+`/proc/<pid>/stat` trên Linux). **Không** gọi `wmic`: nó đã bị gỡ khỏi Windows Server 2022
+— đo được ngay lúc viết hàm này, nó trả về **rỗng, im lặng**, suýt nữa thì kết luận nhầm
+là "không có tiến trình con nào". Cũng không gọi `tasklist`: parse chữ thì hỏng theo ngôn
+ngữ hệ thống.
+
+Test `TestKillTreeDonDuocMoCoi` đã **chứng minh là bắt được lỗi**: cho `KillTree` thoái
+hoá về hành vi `Kill` cũ thì nó đỏ ngay — `MỒ CÔI SỐNG SÓT: [13900]`.
+
+Hai giới hạn, nói trước cho khỏi tin nhầm:
+
+- **PID được dùng lại.** Quan hệ cha-con nhận diện bằng PID; một tiến trình mới trùng PID
+  với cha đã chết sẽ kéo cả đám con của nó vào danh sách. Vì vậy `Descendants` chỉ dùng
+  khi người dùng **chủ động** gõ `stop`, không bao giờ chạy nền tự động.
+- **Còn một lỗ chưa bịt:** phiên tự chết (bị đánh dấu `lost` trong `Running()`) thì hậu
+  duệ của nó không ai quét. Muốn bịt phải có một lệnh dọn riêng, và phải nghĩ kỹ về PID
+  dùng lại trước khi cho nó tự chạy. **Chưa làm.**
+- Trên Linux `StartDetached` không đặt `Setpgid`, nên nhánh `Kill(-pid)` của
+  `proc_linux.go` gần như luôn rơi xuống fallback. `KillTree` che được chỗ đó nhờ chụp
+  trước, nhưng **chưa đo trên máy Linux thật**.
+
 ---
 
 ## Việc cần bạn hỗ trợ
