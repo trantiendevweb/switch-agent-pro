@@ -906,6 +906,73 @@ Bài học, lặp lại lần thứ năm trong tài liệu này: **test xanh kh�
 thật.** Tám test của package này đều xanh trong khi `doc()` đang nuốt lỗi — vì không test
 nào đưa cho nó một file hỏng. Cái sai lộ ra ở dòng đầu ra đầu tiên trông không đúng.
 
+### Console Windows nuốt tiếng Việt — ĐÃ ĐO, ĐÃ VÁ (2026-08-18, lượt chạy thử toàn phần)
+
+Tìm ra khi chạy **một lượt cài sạch từ đầu** trong HOME giả, không phải khi đọc code.
+
+Go luôn ghi ra byte UTF-8. Console Windows thì render byte theo **codepage đang bật**, và
+mặc định của máy **không** phải UTF-8 — đo trên máy dev:
+
+```
+OEMCP = 437     <- cmd.exe dùng cái này
+ACP   = 1252
+```
+
+Toàn bộ thông điệp của công cụ này là tiếng Việt. Mở `cmd.exe` sạch rồi chạy `sagent` thì
+mọi dòng thành rác — kể cả dòng báo lỗi, tức đúng lúc người dùng cần đọc nhất.
+
+Hỏi codex một câu, và nó chặn đúng chỗ tôi định làm ẩu: đổi codepage là đụng vào **tài sản
+chung của cả cửa sổ console**, những lệnh chạy sau `sagent` cũng chịu ảnh hưởng. Nên bản
+vá có hai điều kiện, không phải một:
+
+1. **Chỉ đổi khi stdout là console thật.** Bị chuyển hướng vào file/ống dẫn thì byte UTF-8
+   vốn đã đúng; đổi codepage lúc đó là phá console của người khác chẳng vì lý do gì.
+2. **Khôi phục lúc thoát** — và phải gọi tường minh ở **mọi** lối thoát, vì `os.Exit` bỏ
+   qua `defer`. Có 4 chỗ: `fail()`, hai `os.Exit` trong `main.go`, một trong `flow.go`.
+
+#### Đo thế nào khi chính phép đo làm hỏng thứ cần đo
+
+Chạy `sagent` qua `cmd /c` từ PowerShell thì stdout **bị bắt** → `Dat()` đúng ra không
+làm gì → "codepage vẫn 437" là kết quả **rỗng nghĩa**, dễ tưởng là đã chứng minh.
+
+Cách đo đúng: một chương trình dò chạy trong console thật (`start /wait`) và ghi kết quả
+ra **FILE**. Ghi ra stdout thì chính việc đo đã làm stdout thôi là console.
+
+| | stdout là console | trước | trong khi | sau |
+|---|---|---|---|---|
+| Console thật | **true** | 437 | **65001** ✓ | **437** ✓ |
+| Bị chuyển hướng | false | 437 | 437 | 437 |
+
+Cả hai vế đều đúng: có đổi khi cần, không đụng khi không cần, và trả lại nguyên trạng.
+
+Test tự động chỉ bao được vế "bị chuyển hướng" — `go test` luôn chạy với stdout redirect.
+May thay đó cũng là vế nguy hiểm hơn. Vế console thật ghi số đo tay ở đây và trong comment
+của test, cố ý **không** thay bằng một test giả vờ.
+
+### Lượt chạy thử toàn phần trên máy trắng (2026-08-18)
+
+Cài từ release v0.2.0 vào HOME giả, đi hết các lệnh an toàn (`them`/`goc`/`fleet` bị loại
+vì đều dẫn tới đăng nhập hoặc chưa đo):
+
+| Bước | Kết quả |
+|---|---|
+| Cài bằng lệnh một dòng trong README | **8,1 giây** |
+| `version` `ds` `config` `init` `status` `quet` `db` `db backup` `flow` `help` | mã thoát 0 |
+| `verify` trên máy trắng | mã thoát 1 — **đúng**, chưa có `~/.claude`, `~/.codex` |
+| `dash` khi chưa đặt mật khẩu | **từ chối**, mã thoát 1 — đúng |
+| `dash --host 0.0.0.0` | tự bật HTTPS, in vân tay |
+| `POST /login` qua TLS | 303 |
+| `GET /api/state` có cookie | 200 |
+| `GET /api/state` **không** cookie | **401** |
+| `GET /docs/` | 200 (công khai, đúng thiết kế) |
+| `db restore` | ✓, có cứu bản hiện tại trước |
+| ACL kho hồ sơ | chỉ chủ sở hữu + SYSTEM + Administrators |
+
+Một chi tiết đáng ghi: mục `verify` trong lượt chạy **không có** ô provider drift — vì
+binary tải về là **v0.2.0**, tag trước khi tính năng đó ra đời. Không phải lỗi; nó nhắc
+rằng bản phát hành và nhánh `main` là hai thứ khác nhau, và lượt chạy thử phải nói rõ mình
+đang thử cái nào.
+
 ---
 
 ## Việc cần bạn hỗ trợ

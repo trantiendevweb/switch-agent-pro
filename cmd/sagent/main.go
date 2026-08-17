@@ -22,6 +22,7 @@ import (
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
+	"github.com/trantiendevweb/switch-agent-pro/internal/console"
 	"github.com/trantiendevweb/switch-agent-pro/internal/dash"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 )
@@ -79,6 +80,10 @@ func init() {
 }
 
 func main() {
+	// Console Windows mặc định KHÔNG phải UTF-8 (đo trên máy dev: OEMCP=437), mà
+	// mọi thông điệp của công cụ này là tiếng Việt. Không đặt thì người mở
+	// cmd.exe sạch sẽ đọc ra rác — đúng lúc họ cần đọc nhất là lúc có lỗi.
+	defer console.Dat()()
 	args := os.Args[1:]
 	if len(args) == 0 {
 		runTUI()
@@ -240,6 +245,7 @@ func cmdRunRoot(args []string) {
 	a, done := open()
 	defer done()
 	if err := a.RunRoot(args); err != nil {
+		console.KhoiPhuc()
 		os.Exit(1)
 	}
 }
@@ -298,6 +304,7 @@ func cmdVerify(args []string) {
 	}
 	fmt.Println()
 	done()
+	console.KhoiPhuc()
 	os.Exit(code)
 }
 
@@ -659,6 +666,9 @@ func cmdHelp() {
 }
 
 func fail(err error) {
+	// os.Exit bỏ qua defer, nên phải trả codepage về TẠI ĐÂY. Quên chỗ này thì
+	// mỗi lần sagent báo lỗi là để lại một cửa sổ console bị đổi codepage.
+	console.KhoiPhuc()
 	fmt.Fprintf(os.Stderr, "  ✗ %v\n", err)
 	os.Exit(1)
 }

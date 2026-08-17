@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/console"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
 )
 
@@ -151,6 +152,7 @@ func flowValidate() {
 	}
 	fmt.Println()
 	if nErr > 0 {
+		console.KhoiPhuc()
 		os.Exit(1) // để dùng được trong CI
 	}
 }
