@@ -175,6 +175,20 @@ func Remove(dir string) error {
 	if !insideStore(dir) {
 		return fmt.Errorf("từ chối xoá %s — nằm ngoài kho hồ sơ", dir)
 	}
+	// Thư mục hồ sơ CHÍNH NÓ có thể là một link: tên hợp lệ, nằm đúng trong kho,
+	// nên hai lá chắn trên đều cho qua — nhưng nó là cánh cửa mở sang chỗ khác.
+	//
+	// Phải chặn ở ĐÂY, trước os.ReadDir, vì ReadDir đi XUYÊN link: mọi đường dẫn
+	// dựng từ entries của nó trỏ vào ruột thư mục thật ở đầu bên kia. Đã đo trên
+	// Windows: với hồ sơ là junction trỏ tới ~/.claude, vòng gỡ link bên dưới gỡ
+	// mất junction ~/.claude/skills của người dùng rồi trả về nil — im lặng, không
+	// một dòng cảnh báo.
+	//
+	// Gỡ chính cái link là đúng ý người dùng (hồ sơ biến mất) mà không chạm gì tới
+	// đầu bên kia. Junction dựng bằng `mklink /J`, KHÔNG cần quyền quản trị.
+	if isLink, _ := link.IsLink(dir); isLink {
+		return link.Unlink(dir, true)
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err

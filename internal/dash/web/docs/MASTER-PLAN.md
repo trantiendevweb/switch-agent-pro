@@ -530,11 +530,30 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   (offline) thì **tự rơi về 2D** thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
   root `index.html` giữ làm bản trình diễn.
 
-### Pha 7 — Hardening & phát hành
+### Pha 7 — Hardening & phát hành  🔄 đang làm
 - DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
   symlink-escape test Linux; process-tree cancel + orphan cleanup; upgrade/provider-drift
   verify; SBOM/license notices/dependency scan; signed + reproducible build; **migration
   guide từ tk v1 / ccswitch**.
+- **Trạng thái:**
+  - ✅ **dependency scan** — `govulncheck ./...` chạy được, **23 lỗ hổng có đường gọi
+    thật → 0**. Toàn bộ là thư viện chuẩn Go, chạm qua `dash.Server.Run → http.Serve`;
+    bản vá là ghim `toolchain go1.25.13` trong `go.mod`, không dependency nào phải đổi.
+    CI đọc `go-version-file: go.mod` và có job `vuln` riêng. Số đo ở `docs/DO-LUONG.md`.
+  - ✅ **path-traversal** — tên hồ sơ không thoát được thư mục nữa; lỗ hổng này **đã nổ
+    thật một lần** khi kiểm, xoá mất `~/.claude`. Ghi ở `docs/DO-LUONG.md`.
+  - ✅ **junction-attack (Windows)** — đo ra **lỗi thật**: hồ sơ chính nó là junction thì
+    `os.ReadDir` đi xuyên, và `Remove` gỡ mất junction dùng chung bên trong thư mục nạn
+    nhân rồi trả `nil`. Vá bằng cách kiểm `link.IsLink` **trước** `ReadDir`. Test đã được
+    chứng minh là bắt được lỗi (tắt lá chắn → đỏ). Số đo ở `docs/DO-LUONG.md`.
+  - ✅ **cửa vào dashboard** — bỏ hẳn token trên URL và header `X-Sagent-Token`; chỉ còn
+    đăng nhập bằng mật khẩu băm. Chưa đặt mật khẩu thì server **từ chối chạy**.
+  - ⬜ Còn lại: DB migration/rollback + backup restore · Windows ACL · symlink-escape
+    Linux (**chưa có máy Linux để đo** — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
+    process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license
+    notices · signed + reproducible build · migration guide v1.
+  - ⚠ **HTTP không mã hoá.** `--host 0.0.0.0` gửi mật khẩu dạng trần trên đường truyền.
+    Chưa có TLS — phải giải quyết trước khi gọi là "phát hành được".
 
 ---
 

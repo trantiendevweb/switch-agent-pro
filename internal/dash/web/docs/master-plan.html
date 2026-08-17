@@ -669,12 +669,31 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
   (offline) thì <strong>tự rơi về 2D</strong> thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
   root <code>index.html</code> giữ làm bản trình diễn.</li>
 </ul>
-<h3>Pha 7 — Hardening &amp; phát hành</h3>
+<h3>Pha 7 — Hardening &amp; phát hành  🔄 đang làm</h3>
 <ul>
 <li>DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
   symlink-escape test Linux; process-tree cancel + orphan cleanup; upgrade/provider-drift
   verify; SBOM/license notices/dependency scan; signed + reproducible build; <strong>migration
   guide từ tk v1 / ccswitch</strong>.</li>
+<li><strong>Trạng thái:</strong></li>
+<li>✅ <strong>dependency scan</strong> — <code>govulncheck ./...</code> chạy được, <strong>23 lỗ hổng có đường gọi
+    thật → 0</strong>. Toàn bộ là thư viện chuẩn Go, chạm qua <code>dash.Server.Run → http.Serve</code>;
+    bản vá là ghim <code>toolchain go1.25.13</code> trong <code>go.mod</code>, không dependency nào phải đổi.
+    CI đọc <code>go-version-file: go.mod</code> và có job <code>vuln</code> riêng. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+<li>✅ <strong>path-traversal</strong> — tên hồ sơ không thoát được thư mục nữa; lỗ hổng này <strong>đã nổ
+    thật một lần</strong> khi kiểm, xoá mất <code>~/.claude</code>. Ghi ở <code>docs/DO-LUONG.md</code>.</li>
+<li>✅ <strong>junction-attack (Windows)</strong> — đo ra <strong>lỗi thật</strong>: hồ sơ chính nó là junction thì
+    <code>os.ReadDir</code> đi xuyên, và <code>Remove</code> gỡ mất junction dùng chung bên trong thư mục nạn
+    nhân rồi trả <code>nil</code>. Vá bằng cách kiểm <code>link.IsLink</code> <strong>trước</strong> <code>ReadDir</code>. Test đã được
+    chứng minh là bắt được lỗi (tắt lá chắn → đỏ). Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+<li>✅ <strong>cửa vào dashboard</strong> — bỏ hẳn token trên URL và header <code>X-Sagent-Token</code>; chỉ còn
+    đăng nhập bằng mật khẩu băm. Chưa đặt mật khẩu thì server <strong>từ chối chạy</strong>.</li>
+<li>⬜ Còn lại: DB migration/rollback + backup restore · Windows ACL · symlink-escape
+    Linux (<strong>chưa có máy Linux để đo</strong> — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
+    process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license
+    notices · signed + reproducible build · migration guide v1.</li>
+<li>⚠ <strong>HTTP không mã hoá.</strong> <code>--host 0.0.0.0</code> gửi mật khẩu dạng trần trên đường truyền.
+    Chưa có TLS — phải giải quyết trước khi gọi là "phát hành được".</li>
 </ul>
 <hr>
 <h2>8. Project config <code>.sagent/project.toml</code> (không chứa secret)</h2>

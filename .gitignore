@@ -14,3 +14,6 @@ __pycache__/
 *.exe
 /sagent
 /dist/
+
+# log của remote-control server chạy tại chỗ
+.rc-server.log

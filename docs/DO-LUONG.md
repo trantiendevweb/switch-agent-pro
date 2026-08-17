@@ -189,6 +189,174 @@ Ba bài học, đã thành quy tắc:
   mục tạm rồi mới bắn. Không bao giờ chĩa vào máy thật để "xem thử".
 - **Dừng dash trước khi build.** Server đang chạy khoá cả `sagent.exe` lẫn `state.db`.
 
+### Sự cố thứ hai (2026-08-17 15:04) — mất remote control do tranh chấp device slot
+
+> **Đã đo lại lúc 16:40 cùng ngày và SỬA.** Bản ghi đầu tiên của mục này quy nguyên
+> nhân cho việc lấy token hồ sơ `claude:phu`. Sai. Giữ lại phần đúng, ghi lại phần sai
+> — đó là lý do mục này tồn tại.
+
+Nguồn: `AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\logs\main.log`
+(đường `AppData\Roaming\Claude\logs` ghi ở bản đầu **không tồn tại** — app đóng gói MSIX
+nên Windows chuyển hướng vào `LocalCache`).
+
+| Mốc | Dòng log |
+|---|---|
+| 16/08 20:37:48 | desktop app khởi động lại |
+| 16/08 20:37:54 | `session_stale_relogin` **latched** — cookie tài khoản gốc (org `c6407a30`) chết; mọi lần thử sau đều `short-circuiting fresh /authorize` |
+| 16/08 20:38:09 | supersede đầu tiên: `socket closed: 4000 Superseded by newer connection` + `superseded by another connection for 'win-i51h2n4icta' — another Claude desktop variant is likely running on this machine` |
+| 20:38 → 14:59 | **1866 lần** tranh chấp cùng một device slot, đều đặn ~100 lần/giờ, liên tục 18 tiếng |
+| 17/08 14:16:46 | tranh chấp đổi triệu chứng sang `Unexpected server response: 500` |
+| 17/08 **14:59:47** | lần supersede **cuối cùng** |
+| 17/08 15:00:56 | phiên Claude Code gọi `go install govulncheck` — **hệ thống đã hỏng sẵn từ trước** |
+| 15:01:29–15:03:50 | reconnect #1…#11, toàn 500 hoặc handshake timeout |
+| 17/08 **15:04:16** | `[account] Navigated to /logout, synthesizing logged-out` → `[remote-tools-device] close` → banner "Remote Control disconnected" |
+| 17/08 15:04:38 | `Login-state transition uuid: 5233f516… → 49442b47…` — đăng nhập lại bằng tài khoản `phu`, cookie duy nhất còn sống |
+
+**Nguyên nhân gốc: hai client Claude trên cùng một máy giành nhau MỘT device slot
+`win-i51h2n4icta`, đá nhau 1866 lần.** Bình thường vòng này tự nối lại được. Lần này
+không, vì cookie tài khoản gốc đã chết từ 18 tiếng trước nên không còn đường phục hồi.
+Server chuyển sang trả 500, webview rơi về `/logout`, app đăng nhập lại bằng tài khoản
+duy nhất còn hợp lệ (`phu`) — phiên remote cũ mất chỗ bám.
+
+Đây là phép đo **đắt nhất và liên quan trực tiếp nhất tới dự án này**: mục tiêu của
+`sagent` là chạy nhiều client Claude song song trên một máy, mà device slot thì **dùng
+chung theo máy, không theo `CLAUDE_CONFIG_DIR`**. `CLAUDE_CONFIG_DIR` tách được config
+và tiến trình con — nó **không** tách được device slot.
+
+Bản đầu ghi sai ở ba chỗ, ghi lại để không lặp:
+
+- **Sai người bấm cò.** Cú giết phiên là điều hướng `/logout` lúc 15:04:16, không phải
+  bước lấy token. Việc lấy token lúc 14:16 chỉ trùng mốc loạt 500 bắt đầu (14:16:46).
+- **Thiếu tiền đề.** Danh tính gốc đã không dùng được từ 16/08 20:37:54 — 18 tiếng
+  trước, chẳng liên quan gì tới hồ sơ `phu`.
+- **Thiếu hẳn cơ chế chính.** 1866 sự kiện `Superseded by newer connection` không được
+  nhắc một chữ. Kết luận "do đổi danh tính" là suy luận từ hai dòng log gần nhau, đúng
+  cái lỗi mà tài liệu này lập ra để chống.
+
+Còn đúng và giữ nguyên: cả codebase không có dòng nào biết remote control tồn tại
+(grep `internal/` + `cmd/`: chỉ có `remoteControlSurfacesSeen` trong whitelist dùng
+chung, là cờ "đã xem popup", không liên quan kết nối). `sagent` **không** gây ra sự cố này.
+
+Quy tắc, bổ sung vào ba cái trên:
+
+- **KHÔNG test tool trên phiên Claude Code đang chạy.** Phiên đang làm việc — nhất
+  là phiên có remote control — là môi trường thật, không phải bàn thí nghiệm. Muốn
+  thử `them` / `goc` / `fleet` thì mở terminal riêng, HOME giả, và không có phiên nào
+  đang live. Đây là phiên bản tổng quát của bài học "payload phá hoại chỉ chạy trong
+  HOME giả": lần trước mất `~/.claude`, lần này mất phiên remote — cùng một gốc.
+- **Không chạy `sagent them` / `sagent goc` khi remote control đang bật.** Cả hai
+  đều dẫn tới đăng nhập, mà đăng nhập = đổi danh tính = rơi remote control.
+  (`goc` giờ cũng đòi đăng nhập vì `~/.claude/.credentials.json` đã mất ở sự cố đầu.)
+- **Chưa đo thì không chạy trên tài khoản thật.** `sagent fleet --copies N` chép token
+  ra N chỗ; hành vi khi nhiều phiên cùng refresh **chưa đo** — chính
+  `internal/fleet/fleet.go:76` tự cảnh báo điều đó.
+- **Một máy = một device slot.** Trước khi hứa "chạy N agent song song", phải đo xem
+  slot `win-…` có phải hàng rào cứng không. Chưa đo → chưa hứa. Ghi vào việc còn nợ.
+
+### Remote control tự bật — ĐÃ ĐO (2026-08-17)
+
+- [x] **Không phải bật tay từng phiên.** Mỗi lần tạo phiên, log in
+      `[rcAutoEnable] verdict: enable=true source=explicit_pref` rồi mới
+      `Enabling remote control for session …`. Đúng ở cả 3 phiên quan sát được
+      (16/08 20:39:57, 16/08 21:16:20, 17/08 15:05:37), **kể cả phiên tạo sau khi
+      đổi tài khoản** — tức preference sống qua cả lần đổi danh tính.
+- [x] **Trạng thái remote KHÔNG nằm trong file phiên.**
+      `claude-code-sessions/<acc>/<org>/local_*.json` không có trường nào về remote
+      control → không sửa được bằng cách ghi file. Đừng thử.
+- [ ] `remoteEnabled` trong `~/.claude.json` điều khiển cái gì — **chưa đo**. Nó là
+      `false` suốt từ 31/07 tới nay trong khi remote control vẫn chạy bình thường,
+      nên chắc chắn **không** phải công tắt này. Không đoán, không lật.
+- [ ] **Device slot `win-…` có phải hàng rào cứng cho chạy song song không** — chưa đo.
+      Đã biết: hai client cùng máy thì đá nhau (`4000 Superseded by newer connection`,
+      1866 lần trong 18 tiếng, xem sự cố thứ hai). Chưa biết: slot cấp theo máy hay
+      theo tài khoản, và `sagent fleet --copies N` có đụng vào nó không. **Phải đo
+      trong VM riêng, không đo trên máy có phiên thật.**
+
+### Quét lỗ hổng phụ thuộc — ĐÃ ĐO, ĐÃ VÁ (2026-08-17, mở màn Pha 7)
+
+`govulncheck ./...` trên toolchain **go1.25.0**:
+
+| Nhóm | Số lượng |
+|---|---|
+| Lỗ hổng **có đường gọi thật từ code mình** | **23 — 100% là thư viện chuẩn Go** |
+| Có trong package import nhưng không gọi tới | 9 |
+| Có trong module require nhưng không gọi tới | 14 |
+| Lỗ hổng trong dependency bên thứ ba mà mình gọi | **0** |
+
+23 mục nằm ở `crypto/tls`, `crypto/x509`, `net/http`, `net/url`, `net/textproto`,
+`encoding/asn1`; đường gọi hầu hết là `dash.Server.Run → http.Serve` và
+`dash.Server.ServeHTTP → http.ServeMux.ServeHTTP`. Nghĩa là **chính cái dashboard mở
+cổng ra mạng** là chỗ chạm mặt tất cả chúng.
+
+Không dependency nào phải đổi — bản vá là **nâng toolchain**. Ghim `toolchain go1.25.13`
+trong `go.mod`, quét lại:
+
+```
+$ govulncheck ./...
+No vulnerabilities found.
+```
+
+`go vet ./...` sạch, toàn bộ test xanh trên toolchain mới.
+
+Hai việc kèm theo để nó không trôi lại:
+
+- `.github/workflows/ci.yml` đổi từ `go-version: '1.25'` sang `go-version-file: go.mod`.
+  Ghim hờ kiểu cũ nghĩa là CI có thể build bằng toolchain **khác** với thứ vừa quét.
+- Thêm job `vuln` chạy `govulncheck ./...`, tách khỏi job build/test: một lỗ hổng mới
+  công bố không nên chặn việc test code đang viết.
+
+Bài học: **lỗ hổng "của mình" hoá ra không có cái nào là của mình.** Nếu đọc lướt bảng
+mà kết luận "dependency bẩn" rồi đi nâng `modernc.org/sqlite` thì sửa nhầm chỗ, và 23
+mục vẫn còn nguyên.
+
+### Junction-attack — ĐÃ ĐO, TÌM RA LỖI THẬT, ĐÃ VÁ (2026-08-17, Pha 7)
+
+Ba lớp lỗi đường dẫn, lớp thứ ba trước nay chưa ai đo:
+
+| Lớp | Bẫy | Lá chắn |
+|---|---|---|
+| 1 | link nằm **bên trong** thư mục hồ sơ | `Remove` gỡ link trước, đếm link còn sót (Pha 1) |
+| 2 | tên hồ sơ trỏ **ra ngoài** kho về mặt chữ (`../../.claude`) | `ValidName` + `insideStore` |
+| 3 | **thư mục hồ sơ chính nó là link** | *(chưa có — chỗ này nổ)* |
+
+Lớp 3 lọt qua cả hai lá chắn kia một cách hoàn toàn hợp lệ: `~/.ai-accounts/claude/evil`
+nằm đúng trong kho, tên `evil` sạch sẽ. Nhưng nó là junction trỏ tới `~/.claude`.
+
+Đo trên Windows, go1.25.13 — ba dòng, dòng thứ ba là chỗ nổ:
+
+```
+os.Lstat(junction).Mode()  ->  ModeIrregular, KHÔNG phải ModeSymlink, IsDir()=false
+link.IsLink(junction)      ->  true   (kiểm cờ FILE_ATTRIBUTE_REPARSE_POINT)
+os.ReadDir(junction)       ->  ĐI XUYÊN, liệt kê ruột thư mục THẬT
+```
+
+Vì `ReadDir` đi xuyên, mọi đường dẫn `Remove` dựng từ entries của nó đều trỏ vào ruột
+`~/.claude`. Kết quả đo trước bản vá:
+
+| Thứ | Sau `sagent xoa claude:evil` |
+|---|---|
+| `~/.claude/quan-trong.txt` | còn ✅ |
+| `~/.claude` | còn ✅ |
+| `~/.claude/skills` (junction dùng chung) | **BỊ GỠ** ❌ |
+| `Remove` trả về | `nil` — **không một dòng cảnh báo** |
+
+`os.RemoveAll` không xuyên junction (Lstat báo `IsDir()=false` nên nó gỡ chính cái
+link) — nên **dữ liệu không mất**. Nhưng vòng gỡ link ở đầu `Remove` thì có xuyên, và
+nó tháo mất đúng cấu trúc junction mà cả dự án này dựng lên. Hỏng im lặng, khó phát
+hiện hơn hẳn một lần xoá ồn ào.
+
+Bản vá (`internal/profile/profile.go`): kiểm `link.IsLink(dir)` **trước `os.ReadDir`**,
+nếu hồ sơ chính nó là link thì gỡ đúng cái link rồi dừng — người dùng vẫn xoá được hồ
+sơ, đầu bên kia không bị chạm.
+
+Test `internal/profile/junction_test.go` đã được **chứng minh là bắt được lỗi**: tắt lá
+chắn thì nó đỏ ngay dòng "LINK DÙNG CHUNG BÊN TRONG NẠN NHÂN BỊ GỠ", bật lại thì xanh.
+Một test bảo mật chưa từng thấy đỏ thì chưa biết nó có đo gì không.
+
+Bài học: **thứ tự kiểm quan trọng ngang nội dung kiểm.** Cùng một hàm `link.IsLink`,
+gọi sau `ReadDir` thì vô dụng, gọi trước thì chặn được. `mklink /J` không cần quyền
+quản trị — kẻ tấn công chỉ cần ghi được vào kho hồ sơ là dựng xong bẫy.
+
 ---
 
 ## Việc cần bạn hỗ trợ
