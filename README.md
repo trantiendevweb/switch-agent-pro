@@ -180,6 +180,20 @@ Ba thứ tự động, không phải bấm:
 - **Binary cũ không mở được DB của binary mới.** Trước đây nó mở được, đọc được và **ghi
   được** trong im lặng; giờ nó từ chối và chỉ đường.
 
+### Quyền truy cập kho hồ sơ
+
+Kho `~/.ai-accounts` chứa token của từng hồ sơ và mật khẩu dashboard đã băm. Trên Windows,
+`0o600` trong code Go **không bảo vệ gì** — quyền thật đến từ ACL kế thừa của thư mục cha
+(đã đo: file `0o600` và `0o644` có ACL y hệt). `sagent` siết ACL tường minh và cắt kế thừa
+khi tạo kho, và `sagent verify` nói cho bạn biết trạng thái thật:
+
+```
+  [kho hồ sơ]
+    ✓ quyền truy cập ~/.ai-accounts    chỉ chủ sở hữu, SYSTEM và nhóm quản trị
+```
+
+Ô này ✗ nghĩa là token của bạn đang đọc được bởi người dùng khác trên máy.
+
 ## Trạng thái thật
 
 Không tô hồng:

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
 	"github.com/trantiendevweb/switch-agent-pro/internal/link"
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
@@ -90,6 +91,9 @@ func Create(a provider.Adapter, account string) (linked, seeded int, err error) 
 	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return 0, 0, err
 	}
+	// Thư mục này chứa `.credentials.json`. Trên Windows bit 0o755 ở trên không
+	// bảo vệ gì (đã đo, xem internal/acl) — phải siết ACL tường minh.
+	_ = acl.Restrict(dir)
 	if linked, err = LinkShared(a, dir); err != nil {
 		return linked, 0, err
 	}

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 )
 
@@ -85,6 +86,9 @@ func SetPassword(user, password string) error {
 	if err := os.MkdirAll(filepath.Dir(AuthPath()), 0o755); err != nil {
 		return err
 	}
+	// File này là mật khẩu dashboard đã băm. 0o600 bên dưới không bảo vệ nó trên
+	// Windows (đã đo, xem internal/acl) — siết thư mục để mọi thứ bên trong kín.
+	_ = acl.Restrict(filepath.Dir(AuthPath()))
 	// 0600: chỉ chủ máy đọc được.
 	tmp := AuthPath() + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {

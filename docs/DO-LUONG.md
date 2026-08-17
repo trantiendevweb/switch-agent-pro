@@ -474,6 +474,69 @@ Hai giới hạn, nói trước cho khỏi tin nhầm:
   `proc_linux.go` gần như luôn rơi xuống fallback. `KillTree` che được chỗ đó nhờ chụp
   trước, nhưng **chưa đo trên máy Linux thật**.
 
+### Windows ACL — ĐÃ ĐO, TÌM RA LỖI THẬT, ĐÃ VÁ (2026-08-17, Pha 7)
+
+Khắp codebase, file bí mật ghi bằng `os.WriteFile(path, data, 0o600)`:
+`.credentials.json` của từng hồ sơ, `dash-auth.json` (mật khẩu dashboard đã băm),
+các bản `.bak` của jsonutil. Nhìn thì yên tâm.
+
+Đo: dựng một thư mục có ACL rộng, ghi hai file từ Go, đọc ACL thật.
+
+| File | Tạo bằng | ACL thật |
+|---|---|---|
+| `secret-0600.json` | `0o600` | `BUILTIN\Users:(I)(F)` — **Users TOÀN QUYỀN** |
+| `public-0644.json` | `0o644` | **y hệt** |
+| `dir-0700` | `0o700` | `BUILTIN\Users:(I)(OI)(CI)(F)` |
+
+**Bit quyền Unix trên Windows là trang trí.** Quyền thật đến 100% từ ACL kế thừa của thư
+mục cha. Trên máy dev nó tình cờ kín vì `C:\Users\<tên>` vốn đã chặt — nhưng đó là **may,
+không phải bảo đảm**: đổi `AccountsRoot`, để home trên ổ chia sẻ, hay chạy trên máy có
+profile lỏng là token nằm phơi. Và không có gì báo, vì `0o600` trong code trông như đã lo xong.
+
+Bản vá — package `internal/acl`:
+
+- `Restrict(path)` dựng DACL tường minh cho **chủ sở hữu + SYSTEM + nhóm quản trị**, và
+  **CẮT KẾ THỪA** (`PROTECTED_DACL_SECURITY_INFORMATION`, tương đương `icacls
+  /inheritance:r`). Cắt kế thừa là phần không được quên: chỉ thêm ACE cho chủ sở hữu mà
+  vẫn để ACE rộng của cha chảy xuống thì siết được đúng con số không.
+- Giữ SYSTEM và Administrators có chủ đích. Bỏ chúng thì sao lưu hệ thống, quét virus và
+  chính người quản trị máy không đọc được — đổi rủi ro này lấy rủi ro khác không phải là siết.
+- Thư mục siết kèm cờ kế thừa xuống con, nên **file tạo sau vẫn kín** (có test riêng).
+- Dùng `golang.org/x/sys/windows` gọi thẳng `SetNamedSecurityInfo`, **không** shell ra
+  `icacls`: tên nhóm đổi theo ngôn ngữ Windows ("Users" / "Utilisateurs" / "Benutzer").
+  Code test thì gọi `icacls` bằng **SID** (`*S-1-5-32-545`) để dựng bẫy — SID không đổi.
+- Trên Linux `Restrict` là `chmod` 0700/0600, vì ở đó bit quyền là thật.
+
+Nối vào ba chỗ tạo thư mục bí mật: `store.OpenAt` (kho hồ sơ, kéo theo cả `state.db`),
+`profile` (thư mục từng hồ sơ), `dash.SetPassword`.
+
+Siết lúc tạo là **best-effort** — ổ mạng hay FAT32 có thể từ chối. Nuốt lỗi đó trong im
+lặng thì lại đúng cái bệnh vừa chữa, nên `sagent verify` có thêm ô kiểm nói đúng trạng
+thái thật. Đo trên máy thật:
+
+```
+  [kho hồ sơ]
+    ✓ quyền truy cập C:\Users\Administrator\.ai-accounts  chỉ chủ sở hữu, SYSTEM và nhóm quản trị
+```
+
+ACL của kho trước và sau — chú ý cờ `(I)`:
+
+```
+trước:  NT AUTHORITY\SYSTEM:(I)(OI)(CI)(F)            ← (I) = kế thừa từ cha
+        BUILTIN\Administrators:(I)(OI)(CI)(F)
+        WIN-...\Administrator:(I)(OI)(CI)(F)
+
+sau:    WIN-...\Administrator:(F)   + (OI)(CI)(IO)(F) ← không còn (I)
+        NT AUTHORITY\SYSTEM:(F)     + (OI)(CI)(IO)(F)
+        BUILTIN\Administrators:(F)  + (OI)(CI)(IO)(F)
+```
+
+Cùng ba chủ thể, nhưng giờ là **tường minh** chứ không phụ thuộc vào việc thư mục cha
+tình cờ chặt.
+
+`Check` cũng phải chứng minh được là nó đo thật: test nới lỏng ACL rồi khẳng định `Check`
+**nói hỏng** trước khi vá. Một hàm kiểm lúc nào cũng trả "ổn" thì tệ hơn không có.
+
 ---
 
 ## Việc cần bạn hỗ trợ

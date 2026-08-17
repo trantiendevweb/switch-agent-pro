@@ -17,11 +17,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
+	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
@@ -290,7 +292,28 @@ func (a *API) ProfileVerify(providerName string) (map[string][]provider.Check, e
 		ad, _ := provider.Get(n)
 		out[n] = ad.Verify()
 	}
+	// Ô kiểm không thuộc provider nào: quyền truy cập của chính cái kho chứa
+	// token. Đặt ở đây vì `verify` là chỗ người dùng đến để hỏi "có ổn không",
+	// và vì siết quyền lúc tạo thư mục là việc BEST-EFFORT — ổ mạng hay FAT32
+	// có thể từ chối. Không có ô kiểm này thì thất bại đó im lặng.
+	out["kho hồ sơ"] = []provider.Check{khoHoSoCheck()}
 	return out, nil
+}
+
+func khoHoSoCheck() provider.Check {
+	root := paths.AccountsRoot()
+	c := provider.Check{Name: "quyền truy cập " + root}
+	if _, err := os.Stat(root); err != nil {
+		c.OK, c.Detail = true, "chưa có kho — sẽ được siết khi tạo"
+		return c
+	}
+	ok, detail, err := acl.Check(root)
+	if err != nil {
+		c.OK, c.Detail = false, "không đọc được quyền: "+err.Error()
+		return c
+	}
+	c.OK, c.Detail = ok, detail
+	return c
 }
 
 // ---------------------------- phiên ----------------------------

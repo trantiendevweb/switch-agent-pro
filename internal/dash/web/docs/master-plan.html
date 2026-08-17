@@ -697,7 +697,12 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
     hạn mức, còn <code>Kill</code> chỉ trả <code>exit status 128</code>. Vá bằng <code>process.KillTree</code>: chụp hậu
     duệ trước khi giết, quét lại, rồi mới kết luận. <strong>Chưa bịt:</strong> hậu duệ của phiên tự
     chết (<code>lost</code>) vẫn không ai quét. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
-<li>⬜ Còn lại: Windows ACL · symlink-escape
+<li>✅ <strong>Windows ACL</strong> — đo ra <strong>lỗi thật</strong>: <code>os.WriteFile(..., 0o600)</code> không bảo vệ gì
+    trên Windows; file <code>0o600</code> và <code>0o644</code> có ACL y hệt (<code>BUILTIN\Users:(I)(F)</code>). Token và
+    mật khẩu dashboard chỉ kín nhờ MAY MẮN kế thừa từ <code>C:\Users\&lt;tên&gt;</code>. Vá bằng package
+    <code>internal/acl</code>: DACL tường minh + cắt kế thừa, nối vào kho hồ sơ / thư mục hồ sơ /
+    dash-auth, và <code>sagent verify</code> có ô kiểm nói trạng thái thật. Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+<li>⬜ Còn lại: symlink-escape
     Linux (<strong>chưa có máy Linux để đo</strong> — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
     process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license
     notices · signed + reproducible build · migration guide v1.</li>

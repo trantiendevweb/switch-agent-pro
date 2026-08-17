@@ -18,6 +18,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 )
@@ -78,6 +79,13 @@ func OpenAt(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
+	// 0o755 ở trên KHÔNG bảo vệ gì trên Windows — bit quyền Unix ở đó chỉ là
+	// trang trí, quyền thật kế thừa từ thư mục cha (đã đo, xem internal/acl).
+	// Siết một lần ở đây thì mọi thứ tạo sau bên trong đều thừa hưởng.
+	//
+	// Best-effort: ổ mạng hoặc FAT32 có thể từ chối. Không nuốt trong im lặng —
+	// `sagent verify` có ô kiểm nói đúng trạng thái thật.
+	_ = acl.Restrict(filepath.Dir(path))
 	// busy_timeout: chờ thay vì lỗi ngay khi tiến trình khác đang ghi.
 	// WAL: cho đọc và ghi song song.
 	dsn := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
