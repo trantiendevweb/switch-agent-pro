@@ -93,7 +93,15 @@ func Create(a provider.Adapter, account string) (linked, seeded int, err error) 
 	if linked, err = LinkShared(a, dir); err != nil {
 		return linked, 0, err
 	}
-	seeded, err = jsonutil.Seed(a.IdentitySource(), filepath.Join(dir, ".claude.json"), a.SharedKeys())
+	// Không phải provider nào cũng có "file cấu hình gộp" để gieo whitelist khoá.
+	// Claude có .claude.json; Codex thì thói quen máy nằm ở config.toml/AGENTS.md
+	// và hai thứ đó nối link dùng chung được nguyên vẹn — không cần gieo gì.
+	src := a.IdentitySource()
+	if src == "" || len(a.SharedKeys()) == 0 {
+		return linked, 0, nil
+	}
+	// Tên file đích lấy theo chính nguồn, đừng hardcode tên của một provider.
+	seeded, err = jsonutil.Seed(src, filepath.Join(dir, filepath.Base(src)), a.SharedKeys())
 	return linked, seeded, err
 }
 

@@ -485,12 +485,30 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.</li>
 <li><strong>Ánh xạ:</strong> thay thế prototype <code>registry</code>/<code>fleet</code> hiện tại.</li>
 </ul>
-<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)</h3>
-<p>🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</p>
+<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  🟡 Codex xong</h3>
 <ul>
-<li><strong>DoD:</strong> Claude &amp; Codex dùng chung domain/session API (subscription); Anthropic API &amp;
+<li class="task done"><span class="box"></span><strong>Đo Codex trên Windows</strong> (<code>@openai/codex</code> 0.147.0) — xem <code>docs/DO-LUONG.md</code>.
+  Phép đo quyết định: <code>CODEX_HOME</code> trỏ vào thư mục rỗng thì <code>codex login status</code>
+  báo "Not logged in" dù <code>~/.codex</code> thật đang đăng nhập → <strong>tách thật</strong>.
+  Token là FILE <code>auth.json</code>, không phải keyring.</li>
+<li class="task done"><span class="box"></span><strong>Adapter Codex</strong> (<code>internal/provider/codex.go</code>): danh tính đọc từ claim
+  <code>email</code> trong JWT <code>id_token</code> (giải mã cục bộ, không gọi mạng).</li>
+<li class="task done"><span class="box"></span><strong>Phân loại nội dung <code>~/.codex</code></strong> theo hai lý do khác nhau: danh tính
+  (<code>auth.json</code>, <code>installation_id</code>, <code>cap_sid</code>) và <strong>khoá ghi / SQLite</strong>
+  (<code>thread-writer-locks</code>, <code>tmp</code>, <code>.sandbox</code>, <code>*.sqlite*</code>) — nhóm sau nếu nối
+  chung thì hai phiên song song sẽ giành nhau ghi và hỏng dữ liệu.</li>
+<li class="task done"><span class="box"></span>Chạy thật: <code>them/ds/dong-bo/xoa</code> cho <code>codex:*</code>; xoá an toàn có file mồi.</li>
+<li class="task done"><span class="box"></span>Sửa hai chỗ hardcode <code>.claude.json</code> rò vào lõi chung — giờ lấy theo
+  <code>IdentitySource()</code> của từng adapter.</li>
+<li>
+<p>[ ] Đường API (OpenAI-compatible) — chờ API key.
+🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</p>
+</li>
+<li>
+<p><strong>DoD:</strong> Claude &amp; Codex dùng chung domain/session API (subscription); Anthropic API &amp;
   OpenAI-compatible dùng chung route API (direct); khác biệt auth/config nằm trong adapter,
-  khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</li>
+  khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</p>
+</li>
 <li>2 API protocol; capability không hỗ trợ báo trung thực.</li>
 </ul>
 <h3>Pha 3 — Flow DAG ghép được  🟢 chạy được (còn workflow board)</h3>

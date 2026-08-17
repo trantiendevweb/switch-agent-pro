@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -217,9 +218,17 @@ func (a *API) ProfileSync(dryRun bool) ([]SyncReport, error) {
 			out = append(out, r)
 			continue
 		}
-		dst := acc.Dir + string(pathSep) + ".claude.json"
+		// Provider không có file cấu hình gộp thì chẳng có gì để đồng bộ —
+		// thói quen máy của nó nằm ở các file đã nối link dùng chung rồi.
+		src := ad.IdentitySource()
+		if src == "" || len(ad.SharedKeys()) == 0 {
+			r.Skipped = "không cần (không có file cấu hình gộp)"
+			out = append(out, r)
+			continue
+		}
+		dst := filepath.Join(acc.Dir, filepath.Base(src))
 		if !fileExists(dst) {
-			r.Skipped = "chưa có .claude.json"
+			r.Skipped = "chưa có " + filepath.Base(src)
 			out = append(out, r)
 			continue
 		}

@@ -43,10 +43,32 @@ là `sagent verify claude` (đã chạy: cả 3 phép đo ✓).
 - [ ] `CLAUDE_CONFIG_DIR` có tác dụng y hệt trên Linux không.
 - [ ] `os.Symlink` cho phần dùng chung chạy không cần quyền đặc biệt (dự kiến có).
 
-## Codex CLI — CHƯA ĐO
+## Codex CLI · Windows — ĐÃ ĐO ✅ (2026-08-17)
 
-- [ ] Biến config dir có đúng `CODEX_HOME`? File token/danh tính tên gì?
-- [ ] Đặt biến rồi kiểm hai hồ sơ không thấy nhau (Win + Linux).
+Bản đo: `@openai/codex` 0.147.0, cài qua npm global.
+
+- [x] **`CODEX_HOME` có tác dụng.** `codex --help` có nhắc biến này.
+- [x] **TÁCH THẬT — phép đo quyết định.** Đặt `CODEX_HOME` vào một thư mục rỗng
+      rồi chạy `codex login status` → trả về **"Not logged in"**, trong khi
+      `~/.codex` thật đang đăng nhập. Nghĩa là Codex đọc đúng chỗ được trỏ chứ
+      không lén dùng thư mục mặc định. Nó cũng tự tạo `tmp/` trong đó.
+- [x] **Token là FILE, không phải keyring.** `~/.codex/auth.json` chứa:
+      `auth_mode` ("chatgpt"), `OPENAI_API_KEY` (null khi đăng nhập bằng ChatGPT),
+      và `tokens.{id_token, access_token, refresh_token, account_id}`, `last_refresh`.
+      → primitive "tách thư mục = tách tài khoản" **đứng vững với Codex**.
+- [x] **Danh tính hiển thị được.** `id_token` là JWT; phần payload có claim
+      `email`. Đọc cục bộ, không gọi mạng.
+- [x] **Phân loại nội dung `~/.codex`** (quyết định cái gì dùng chung):
+      - *riêng từng hồ sơ*: `auth.json` (token+danh tính), `installation_id`,
+        `cap_sid` — đây là danh tính máy/phiên cài đặt.
+      - *KHÔNG được nối link*: `thread-writer-locks/`, `tmp/`, `.sandbox/`, và
+        các file SQLite (`state_5.sqlite`, `goals_1.sqlite`, `queue_1.sqlite`,
+        `memories_1.sqlite`, `logs_2.sqlite` kèm `-wal`/`-shm`). Dùng chung khoá
+        ghi hoặc DB giữa nhiều phiên song song là hỏng dữ liệu.
+      - *dùng chung được*: `AGENTS.md`, `config.toml`, `skills/`, `plugins/`,
+        `sessions/`, `cache/`, `models_cache.json`, `log/`.
+
+- [ ] Codex trên **Linux** — chưa đo (cùng blocker VM Linux).
 
 ## Gemini CLI — CHƯA ĐO
 

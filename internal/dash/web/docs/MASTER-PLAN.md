@@ -353,7 +353,21 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.
 - **Ánh xạ:** thay thế prototype `registry`/`fleet` hiện tại.
 
-### Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)
+### Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  🟡 Codex xong
+- [x] **Đo Codex trên Windows** (`@openai/codex` 0.147.0) — xem `docs/DO-LUONG.md`.
+  Phép đo quyết định: `CODEX_HOME` trỏ vào thư mục rỗng thì `codex login status`
+  báo "Not logged in" dù `~/.codex` thật đang đăng nhập → **tách thật**.
+  Token là FILE `auth.json`, không phải keyring.
+- [x] **Adapter Codex** (`internal/provider/codex.go`): danh tính đọc từ claim
+  `email` trong JWT `id_token` (giải mã cục bộ, không gọi mạng).
+- [x] **Phân loại nội dung `~/.codex`** theo hai lý do khác nhau: danh tính
+  (`auth.json`, `installation_id`, `cap_sid`) và **khoá ghi / SQLite**
+  (`thread-writer-locks`, `tmp`, `.sandbox`, `*.sqlite*`) — nhóm sau nếu nối
+  chung thì hai phiên song song sẽ giành nhau ghi và hỏng dữ liệu.
+- [x] Chạy thật: `them/ds/dong-bo/xoa` cho `codex:*`; xoá an toàn có file mồi.
+- [x] Sửa hai chỗ hardcode `.claude.json` rò vào lõi chung — giờ lấy theo
+  `IdentitySource()` của từng adapter.
+- [ ] Đường API (OpenAI-compatible) — chờ API key.
 🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.
 - **DoD:** Claude & Codex dùng chung domain/session API (subscription); Anthropic API &
   OpenAI-compatible dùng chung route API (direct); khác biệt auth/config nằm trong adapter,
