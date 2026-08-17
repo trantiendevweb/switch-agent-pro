@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io/fs"
 	"net"
 	"net/http"
@@ -37,8 +38,11 @@ type Server struct {
 	mux     *http.ServeMux
 	exposed bool // true = nghe ngoài loopback (phải chủ động bật)
 
+	auth *Auth     // nil = chưa đặt mật khẩu, chỉ dùng token
+	sess *sessions // phiên đăng nhập bằng cookie
+
 	failMu sync.Mutex
-	fails  int       // số lần sai token liên tiếp
+	fails  int       // số lần sai token/mật khẩu liên tiếp
 	failAt time.Time // lần sai gần nhất
 }
 
@@ -51,7 +55,7 @@ func NewWithToken(a *api.API, token string) *Server {
 	if token == "" {
 		token = randToken()
 	}
-	s := &Server{api: a, token: token}
+	s := &Server{api: a, token: token, auth: LoadAuth(), sess: newSessions()}
 	sub, _ := fs.Sub(webFS, "web")
 	files := http.FileServer(http.FS(sub))
 
@@ -61,6 +65,9 @@ func NewWithToken(a *api.API, token string) *Server {
 	m.HandleFunc("/api/fleet", s.guard(s.handleFleet))
 	m.HandleFunc("/api/stop", s.guard(s.handleStop))
 
+	m.HandleFunc("/login", s.handleLogin)
+	m.HandleFunc("/logout", s.handleLogout)
+
 	// /docs/ là vùng CÔNG KHAI: kế hoạch, thiết kế, master plan — chỉ để đọc.
 	// Cố ý không đòi token để chia sẻ link kế hoạch KHÔNG đồng nghĩa trao quyền
 	// điều khiển agent. Đằng nào nội dung này cũng nằm công khai trên GitHub.
@@ -69,7 +76,11 @@ func NewWithToken(a *api.API, token string) *Server {
 	// Mọi thứ còn lại (dashboard 2D, 3D) cần token. Riêng trang gốc khi chưa có
 	// token thì hiện trang giới thiệu thay vì ném 401 trần trụi.
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" && !s.hasToken(r) {
+		if r.URL.Path == "/" && !s.authorized(r) {
+			if s.auth != nil {
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
 			s.landing(w)
 			return
 		}
@@ -85,6 +96,117 @@ func (s *Server) hasToken(r *http.Request) bool {
 		tok = r.URL.Query().Get("t")
 	}
 	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1
+}
+
+// authorized: có phiên đăng nhập hợp lệ, hoặc có token đúng.
+func (s *Server) authorized(r *http.Request) bool {
+	return s.sess.valid(cookieID(r)) || s.hasToken(r)
+}
+
+// wantsHTML đoán request đến từ thanh địa chỉ trình duyệt (để chuyển hướng tới
+// form) chứ không phải fetch/curl (để trả 401).
+func wantsHTML(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
+// ---------------------------- đăng nhập ----------------------------
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if s.auth == nil {
+		http.Error(w, "chưa đặt mật khẩu — chạy: sagent dash --set-password", http.StatusNotImplemented)
+		return
+	}
+	next := r.URL.Query().Get("next")
+	if next == "" || !strings.HasPrefix(next, "/") {
+		next = "/" // chỉ nhận đường dẫn nội bộ, tránh open-redirect
+	}
+
+	if r.Method == http.MethodGet {
+		if s.authorized(r) { // đã đăng nhập rồi thì vào thẳng
+			http.Redirect(w, r, next, http.StatusSeeOther)
+			return
+		}
+		s.loginPage(w, next, "")
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "chỉ nhận GET/POST", http.StatusMethodNotAllowed)
+		return
+	}
+	// Chống dò mật khẩu: dùng chung bộ đếm với token.
+	if wait := s.throttle(); wait > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		s.loginPage(w, next, fmt.Sprintf("Sai nhiều lần — thử lại sau %d giây.", int(wait.Seconds())+1))
+		return
+	}
+	if !sameOrigin(r) {
+		http.Error(w, "origin không hợp lệ", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.loginPage(w, next, "Dữ liệu gửi lên không đọc được.")
+		return
+	}
+	if !s.auth.Check(r.FormValue("user"), r.FormValue("password")) {
+		s.noteFail()
+		s.loginPage(w, next, "Sai tên đăng nhập hoặc mật khẩu.")
+		return
+	}
+	s.noteOK()
+	setCookie(w, s.sess.create())
+	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	s.sess.drop(cookieID(r))
+	clearCookie(w)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func (s *Server) loginPage(w http.ResponseWriter, next, errMsg string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	banner := ""
+	if errMsg != "" {
+		banner = `<p class="err">` + html.EscapeString(errMsg) + `</p>`
+	}
+	warn := ""
+	if s.exposed {
+		warn = `<p class="warn">Đang phơi ra mạng qua HTTP — mật khẩu truyền đi <b>không mã hoá</b>.
+		Chỉ dùng trên mạng bạn tin được, hoặc bọc qua SSH tunnel.</p>`
+	}
+	fmt.Fprintf(w, `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Đăng nhập — Switch-Agent-Pro</title><style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0F172A;color:#F8FAFC;
+font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px}
+.c{width:100%%;max-width:340px}
+h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+p.s{color:#94A3B8;font-size:13px;margin:0 0 20px}
+label{display:block;font-size:12px;color:#94A3B8;margin:12px 0 5px}
+input{width:100%%;background:#0f172a;color:#F8FAFC;border:1px solid #475569;border-radius:9px;
+padding:11px 12px;font:inherit;font-size:15px}
+input:focus{outline:none;border-color:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+button{width:100%%;margin-top:18px;background:#22C55E;color:#06240f;border:0;border-radius:9px;
+padding:11px;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+button:hover{opacity:.92}
+.err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.45);color:#fecaca;
+border-radius:9px;padding:10px 12px;font-size:13px;margin:0 0 4px}
+.warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);color:#fde68a;
+border-radius:9px;padding:10px 12px;font-size:12px;line-height:1.5;margin:16px 0 0}
+a{color:#7dd3fc;font-size:13px;display:inline-block;margin-top:16px;text-decoration:none}
+</style></head><body><div class="c">
+<h1><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>Switch-Agent-Pro</h1>
+<p class="s">Đăng nhập để vào dashboard điều khiển.</p>
+%s
+<form method="POST" action="/login?next=%s">
+<label for="user">Tên đăng nhập</label>
+<input id="user" name="user" autocomplete="username" autofocus required>
+<label for="password">Mật khẩu</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Đăng nhập</button>
+</form>
+%s
+<a href="/docs/">Xem kế hoạch (không cần đăng nhập) →</a>
+</div></body></html>`, banner, url.QueryEscape(next), warn)
 }
 
 // landing là trang cho người ghé mà không có token: chỉ đường tới tài liệu công
@@ -178,14 +300,19 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Token: header trước (JS đặt), hoặc query (lần mở link đầu tiên).
-		tok := r.Header.Get("X-Sagent-Token")
-		if tok == "" {
-			tok = r.URL.Query().Get("t")
-		}
-		if subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) != 1 {
+		// Ba đường vào, theo thứ tự ưu tiên:
+		//   1. cookie phiên (người dùng đã đăng nhập bằng form)
+		//   2. header X-Sagent-Token (script/curl)
+		//   3. token trên URL (link chia sẻ nhanh)
+		if !s.authorized(r) {
 			s.noteFail()
-			http.Error(w, "token sai hoặc thiếu", http.StatusUnauthorized)
+			// Trình duyệt gõ đường dẫn thì đưa tới form đăng nhập cho tử tế;
+			// còn gọi API thì trả 401 để client biết mà xử lý.
+			if s.auth != nil && r.Method == http.MethodGet && wantsHTML(r) {
+				http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
+				return
+			}
+			http.Error(w, "chưa đăng nhập", http.StatusUnauthorized)
 			return
 		}
 		s.noteOK()

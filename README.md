@@ -126,10 +126,21 @@ Mặc định chỉ nghe `127.0.0.1`, mỗi lần chạy một token ngẫu nhi�
 lạ, DTO allowlist nên không gửi token/API key ra trình duyệt. Assets nhúng trong
 binary (không cần Node).
 
+**Đăng nhập bằng form** (thay vì dán token vào URL):
+
+```bash
+sagent dash --set-password        # hỏi tên đăng nhập + mật khẩu, lưu ĐÃ BĂM
+                                  # ở ~/.ai-accounts/dash-auth.json (ngoài repo)
+```
+
+Sau đó mở dashboard sẽ hiện form. Mật khẩu băm bằng PBKDF2-HMAC-SHA256 210k vòng;
+phiên giữ bằng cookie HttpOnly, hết hạn sau 12 giờ và mất khi tắt server. Token vẫn
+dùng được cho script/curl qua header `X-Sagent-Token`.
+
 **Xem từ máy khác / điện thoại** — khi bạn làm việc trên server không có màn hình:
 
 ```bash
-sagent dash --host 0.0.0.0 --port 8788 --token <chuỗi-bí-mật-≥16-ký-tự>
+sagent dash --host 0.0.0.0 --port 8787
 ```
 
 > ⚠ Lúc này **token là hàng rào duy nhất**: ai có link đều bật/dừng được agent của

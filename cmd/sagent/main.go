@@ -10,6 +10,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -387,6 +388,11 @@ func cmdClean(args []string) {
 // ---------------------------- dashboard ----------------------------
 
 func cmdDash(args []string) {
+	// Đặt mật khẩu rồi thoát — không khởi động server.
+	if set, rest := boolFlag(args, "--set-password"); set {
+		cmdSetPassword(rest)
+		return
+	}
 	port, args := intFlag(args, "--port", 4600)
 	host, args := strFlag(args, "--host", "127.0.0.1")
 	token, _ := strFlag(args, "--token", os.Getenv("SAGENT_DASH_TOKEN"))
@@ -408,6 +414,32 @@ func cmdDash(args []string) {
 	if err := dash.NewWithToken(a, token).Run(host, port); err != nil {
 		fail(err)
 	}
+}
+
+// cmdSetPassword ghi tài khoản/mật khẩu dashboard (đã băm) ra
+// ~/.ai-accounts/dash-auth.json — CỐ Ý để ngoài repo.
+func cmdSetPassword(args []string) {
+	user, args := strFlag(args, "--user", "")
+	pass, _ := strFlag(args, "--password", "")
+
+	in := bufio.NewReader(os.Stdin)
+	if user == "" {
+		fmt.Print("  Tên đăng nhập: ")
+		line, _ := in.ReadString('\n')
+		user = strings.TrimSpace(line)
+	}
+	if pass == "" {
+		// Không tắt được echo mà chỉ dùng thư viện chuẩn, nên nói thẳng là mật
+		// khẩu sẽ hiện lên màn hình thay vì giả vờ an toàn.
+		fmt.Print("  Mật khẩu (sẽ hiện trên màn hình): ")
+		line, _ := in.ReadString('\n')
+		pass = strings.TrimSpace(line)
+	}
+	if err := dash.SetPassword(user, pass); err != nil {
+		fail(err)
+	}
+	fmt.Printf("  ✓ đã lưu (băm PBKDF2) vào %s\n", dash.AuthPath())
+	fmt.Println("  File này KHÔNG nằm trong repo. Mở dashboard sẽ hiện form đăng nhập.")
 }
 
 // ---------------------------- cấu hình ----------------------------
@@ -550,8 +582,9 @@ func cmdHelp() {
     sagent dash [--port N]      mở dashboard ở trình duyệt (mặc định chỉ loopback)
       --host 0.0.0.0            PHƠI RA MẠNG để xem từ máy/điện thoại khác.
                                 Ai có link đều bật/dừng được agent của bạn.
-      --token <chuỗi ≥16>       token cố định, khỏi phải lấy lại link mỗi lần
-                                (hoặc đặt biến SAGENT_DASH_TOKEN)
+      --token <chuỗi ≥16>       token cố định (cho script/curl)
+      --set-password            đặt tài khoản + mật khẩu để đăng nhập bằng form
+                                (lưu đã băm ở ~/.ai-accounts/dash-auth.json)
 
   Ví dụ:
 
