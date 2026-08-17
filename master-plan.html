@@ -727,8 +727,13 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <li>✅ <strong>provider-drift verify</strong> — <code>Adapter.Version()</code> + <code>internal/drift</code>. <code>sagent verify</code>
     ghi mốc phiên bản CLI và BÁO ĐỘNG khi nó đổi, vì mọi số đo trong <code>docs/DO-LUONG.md</code>
     đều gắn với một bản CLI cụ thể. Cảnh báo cố ý <strong>không tự tắt</strong> — phải <code>--chap-nhan</code>.</li>
-<li>⬜ Còn lại: <strong>ký số</strong> binary (đã có băm, chưa có chữ ký — cần chứng chỉ, chờ chủ dự
-    án) · migration guide v1.</li>
+<li>✅ <strong>migration guide v1</strong> — <a href="DI-TRU-TU-V1.md"><code>docs/DI-TRU-TU-V1.md</code></a>. Câu trả lời đo
+    được: <strong>không phải làm gì</strong>, <code>sagent</code> đọc thẳng kho <code>~/.claude-accounts</code>. Kèm theo,
+    đo ra <strong>lỗi thật</strong>: <code>them</code> một tên đã có ở kho v1 KHÔNG bị từ chối → hồ sơ cũ bị đè
+    bóng, token vẫn trên đĩa nhưng thôi được dùng. Đã vá. <code>ccswitch</code> <strong>chưa đo</strong> — chưa
+    có bản thật để mở ra xem.</li>
+<li>⬜ Còn lại: <strong>ký số</strong> binary — đã có SHA256, chưa có chữ ký. Cần chứng chỉ
+    code-signing thật, là việc của chủ dự án; tôi chỉ dựng được phần ống dẫn.</li>
 <li>~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.</li>
 <li>✅ <strong>TLS cho dashboard</strong> — phơi ra mạng giờ <strong>mặc định HTTPS</strong>, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

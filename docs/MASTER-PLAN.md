@@ -591,8 +591,13 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   - ✅ **provider-drift verify** — `Adapter.Version()` + `internal/drift`. `sagent verify`
     ghi mốc phiên bản CLI và BÁO ĐỘNG khi nó đổi, vì mọi số đo trong `docs/DO-LUONG.md`
     đều gắn với một bản CLI cụ thể. Cảnh báo cố ý **không tự tắt** — phải `--chap-nhan`.
-  - ⬜ Còn lại: **ký số** binary (đã có băm, chưa có chữ ký — cần chứng chỉ, chờ chủ dự
-    án) · migration guide v1.
+  - ✅ **migration guide v1** — [`docs/DI-TRU-TU-V1.md`](DI-TRU-TU-V1.md). Câu trả lời đo
+    được: **không phải làm gì**, `sagent` đọc thẳng kho `~/.claude-accounts`. Kèm theo,
+    đo ra **lỗi thật**: `them` một tên đã có ở kho v1 KHÔNG bị từ chối → hồ sơ cũ bị đè
+    bóng, token vẫn trên đĩa nhưng thôi được dùng. Đã vá. `ccswitch` **chưa đo** — chưa
+    có bản thật để mở ra xem.
+  - ⬜ Còn lại: **ký số** binary — đã có SHA256, chưa có chữ ký. Cần chứng chỉ
+    code-signing thật, là việc của chủ dự án; tôi chỉ dựng được phần ống dẫn.
   - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
   - ✅ **TLS cho dashboard** — phơi ra mạng giờ **mặc định HTTPS**, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

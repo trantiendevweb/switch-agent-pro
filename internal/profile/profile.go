@@ -84,10 +84,15 @@ func LinkShared(a provider.Adapter, dir string) (int, error) {
 
 // Create tạo hồ sơ mới: thư mục + nối phần dùng chung + gieo whitelist.
 func Create(a provider.Adapter, account string) (linked, seeded int, err error) {
-	dir := Dir(a.Name(), account)
-	if _, e := os.Stat(dir); e == nil {
-		return 0, 0, fmt.Errorf("đã có tài khoản %s:%s", a.Name(), account)
+	// Kiểm bằng ResolveDir chứ KHÔNG phải os.Stat(Dir(...)): ResolveDir nhìn cả
+	// kho v1 (~/.claude-accounts). Chỉ kiểm chỗ v2 thì `them claude:phu` khi đã
+	// có hồ sơ v1 cùng tên sẽ tạo một hồ sơ RỖNG đè bóng lên nó — đã đo: sau khi
+	// tạo, ResolveDir trỏ sang v2, token v1 vẫn nằm trên đĩa nhưng không còn
+	// được dùng. Người dùng bị hỏi đăng nhập lại và không hiểu vì sao.
+	if cu, ok := ResolveDir(a.Name(), account); ok {
+		return 0, 0, fmt.Errorf("đã có tài khoản %s:%s tại %s", a.Name(), account, cu)
 	}
+	dir := Dir(a.Name(), account)
 	if err = os.MkdirAll(dir, 0o755); err != nil {
 		return 0, 0, err
 	}

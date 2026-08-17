@@ -272,6 +272,7 @@ giữ nhãn `experimental` vì chưa có CLI để đo.
 | [`docs/DO-LUONG.md`](docs/DO-LUONG.md) | Báo cáo đo — cái gì đã chứng minh, cái gì chưa |
 | [`docs/PLAN.md`](docs/PLAN.md) | Nhật ký thực thi Pha 1 (đã bị MASTER-PLAN thay thế) |
 | `plan.html` · `master-plan.html` · `index.html` | Trang xem kế hoạch + nguyên mẫu dashboard 3D |
+| [`docs/DI-TRU-TU-V1.md`](docs/DI-TRU-TU-V1.md) | Di trú từ `tk` v1 — câu trả lời ngắn: không phải làm gì |
 
 ## Bốn nguyên tắc đã trả giá để có
 
