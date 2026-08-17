@@ -403,10 +403,19 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
   Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
 *DoD:* mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào `store`.
 
-**5b · Dashboard 2D.** Trạng thái chuẩn:
-`queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost`.
-Điều khiển được: bật/dừng phiên, duyệt approval, đọc log đã redaction.
-*DoD:* mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền).
+**5b · Dashboard 2D.**  ✅ nền tảng xong
+- [x] `internal/dash`: server localhost bọc `internal/api` (không mở đường riêng
+  vào store). Assets nhúng bằng Go `embed` — vẫn một binary.
+- [x] `sagent dash [--port N]`: in URL kèm token, mở trình duyệt là thấy.
+- [x] Realtime bằng **SSE** (thuần stdlib, KHÔNG thêm dependency WebSocket).
+- [x] Dashboard đọc **ảnh chụp đầy đủ** từ `/api/state` khi kết nối rồi mới dùng
+  event cập nhật (không dựng UI chỉ từ event — người nghe chậm có thể lỡ).
+- [x] Điều khiển: bật hạm đội + dừng phiên qua POST; đã chạy thật.
+- [x] **Bảo mật**: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
+  · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.
+- [ ] Trạng thái phiên chi tiết (queued/blocked/rate_limited…) — hiện mới running/stopped/lost.
+- [ ] Approval gate (chờ Pha 3 flow).
+*DoD:* mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.
 
 **5c · Workflow board.** Dựng/sửa flow bằng giao diện, ghi ra `flows.toml`
 (file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.

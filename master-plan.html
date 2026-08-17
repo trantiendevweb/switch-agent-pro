@@ -538,10 +538,21 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
   Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
 <em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</li>
 </ul>
-<p><strong>5b · Dashboard 2D.</strong> Trạng thái chuẩn:
-<code>queued·starting·running·waiting_input·blocked·rate_limited·completed·failed·cancelling·cancelled·lost</code>.
-Điều khiển được: bật/dừng phiên, duyệt approval, đọc log đã redaction.
-<em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền).</p>
+<p><strong>5b · Dashboard 2D.</strong>  ✅ nền tảng xong</p>
+<ul>
+<li class="task done"><span class="box"></span><code>internal/dash</code>: server localhost bọc <code>internal/api</code> (không mở đường riêng
+  vào store). Assets nhúng bằng Go <code>embed</code> — vẫn một binary.</li>
+<li class="task done"><span class="box"></span><code>sagent dash [--port N]</code>: in URL kèm token, mở trình duyệt là thấy.</li>
+<li class="task done"><span class="box"></span>Realtime bằng <strong>SSE</strong> (thuần stdlib, KHÔNG thêm dependency WebSocket).</li>
+<li class="task done"><span class="box"></span>Dashboard đọc <strong>ảnh chụp đầy đủ</strong> từ <code>/api/state</code> khi kết nối rồi mới dùng
+  event cập nhật (không dựng UI chỉ từ event — người nghe chậm có thể lỡ).</li>
+<li class="task done"><span class="box"></span>Điều khiển: bật hạm đội + dừng phiên qua POST; đã chạy thật.</li>
+<li class="task done"><span class="box"></span><strong>Bảo mật</strong>: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
+  · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.</li>
+<li class="task"><span class="box"></span>Trạng thái phiên chi tiết (queued/blocked/rate_limited…) — hiện mới running/stopped/lost.</li>
+<li class="task"><span class="box"></span>Approval gate (chờ Pha 3 flow).
+<em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.</li>
+</ul>
 <p><strong>5c · Workflow board.</strong> Dựng/sửa flow bằng giao diện, ghi ra <code>flows.toml</code>
 (file vẫn là nguồn sự thật, sửa tay được); chạy/tạm dừng/resume/hủy flow.
 <em>DoD:</em> flow tạo từ board và flow viết tay chạy y hệt nhau.</p>

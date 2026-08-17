@@ -20,6 +20,7 @@ import (
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
+	"github.com/trantiendevweb/switch-agent-pro/internal/dash"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 )
 
@@ -49,6 +50,7 @@ func init() {
 		"clean":   {"clones.clean", "gỡ worktree + xoá clone", cmdClean},
 		"config":  {"config.show", "xem cấu hình đã gộp", func(a []string) { cmdConfig() }},
 		"init":    {"config.init", "tạo .sagent/project.toml", func(a []string) { cmdInit() }},
+		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},
 	}
@@ -382,6 +384,23 @@ func cmdClean(args []string) {
 	}
 }
 
+// ---------------------------- dashboard ----------------------------
+
+func cmdDash(args []string) {
+	port, _ := intFlag(args, "--port", 4600)
+	// Mở API TRỰC TIẾP (không gắn bộ vẽ terminal): dashboard tiêu thụ event qua
+	// SSE, terminal chỉ cần in URL. Nếu dùng open() thì event sẽ đổ ra cả terminal.
+	wd, _ := os.Getwd()
+	a, err := api.New(wd)
+	if err != nil {
+		fail(err)
+	}
+	defer a.Close()
+	if err := dash.New(a).Run("127.0.0.1", port); err != nil {
+		fail(err)
+	}
+}
+
 // ---------------------------- cấu hình ----------------------------
 
 func cmdInit() {
@@ -502,6 +521,10 @@ func cmdHelp() {
 
     sagent init                 tạo .sagent/project.toml
     sagent config               xem cấu hình đã gộp + đọc từ file nào
+
+  Dashboard:
+
+    sagent dash [--port N]      mở dashboard 2D ở trình duyệt (chỉ loopback)
 
   Ví dụ:
 

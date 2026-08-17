@@ -114,6 +114,16 @@ require_approval_for  = ["merge", "deploy"]
 default_surface = "tui"       # tui | dashboard | workflow | 3d
 ```
 
+### Dashboard
+
+```bash
+sagent dash            # in ra URL kèm token, mở trên trình duyệt (cùng máy)
+```
+
+Dashboard 2D xem phiên đang chạy, bật/dừng hạm đội, và nhật ký sự kiện realtime.
+Chỉ nghe ở `127.0.0.1`, mỗi lần chạy một token ngẫu nhiên, chặn Host/Origin lạ —
+không gửi token hay API key ra trình duyệt. Assets nhúng trong binary (không cần Node).
+
 > File cấu hình **không bao giờ chứa secret** — API key/token chỉ được tham chiếu bằng ID.
 
 Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite, migration có version), và

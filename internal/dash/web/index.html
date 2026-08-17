@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Switch-Agent-Pro — Dashboard</title>
+<style>
+  :root{
+    --bg:#0F172A;--primary:#1E293B;--muted:#272F42;--fg:#F8FAFC;--sub:#94A3B8;
+    --border:#475569;--run:#22C55E;--warn:#F59E0B;--limit:#EF4444;--api:#4285F4;
+    --panel:rgba(30,41,59,.55);--ease:cubic-bezier(0.16,1,0.3,1);
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;
+    -webkit-font-smoothing:antialiased}
+  a{color:#7dd3fc}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:.9em}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px 16px calc(24px + var(--safe-b))}
+  header{display:flex;align-items:center;gap:12px;padding:6px 0 16px}
+  header .b{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px}
+  #conn{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub)}
+  #conn .d{width:9px;height:9px;border-radius:50%;background:var(--limit)}
+  #conn.on .d{background:var(--run)}
+  h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin:22px 0 10px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid rgba(71,85,105,.35)}
+  th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  td.num{font-variant-numeric:tabular-nums}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .ok{color:var(--run);background:rgba(34,197,94,.13)}
+  .off{color:var(--sub);background:rgba(148,163,184,.12)}
+  .btn{cursor:pointer;background:transparent;color:var(--fg);border:1px solid var(--border);
+    border-radius:7px;padding:6px 11px;font:inherit;font-size:12px;font-weight:600;transition:all .15s var(--ease)}
+  .btn:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
+  .btn.danger:hover{border-color:var(--limit);background:rgba(239,68,68,.12);color:#fca5a5}
+  .btn:disabled{opacity:.4;cursor:default}
+  .empty{padding:16px;color:var(--sub);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  /* fleet form */
+  form{padding:14px;display:grid;gap:10px}
+  label{font-size:12px;color:var(--sub);display:block;margin-bottom:4px}
+  select,input[type=text],input[type=number]{width:100%;background:#0f172a;color:var(--fg);
+    border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  .row{display:flex;gap:10px}.row>div{flex:1}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg)}
+  .go{background:var(--run);color:#06240f;border:0;font-weight:700;padding:9px;border-radius:8px;cursor:pointer;font-size:13px}
+  .go:hover{opacity:.92}
+  .warnbox{font-size:12px;color:var(--warn);background:rgba(245,158,11,.08);
+    border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px 10px;line-height:1.45}
+  /* event log */
+  #log{padding:10px 13px;max-height:340px;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+  #log .e{padding:3px 0;border-bottom:1px solid rgba(71,85,105,.25);white-space:pre-wrap;word-break:break-word}
+  #log .t{color:var(--sub);margin-right:8px}
+  .e.warning{color:var(--warn)} .e.failure{color:var(--limit)} .e.session\.started{color:var(--run)}
+  .banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:#fecaca;
+    border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="b">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
+      Switch-Agent-Pro
+    </div>
+    <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
+  </header>
+
+  <div id="err" class="banner"></div>
+
+  <div class="grid">
+    <div>
+      <h2>Phiên đang chạy · <span id="scount">0</span></h2>
+      <div class="card">
+        <table>
+          <thead><tr><th>#</th><th>Địa chỉ</th><th class="num">PID</th><th>Nơi làm việc</th><th></th></tr></thead>
+          <tbody id="sessions"></tbody>
+        </table>
+        <div id="s-empty" class="empty">Chưa có phiên nào. Dùng biểu mẫu bên phải để bật.</div>
+      </div>
+
+      <h2>Tài khoản</h2>
+      <div class="card">
+        <table>
+          <thead><tr><th></th><th>Provider</th><th>Tài khoản</th><th>Danh tính</th><th>Trạng thái</th></tr></thead>
+          <tbody id="profiles"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h2>Bật hạm đội</h2>
+      <div class="card">
+        <form id="fleet">
+          <div>
+            <label>Tài khoản</label>
+            <select id="f-addr"></select>
+          </div>
+          <div class="row">
+            <div><label>Số phiên</label><input type="number" id="f-copies" value="3" min="1" max="16"></div>
+            <div style="display:flex;align-items:flex-end"><label class="chk"><input type="checkbox" id="f-wt" checked> git worktree riêng</label></div>
+          </div>
+          <div>
+            <label>Lệnh headless (sau <code>--</code>)</label>
+            <input type="text" id="f-cmd" placeholder='-p "tóm tắt repo này"'>
+          </div>
+          <div class="warnbox">N phiên trên một tài khoản tiêu hạn mức gấp N. Hành vi khi nhiều phiên cùng refresh token <b>chưa được đo</b>.</div>
+          <button class="go" type="submit">Bật hạm đội</button>
+        </form>
+      </div>
+
+      <h2>Nhật ký sự kiện</h2>
+      <div class="card"><div id="log"></div></div>
+      <div style="margin-top:10px;text-align:right">
+        <button class="btn danger" id="stopall">Dừng hết</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+const H = { 'X-Sagent-Token': TOKEN, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+
+async function api(path, opts){
+  const r = await fetch(path, Object.assign({ headers: H }, opts||{}));
+  if(!r.ok){ const b = await r.json().catch(()=>({error:r.statusText})); throw new Error(b.error||('HTTP '+r.status)); }
+  return r.headers.get('content-type')?.includes('json') ? r.json() : r.text();
+}
+function showErr(m){ const e=$('err'); e.textContent='✗ '+m; e.style.display='block'; setTimeout(()=>e.style.display='none',6000); }
+
+function elapsed(startUnix, now){ let s=Math.max(0,now-startUnix); if(s<60)return s+'s'; if(s<3600)return Math.floor(s/60)+'m'+(s%60)+'s'; return Math.floor(s/3600)+'h'+Math.floor((s%3600)/60)+'m'; }
+
+let profiles=[];
+function render(state){
+  const now = state.now;
+  // sessions
+  const tb=$('sessions'); tb.innerHTML='';
+  (state.sessions||[]).forEach(s=>{
+    const where = s.worktree ? ('<code>'+s.worktree.split(/[\\/]/).slice(-2).join('/')+'</code>') : '<span style="color:var(--sub)">thư mục hiện tại</span>';
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td class="num">#${s.id}</td><td>${s.addr}</td><td class="num">${s.pid}</td><td>${where}</td>`+
+      `<td style="text-align:right"><button class="btn danger" data-stop="${s.id}">Dừng</button></td>`;
+    tb.appendChild(tr);
+  });
+  $('scount').textContent = (state.sessions||[]).length;
+  $('s-empty').style.display = (state.sessions||[]).length ? 'none':'block';
+
+  // profiles
+  profiles = state.profiles||[];
+  const pb=$('profiles'); pb.innerHTML='';
+  profiles.forEach(p=>{
+    const tok = p.hasToken ? '<span class="pill ok">sẵn sàng</span>' : '<span class="pill off">chưa đăng nhập</span>';
+    const act = p.active ? '<span class="dot" style="background:var(--run)"></span>' : '';
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${act}</td><td>${p.provider}</td><td>${p.account}</td><td style="color:var(--sub)">${p.identity||'—'}</td><td>${tok}</td>`;
+    pb.appendChild(tr);
+  });
+  // fleet dropdown
+  const sel=$('f-addr'); const cur=sel.value;
+  sel.innerHTML=''; profiles.filter(p=>p.hasToken).forEach(p=>{
+    const o=document.createElement('option'); o.value=p.addr; o.textContent=p.addr; sel.appendChild(o);
+  });
+  if(cur) sel.value=cur;
+}
+
+async function refresh(){
+  try{ render(await api('/api/state')); }catch(e){ showErr(e.message); }
+}
+
+// nút Dừng (event delegation)
+document.addEventListener('click', async e=>{
+  const id = e.target.getAttribute && e.target.getAttribute('data-stop');
+  if(!id) return;
+  e.target.disabled=true;
+  try{ await api('/api/stop',{method:'POST',body:JSON.stringify({id:Number(id)})}); }catch(err){ showErr(err.message); e.target.disabled=false; }
+});
+$('stopall').onclick = async ()=>{ try{ await api('/api/stop',{method:'POST',body:JSON.stringify({all:true})}); }catch(e){ showErr(e.message); } };
+
+$('fleet').onsubmit = async e=>{
+  e.preventDefault();
+  const body = { addr:$('f-addr').value, copies:Number($('f-copies').value), worktree:$('f-wt').checked, command:$('f-cmd').value };
+  if(!body.addr){ showErr('chưa có tài khoản đã đăng nhập'); return; }
+  try{ await api('/api/fleet',{method:'POST',body:JSON.stringify(body)}); }catch(err){ showErr(err.message); }
+};
+
+// nhật ký sự kiện
+function logEvent(ev){
+  const box=$('log'); const at=new Date((ev.time?Date.parse(ev.time):Date.now())).toLocaleTimeString();
+  const d=document.createElement('div'); d.className='e '+ev.type;
+  const label = ev.addr ? (ev.addr+' — ') : '';
+  d.innerHTML = `<span class="t">${at}</span>${label}${(ev.msg||'').replace(/</g,'&lt;')}`;
+  box.insertBefore(d, box.firstChild);
+  while(box.children.length>200) box.removeChild(box.lastChild);
+}
+
+// SSE: đọc snapshot trước (ở trên), rồi dùng event để cập nhật.
+function connect(){
+  const es = new EventSource('/api/events?t='+encodeURIComponent(TOKEN));
+  es.onopen = ()=>{ $('conn').classList.add('on'); $('conntext').textContent='đã kết nối'; };
+  es.onerror = ()=>{ $('conn').classList.remove('on'); $('conntext').textContent='mất kết nối — đang thử lại'; };
+  es.onmessage = ev=>{
+    let e; try{ e=JSON.parse(ev.data); }catch(_){ return; }
+    logEvent(e);
+    // trạng thái đổi thì đọc lại ảnh chụp đầy đủ (không dựng UI chỉ từ event)
+    if(['session.started','session.stopped','clones.cleaned','worktree.removed'].includes(e.type)) refresh();
+  };
+}
+
+refresh();
+connect();
+setInterval(refresh, 5000); // đồng hồ "đang chạy bao lâu" + phòng khi lỡ event
+</script>
+</body>
+</html>

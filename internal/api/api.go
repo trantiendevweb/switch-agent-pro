@@ -47,6 +47,7 @@ var Actions = []string{
 	"clones.clean",
 	"config.show",
 	"config.init",
+	"dash.serve",
 }
 
 // API gom mọi thứ một mặt cần. Tạo bằng New, nhớ Close.
