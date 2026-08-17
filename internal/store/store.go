@@ -85,7 +85,7 @@ func OpenAt(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := migrate(db); err != nil {
+	if err := migrate(db, path); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -296,15 +296,44 @@ func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 
 // migrate đưa schema lên phiên bản mới nhất, chạy trong transaction để không
 // bao giờ để lại nửa vời.
-func migrate(db *sql.DB) error {
+func migrate(db *sql.DB, path string) error {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
 		return err
 	}
-	cur := 0
-	var s string
-	if err := db.QueryRow(`SELECT value FROM meta WHERE key='schema_version'`).Scan(&s); err == nil {
-		cur, _ = strconv.Atoi(s)
+	cur, err := schemaVersion(db)
+	if err != nil {
+		return err
 	}
+
+	// HẠ CẤP: file do bản sagent MỚI HƠN tạo ra. Đã đo hành vi cũ — không có
+	// chốt này thì binary cũ mở bình thường, đọc được, GHI ĐƯỢC, và để nguyên
+	// schema_version của bản mới. Ghi chéo phiên bản trong im lặng: bản cũ không
+	// biết ràng buộc mà bản mới đặt ra, nên nó ghi ra những dòng hợp lệ với nó
+	// và sai với bản mới. Hỏng kiểu đó chỉ lộ ra sau, ở chỗ khác.
+	//
+	// Thà không chạy. Đây là cùng một lựa chọn với "chưa đặt mật khẩu thì dash
+	// từ chối mở cổng".
+	if cur > len(migrations) {
+		return fmt.Errorf("%s ở schema v%d, bản sagent này chỉ biết tới v%d — "+
+			"nâng cấp sagent, hoặc khôi phục bản sao lưu cũ: sagent db restore <file>",
+			path, cur, len(migrations))
+	}
+
+	// Sắp đổi schema của một file ĐÃ CÓ DỮ LIỆU: chụp ảnh trước. Migration chạy
+	// trong transaction nên không để lại nửa vời, nhưng transaction không cứu
+	// được một migration viết đúng cú pháp mà sai ý (ví dụ DROP nhầm cột) —
+	// nó commit gọn gàng rồi dữ liệu vẫn đi.
+	//
+	// cur == 0 là file mới tinh, không có gì để mất, bỏ qua.
+	if cur > 0 && cur < len(migrations) {
+		bak := autoBackupPath(path, cur)
+		if err := snapshot(db, bak); err != nil {
+			return fmt.Errorf("không sao lưu được trước khi nâng schema v%d→v%d, KHÔNG nâng: %w",
+				cur, len(migrations), err)
+		}
+		fmt.Fprintf(os.Stderr, "  ℹ nâng schema v%d → v%d, đã sao lưu: %s\n", cur, len(migrations), bak)
+	}
+
 	for i := cur; i < len(migrations); i++ {
 		tx, err := db.Begin()
 		if err != nil {

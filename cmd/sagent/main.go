@@ -52,6 +52,7 @@ func init() {
 		"config":  {"config.show", "xem cấu hình đã gộp", func(a []string) { cmdConfig() }},
 		"init":    {"config.init", "tạo .sagent/project.toml", func(a []string) { cmdInit() }},
 		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
+		"db":      {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},

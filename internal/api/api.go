@@ -52,6 +52,12 @@ var Actions = []string{
 	"config.show",
 	"config.init",
 	"dash.serve",
+	// db.admin cùng loại với dash.serve: có mặt trong hợp đồng, nhưng mặt web
+	// KHÔNG tự làm được phần nặng của nó. `db restore` ghi đè chính file mà
+	// server đang mở — muốn làm từ web thì server phải tự đóng DB dưới chân
+	// mình rồi tin rằng mình mở lại được. Xem/sao lưu thì mặt khác làm được và
+	// nên làm; khôi phục thì phải đứng ngoài mà làm.
+	"db.admin",
 	"flow.list",
 	"flow.show",
 	"flow.validate",

@@ -159,6 +159,27 @@ Trạng thái lưu ở `~/.ai-accounts/state.db` (SQLite, migration có version)
 > **tiêu hạn mức gấp N**, và hành vi khi nhiều phiên **cùng refresh token thì chưa
 > đo** — xem [`docs/DO-LUONG.md`](docs/DO-LUONG.md).
 
+### Sao lưu cơ sở dữ liệu
+
+```bash
+sagent db                      # đường dẫn, kích thước, schema, các bản sao lưu đang có
+sagent db backup [file]        # chụp ảnh nhất quán (mặc định: state.db.bak-<ngày-giờ>)
+sagent db restore <file>       # ghi đè — dừng dash và mọi phiên trước
+```
+
+Sao lưu bằng `VACUUM INTO` chứ **không chép file**: DB chạy ở chế độ WAL nên dữ liệu mới
+nhất còn nằm trong `state.db-wal`; chép mình file chính ra được một bản thiếu mà trông
+như đủ.
+
+Ba thứ tự động, không phải bấm:
+
+- **Nâng schema thì sao lưu trước** → `state.db.bak-v<cũ>`. Transaction chống được
+  migration hỏng giữa chừng, không chống được migration chạy trót lọt mà sai ý.
+- **Khôi phục thì cứu bản hiện tại trước** → `state.db.truoc-khi-khoi-phuc`. Một lệnh
+  khôi phục không hoàn tác được thì chỉ là một lệnh xoá có thêm bước.
+- **Binary cũ không mở được DB của binary mới.** Trước đây nó mở được, đọc được và **ghi
+  được** trong im lặng; giờ nó từ chối và chỉ đường.
+
 ## Trạng thái thật
 
 Không tô hồng:

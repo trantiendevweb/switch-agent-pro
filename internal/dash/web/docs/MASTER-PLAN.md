@@ -548,7 +548,11 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
     chứng minh là bắt được lỗi (tắt lá chắn → đỏ). Số đo ở `docs/DO-LUONG.md`.
   - ✅ **cửa vào dashboard** — bỏ hẳn token trên URL và header `X-Sagent-Token`; chỉ còn
     đăng nhập bằng mật khẩu băm. Chưa đặt mật khẩu thì server **từ chối chạy**.
-  - ⬜ Còn lại: DB migration/rollback + backup restore · Windows ACL · symlink-escape
+  - ✅ **DB migration/rollback + backup restore** — đo ra **lỗi thật**: binary cũ mở
+    `state.db` của binary mới thì đọc được VÀ ghi được, im lặng. Vá: chặn hạ cấp, tự sao
+    lưu trước khi nâng schema, và lệnh `sagent db info|backup|restore`. Sao lưu bằng
+    `VACUUM INTO` chứ không chép file (WAL). Số đo ở `docs/DO-LUONG.md`.
+  - ⬜ Còn lại: Windows ACL · symlink-escape
     Linux (**chưa có máy Linux để đo** — bẫy tương đương đã có test, chỉ thiếu chỗ chạy) ·
     process-tree cancel + orphan cleanup · upgrade/provider-drift verify · SBOM + license
     notices · signed + reproducible build · migration guide v1.

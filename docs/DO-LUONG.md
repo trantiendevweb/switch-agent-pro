@@ -357,6 +357,74 @@ Bài học: **thứ tự kiểm quan trọng ngang nội dung kiểm.** Cùng m�
 gọi sau `ReadDir` thì vô dụng, gọi trước thì chặn được. `mklink /J` không cần quyền
 quản trị — kẻ tấn công chỉ cần ghi được vào kho hồ sơ là dựng xong bẫy.
 
+### DB migration/rollback + backup restore — ĐÃ ĐO, TÌM RA LỖI THẬT, ĐÃ VÁ (2026-08-17, Pha 7)
+
+Migration **tiến** đã có từ Pha 1 và chạy đúng. Chỗ chưa ai đo là chiều ngược lại:
+chuyện gì xảy ra khi **binary cũ mở `state.db` của binary mới** (hạ cấp, hoặc hai máy
+dùng chung thư mục đồng bộ)?
+
+Đo trước khi vá:
+
+```
+OpenAt(db ở schema v99)  ->  err = nil          (mở bình thường)
+Running()                ->  đọc được
+AddSession(...)          ->  id=2, err = nil    (GHI ĐƯỢC)
+schema_version sau đó    ->  vẫn 99
+```
+
+**Bản cũ ghi vào cơ sở dữ liệu của bản mới, không một tiếng động.** Nó không biết ràng
+buộc mà bản mới đặt ra, nên nó ghi ra những dòng hợp lệ-với-nó và sai-với-bản-mới.
+Kiểu hỏng này không lộ ra lúc xảy ra; nó lộ ra sau, ở chỗ khác, khi đã muộn.
+
+Ba bản vá, tất cả trong `internal/store`:
+
+1. **Chặn hạ cấp.** `cur > len(migrations)` → từ chối mở, kèm câu chỉ đường
+   (`nâng cấp sagent, hoặc sagent db restore <file>`). Cùng một lựa chọn với "chưa đặt
+   mật khẩu thì dash từ chối mở cổng": thà không chạy.
+2. **Sao lưu trước khi nâng schema.** File đã có dữ liệu mà sắp đổi schema thì chụp ảnh
+   ra `state.db.bak-v<cũ>` trước. Migration chạy trong transaction nên không để lại nửa
+   vời — nhưng transaction **không cứu được một migration viết đúng cú pháp mà sai ý**
+   (DROP nhầm cột chẳng hạn): nó commit gọn gàng rồi dữ liệu vẫn đi. File mới tinh thì
+   bỏ qua, không có gì để mất.
+3. **`sagent db`** — `info` / `backup [file]` / `restore <file>`.
+
+Chi tiết đáng nhớ nhất: **không được chép thẳng file `state.db`.** DB chạy WAL, phần dữ
+liệu mới nhất nằm trong `state.db-wal` chứ chưa vào file chính. Chép mình file chính ra
+được một bản **thiếu mà trông như đủ** — hỏng kiểu tệ nhất, vì chỉ lộ đúng lúc cần khôi
+phục. Dùng `VACUUM INTO` để SQLite tự gộp WAL và ghi ra file nhất quán. Test
+`TestSaoLuuRoiKhoiPhucQuayDungVeLucChup` chốt đúng điểm này: bản cứu phải có **đủ 2
+phiên**, thiếu một là biết snapshot đã bỏ sót phần nằm trong WAL.
+
+`Restore` tự bảo vệ theo thứ tự đã học từ những lần hỏng trước:
+
+- kiểm file nguồn có thật là `state.db` không, schema có đọc nổi không — khôi phục nhầm
+  file là mất trắng;
+- **chụp ảnh bản hiện tại trước khi ghi đè** → `state.db.truoc-khi-khoi-phuc`. Một lệnh
+  khôi phục không hoàn tác được thì chỉ là một lệnh xoá có thêm bước;
+- dọn `-wal`/`-shm` cũ. WAL sót lại của file cũ đứng cạnh file mới thì SQLite áp nhầm dữ
+  liệu bản trước lên bản vừa khôi phục.
+
+`store.InUse` chặn khôi phục khi còn tiến trình khác mở DB — xin `locking_mode=EXCLUSIVE`
+với `busy_timeout(0)`, lấy được khoá là bằng chứng, không phải phỏng đoán. Đo tại chỗ với
+dash thật đang chạy:
+
+```
+$ sagent db restore khong-co-that.db
+  ✗ ...\state.db đang được tiến trình khác dùng (database is locked (5) (SQLITE_BUSY))
+     dừng dash và mọi phiên sagent rồi chạy lại
+```
+
+Giới hạn đã biết, nói trước cho khỏi tin nhầm: `InUse` phát hiện *kết nối đang mở*, không
+phát hiện một tiến trình vừa đóng kết nối và sắp mở lại.
+
+Cả hai lá chắn mới đều đã **chứng minh là bắt được lỗi**: tắt đi thì
+`TestMoFileCuaBanMoiHonThiTuChoi` và `TestNangSchemaThiSaoLuuTruoc` đỏ ngay.
+
+Một chi tiết về kiến trúc: `db.admin` phải vào `api.Actions` vì test hợp đồng bắt mọi
+lệnh CLI đều có action. Nó cùng loại với `dash.serve` — có trong hợp đồng nhưng mặt web
+không tự làm được phần nặng: `db restore` ghi đè chính file mà server đang mở. Xem và sao
+lưu thì mặt khác làm được và nên làm; khôi phục thì phải đứng ngoài mà làm.
+
 ---
 
 ## Việc cần bạn hỗ trợ
