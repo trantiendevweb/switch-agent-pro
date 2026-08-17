@@ -546,7 +546,7 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   (offline) thì **tự rơi về 2D** thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
   root `index.html` giữ làm bản trình diễn.
 
-### Pha 7 — Hardening & phát hành  🔄 đang làm
+### Pha 7 — Hardening & phát hành  ✅ xong (trừ ký số: quyết định không làm)
 - DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
   symlink-escape test Linux; process-tree cancel + orphan cleanup; upgrade/provider-drift
   verify; SBOM/license notices/dependency scan; signed + reproducible build; **migration
@@ -596,8 +596,14 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
     đo ra **lỗi thật**: `them` một tên đã có ở kho v1 KHÔNG bị từ chối → hồ sơ cũ bị đè
     bóng, token vẫn trên đĩa nhưng thôi được dùng. Đã vá. `ccswitch` **chưa đo** — chưa
     có bản thật để mở ra xem.
-  - ⬜ Còn lại: **ký số** binary — đã có SHA256, chưa có chữ ký. Cần chứng chỉ
-    code-signing thật, là việc của chủ dự án; tôi chỉ dựng được phần ống dẫn.
+  - 🚫 **Ký số binary — QUYẾT ĐỊNH KHÔNG LÀM** (chủ dự án, 2026-08-17). Dự án mã nguồn
+    mở, không mua chứng chỉ code-signing.
+    Hệ quả, ghi cho đúng chứ không tô hồng: **SmartScreen vẫn cảnh báo lần chạy đầu.**
+    Nó xét chữ ký số và độ phổ biến của file, **không** xét giấy phép — mở mã nguồn
+    không gỡ được cảnh báo đó. Thứ thay thế là `SHA256SUMS.txt` trong mỗi release: người
+    dùng đối chiếu băm để biết file tải về đúng là file CI dựng ra.
+    Muốn làm sau: Azure Trusted Signing (~10 USD/tháng, ký được từ Actions) là đường rẻ
+    nhất; lúc đó thêm một bước vào `phat-hanh.yml` là xong.
   - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
   - ✅ **TLS cho dashboard** — phơi ra mạng giờ **mặc định HTTPS**, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

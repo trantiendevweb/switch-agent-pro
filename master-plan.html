@@ -681,7 +681,7 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
   (offline) thì <strong>tự rơi về 2D</strong> thay vì màn hình trống. Nguyên mẫu tĩnh cũ ở
   root <code>index.html</code> giữ làm bản trình diễn.</li>
 </ul>
-<h3>Pha 7 — Hardening &amp; phát hành  🔄 đang làm</h3>
+<h3>Pha 7 — Hardening &amp; phát hành  ✅ xong (trừ ký số: quyết định không làm)</h3>
 <ul>
 <li>DB migration/rollback + backup restore; Windows ACL/path-traversal/junction-attack test;
   symlink-escape test Linux; process-tree cancel + orphan cleanup; upgrade/provider-drift
@@ -732,8 +732,14 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
     đo ra <strong>lỗi thật</strong>: <code>them</code> một tên đã có ở kho v1 KHÔNG bị từ chối → hồ sơ cũ bị đè
     bóng, token vẫn trên đĩa nhưng thôi được dùng. Đã vá. <code>ccswitch</code> <strong>chưa đo</strong> — chưa
     có bản thật để mở ra xem.</li>
-<li>⬜ Còn lại: <strong>ký số</strong> binary — đã có SHA256, chưa có chữ ký. Cần chứng chỉ
-    code-signing thật, là việc của chủ dự án; tôi chỉ dựng được phần ống dẫn.</li>
+<li>🚫 <strong>Ký số binary — QUYẾT ĐỊNH KHÔNG LÀM</strong> (chủ dự án, 2026-08-17). Dự án mã nguồn
+    mở, không mua chứng chỉ code-signing.
+    Hệ quả, ghi cho đúng chứ không tô hồng: <strong>SmartScreen vẫn cảnh báo lần chạy đầu.</strong>
+    Nó xét chữ ký số và độ phổ biến của file, <strong>không</strong> xét giấy phép — mở mã nguồn
+    không gỡ được cảnh báo đó. Thứ thay thế là <code>SHA256SUMS.txt</code> trong mỗi release: người
+    dùng đối chiếu băm để biết file tải về đúng là file CI dựng ra.
+    Muốn làm sau: Azure Trusted Signing (~10 USD/tháng, ký được từ Actions) là đường rẻ
+    nhất; lúc đó thêm một bước vào <code>phat-hanh.yml</code> là xong.</li>
 <li>~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.</li>
 <li>✅ <strong>TLS cho dashboard</strong> — phơi ra mạng giờ <strong>mặc định HTTPS</strong>, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

@@ -53,6 +53,11 @@ Một dòng. **Không cần Go, không cần quyền quản trị, không cần 
 iex (irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1)
 ```
 
+> **Windows sẽ cảnh báo lần chạy đầu.** Binary **không ký số** — dự án mã nguồn mở, không
+> mua chứng chỉ code-signing. SmartScreen xét chữ ký và độ phổ biến của file chứ không xét
+> giấy phép, nên mở mã nguồn không gỡ được cảnh báo này. Thay vào đó mỗi bản phát hành có
+> `SHA256SUMS.txt`: trình cài **tự đối chiếu băm**, và bạn kiểm lại tay được bất cứ lúc nào.
+
 Nó tải một file `.exe` (~11 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
 `%USERPROFILE%\bin` rồi thêm vào PATH của người dùng. Chỉ cần Windows 10 trở lên —
 PowerShell 5.1 có sẵn là đủ. Có bản `amd64` và `arm64`, trình cài tự chọn.
