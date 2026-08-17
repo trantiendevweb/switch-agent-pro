@@ -67,6 +67,16 @@
     border:2px solid var(--sub);top:50%;transform:translateY(-50%);cursor:crosshair;z-index:2}
   .port:hover,.port.hot{border-color:var(--run);background:rgba(34,197,94,.35)}
   .port.in{left:-7px} .port.out{right:-7px}
+  /* Vùng chạm rộng hơn phần nhìn thấy — CHỈ trên thiết bị cảm ứng.
+     Trên desktop mà nới ra thì bấm giữa-trái node sẽ hoá thành kéo dây. */
+  @media (pointer: coarse){
+    .port{width:16px;height:16px}
+    .port.in{left:-9px} .port.out{right:-9px}
+    .port::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      width:38px;height:38px;border-radius:50%}
+  }
+  .btn:disabled{opacity:.35;cursor:default}
+  .btn:disabled:hover{border-color:var(--border);background:transparent}
   /* cột phải */
   #right{background:var(--panel);border-left:1px solid var(--border);overflow:auto;padding:14px}
   .fld{margin-bottom:11px}
@@ -113,6 +123,9 @@
     </div>
     <select class="pick" id="pick"></select>
     <button class="btn" id="new">+ Mới</button>
+    <button class="btn" id="undo" title="Hoàn tác (Ctrl+Z)" disabled>↶</button>
+    <button class="btn" id="redo" title="Làm lại (Ctrl+Shift+Z)" disabled>↷</button>
+    <button class="btn" id="tidy" title="Tự xếp theo thứ tự phụ thuộc">Tự xếp</button>
     <button class="btn" id="save">Lưu</button>
     <button class="btn go" id="run">▶ Chạy workflow</button>
     <div class="sp"></div>
@@ -210,6 +223,69 @@ function toWorld(clientX, clientY){
 }
 function applyView(){ world.style.transform='translate('+view.x+'px,'+view.y+'px) scale('+view.k+')'; }
 
+// ---- hoàn tác / làm lại ----
+//
+// Lưu ảnh chụp cả bảng (JSON) sau mỗi thay đổi. Đơn giản hơn ghi lại từng thao
+// tác, và với vài chục node thì rẻ như không.
+let hist = [], hpos = -1;
+const HIST_MAX = 60;
+
+function snap(){ return JSON.stringify({nodes, flowName, flowDesc, flowVars}); }
+function pushHist(){
+  const s = snap();
+  if (hist[hpos] === s) return;          // không có gì đổi thì đừng ghi
+  hist = hist.slice(0, hpos + 1);
+  hist.push(s);
+  if (hist.length > HIST_MAX) hist.shift(); else hpos++;
+  dirty = true; updateHistBtns();
+}
+function resetHist(){ hist = [snap()]; hpos = 0; updateHistBtns(); }
+function restoreHist(){
+  const s = JSON.parse(hist[hpos]);
+  nodes = s.nodes; flowName = s.flowName; flowDesc = s.flowDesc; flowVars = s.flowVars;
+  if (sel && !nodes.some(n => n.id === sel)) sel = null;
+  dirty = true; render(); inspector(); updateHistBtns();
+}
+function undo(){ if (hpos > 0) { hpos--; restoreHist(); toast('Đã hoàn tác'); } }
+function redo(){ if (hpos < hist.length - 1) { hpos++; restoreHist(); toast('Đã làm lại'); } }
+function updateHistBtns(){
+  $('#undo').disabled = hpos <= 0;
+  $('#redo').disabled = hpos >= hist.length - 1;
+}
+
+// ---- tự xếp theo tầng phụ thuộc ----
+//
+// Tầng của một node = tầng sâu nhất trong các node nó phụ thuộc, cộng một. Nhờ
+// vậy dây luôn chảy từ trái sang phải và không cắt ngược.
+function autoLayout(){
+  if (!nodes.length) return;
+  const byId = {}; nodes.forEach(n => byId[n.id] = n);
+  const level = {}, seen = {};
+  const depth = id => {
+    if (level[id] !== undefined) return level[id];
+    if (seen[id]) return 0;              // phòng vòng lặp, dù đã chặn ở chỗ nối
+    seen[id] = true;
+    const needs = (byId[id] && byId[id].needs) || [];
+    let d = 0;
+    needs.forEach(p => { if (byId[p]) d = Math.max(d, depth(p) + 1); });
+    level[id] = d;
+    return d;
+  };
+  nodes.forEach(n => depth(n.id));
+
+  const cols = {};
+  nodes.forEach(n => { (cols[level[n.id]] = cols[level[n.id]] || []).push(n); });
+  const COL = 300, ROW = 175;
+  Object.keys(cols).forEach(k => {
+    const list = cols[k];
+    // giữ thứ tự cũ theo trục dọc để bố cục không nhảy lung tung mỗi lần bấm
+    list.sort((a, b) => a.y - b.y);
+    list.forEach((n, i) => { n.x = 60 + Number(k) * COL; n.y = 80 + i * ROW; });
+  });
+  pushHist(); render(); fit();
+  toast('Đã xếp lại theo thứ tự phụ thuộc');
+}
+
 // ---- thêm / xoá node ----
 function addNode(type, x, y){
   const d = {agent:{prompt:'Mô tả việc cần agent làm.'}, shell:{run:'go test ./...'},
@@ -221,12 +297,23 @@ function addNode(type, x, y){
     type, x:Math.round(x), y:Math.round(y), needs:[], copies:1, worktree:true,
     timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:'', when:'', profile:'', foreach:''
   }, d);
-  nodes.push(n); dirty=true; render(); select(n.id);
+  nodes.push(n); pushHist(); render(); select(n.id);
 }
+// nhân bản node đang chọn (Ctrl+D) — giữ mọi thuộc tính, chỉ đổi id và vị trí
+function duplicateNode(id){
+  const src = nodes.find(n=>n.id===id); if(!src) return;
+  const copy = Object.assign({}, src);
+  copy.id = uid(src.id.replace(/-\d+$/,''));
+  copy.x = src.x + 40; copy.y = src.y + 40;
+  copy.needs = (src.needs||[]).slice();   // giữ nguyên phụ thuộc đầu vào
+  nodes.push(copy); pushHist(); render(); select(copy.id);
+  toast('Đã nhân bản thành '+copy.id);
+}
+
 function removeNode(id){
   nodes = nodes.filter(n=>n.id!==id);
   nodes.forEach(n=> n.needs = (n.needs||[]).filter(x=>x!==id));
-  sel=null; dirty=true; render(); inspector();
+  sel=null; pushHist(); render(); inspector();
 }
 
 // ---- vẽ ----
@@ -295,7 +382,7 @@ mid.addEventListener('pointerdown', e=>{
   if(e.target.tagName==='path'){          // bấm dây để xoá
     const from=e.target.dataset.from, to=e.target.dataset.to;
     const n=nodes.find(x=>x.id===to);
-    if(n){ n.needs=n.needs.filter(x=>x!==from); dirty=true; render(); toast('Đã bỏ nối '+from+' → '+to); }
+    if(n){ n.needs=n.needs.filter(x=>x!==from); pushHist(); render(); toast('Đã bỏ nối '+from+' → '+to); }
     return;
   }
   select(null);
@@ -328,6 +415,7 @@ window.addEventListener('pointerup', e=>{
     }
     link=null; tmpEdge=''; document.querySelectorAll('.port').forEach(el=>el.classList.remove('hot')); drawEdges();
   }
+  if(drag){ pushHist(); }
   drag=null; pan=null;
 });
 function connect(from,to){
@@ -338,7 +426,7 @@ function connect(from,to){
   n.needs.push(from);
   if(hasCycle()){ n.needs=n.needs.filter(x=>x!==from);
     toast('Nối vậy tạo thành vòng lặp — không cho','err'); return; }
-  dirty=true; render();
+  pushHist(); render();
 }
 // phát hiện chu trình ngay trên bảng vẽ, khỏi đợi server báo
 function hasCycle(){
@@ -366,6 +454,9 @@ mid.addEventListener('wheel', e=>{
 $('#zin').onclick=()=>{ view.k=Math.min(2,view.k*1.2); applyView(); };
 $('#zout').onclick=()=>{ view.k=Math.max(.35,view.k/1.2); applyView(); };
 $('#zfit').onclick=fit;
+$('#undo').onclick=undo;
+$('#redo').onclick=redo;
+$('#tidy').onclick=autoLayout;
 function fit(){
   if(!nodes.length){ view={x:60,y:60,k:1}; applyView(); return; }
   const xs=nodes.map(n=>n.x), ys=nodes.map(n=>n.y);
@@ -468,9 +559,11 @@ function inspector(){
     (n.needs&&n.needs.length?'<div class="hint">Chạy sau: <b>'+n.needs.map(esc).join(', ')+'</b><br>Bấm vào dây để bỏ nối.</div>':'<div class="hint">Chưa nối với bước nào — sẽ chạy đầu tiên.</div>')+
     '<button class="btn danger" style="margin-top:14px;width:100%" id="p-del">Xoá node</button>';
 
+  let typeTimer=null;
   const bind=(id,key,conv)=>{ const el=$('#'+id); if(el) el.oninput=e=>{
     n[key]= conv? conv(e.target.value) : e.target.value; dirty=true;
-    if(key==='id'||key==='prompt'||key==='run'||key==='message') render();
+    if(key==='id'||key==='prompt'||key==='run'||key==='message'||key==='foreach') render();
+    clearTimeout(typeTimer); typeTimer=setTimeout(pushHist, 700); // gõ xong mới ghi một mục
   };};
   bind('p-prompt','prompt'); bind('p-run','run'); bind('p-message','message');
   bind('p-when','when'); bind('p-profile','profile'); bind('p-foreach','foreach');
@@ -484,7 +577,7 @@ function inspector(){
     const old=n.id, nw=e.target.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'-');
     if(!nw || nodes.some(x=>x!==n && x.id===nw)){ e.target.value=old; toast('Tên bước bị trùng hoặc rỗng','err'); return; }
     n.id=nw; nodes.forEach(x=>x.needs=(x.needs||[]).map(v=>v===old?nw:v));
-    sel=nw; dirty=true; render(); inspector();
+    sel=nw; pushHist(); render(); inspector();
   };
   $('#p-del').onclick=()=>removeNode(n.id);
 }
@@ -515,7 +608,7 @@ async function loadFlow(name){
       when:s.when||'', profile:s.profile||'', foreach:s.foreach||'',
       x: s.x || (80 + i*270), y: s.y || (90 + (i%2)*150)
     }));
-    sel=null; dirty=false; liveStates={}; render(); inspector(); fit();
+    sel=null; dirty=false; liveStates={}; resetHist(); render(); inspector(); fit();
   }catch(e){ toast(e.message,'err'); }
 }
 $('#pick').onchange=e=>{
@@ -525,7 +618,7 @@ $('#pick').onchange=e=>{
 $('#new').onclick=()=>{
   if(dirty && !confirm('Bỏ thay đổi chưa lưu?')) return;
   flowName=''; flowDesc=''; flowVars={}; builtin=false; nodes=[]; sel=null; liveStates={};
-  view={x:60,y:60,k:1}; applyView(); render(); inspector();
+  view={x:60,y:60,k:1}; applyView(); resetHist(); dirty=false; render(); inspector();
   toast('Workflow mới — kéo node vào rồi đặt tên ở cột phải');
 };
 $('#save').onclick=async()=>{
@@ -588,10 +681,14 @@ window.addEventListener('keydown', e=>{
   if(e.target.matches('input,textarea')) return;
   if((e.key==='Delete'||e.key==='Backspace') && sel){ e.preventDefault(); removeNode(sel); }
   if(e.key==='Escape'){ select(null); $('#right').classList.remove('open'); }
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); }
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='d' && sel){ e.preventDefault(); duplicateNode(sel); }
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); $('#save').click(); }
 });
 window.addEventListener('beforeunload', e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
 
-buildPalette(); applyView(); loadList(); connect_sse();
+buildPalette(); applyView(); resetHist(); loadList(); connect_sse();
 setInterval(()=>{ if(flowName) pollRun(); }, 5000);
 </script>
 </body>
