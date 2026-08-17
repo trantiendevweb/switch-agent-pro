@@ -398,6 +398,13 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   empty not-empty > < >= <=`; đọc được `steps.<id>.state`, `steps.<id>.output`,
   `vars.<tên>`. Cố ý KHÔNG nhúng ngôn ngữ biểu thức đầy đủ — flow là file người ta
   gửi cho nhau được. Sai cú pháp thì BÁO LỖI chứ không âm thầm coi là false.
+- [x] **`foreach` — một bước, nhiều lượt**: `foreach = "steps.liet-ke.output"`
+  biến mỗi dòng của nguồn thành một lượt chạy, có `{{item}}` và `{{index}}`, các
+  lượt chạy SONG SONG theo trần. Kết quả gộp có đánh dấu từng mục để bước sau
+  phân biệt được. **Trần 50 mục**: nguồn thường là output của agent, lỡ in 5000
+  dòng thì thành 5000 lượt gọi thật — vượt trần là DỪNG và báo, không âm thầm cắt.
+- [x] **Huỷ bước cùng đợt khi có bước hỏng** (`on_failure=stop`): trước đó các
+  bước song song vẫn chạy nốt dù flow sắp dừng — tốn hạn mức vô ích.
 - [x] Node `test`/`lint`/`review` chạy được: test/lint lấy lệnh từ
   `commands.test`/`commands.lint` của `.sagent/project.toml` nên không phải lặp
   lại trong từng flow.

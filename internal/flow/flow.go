@@ -78,6 +78,16 @@ type Step struct {
 	// approve / notify
 	Message string `toml:"message,omitempty" json:"message,omitempty"`
 
+	// ForEach cho phép MỘT bước chạy lặp trên một danh sách:
+	//
+	//	foreach = "steps.liet-ke.output"   # hoặc "vars.danh_sach"
+	//	prompt  = "Rà soát file: {{item}}"
+	//
+	// Mỗi dòng của nguồn thành một lượt chạy, có {{item}} và {{index}}. Các lượt
+	// chạy SONG SONG theo trần của dự án. Kết quả gộp lại thành output của bước.
+	ForEach   string `toml:"foreach,omitempty" json:"foreach,omitempty"`
+	Separator string `toml:"separator,omitempty" json:"separator,omitempty"` // mặc định: xuống dòng
+
 	// When là điều kiện chạy; rỗng = luôn chạy. Xem when.go.
 	// Không thoả thì bước bị BỎ QUA (skipped), và bước sau vẫn chạy tiếp.
 	When string `toml:"when,omitempty" json:"when,omitempty"`
@@ -240,6 +250,15 @@ func Validate(f Flow) []Problem {
 		case TypeApprove, TypeNotify:
 			if s.Message == "" {
 				warn(s.ID, "nên có `message` để người đọc biết đang duyệt/báo cái gì")
+			}
+		}
+
+		if s.ForEach != "" {
+			if !strings.HasPrefix(s.ForEach, "steps.") && !strings.HasPrefix(s.ForEach, "vars.") {
+				add(s.ID, fmt.Sprintf("foreach = %q phải trỏ vào steps.<id>.output hoặc vars.<tên>", s.ForEach))
+			}
+			if s.Type == TypeApprove {
+				add(s.ID, "bước approve không lặp được — mỗi lượt sẽ là một lần chờ người duyệt")
 			}
 		}
 

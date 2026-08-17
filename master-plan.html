@@ -532,6 +532,13 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   empty not-empty &gt; &lt; &gt;= &lt;=</code>; đọc được <code>steps.&lt;id&gt;.state</code>, <code>steps.&lt;id&gt;.output</code>,
   <code>vars.&lt;tên&gt;</code>. Cố ý KHÔNG nhúng ngôn ngữ biểu thức đầy đủ — flow là file người ta
   gửi cho nhau được. Sai cú pháp thì BÁO LỖI chứ không âm thầm coi là false.</li>
+<li class="task done"><span class="box"></span><strong><code>foreach</code> — một bước, nhiều lượt</strong>: <code>foreach = "steps.liet-ke.output"</code>
+  biến mỗi dòng của nguồn thành một lượt chạy, có <code>{{item}}</code> và <code>{{index}}</code>, các
+  lượt chạy SONG SONG theo trần. Kết quả gộp có đánh dấu từng mục để bước sau
+  phân biệt được. <strong>Trần 50 mục</strong>: nguồn thường là output của agent, lỡ in 5000
+  dòng thì thành 5000 lượt gọi thật — vượt trần là DỪNG và báo, không âm thầm cắt.</li>
+<li class="task done"><span class="box"></span><strong>Huỷ bước cùng đợt khi có bước hỏng</strong> (<code>on_failure=stop</code>): trước đó các
+  bước song song vẫn chạy nốt dù flow sắp dừng — tốn hạn mức vô ích.</li>
 <li class="task done"><span class="box"></span>Node <code>test</code>/<code>lint</code>/<code>review</code> chạy được: test/lint lấy lệnh từ
   <code>commands.test</code>/<code>commands.lint</code> của <code>.sagent/project.toml</code> nên không phải lặp
   lại trong từng flow.</li>

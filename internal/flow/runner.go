@@ -261,6 +261,11 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 	var mu sync.Mutex
 	stopAt := ""
 
+	// Một bước hỏng với on_failure=stop thì HUỶ luôn các bước cùng đợt: chúng
+	// sắp bị bỏ đi anyway, để chạy tiếp chỉ tốn hạn mức.
+	waveCtx, cancelWave := context.WithCancel(ctx)
+	defer cancelWave()
+
 	if len(work) > 1 {
 		r.Bus.Infof("chạy song song %d bước: %s", len(work), stepIDs(work))
 	}
@@ -297,7 +302,41 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				}
 			}
 
-			state, msg, out := r.runStep(ctx, runID, f, s, vars, outs)
+			// foreach: một bước, nhiều lượt chạy trên một danh sách.
+			if s.ForEach != "" {
+				items, err := Items(s, Ctx{Vars: vars, States: states, Outputs: outs})
+				if err != nil {
+					_ = r.DB.SetStep(runID, s.ID, store.StepFailed, err.Error(), 0)
+					st.set(s.ID, store.StepFailed, "")
+					r.Bus.Failuref("%s.%s: %v", f.Name, s.ID, err)
+					mu.Lock()
+					if stopAt == "" && s.OnFailure != OnFailContinue {
+						stopAt = s.ID
+					}
+					mu.Unlock()
+					return
+				}
+				if len(items) == 0 {
+					_ = r.DB.SetStep(runID, s.ID, store.StepSkipped, "danh sách rỗng", 0)
+					st.set(s.ID, store.StepSkipped, "")
+					r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
+						SessionID: runID, Msg: "bỏ qua — danh sách rỗng"})
+					return
+				}
+				state, msg, out := r.runForEach(waveCtx, runID, f, s, vars, outs, items)
+				st.set(s.ID, state, out)
+				if state == store.StepFailed && s.OnFailure != OnFailContinue && s.OnFailure != OnFailFallback {
+					mu.Lock()
+					if stopAt == "" {
+						stopAt = s.ID + ": " + msg
+					}
+					mu.Unlock()
+					cancelWave()
+				}
+				return
+			}
+
+			state, msg, out := r.runStep(waveCtx, runID, f, s, vars, outs)
 			st.set(s.ID, state, out)
 
 			if state == store.StepFailed {
@@ -312,12 +351,94 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 						stopAt = s.ID + ": " + msg
 					}
 					mu.Unlock()
+					cancelWave() // dừng các bước cùng đợt, khỏi tốn thêm
 				}
 			}
 		}()
 	}
 	wg.Wait()
 	return stopAt
+}
+
+// runForEach chạy một bước lặp trên danh sách, các lượt SONG SONG theo trần.
+//
+// Kết quả gộp lại có đánh dấu từng mục, để bước sau đọc `{{steps.x.output}}`
+// vẫn biết mục nào ra kết quả gì.
+func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
+	vars map[string]string, outs map[string]string, items []string) (state, msg, output string) {
+
+	r.Bus.Infof("%s.%s lặp trên %d mục", f.Name, s.ID, len(items))
+	_ = r.DB.SetStep(runID, s.ID, store.StepRunning, fmt.Sprintf("lặp %d mục", len(items)), 1)
+
+	limit := r.MaxParallel
+	if limit < 1 {
+		limit = 4
+	}
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	results := make([]string, len(items))
+	var firstErr string
+
+	for i, item := range items {
+		i, item := i, item
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if ctx.Err() != nil {
+				return
+			}
+			env := WithOutputs(itemVars(vars, item, i), outs)
+
+			stepCtx := ctx
+			var cancel context.CancelFunc
+			if s.TimeoutSec > 0 {
+				stepCtx, cancel = context.WithTimeout(ctx, time.Duration(s.TimeoutSec)*time.Second)
+			}
+			out, err := r.do(stepCtx, s, env)
+			if cancel != nil {
+				cancel()
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == "" {
+					firstErr = fmt.Sprintf("mục %d (%s): %v", i+1, short(item, 40), err)
+				}
+				results[i] = "=== " + item + " === LỖI: " + err.Error()
+				return
+			}
+			results[i] = "=== " + item + " ===\n" + out
+		}()
+	}
+	wg.Wait()
+
+	combined := strings.TrimSpace(strings.Join(results, "\n"))
+	if firstErr != "" {
+		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, firstErr, 1)
+		if combined != "" {
+			_ = r.DB.SetStepOutput(runID, s.ID, combined)
+		}
+		r.Bus.Failuref("%s.%s: %s", f.Name, s.ID, firstErr)
+		return store.StepFailed, firstErr, combined
+	}
+	_ = r.DB.SetStep(runID, s.ID, store.StepDone, fmt.Sprintf("xong %d mục", len(items)), 1)
+	_ = r.DB.SetStepOutput(runID, s.ID, combined)
+	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
+		SessionID: runID, Msg: fmt.Sprintf("xong %d mục", len(items))})
+	return store.StepDone, "", combined
+}
+
+func short(s string, n int) string {
+	r := []rune(strings.ReplaceAll(s, "\n", " "))
+	if len(r) <= n {
+		return string(r)
+	}
+	return string(r[:n-1]) + "…"
 }
 
 func stepIDs(ss []Step) string {

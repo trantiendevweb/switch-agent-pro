@@ -219,7 +219,7 @@ function addNode(type, x, y){
   const n = Object.assign({
     id: uid({agent:'agent',shell:'lenh',approve:'duyet',notify:'bao',test:'test',lint:'lint',review:'review'}[type]||'buoc'),
     type, x:Math.round(x), y:Math.round(y), needs:[], copies:1, worktree:true,
-    timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:'', when:'', profile:''
+    timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:'', when:'', profile:'', foreach:''
   }, d);
   nodes.push(n); dirty=true; render(); select(n.id);
 }
@@ -246,7 +246,8 @@ function render(){
       '<div class="bar" style="background:'+d.color+'"></div>'+
       '<div class="st">'+(STATE_MARK[liveStates[n.id]]||'')+'</div>'+
       '<div class="hd"><span class="ic" style="background:'+d.color+'22">'+icon(d.icon,d.color,13)+'</span>'+
-        esc(n.id)+'<span class="ty">'+d.name+'</span></div>'+
+        esc(n.id)+(n.foreach?'<span class="ty" style="color:var(--warn)">⟳ lặp</span>':'')+
+        '<span class="ty">'+d.name+'</span></div>'+
       '<div class="bd">'+esc(body||'—')+'</div>'+
       '<div class="port in" data-port="in"></div><div class="port out" data-port="out"></div>';
     world.appendChild(el);
@@ -449,6 +450,11 @@ function inspector(){
     '<div class="lbl">'+d.name+'</div>'+
     '<div class="fld"><label>Tên bước (id)</label><input id="p-id" value="'+esc(n.id)+'"></div>'+
     body +
+    (n.type!=='approve' ?
+      '<div class="fld"><label>Lặp qua danh sách (để trống = chạy một lần)</label>'+
+        '<input id="p-foreach" placeholder="steps.liet-ke.output" value="'+esc(n.foreach||'')+'"></div>'+
+      '<div class="hint" style="margin:-2px 0 10px">Mỗi dòng của nguồn thành một lượt chạy. '+
+        'Trong prompt/lệnh dùng <code>{{item}}</code> và <code>{{index}}</code>.</div>' : '')+
     '<div class="fld"><label>Điều kiện chạy (để trống = luôn chạy)</label>'+
       '<input id="p-when" placeholder="steps.kiem.output contains LOI" value="'+esc(n.when||'')+'"></div>'+
     '<div class="hint" style="margin:-2px 0 10px">Ví dụ: <code>steps.a.state == done</code> · '+
@@ -467,7 +473,7 @@ function inspector(){
     if(key==='id'||key==='prompt'||key==='run'||key==='message') render();
   };};
   bind('p-prompt','prompt'); bind('p-run','run'); bind('p-message','message');
-  bind('p-when','when'); bind('p-profile','profile');
+  bind('p-when','when'); bind('p-profile','profile'); bind('p-foreach','foreach');
   bind('p-copies','copies',v=>Math.max(1,parseInt(v)||1));
   bind('p-timeout','timeout_sec',v=>Math.max(0,parseInt(v)||0));
   bind('p-retry','retry',v=>Math.max(0,parseInt(v)||0));
@@ -506,7 +512,7 @@ async function loadFlow(name){
       prompt:s.prompt||'', run:(s.run||[]).join(' '), message:s.message||'',
       copies:s.copies||1, worktree:!!s.worktree, timeout_sec:s.timeout_sec||0,
       retry:s.retry||0, on_failure:s.on_failure||'stop',
-      when:s.when||'', profile:s.profile||'',
+      when:s.when||'', profile:s.profile||'', foreach:s.foreach||'',
       x: s.x || (80 + i*270), y: s.y || (90 + (i%2)*150)
     }));
     sel=null; dirty=false; liveStates={}; render(); inspector(); fit();
