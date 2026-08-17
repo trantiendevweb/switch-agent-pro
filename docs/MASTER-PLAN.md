@@ -336,6 +336,11 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Sửa bug thật: `clean` đoán số thứ tự worktree nên gặp khoảng trống là dừng,
   bỏ sót phần còn lại → chuyển sang **quét thư mục thật** (`FindAll`).
 - [x] `docs/OPEN_SOURCE_LEDGER.md` — ghi 2 phụ thuộc trực tiếp + giấy phép.
+- [x] **Integration test cho `fleet` + `workspace`** (29 test toàn dự án): dùng
+  git thật và tiến trình con thật. Bắt được **rò file descriptor** trong
+  `StartDetached` — tiến trình cha mở file log rồi không đóng, mỗi lần `fleet`
+  rò một handle và trên Windows khoá luôn file. Có test hồi quy cho bug
+  "đoán số thứ tự worktree".
 - [ ] ~~`sagentd` daemon~~ **bỏ** (xem mục 2b) — `dash` sẽ là server tạm.
 - [ ] Project discovery + `.sagent/project.toml`.
 - [ ] Workspace backend: directory + **Git worktree**.

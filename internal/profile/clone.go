@@ -125,5 +125,9 @@ func StartDetached(a provider.Adapter, dir string, args []string, logPath, workD
 		f.Close()
 		return 0, err
 	}
+	// Tiến trình con đã có bản sao handle của riêng nó, nên cha PHẢI đóng bản
+	// của mình. Không đóng thì mỗi lần fleet là rò một file descriptor, và trên
+	// Windows file log bị khoá tới khi tiến trình cha thoát.
+	f.Close()
 	return c.Process.Pid, nil
 }
