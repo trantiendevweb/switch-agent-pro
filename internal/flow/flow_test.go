@@ -215,3 +215,39 @@ func TestFileHongBaoLoiRo(t *testing.T) {
 		t.Fatal("version lạ mà không báo lỗi")
 	}
 }
+
+// Bước approve không chặn bước nào thì phải CẢNH BÁO.
+//
+// Sinh ra từ một lượt tấn công tính chất "approval không thể bị bỏ qua" bằng
+// codex. Nó phá được — nhưng không phải bằng cách qua mặt hàm Approve, mà bằng
+// cách chỉ ra rằng hàng rào ấy chỉ chặn những bước CÓ KHAI `needs` tới nó. Đặt
+// một bước approve rồi quên khai phụ thuộc là luồng vẫn chạy tiếp bên cạnh.
+//
+// Đúng ngữ nghĩa DAG, nhưng sai ý định người viết, và sai theo hướng nguy hiểm.
+// Không sửa ngữ nghĩa sau lưng họ — chỉ nói ra ở khâu kiểm.
+func TestCanhBaoApproveKhongChanAi(t *testing.T) {
+	f := Flow{Name: "phat-hanh", Steps: []Step{
+		{ID: "gate", Type: TypeApprove},
+		{ID: "deploy", Type: TypeNotify, Message: "xong"}, // quên needs = ["gate"]
+	}}
+	chanAi := func(f Flow) bool {
+		for _, p := range Validate(f) {
+			if p.Step == "gate" && p.Warn && strings.Contains(p.Msg, "không chặn bước nào") {
+				return true
+			}
+		}
+		return false
+	}
+	thay := chanAi(f)
+	if !thay {
+		t.Fatal("approve không chặn bước nào mà không cảnh báo — người viết flow " +
+			"sẽ tưởng luồng đã dừng chờ mình trong khi deploy vẫn chạy")
+	}
+
+	// Khai đúng thì im. (Các cảnh báo khác của bước approve — như thiếu
+	// `message` — không liên quan, nên chỉ soi đúng câu đang đo.)
+	f.Steps[1].Needs = []string{"gate"}
+	if chanAi(f) {
+		t.Fatal("khai needs đúng rồi mà vẫn cảnh báo là không chặn ai")
+	}
+}

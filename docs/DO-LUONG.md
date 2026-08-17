@@ -1067,6 +1067,40 @@ Sau đó mới chứng minh được test có giá trị: quay `tam := dst + ".d
 Lại đúng bài học cũ, ở dạng khác: **một cái bẫy dựng sai thì test xanh, và cái xanh đó
 không có nghĩa gì.**
 
+### Tấn công tính chất "approval không thể bị bỏ qua" (2026-08-18, phiên tự chạy)
+
+Vòng ba không hỏi "có lỗi gì không" mà giao thẳng một khẳng định của dự án cho codex
+**đập**: *chỉ hàm `Approve` mới chuyển một bước approve sang `done`*.
+
+Nó **không** qua mặt được `Approve`. Nhưng nó chỉ ra khẳng định đó **không có nghĩa như
+người ta tưởng**, bằng hai đường:
+
+**1. Approve chỉ chặn bước nào KHAI `needs` tới nó.** Đúng ngữ nghĩa DAG, nhưng người viết
+flow đặt một bước `approve` là để dừng cả luồng chờ mình. Quên khai `needs` một chỗ là
+`deploy` chạy song song với chính cái cổng đáng ra phải chặn nó. Runner loại bước approve
+khỏi đợt chạy rồi mới trả `waiting` — nghĩa là đợt đó **vẫn chạy những bước khác**.
+
+Không sửa ngữ nghĩa sau lưng người dùng (tự ý bắt mọi bước phụ thuộc vào approve còn tệ
+hơn). Thay vào đó `Validate` **cảnh báo**:
+
+```
+⚠ bước approve này không chặn bước nào — không có bước nào khai `needs = ["gate"]`.
+  Nó sẽ dừng luồng nhưng các bước khác VẪN CHẠY song song với nó.
+```
+
+**2. `Resume` tin định nghĩa flow do người gọi đưa vào**, không đối chiếu với lúc `Start`.
+Đang chờ duyệt mà sửa `flows.toml` bỏ cổng đi rồi resume thì bước sau chạy luôn.
+
+Cái này **ghi lại chứ chưa vá**, và nói rõ vì sao: đây là công cụ chạy trên máy cá nhân,
+người sửa được `flows.toml` chính là người bấm duyệt. Approval ở đây là **hàng rào chống
+nhầm lẫn của chính mình**, không phải hàng rào chống người khác. Muốn nó thành cái thứ hai
+thì phải chụp ảnh định nghĩa flow lúc `Start` và đối chiếu khi `Resume` — làm được, nhưng
+đừng làm nửa vời rồi ghi vào tài liệu như một bảo đảm.
+
+Điểm đáng nói về cách dùng agent để soát: hai vòng đầu tôi hỏi "tìm lỗi", vòng này tôi giao
+một **khẳng định cụ thể để đập**. Vòng này cho kết quả sắc hơn hẳn — nó không kể ra một
+danh sách, nó chỉ đúng vào khoảng cách giữa *điều code làm* và *điều tài liệu hứa*.
+
 ---
 
 ## Việc cần bạn hỗ trợ

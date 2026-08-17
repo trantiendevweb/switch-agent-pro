@@ -287,6 +287,27 @@ func Validate(f Flow) []Problem {
 	if cyc := findCycle(f.Steps); len(cyc) > 0 {
 		add("", "có chu trình phụ thuộc: "+strings.Join(cyc, " → "))
 	}
+	// Bước approve KHÔNG phải hàng rào toàn cục — nó chỉ chặn những bước có khai
+	// `needs` tới nó. Người viết flow rất dễ đặt một bước `approve` rồi tưởng cả
+	// luồng dừng lại chờ mình, trong khi bước `deploy` bên cạnh vẫn chạy vì quên
+	// khai phụ thuộc. Đúng ngữ nghĩa DAG, nhưng sai ý định — và sai theo hướng
+	// nguy hiểm.
+	//
+	// Không tự ý bắt mọi bước phụ thuộc vào approve: sửa ngữ nghĩa sau lưng người
+	// dùng còn tệ hơn. Chỉ nói ra.
+	coAiCho := map[string]bool{}
+	for _, s := range f.Steps {
+		for _, n := range s.Needs {
+			coAiCho[n] = true
+		}
+	}
+	for _, s := range f.Steps {
+		if s.Type == TypeApprove && !coAiCho[s.ID] {
+			warn(s.ID, "bước approve này không chặn bước nào — không có bước nào khai `needs = [\""+s.ID+"\"]`. "+
+				"Nó sẽ dừng luồng nhưng các bước khác VẪN CHẠY song song với nó.")
+		}
+	}
+
 	return ps
 }
 
