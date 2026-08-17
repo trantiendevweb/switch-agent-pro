@@ -271,13 +271,17 @@ func cmdSync(args []string) {
 }
 
 func cmdVerify(args []string) {
+	// --chap-nhan: "tôi đã đo lại với bản CLI mới" — ghi đè mốc drift. Không có
+	// cờ này thì cảnh báo CỨ HIỆN mãi, cố ý: tự cập nhật mốc thì cảnh báo hiện
+	// đúng một lần rồi biến mất, mà thứ đã trôi thì vẫn trôi.
+	chapNhan, args := boolFlag(args, "--chap-nhan")
 	name := ""
 	if len(args) > 0 {
 		name = args[0]
 	}
 	a, done := open()
 	defer done()
-	res, err := a.ProfileVerify(name)
+	res, err := a.ProfileVerify(name, chapNhan)
 	if err != nil {
 		fail(err)
 	}

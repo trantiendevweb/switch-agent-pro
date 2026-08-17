@@ -837,6 +837,75 @@ Hai đường đo độc lập cho cùng một con số — nếu lệch thì m�
 
 Cả hai file được đính kèm mọi bản phát hành.
 
+### Provider drift — ĐÃ LÀM, VÀ CHÍNH NÓ NỔ KHI CHẠY THẬT (2026-08-17, Pha 7)
+
+Cả tài liệu này dựa trên một giả định chưa ai viết ra: **CLI bên dưới không đổi.** Mọi
+khẳng định đều gắn với một phiên bản cụ thể — "đã đo trên codex 0.147.0: `codex exec`
+chạy không tương tác", "đã đo: `claude -p` in kết quả ra stdout". Người dùng gõ
+`npm i -g @openai/codex` một cái là toàn bộ số đo đó thành lời đồn, mà không có gì báo.
+
+`internal/drift` ghi mốc phiên bản; `sagent verify` so mốc với hiện tại.
+
+**Tín hiệu nào?** Đo hai lựa chọn:
+
+| Cách | Kết quả |
+|---|---|
+| băm file `claude.cmd` | **sai thứ** — shim là file `.cmd` 1486 byte sửa tay, nâng cấp CLI không đụng tới nó |
+| chạy `--version` | `2.1.229 (Claude Code)` 499 ms · `codex-cli 0.147.0` 769 ms |
+
+Nên `Version()` vào thẳng `Adapter` interface, không phải helper dùng chung: cách hỏi có
+thể khác nhau giữa các provider (`--version` / `version` / `-v`), mà lõi thì không được
+có nhánh `if provider == ...`. Đổi interface làm hai fake trong test đỏ ngay — đúng ý đồ.
+
+**Cảnh báo CỐ Ý không tự tắt.** Thấy drift thì mốc cũ **giữ nguyên**, nên lần chạy sau
+vẫn báo. Tự cập nhật mốc thì cảnh báo hiện đúng một lần rồi biến mất, còn thứ đã trôi thì
+vẫn trôi. Muốn tắt phải gõ `sagent verify --chap-nhan`, tức người dùng nói "tôi đã đo lại".
+
+#### Và rồi chính nó nổ, ngay lần chạy thật đầu tiên
+
+Test xanh hết. Chạy tay trên máy để xem đầu ra thế nào:
+
+```
+lần 1  ✓ ghi mốc đầu tiên: codex-cli 0.147.0
+lần 2  ✓ codex-cli 0.147.0 — không đổi từ 17/08/2026
+       (sửa file mốc bằng Set-Content -Encoding UTF8 để giả lập nâng cấp)
+lần 3  ✓ ghi mốc đầu tiên: codex-cli 0.147.0      ← ??? phải BÁO ĐỘNG mới đúng
+```
+
+`Set-Content -Encoding UTF8` của PowerShell 5.1 **thêm BOM**. `json.Unmarshal` hỏng vì
+BOM. Và `doc()` viết `_ = json.Unmarshal(...)` — **nuốt lỗi**, trả về sổ rỗng. `verify`
+bèn coi như chưa có mốc nào, báo "ghi mốc đầu tiên", rồi **ghi đè sổ**. Mốc của **mọi**
+provider mất sạch, phát hiện drift thành vô dụng, không một dòng cảnh báo.
+
+Đúng thứ bệnh mà cả tính năng này lập ra để chống, nằm ngay trong tính năng đó.
+
+Phần tệ nhất: **lần ghi đè xoá luôn cái BOM**, nên kiểm lại file sau khi chạy thì thấy nó
+hoàn toàn bình thường. Con bug tự xoá bằng chứng của chính nó. Phải cố tình ghi BOM lại
+lần nữa mới chứng minh được.
+
+Vá hai chỗ:
+
+- **Chịu được BOM.** Trình soạn thảo và cmdlet trên Windows hay thêm nó; người dùng chẳng
+  làm gì sai.
+- **File CÓ mà không đọc được thì BÁO, và KHÔNG ghi đè.** Ghi đè một cái sổ hỏng nghĩa là
+  xoá sạch mốc của mọi provider — im lặng, đúng lúc không ai ngờ.
+
+Hai test mới chốt đúng hai điều đó, và test "sổ hỏng" so cả **nội dung file sau khi chạy**
+chứ không chỉ giá trị trả về — vì cái sai ở đây là *ghi đè*, không phải *trả nhầm*.
+
+Đo lại trên máy sau khi vá:
+
+```
+A  thêm BOM         ✓ codex-cli 0.147.0 — không đổi từ 17/08/2026     (mốc còn nguyên)
+B  đổi phiên bản    ✗ CLI ĐÃ ĐỔI: 0.100.0 → 0.147.0 … sagent verify --chap-nhan
+C  --chap-nhan      ✓ đã nhận mốc mới: 0.147.0 (trước là 0.100.0)
+D  chạy lại         ✓ codex-cli 0.147.0 — không đổi
+```
+
+Bài học, lặp lại lần thứ năm trong tài liệu này: **test xanh không thay được một lần chạy
+thật.** Tám test của package này đều xanh trong khi `doc()` đang nuốt lỗi — vì không test
+nào đưa cho nó một file hỏng. Cái sai lộ ra ở dòng đầu ra đầu tiên trông không đúng.
+
 ---
 
 ## Việc cần bạn hỗ trợ

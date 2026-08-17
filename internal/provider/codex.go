@@ -42,6 +42,15 @@ func (codex) Command() (string, error) {
 	return "", errors.New("không tìm thấy lệnh codex — cài bằng: npm i -g @openai/codex")
 }
 
+// Version: đã đo trên máy dev -> "codex-cli 0.147.0".
+func (c codex) Version() (string, error) {
+	p, err := c.Command()
+	if err != nil {
+		return "", err
+	}
+	return hoiVersion(p, "--version")
+}
+
 // Đã đo trên 0.147.0: `codex exec "<prompt>"` = "Run Codex non-interactively".
 // KHÁC hẳn Claude (`-p`) — đây chính là lý do phải để việc này cho adapter.
 func (codex) HeadlessArgs(prompt string) []string { return []string{"exec", prompt} }

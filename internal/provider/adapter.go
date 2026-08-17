@@ -52,6 +52,15 @@ type Adapter interface {
 	// sau ~7,5 giờ, nên một đội chạy qua đêm chắc chắn vượt mốc refresh.
 	TokenExpiry(configDir string) (time.Time, bool)
 
+	// Version là chuỗi phiên bản của CLI bên dưới.
+	//
+	// Nằm trong interface chứ không phải một helper dùng chung, vì cách hỏi có
+	// thể khác nhau (`--version`, `version`, `-v`) và lõi thì không được có
+	// nhánh "if provider == ...". Đây cũng là dữ liệu để phát hiện provider
+	// drift: mọi phép đo trong docs/DO-LUONG.md đều gắn với MỘT phiên bản CLI,
+	// CLI đổi thì phép đo hết hiệu lực.
+	Version() (string, error)
+
 	// Verify chứng minh trên MÁY NÀY việc tách thư mục là tách thật.
 	Verify() []Check
 }

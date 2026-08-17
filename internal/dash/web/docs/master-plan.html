@@ -724,8 +724,11 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
     kèm cả <code>sbom.cdx.json</code> (CycloneDX 1.6). <strong>Đo được:</strong> <code>cyclonedx-gomod -licenses</code> trả
     0/10 trường giấy phép, im lặng — SBOM KHÔNG thay được notices. Sổ viết tay cũ đã sai
     3 chỗ, nay chỉ giữ phần "vì sao". Số đo ở <code>docs/DO-LUONG.md</code>.</li>
-<li>⬜ Còn lại: upgrade/provider-drift verify · <strong>ký số</strong> binary (đã có băm, chưa có chữ
-    ký — cần chứng chỉ, chờ chủ dự án) · migration guide v1.</li>
+<li>✅ <strong>provider-drift verify</strong> — <code>Adapter.Version()</code> + <code>internal/drift</code>. <code>sagent verify</code>
+    ghi mốc phiên bản CLI và BÁO ĐỘNG khi nó đổi, vì mọi số đo trong <code>docs/DO-LUONG.md</code>
+    đều gắn với một bản CLI cụ thể. Cảnh báo cố ý <strong>không tự tắt</strong> — phải <code>--chap-nhan</code>.</li>
+<li>⬜ Còn lại: <strong>ký số</strong> binary (đã có băm, chưa có chữ ký — cần chứng chỉ, chờ chủ dự
+    án) · migration guide v1.</li>
 <li>~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.</li>
 <li>✅ <strong>TLS cho dashboard</strong> — phơi ra mạng giờ <strong>mặc định HTTPS</strong>, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

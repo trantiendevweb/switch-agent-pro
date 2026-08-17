@@ -16,6 +16,7 @@ type fakeAdapter struct {
 }
 
 func (f fakeAdapter) Name() string             { return "fake" }
+func (f fakeAdapter) Version() (string, error) { return "fake 0.0.0", nil }
 func (f fakeAdapter) EnvVar() string           { return "FAKE_CONFIG_DIR" }
 func (f fakeAdapter) Command() (string, error) { return "echo", nil }
 func (f fakeAdapter) HeadlessArgs(p string) []string { return []string{"-p", p} }

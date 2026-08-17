@@ -33,6 +33,15 @@ func (claude) Command() (string, error) {
 	return "", errors.New("không tìm thấy lệnh claude — cài Claude Code trước")
 }
 
+// Version: đã đo trên máy dev -> "2.1.229 (Claude Code)".
+func (c claude) Version() (string, error) {
+	p, err := c.Command()
+	if err != nil {
+		return "", err
+	}
+	return hoiVersion(p, "--version")
+}
+
 // Đã đo: `claude -p "<prompt>"` chạy không tương tác và in kết quả ra stdout.
 func (claude) HeadlessArgs(prompt string) []string { return []string{"-p", prompt} }
 

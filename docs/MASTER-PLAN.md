@@ -588,8 +588,11 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
     kèm cả `sbom.cdx.json` (CycloneDX 1.6). **Đo được:** `cyclonedx-gomod -licenses` trả
     0/10 trường giấy phép, im lặng — SBOM KHÔNG thay được notices. Sổ viết tay cũ đã sai
     3 chỗ, nay chỉ giữ phần "vì sao". Số đo ở `docs/DO-LUONG.md`.
-  - ⬜ Còn lại: upgrade/provider-drift verify · **ký số** binary (đã có băm, chưa có chữ
-    ký — cần chứng chỉ, chờ chủ dự án) · migration guide v1.
+  - ✅ **provider-drift verify** — `Adapter.Version()` + `internal/drift`. `sagent verify`
+    ghi mốc phiên bản CLI và BÁO ĐỘNG khi nó đổi, vì mọi số đo trong `docs/DO-LUONG.md`
+    đều gắn với một bản CLI cụ thể. Cảnh báo cố ý **không tự tắt** — phải `--chap-nhan`.
+  - ⬜ Còn lại: **ký số** binary (đã có băm, chưa có chữ ký — cần chứng chỉ, chờ chủ dự
+    án) · migration guide v1.
   - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
   - ✅ **TLS cho dashboard** — phơi ra mạng giờ **mặc định HTTPS**, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

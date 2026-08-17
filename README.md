@@ -233,6 +233,17 @@ khi tạo kho, và `sagent verify` nói cho bạn biết trạng thái thật:
 
 Ô này ✗ nghĩa là token của bạn đang đọc được bởi người dùng khác trên máy.
 
+`verify` cũng ghi lại **phiên bản CLI** của từng provider và báo động khi nó đổi:
+
+```
+  [codex]
+    ✗ phiên bản CLI (provider drift)   CLI ĐÃ ĐỔI: codex-cli 0.147.0 → 0.200.0 …
+```
+
+Vì sao quan trọng: mọi khẳng định "đã đo" trong [`docs/DO-LUONG.md`](docs/DO-LUONG.md)
+đều gắn với **một** phiên bản CLI. Nâng cấp CLI là số đo cũ hết hiệu lực. Cảnh báo **không
+tự tắt** — đo lại xong thì `sagent verify --chap-nhan`.
+
 ## Trạng thái thật
 
 Không tô hồng:

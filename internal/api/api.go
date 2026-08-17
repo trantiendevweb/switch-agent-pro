@@ -19,6 +19,7 @@ import (
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
+	"github.com/trantiendevweb/switch-agent-pro/internal/drift"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
@@ -287,7 +288,7 @@ func (a *API) ProfileSync(dryRun bool) ([]SyncReport, error) {
 }
 
 // ProfileVerify — action "profile.verify". Chạy bộ "đã đo" của adapter.
-func (a *API) ProfileVerify(providerName string) (map[string][]provider.Check, error) {
+func (a *API) ProfileVerify(providerName string, chapNhanDrift bool) (map[string][]provider.Check, error) {
 	names := provider.Names()
 	if providerName != "" {
 		if _, err := adapterOf(providerName); err != nil {
@@ -298,7 +299,7 @@ func (a *API) ProfileVerify(providerName string) (map[string][]provider.Check, e
 	out := map[string][]provider.Check{}
 	for _, n := range names {
 		ad, _ := provider.Get(n)
-		out[n] = ad.Verify()
+		out[n] = append(ad.Verify(), driftCheck(ad, chapNhanDrift))
 	}
 	// Ô kiểm không thuộc provider nào: quyền truy cập của chính cái kho chứa
 	// token. Đặt ở đây vì `verify` là chỗ người dùng đến để hỏi "có ổn không",
@@ -306,6 +307,27 @@ func (a *API) ProfileVerify(providerName string) (map[string][]provider.Check, e
 	// có thể từ chối. Không có ô kiểm này thì thất bại đó im lặng.
 	out["kho hồ sơ"] = []provider.Check{khoHoSoCheck()}
 	return out, nil
+}
+
+// driftCheck hỏi CLI phiên bản hiện tại và so với mốc đã ghi.
+//
+// Đặt trong `verify` chứ không chạy nền: nó SPAWN tiến trình thật (`claude
+// --version`), và tự chạy tiến trình của provider sau lưng người dùng là đúng
+// thứ đã gây sự cố trên máy dev — xem docs/DO-LUONG.md. `verify` là lệnh người
+// ta chủ động gõ.
+func driftCheck(ad provider.Adapter, chapNhan bool) provider.Check {
+	c := provider.Check{Name: "phiên bản CLI (provider drift)"}
+	v, err := ad.Version()
+	if err != nil {
+		// Không hỏi được phiên bản KHÔNG phải là lỗi của bộ đo drift — có thể
+		// CLI chưa cài. Các ô kiểm khác đã nói điều đó rồi, đừng báo động hai lần.
+		c.OK, c.Detail = true, "không hỏi được phiên bản ("+err.Error()+")"
+		return c
+	}
+	duong, _ := ad.Command()
+	kq := drift.Kiem(ad.Name(), v, duong, chapNhan)
+	c.OK, c.Detail = kq.OK, kq.Chi
+	return c
 }
 
 func khoHoSoCheck() provider.Check {
