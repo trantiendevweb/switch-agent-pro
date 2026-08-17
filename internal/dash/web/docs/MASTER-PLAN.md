@@ -389,8 +389,18 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   bước đã `done` không chạy lại — chạy tiếp được sau khi máy khởi động lại.
 - [x] Lệnh: `flow run | runs | approve | reject | resume`.
 - [x] Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.
-- [ ] Chạy **song song nhiều bước** cùng lúc (v1 tuần tự theo topo; song song
-      thật nằm trong bước agent qua `copies`).
+- [x] **Chạy song song nhiều bước**: vòng chạy theo ĐỢT — mỗi vòng tìm mọi bước
+  đã sẵn sàng rồi chạy chúng cùng lúc, có trần lấy từ `policy.max_parallel_sessions`.
+  Nhánh độc lập (test + lint + build) không còn xếp hàng. Approval gate vẫn nguyên:
+  bước approve không bao giờ chạy trong đợt.
+- [x] **Điều kiện `when`** — flow rẽ nhánh được:
+  `when = "steps.kiem.output contains LOI"`. Toán tử: `== != contains not-contains
+  empty not-empty > < >= <=`; đọc được `steps.<id>.state`, `steps.<id>.output`,
+  `vars.<tên>`. Cố ý KHÔNG nhúng ngôn ngữ biểu thức đầy đủ — flow là file người ta
+  gửi cho nhau được. Sai cú pháp thì BÁO LỖI chứ không âm thầm coi là false.
+- [x] Node `test`/`lint`/`review` chạy được: test/lint lấy lệnh từ
+  `commands.test`/`commands.lint` của `.sagent/project.toml` nên không phải lặp
+  lại trong từng flow.
 - [x] **Truyền dữ liệu giữa các bước**: `{{steps.<id>.output}}`. Kết quả lưu ở
   SQLite (migration v4) nên **sống sót qua resume**. shell lấy stdout+stderr,
   agent gộp log các phiên, notify lấy chính lời nhắn. Có hai trần: lưu 32KB,

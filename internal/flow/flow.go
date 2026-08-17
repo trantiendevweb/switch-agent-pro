@@ -41,7 +41,12 @@ const (
 // implemented đánh dấu loại nào chạy được ở phiên bản hiện tại.
 var implemented = map[string]bool{
 	TypeAgent: true, TypeShell: true, TypeApprove: true, TypeNotify: true,
-	TypeModel: false, TypeTest: false, TypeLint: false, TypeReview: false, TypeMerge: false,
+	// test/lint chạy bằng `commands.test` / `commands.lint` của .sagent/project.toml
+	TypeTest: true, TypeLint: true,
+	// review = agent đọc kết quả bước trước; chỉ là agent có prompt dựng sẵn
+	TypeReview: true,
+	// còn chờ đường API và cơ chế merge an toàn
+	TypeModel: false, TypeMerge: false,
 }
 
 // Chính sách khi một bước hỏng.
@@ -72,6 +77,10 @@ type Step struct {
 
 	// approve / notify
 	Message string `toml:"message,omitempty" json:"message,omitempty"`
+
+	// When là điều kiện chạy; rỗng = luôn chạy. Xem when.go.
+	// Không thoả thì bước bị BỎ QUA (skipped), và bước sau vẫn chạy tiếp.
+	When string `toml:"when,omitempty" json:"when,omitempty"`
 
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`

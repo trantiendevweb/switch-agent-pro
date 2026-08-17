@@ -523,8 +523,18 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   bước đã <code>done</code> không chạy lại — chạy tiếp được sau khi máy khởi động lại.</li>
 <li class="task done"><span class="box"></span>Lệnh: <code>flow run | runs | approve | reject | resume</code>.</li>
 <li class="task done"><span class="box"></span>Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.</li>
-<li class="task"><span class="box"></span>Chạy <strong>song song nhiều bước</strong> cùng lúc (v1 tuần tự theo topo; song song
-      thật nằm trong bước agent qua <code>copies</code>).</li>
+<li class="task done"><span class="box"></span><strong>Chạy song song nhiều bước</strong>: vòng chạy theo ĐỢT — mỗi vòng tìm mọi bước
+  đã sẵn sàng rồi chạy chúng cùng lúc, có trần lấy từ <code>policy.max_parallel_sessions</code>.
+  Nhánh độc lập (test + lint + build) không còn xếp hàng. Approval gate vẫn nguyên:
+  bước approve không bao giờ chạy trong đợt.</li>
+<li class="task done"><span class="box"></span><strong>Điều kiện <code>when</code></strong> — flow rẽ nhánh được:
+  <code>when = "steps.kiem.output contains LOI"</code>. Toán tử: <code>== != contains not-contains
+  empty not-empty &gt; &lt; &gt;= &lt;=</code>; đọc được <code>steps.&lt;id&gt;.state</code>, <code>steps.&lt;id&gt;.output</code>,
+  <code>vars.&lt;tên&gt;</code>. Cố ý KHÔNG nhúng ngôn ngữ biểu thức đầy đủ — flow là file người ta
+  gửi cho nhau được. Sai cú pháp thì BÁO LỖI chứ không âm thầm coi là false.</li>
+<li class="task done"><span class="box"></span>Node <code>test</code>/<code>lint</code>/<code>review</code> chạy được: test/lint lấy lệnh từ
+  <code>commands.test</code>/<code>commands.lint</code> của <code>.sagent/project.toml</code> nên không phải lặp
+  lại trong từng flow.</li>
 <li class="task done"><span class="box"></span><strong>Truyền dữ liệu giữa các bước</strong>: <code>{{steps.&lt;id&gt;.output}}</code>. Kết quả lưu ở
   SQLite (migration v4) nên <strong>sống sót qua resume</strong>. shell lấy stdout+stderr,
   agent gộp log các phiên, notify lấy chính lời nhắn. Có hai trần: lưu 32KB,

@@ -154,6 +154,9 @@ const TYPES = {
   shell:  {name:'Lệnh',    color:'#4285F4', desc:'Chạy lệnh (argv)',           icon:'M4 17l6-5-6-5M12 19h8'},
   approve:{name:'Duyệt',   color:'#F59E0B', desc:'Dừng chờ người quyết',       icon:'M9 12l2 2 4-4M12 3l9 4v6c0 4-4 7-9 8-5-1-9-4-9-8V7z'},
   notify: {name:'Báo',     color:'#8B5CF6', desc:'Nhắn một dòng',              icon:'M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4'},
+  test:   {name:'Test',    color:'#06B6D4', desc:'Chạy commands.test',         icon:'M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3'},
+  lint:   {name:'Lint',    color:'#06B6D4', desc:'Chạy commands.lint',         icon:'M4 7h16M4 12h10M4 17h13M18 15l2 2 3-3'},
+  review: {name:'Review',  color:'#22C55E', desc:'Agent đọc kết quả trước đó', icon:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6'},
 };
 const STATE_MARK = {done:'✓',running:'●',waiting:'?',failed:'✗',skipped:'–'};
 
@@ -210,11 +213,13 @@ function applyView(){ world.style.transform='translate('+view.x+'px,'+view.y+'px
 // ---- thêm / xoá node ----
 function addNode(type, x, y){
   const d = {agent:{prompt:'Mô tả việc cần agent làm.'}, shell:{run:'go test ./...'},
-             approve:{message:'Duyệt để chạy tiếp?'}, notify:{message:'Đã xong.'}}[type] || {};
+             approve:{message:'Duyệt để chạy tiếp?'}, notify:{message:'Đã xong.'},
+             review:{prompt:'Đọc kết quả bước trước rồi nhận xét: {{steps.<id>.output}}'},
+             test:{}, lint:{}}[type] || {};
   const n = Object.assign({
-    id: uid(type==='agent'?'agent':type==='shell'?'lenh':type==='approve'?'duyet':'bao'),
+    id: uid({agent:'agent',shell:'lenh',approve:'duyet',notify:'bao',test:'test',lint:'lint',review:'review'}[type]||'buoc'),
     type, x:Math.round(x), y:Math.round(y), needs:[], copies:1, worktree:true,
-    timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:''
+    timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:'', when:'', profile:''
   }, d);
   nodes.push(n); dirty=true; render(); select(n.id);
 }
@@ -233,7 +238,10 @@ function render(){
     const el=document.createElement('div');
     el.className='node'+(sel===n.id?' sel':'')+(liveStates[n.id]?' s-'+liveStates[n.id]:'');
     el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.dataset.id=n.id;
-    const body = n.type==='shell' ? n.run : (n.type==='agent'? n.prompt : n.message);
+    const body = (n.type==='shell') ? n.run
+      : (n.type==='agent'||n.type==='review') ? n.prompt
+      : (n.type==='test'||n.type==='lint') ? (n.run || '(lấy lệnh từ project.toml)')
+      : n.message;
     el.innerHTML =
       '<div class="bar" style="background:'+d.color+'"></div>'+
       '<div class="st">'+(STATE_MARK[liveStates[n.id]]||'')+'</div>'+
@@ -411,7 +419,7 @@ function inspector(){
   const n=nodes.find(x=>x.id===sel); if(!n) return;
   const d=TYPES[n.type]||{name:n.type};
   let body='';
-  if(n.type==='agent'){
+  if(n.type==='agent'||n.type==='review'){
     body =
       '<div class="fld"><label>Prompt giao cho agent</label><textarea id="p-prompt">'+esc(n.prompt)+'</textarea></div>'+
       '<div class="two"><div class="fld"><label>Số agent song song</label>'+
@@ -419,7 +427,14 @@ function inspector(){
       '<div class="fld"><label>Timeout (giây, 0 = không)</label>'+
         '<input type="number" id="p-timeout" min="0" value="'+(n.timeout_sec||0)+'"></div></div>'+
       '<label class="chk"><input type="checkbox" id="p-wt" '+(n.worktree?'checked':'')+'> mỗi agent một git worktree</label>'+
+      '<div class="fld"><label>Tài khoản (để trống = mặc định khi chạy)</label>'+
+        '<input id="p-profile" placeholder="claude:phu" value="'+esc(n.profile||'')+'"></div>'+
       '<div class="hint">Dùng <code>{{steps.&lt;id&gt;.output}}</code> để nhận kết quả bước trước.</div>';
+  } else if(n.type==='test'||n.type==='lint'){
+    body =
+      '<div class="fld"><label>Lệnh (để trống = lấy <code>commands.'+n.type+'</code> của dự án)</label>'+
+        '<input id="p-run" value="'+esc(n.run||'')+'"></div>'+
+      '<div class="fld"><label>Timeout (giây)</label><input type="number" id="p-timeout" min="0" value="'+(n.timeout_sec||0)+'"></div>';
   } else if(n.type==='shell'){
     body =
       '<div class="fld"><label>Lệnh (cách nhau bằng khoảng trắng)</label><textarea id="p-run">'+esc(n.run)+'</textarea></div>'+
@@ -434,6 +449,11 @@ function inspector(){
     '<div class="lbl">'+d.name+'</div>'+
     '<div class="fld"><label>Tên bước (id)</label><input id="p-id" value="'+esc(n.id)+'"></div>'+
     body +
+    '<div class="fld"><label>Điều kiện chạy (để trống = luôn chạy)</label>'+
+      '<input id="p-when" placeholder="steps.kiem.output contains LOI" value="'+esc(n.when||'')+'"></div>'+
+    '<div class="hint" style="margin:-2px 0 10px">Ví dụ: <code>steps.a.state == done</code> · '+
+      '<code>steps.a.output contains LOI</code> · <code>vars.moi_truong != prod</code><br>'+
+      'Không thoả thì bước bị bỏ qua, các bước sau vẫn chạy.</div>'+
     '<div class="two"><div class="fld"><label>Thử lại</label>'+
       '<input type="number" id="p-retry" min="0" max="5" value="'+(n.retry||0)+'"></div>'+
     '<div class="fld"><label>Khi hỏng</label><select id="p-onfail">'+
@@ -447,6 +467,7 @@ function inspector(){
     if(key==='id'||key==='prompt'||key==='run'||key==='message') render();
   };};
   bind('p-prompt','prompt'); bind('p-run','run'); bind('p-message','message');
+  bind('p-when','when'); bind('p-profile','profile');
   bind('p-copies','copies',v=>Math.max(1,parseInt(v)||1));
   bind('p-timeout','timeout_sec',v=>Math.max(0,parseInt(v)||0));
   bind('p-retry','retry',v=>Math.max(0,parseInt(v)||0));
@@ -485,6 +506,7 @@ async function loadFlow(name){
       prompt:s.prompt||'', run:(s.run||[]).join(' '), message:s.message||'',
       copies:s.copies||1, worktree:!!s.worktree, timeout_sec:s.timeout_sec||0,
       retry:s.retry||0, on_failure:s.on_failure||'stop',
+      when:s.when||'', profile:s.profile||'',
       x: s.x || (80 + i*270), y: s.y || (90 + (i%2)*150)
     }));
     sel=null; dirty=false; liveStates={}; render(); inspector(); fit();
@@ -506,7 +528,7 @@ $('#save').onclick=async()=>{
   const steps = nodes.map(n=>{
     const s={id:n.id, type:n.type, needs:n.needs||[], x:n.x, y:n.y,
              timeout_sec:n.timeout_sec||0, retry:n.retry||0, on_failure:n.on_failure||'stop'};
-    if(n.type==='agent'){ s.prompt=n.prompt; s.copies=n.copies||1; s.worktree=!!n.worktree; }
+    if(n.type==='agent'||n.type==='review'){ s.prompt=n.prompt; s.copies=n.copies||1; s.worktree=!!n.worktree; }
     else if(n.type==='shell'){ s.run=(n.run||'').trim().split(/\s+/).filter(Boolean); }
     else { s.message=n.message; }
     return s;

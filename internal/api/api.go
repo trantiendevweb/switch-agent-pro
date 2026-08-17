@@ -528,6 +528,14 @@ func (a *API) runner(defaultProfile Addr) *flow.Runner {
 		DB: a.db, Bus: a.bus,
 		Agent:       agentBridge{a: a, fallback: defaultProfile},
 		MaxParallel: a.cfg.Policy.MaxParallelSessions,
+		// Node `test`/`lint` lấy lệnh từ .sagent/project.toml, khỏi lặp lại
+		// trong từng flow.
+		Commands: map[string][]string{
+			"test":  a.cfg.Commands.Test,
+			"lint":  a.cfg.Commands.Lint,
+			"build": a.cfg.Commands.Build,
+			"setup": a.cfg.Commands.Setup,
+		},
 	}
 }
 
