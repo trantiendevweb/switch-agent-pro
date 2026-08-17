@@ -55,6 +55,9 @@ func init() {
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},
+		"__frun":  {"flow.run", "chạy một workflow", nil},
+		"__fruns": {"flow.runs", "lịch sử chạy workflow", nil},
+		"__fapp":  {"flow.approve", "duyệt/từ chối bước đang chờ", nil},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},
 	}
@@ -585,6 +588,12 @@ func cmdHelp() {
     sagent flow                 liệt kê workflow (có 3 flow mẫu dựng sẵn)
     sagent flow show <tên>      xem các bước + thứ tự chạy
     sagent flow validate        kiểm tra mọi flow (thoát ≠ 0 nếu có lỗi — dùng trong CI)
+    sagent flow run <tên> [--profile claude:x] [--var k=v]
+                                chạy flow; dừng lại khi gặp bước cần duyệt
+    sagent flow runs            lịch sử các lần chạy
+    sagent flow approve <#> <bước>   duyệt để chạy tiếp
+    sagent flow reject  <#> <bước>   từ chối, huỷ lần chạy
+    sagent flow resume  <#>     chạy tiếp sau khi máy khởi động lại
 
   Dashboard:
 

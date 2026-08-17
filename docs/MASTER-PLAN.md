@@ -360,7 +360,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   khác biệt tương tác nằm trong driver/model client; **conformance suite** chạy cho 2 harness
   + 2 API protocol; capability không hỗ trợ báo trung thực.
 
-### Pha 3 — Flow DAG ghép được  🟡 schema + kiểm tra xong, bộ thực thi chưa
+### Pha 3 — Flow DAG ghép được  🟢 chạy được (còn workflow board)
 🎯 Người dùng định nghĩa workflow mới **không sửa mã Go**.
 - [ ] Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
   retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
@@ -380,7 +380,18 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] `shell` chỉ nhận **argv** (`run = ["go","test"]`), cố ý không nhận chuỗi
   shell để khỏi mở đường injection.
 - [x] Lệnh `sagent flow list | show <tên> | validate` (validate thoát ≠ 0 cho CI).
-- [ ] **Bộ thực thi** (chạy thật, retry/timeout, approval gate, resume sau restart).
+- [x] **Bộ thực thi** (`internal/flow/runner.go`): chạy theo thứ tự topo, timeout,
+  retry lùi dần, `on_failure` stop/continue/fallback, biến `{{...}}`.
+- [x] **Approval gate không thể bị bỏ qua** — `Approve()` là hàm DUY NHẤT chuyển
+  bước approve sang `done`; bộ thực thi không có nhánh nào tự làm việc đó. Có
+  test gọi `Resume` nhiều lần khi chưa duyệt và khẳng định bước sau KHÔNG chạy.
+- [x] **Resume**: trạng thái từng bước nằm ở SQLite (bảng `flow_runs`/`flow_steps`),
+  bước đã `done` không chạy lại — chạy tiếp được sau khi máy khởi động lại.
+- [x] Lệnh: `flow run | runs | approve | reject | resume`.
+- [x] Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.
+- [ ] Chạy **song song nhiều bước** cùng lúc (v1 tuần tự theo topo; song song
+      thật nằm trong bước agent qua `copies`).
+- [ ] Truyền dữ liệu giữa các bước (`{{steps.x.output}}`).
 - [ ] Workflow board (mặt 4).
 - **DoD:** thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh **approval không thể bị bỏ qua**.

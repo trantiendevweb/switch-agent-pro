@@ -24,8 +24,24 @@ func cmdFlow(args []string) {
 		flowShow(args[1])
 	case "validate", "kiem":
 		flowValidate()
+	case "run", "chay":
+		if len(args) < 2 {
+			fail(fmt.Errorf("thiếu tên flow. Ví dụ: sagent flow run squad --profile claude:phu"))
+		}
+		flowRun(args[1], args[2:])
+	case "runs", "lich-su":
+		flowRuns()
+	case "approve", "duyet":
+		flowDecide(args[1:], true)
+	case "reject", "tu-choi":
+		flowDecide(args[1:], false)
+	case "resume", "tiep":
+		if len(args) < 2 {
+			fail(fmt.Errorf("thiếu số lần chạy. Ví dụ: sagent flow resume 3"))
+		}
+		flowResume(args[1])
 	default:
-		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show <tên> | validate", sub))
+		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | approve | reject | resume", sub))
 	}
 }
 

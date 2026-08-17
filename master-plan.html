@@ -493,7 +493,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</li>
 <li>2 API protocol; capability không hỗ trợ báo trung thực.</li>
 </ul>
-<h3>Pha 3 — Flow DAG ghép được  🟡 schema + kiểm tra xong, bộ thực thi chưa</h3>
+<h3>Pha 3 — Flow DAG ghép được  🟢 chạy được (còn workflow board)</h3>
 <p>🎯 Người dùng định nghĩa workflow mới <strong>không sửa mã Go</strong>.</p>
 <ul>
 <li class="task"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
@@ -514,7 +514,18 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li class="task done"><span class="box"></span><code>shell</code> chỉ nhận <strong>argv</strong> (<code>run = ["go","test"]</code>), cố ý không nhận chuỗi
   shell để khỏi mở đường injection.</li>
 <li class="task done"><span class="box"></span>Lệnh <code>sagent flow list | show &lt;tên&gt; | validate</code> (validate thoát ≠ 0 cho CI).</li>
-<li class="task"><span class="box"></span><strong>Bộ thực thi</strong> (chạy thật, retry/timeout, approval gate, resume sau restart).</li>
+<li class="task done"><span class="box"></span><strong>Bộ thực thi</strong> (<code>internal/flow/runner.go</code>): chạy theo thứ tự topo, timeout,
+  retry lùi dần, <code>on_failure</code> stop/continue/fallback, biến <code>{{...}}</code>.</li>
+<li class="task done"><span class="box"></span><strong>Approval gate không thể bị bỏ qua</strong> — <code>Approve()</code> là hàm DUY NHẤT chuyển
+  bước approve sang <code>done</code>; bộ thực thi không có nhánh nào tự làm việc đó. Có
+  test gọi <code>Resume</code> nhiều lần khi chưa duyệt và khẳng định bước sau KHÔNG chạy.</li>
+<li class="task done"><span class="box"></span><strong>Resume</strong>: trạng thái từng bước nằm ở SQLite (bảng <code>flow_runs</code>/<code>flow_steps</code>),
+  bước đã <code>done</code> không chạy lại — chạy tiếp được sau khi máy khởi động lại.</li>
+<li class="task done"><span class="box"></span>Lệnh: <code>flow run | runs | approve | reject | resume</code>.</li>
+<li class="task done"><span class="box"></span>Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.</li>
+<li class="task"><span class="box"></span>Chạy <strong>song song nhiều bước</strong> cùng lúc (v1 tuần tự theo topo; song song
+      thật nằm trong bước agent qua <code>copies</code>).</li>
+<li class="task"><span class="box"></span>Truyền dữ liệu giữa các bước (<code>{{steps.x.output}}</code>).</li>
 <li class="task"><span class="box"></span>Workflow board (mặt 4).</li>
 <li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>

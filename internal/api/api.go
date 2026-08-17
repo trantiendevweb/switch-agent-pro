@@ -10,9 +10,11 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
@@ -52,6 +54,9 @@ var Actions = []string{
 	"flow.list",
 	"flow.show",
 	"flow.validate",
+	"flow.run",
+	"flow.runs",
+	"flow.approve",
 }
 
 // API gom mọi thứ một mặt cần. Tạo bằng New, nhớ Close.
@@ -413,6 +418,120 @@ func (a *API) FlowValidate(dir string) ([]flow.Problem, error) {
 		ps = append(ps, flow.Validate(flows[n])...)
 	}
 	return ps, nil
+}
+
+// agentBridge nối bước `agent` của flow vào fleet — và ĐỢI xong, vì flow cần
+// biết bước trước kết thúc mới đi tiếp.
+type agentBridge struct {
+	a        *API
+	fallback Addr
+}
+
+func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree bool) error {
+	addr := b.fallback
+	if profileStr != "" {
+		addr = ParseAddr(profileStr)
+	}
+	if addr.Account == "" {
+		return fmt.Errorf("bước agent chưa biết chạy bằng tài khoản nào — đặt `profile` trong flow hoặc truyền --profile")
+	}
+	res, err := b.a.FleetStart(FleetRequest{
+		Addr: addr, Copies: copies, Worktree: worktree,
+		Args: []string{"-p", prompt},
+	})
+	if err != nil {
+		return err
+	}
+	if res.Started == 0 {
+		return fmt.Errorf("không bật được phiên nào")
+	}
+	return b.a.waitSessions(ctx, res.IDs)
+}
+
+// waitSessions đợi các phiên kết thúc. Không có daemon nên hỏi sổ theo nhịp —
+// đơn giản và đủ dùng cho một tiến trình CLI đang đứng chờ.
+func (a *API) waitSessions(ctx context.Context, ids []int64) error {
+	want := map[int64]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	tick := time.NewTicker(2 * time.Second)
+	defer tick.Stop()
+	for {
+		running, err := a.db.Running()
+		if err != nil {
+			return err
+		}
+		still := 0
+		for _, s := range running {
+			if want[s.ID] {
+				still++
+			}
+		}
+		if still == 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-tick.C:
+		}
+	}
+}
+
+func (a *API) runner(defaultProfile Addr) *flow.Runner {
+	return &flow.Runner{
+		DB: a.db, Bus: a.bus,
+		Agent:       agentBridge{a: a, fallback: defaultProfile},
+		MaxParallel: a.cfg.Policy.MaxParallelSessions,
+	}
+}
+
+// FlowRun — action "flow.run". Chạy một flow; dừng lại nếu gặp bước chờ duyệt.
+func (a *API) FlowRun(ctx context.Context, dir, name string, vars map[string]string, defaultProfile Addr) (flow.Result, error) {
+	f, _, err := a.FlowShow(dir, name)
+	if err != nil {
+		return flow.Result{}, err
+	}
+	if ps := flow.Validate(f); len(ps) > 0 {
+		for _, p := range ps {
+			if !p.Warn {
+				return flow.Result{}, fmt.Errorf("flow %q có lỗi: %s", name, p.Msg)
+			}
+		}
+	}
+	return a.runner(defaultProfile).Start(ctx, f, dir, vars)
+}
+
+// FlowResume — chạy tiếp một lần chạy đang dở.
+func (a *API) FlowResume(ctx context.Context, runID int64, defaultProfile Addr) (flow.Result, error) {
+	run, err := a.db.GetRun(runID)
+	if err != nil {
+		return flow.Result{}, fmt.Errorf("không có lần chạy #%d", runID)
+	}
+	f, _, err := a.FlowShow(run.Dir, run.Flow)
+	if err != nil {
+		return flow.Result{}, err
+	}
+	return a.runner(defaultProfile).Resume(ctx, runID, f)
+}
+
+// FlowRuns — action "flow.runs". Lịch sử các lần chạy.
+func (a *API) FlowRuns(limit int) ([]store.Run, error) { return a.db.ListRuns(limit) }
+
+// FlowSteps trả trạng thái từng bước của một lần chạy.
+func (a *API) FlowSteps(runID int64) (map[string]store.StepRun, error) { return a.db.Steps(runID) }
+
+// FlowApprove — action "flow.approve". Duyệt (hoặc từ chối) rồi chạy tiếp.
+func (a *API) FlowApprove(ctx context.Context, runID int64, stepID, by string, ok bool, defaultProfile Addr) (flow.Result, error) {
+	r := a.runner(defaultProfile)
+	if !ok {
+		return flow.Result{RunID: runID, State: store.RunCanceled}, r.Reject(runID, stepID, by)
+	}
+	if err := r.Approve(runID, stepID, by); err != nil {
+		return flow.Result{}, err
+	}
+	return a.FlowResume(ctx, runID, defaultProfile)
 }
 
 // ---------------------------- lặt vặt ----------------------------

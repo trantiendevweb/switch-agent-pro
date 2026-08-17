@@ -115,6 +115,162 @@ var migrations = []string{
 
 	// v2 — mỗi phiên có thể chạy trong git worktree riêng
 	`ALTER TABLE sessions ADD COLUMN worktree TEXT;`,
+
+	// v3 — lần chạy workflow. Đây là thứ cho phép RESUME: tiến trình chết giữa
+	// chừng thì trạng thái từng bước vẫn còn trên đĩa.
+	`CREATE TABLE IF NOT EXISTS flow_runs (
+		id      INTEGER PRIMARY KEY AUTOINCREMENT,
+		flow    TEXT NOT NULL,
+		dir     TEXT NOT NULL,
+		vars    TEXT,
+		state   TEXT NOT NULL,
+		started TEXT NOT NULL,
+		ended   TEXT
+	);
+	CREATE TABLE IF NOT EXISTS flow_steps (
+		run_id  INTEGER NOT NULL,
+		step_id TEXT    NOT NULL,
+		state   TEXT    NOT NULL,
+		attempt INTEGER NOT NULL DEFAULT 0,
+		msg     TEXT,
+		started TEXT,
+		ended   TEXT,
+		PRIMARY KEY (run_id, step_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_runs_state ON flow_runs(state);`,
+}
+
+// Trạng thái một lần chạy flow và từng bước.
+const (
+	RunRunning  = "running"
+	RunWaiting  = "waiting_approval" // dừng chờ người duyệt
+	RunDone     = "completed"
+	RunFailed   = "failed"
+	RunCanceled = "cancelled"
+
+	StepPending = "pending"
+	StepRunning = "running"
+	StepDone    = "done"
+	StepFailed  = "failed"
+	StepSkipped = "skipped"
+	StepWaiting = "waiting" // bước approve đang chờ người quyết
+)
+
+// Run là một lần chạy workflow.
+type Run struct {
+	ID      int64
+	Flow    string
+	Dir     string
+	Vars    string // JSON
+	State   string
+	Started time.Time
+	Ended   string
+}
+
+// StepRun là trạng thái một bước trong một lần chạy.
+type StepRun struct {
+	RunID   int64
+	StepID  string
+	State   string
+	Attempt int
+	Msg     string
+}
+
+// CreateRun mở một lần chạy mới.
+func (d *DB) CreateRun(flowName, dir, varsJSON string) (int64, error) {
+	res, err := d.db.Exec(
+		`INSERT INTO flow_runs(flow,dir,vars,state,started) VALUES(?,?,?,?,?)`,
+		flowName, dir, varsJSON, RunRunning, time.Now().Format(time.RFC3339))
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// GetRun đọc một lần chạy.
+func (d *DB) GetRun(id int64) (Run, error) {
+	var r Run
+	var started string
+	var ended, vars sql.NullString
+	err := d.db.QueryRow(
+		`SELECT id,flow,dir,COALESCE(vars,''),state,started,ended FROM flow_runs WHERE id=?`, id).
+		Scan(&r.ID, &r.Flow, &r.Dir, &vars, &r.State, &started, &ended)
+	if err != nil {
+		return r, err
+	}
+	r.Vars = vars.String
+	r.Ended = ended.String
+	r.Started, _ = time.Parse(time.RFC3339, started)
+	return r, nil
+}
+
+// ListRuns liệt kê các lần chạy, mới nhất trước.
+func (d *DB) ListRuns(limit int) ([]Run, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := d.db.Query(
+		`SELECT id,flow,dir,COALESCE(vars,''),state,started,COALESCE(ended,'')
+		   FROM flow_runs ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Run
+	for rows.Next() {
+		var r Run
+		var started string
+		if err := rows.Scan(&r.ID, &r.Flow, &r.Dir, &r.Vars, &r.State, &started, &r.Ended); err != nil {
+			return nil, err
+		}
+		r.Started, _ = time.Parse(time.RFC3339, started)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// SetRunState đổi trạng thái một lần chạy; kết thúc thì ghi luôn thời điểm.
+func (d *DB) SetRunState(id int64, state string) error {
+	if state == RunRunning || state == RunWaiting {
+		_, err := d.db.Exec(`UPDATE flow_runs SET state=? WHERE id=?`, state, id)
+		return err
+	}
+	_, err := d.db.Exec(`UPDATE flow_runs SET state=?, ended=? WHERE id=?`,
+		state, time.Now().Format(time.RFC3339), id)
+	return err
+}
+
+// SetStep ghi trạng thái một bước (tạo mới nếu chưa có).
+func (d *DB) SetStep(runID int64, stepID, state, msg string, attempt int) error {
+	now := time.Now().Format(time.RFC3339)
+	_, err := d.db.Exec(`
+		INSERT INTO flow_steps(run_id,step_id,state,attempt,msg,started,ended)
+		VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(run_id,step_id) DO UPDATE SET
+			state=excluded.state, attempt=excluded.attempt, msg=excluded.msg,
+			ended=CASE WHEN excluded.state IN ('done','failed','skipped') THEN excluded.ended ELSE flow_steps.ended END`,
+		runID, stepID, state, attempt, msg, now,
+		map[bool]string{true: now, false: ""}[state == StepDone || state == StepFailed || state == StepSkipped])
+	return err
+}
+
+// Steps đọc trạng thái mọi bước của một lần chạy.
+func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
+	rows, err := d.db.Query(
+		`SELECT run_id,step_id,state,attempt,COALESCE(msg,'') FROM flow_steps WHERE run_id=?`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]StepRun{}
+	for rows.Next() {
+		var s StepRun
+		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg); err != nil {
+			return nil, err
+		}
+		out[s.StepID] = s
+	}
+	return out, rows.Err()
 }
 
 // migrate đưa schema lên phiên bản mới nhất, chạy trong transaction để không
