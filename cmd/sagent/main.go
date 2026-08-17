@@ -52,6 +52,9 @@ func init() {
 		"config":  {"config.show", "xem cấu hình đã gộp", func(a []string) { cmdConfig() }},
 		"init":    {"config.init", "tạo .sagent/project.toml", func(a []string) { cmdInit() }},
 		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
+		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
+		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
+		"__val":   {"flow.validate", "kiểm tra workflow", nil},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},
 	}
@@ -576,6 +579,12 @@ func cmdHelp() {
 
     sagent init                 tạo .sagent/project.toml
     sagent config               xem cấu hình đã gộp + đọc từ file nào
+
+  Workflow:
+
+    sagent flow                 liệt kê workflow (có 3 flow mẫu dựng sẵn)
+    sagent flow show <tên>      xem các bước + thứ tự chạy
+    sagent flow validate        kiểm tra mọi flow (thoát ≠ 0 nếu có lỗi — dùng trong CI)
 
   Dashboard:
 

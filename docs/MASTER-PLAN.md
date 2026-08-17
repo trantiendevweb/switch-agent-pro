@@ -360,7 +360,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   khác biệt tương tác nằm trong driver/model client; **conformance suite** chạy cho 2 harness
   + 2 API protocol; capability không hỗ trợ báo trung thực.
 
-### Pha 3 — Flow DAG ghép được
+### Pha 3 — Flow DAG ghép được  🟡 schema + kiểm tra xong, bộ thực thi chưa
 🎯 Người dùng định nghĩa workflow mới **không sửa mã Go**.
 - [ ] Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
   retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
@@ -371,6 +371,17 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   implementer → reviewer → test → approval), `agents` (danh sách task theo concurrency).
 - [ ] Plugin model: TOML chỉ manifest/config tĩnh; logic động là **executable riêng** qua
   JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.
+- [x] `internal/flow`: schema `flows.toml`, tầng đọc (mẫu dựng sẵn → global →
+  dự án), **kiểm tra DAG** (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
+  thứ tự chạy topo **ổn định**, `{{bien}}`.
+- [x] 3 flow mẫu dựng sẵn: `fanout` · `squad` · `agents` — dùng ngay không cần file.
+- [x] Trung thực năng lực: type đã thiết kế nhưng **chưa chạy được** thì CẢNH BÁO
+  lúc kiểm tra (`model`/`test`/`lint`/`review`/`merge`), không im lặng chấp nhận.
+- [x] `shell` chỉ nhận **argv** (`run = ["go","test"]`), cố ý không nhận chuỗi
+  shell để khỏi mở đường injection.
+- [x] Lệnh `sagent flow list | show <tên> | validate` (validate thoát ≠ 0 cho CI).
+- [ ] **Bộ thực thi** (chạy thật, retry/timeout, approval gate, resume sau restart).
+- [ ] Workflow board (mặt 4).
 - **DoD:** thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh **approval không thể bị bỏ qua**.
 

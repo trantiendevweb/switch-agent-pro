@@ -493,7 +493,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</li>
 <li>2 API protocol; capability không hỗ trợ báo trung thực.</li>
 </ul>
-<h3>Pha 3 — Flow DAG ghép được</h3>
+<h3>Pha 3 — Flow DAG ghép được  🟡 schema + kiểm tra xong, bộ thực thi chưa</h3>
 <p>🎯 Người dùng định nghĩa workflow mới <strong>không sửa mã Go</strong>.</p>
 <ul>
 <li class="task"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
@@ -505,6 +505,17 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   implementer → reviewer → test → approval), <code>agents</code> (danh sách task theo concurrency).</li>
 <li class="task"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
   JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.</li>
+<li class="task done"><span class="box"></span><code>internal/flow</code>: schema <code>flows.toml</code>, tầng đọc (mẫu dựng sẵn → global →
+  dự án), <strong>kiểm tra DAG</strong> (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
+  thứ tự chạy topo <strong>ổn định</strong>, <code>{{bien}}</code>.</li>
+<li class="task done"><span class="box"></span>3 flow mẫu dựng sẵn: <code>fanout</code> · <code>squad</code> · <code>agents</code> — dùng ngay không cần file.</li>
+<li class="task done"><span class="box"></span>Trung thực năng lực: type đã thiết kế nhưng <strong>chưa chạy được</strong> thì CẢNH BÁO
+  lúc kiểm tra (<code>model</code>/<code>test</code>/<code>lint</code>/<code>review</code>/<code>merge</code>), không im lặng chấp nhận.</li>
+<li class="task done"><span class="box"></span><code>shell</code> chỉ nhận <strong>argv</strong> (<code>run = ["go","test"]</code>), cố ý không nhận chuỗi
+  shell để khỏi mở đường injection.</li>
+<li class="task done"><span class="box"></span>Lệnh <code>sagent flow list | show &lt;tên&gt; | validate</code> (validate thoát ≠ 0 cho CI).</li>
+<li class="task"><span class="box"></span><strong>Bộ thực thi</strong> (chạy thật, retry/timeout, approval gate, resume sau restart).</li>
+<li class="task"><span class="box"></span>Workflow board (mặt 4).</li>
 <li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>
 </ul>

@@ -17,6 +17,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
+	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
@@ -48,6 +49,9 @@ var Actions = []string{
 	"config.show",
 	"config.init",
 	"dash.serve",
+	"flow.list",
+	"flow.show",
+	"flow.validate",
 }
 
 // API gom mọi thứ một mặt cần. Tạo bằng New, nhớ Close.
@@ -375,6 +379,40 @@ func (a *API) ClonesClean(addr Addr, workDir string, force bool) (CleanResult, e
 			Msg: fmt.Sprintf("đã xoá %d bản clone", n)})
 	}
 	return res, err
+}
+
+// ---------------------------- flow ----------------------------
+
+// FlowList — action "flow.list". Trả về flow đã gộp (mẫu + global + dự án).
+func (a *API) FlowList(dir string) (map[string]flow.Flow, []string, error) {
+	return flow.Load(dir)
+}
+
+// FlowShow — action "flow.show". Kèm thứ tự chạy đã sắp xếp.
+func (a *API) FlowShow(dir, name string) (flow.Flow, []flow.Step, error) {
+	flows, _, err := flow.Load(dir)
+	if err != nil {
+		return flow.Flow{}, nil, err
+	}
+	f, ok := flows[name]
+	if !ok {
+		return flow.Flow{}, nil, fmt.Errorf("không có flow %q (xem: sagent flow list)", name)
+	}
+	order, err := flow.Order(f)
+	return f, order, err
+}
+
+// FlowValidate — action "flow.validate". Kiểm mọi flow, trả về lỗi + cảnh báo.
+func (a *API) FlowValidate(dir string) ([]flow.Problem, error) {
+	flows, _, err := flow.Load(dir)
+	if err != nil {
+		return nil, err
+	}
+	var ps []flow.Problem
+	for _, n := range flow.Names(flows) {
+		ps = append(ps, flow.Validate(flows[n])...)
+	}
+	return ps, nil
 }
 
 // ---------------------------- lặt vặt ----------------------------

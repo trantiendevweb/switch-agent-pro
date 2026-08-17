@@ -60,7 +60,7 @@ func TestKhongCoLenhNgoaiHopDong(t *testing.T) {
 // ứng với việc gõ thẳng địa chỉ hồ sơ chứ không phải một từ khoá.
 func TestLenhCoHamChay(t *testing.T) {
 	for name, c := range commands {
-		if c.run == nil && name != "__run" {
+		if c.run == nil && !strings.HasPrefix(name, "__") {
 			t.Fatalf("lệnh %q không có hàm chạy", name)
 		}
 		if c.summary == "" {
