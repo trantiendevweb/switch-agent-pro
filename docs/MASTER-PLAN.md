@@ -583,8 +583,13 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   - ✅ **build phát hành** — `-trimpath -ldflags "-s -w"`, đo được **16.21 MB → 11.09 MB**;
     `CGO_ENABLED=0` nên binary không phụ thuộc DLL nào. Workflow `phat-hanh.yml` dựng
     amd64 + arm64 kèm `SHA256SUMS.txt`. Trình cài một dòng, không cần Go, không cần admin.
-  - ⬜ Còn lại: upgrade/provider-drift verify · SBOM +
-    license notices · **ký số** binary (đã có băm, chưa có chữ ký) · migration guide v1.
+  - ✅ **SBOM + license notices** — `tools/giayphep` sinh `THONG-BAO-GIAY-PHEP.txt` từ
+    `go list -deps` (10 phụ thuộc, toàn văn); CI chạy `-kiem` nên không trôi được. Release
+    kèm cả `sbom.cdx.json` (CycloneDX 1.6). **Đo được:** `cyclonedx-gomod -licenses` trả
+    0/10 trường giấy phép, im lặng — SBOM KHÔNG thay được notices. Sổ viết tay cũ đã sai
+    3 chỗ, nay chỉ giữ phần "vì sao". Số đo ở `docs/DO-LUONG.md`.
+  - ⬜ Còn lại: upgrade/provider-drift verify · **ký số** binary (đã có băm, chưa có chữ
+    ký — cần chứng chỉ, chờ chủ dự án) · migration guide v1.
   - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
   - ✅ **TLS cho dashboard** — phơi ra mạng giờ **mặc định HTTPS**, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

@@ -719,8 +719,13 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <li>✅ <strong>build phát hành</strong> — <code>-trimpath -ldflags "-s -w"</code>, đo được <strong>16.21 MB → 11.09 MB</strong>;
     <code>CGO_ENABLED=0</code> nên binary không phụ thuộc DLL nào. Workflow <code>phat-hanh.yml</code> dựng
     amd64 + arm64 kèm <code>SHA256SUMS.txt</code>. Trình cài một dòng, không cần Go, không cần admin.</li>
-<li>⬜ Còn lại: upgrade/provider-drift verify · SBOM +
-    license notices · <strong>ký số</strong> binary (đã có băm, chưa có chữ ký) · migration guide v1.</li>
+<li>✅ <strong>SBOM + license notices</strong> — <code>tools/giayphep</code> sinh <code>THONG-BAO-GIAY-PHEP.txt</code> từ
+    <code>go list -deps</code> (10 phụ thuộc, toàn văn); CI chạy <code>-kiem</code> nên không trôi được. Release
+    kèm cả <code>sbom.cdx.json</code> (CycloneDX 1.6). <strong>Đo được:</strong> <code>cyclonedx-gomod -licenses</code> trả
+    0/10 trường giấy phép, im lặng — SBOM KHÔNG thay được notices. Sổ viết tay cũ đã sai
+    3 chỗ, nay chỉ giữ phần "vì sao". Số đo ở <code>docs/DO-LUONG.md</code>.</li>
+<li>⬜ Còn lại: upgrade/provider-drift verify · <strong>ký số</strong> binary (đã có băm, chưa có chữ
+    ký — cần chứng chỉ, chờ chủ dự án) · migration guide v1.</li>
 <li>~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.</li>
 <li>✅ <strong>TLS cho dashboard</strong> — phơi ra mạng giờ <strong>mặc định HTTPS</strong>, chứng chỉ tự ký sinh
     tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP

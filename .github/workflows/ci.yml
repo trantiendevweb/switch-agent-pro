@@ -25,6 +25,10 @@ jobs:
         run: go test ./...
       - name: go build
         run: go build ./cmd/sagent
+      - name: thông báo giấy phép còn khớp phụ thuộc?
+        # Sổ giấy phép viết tay thì TRÔI — đã đo: nó từng kê một module không hề
+        # được liên kết vào binary. Bước này làm CI đỏ ngay khi file lệch.
+        run: go run ./tools/giayphep -kiem
 
   vuln:
     # Quét lỗ hổng phụ thuộc (Pha 7). Chạy riêng và KHÔNG chặn job trên: một lỗ

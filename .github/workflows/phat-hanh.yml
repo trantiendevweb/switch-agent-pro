@@ -42,6 +42,20 @@ jobs:
           done
           ls -la dist
 
+      - name: SBOM + thông báo giấy phép
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Hai thứ KHÁC NHAU, không thay nhau được:
+          #  · SBOM  = danh mục thành phần (ai đang nằm trong binary).
+          #  · notices = VĂN BẢN giấy phép, thứ MIT/BSD đòi phải kèm theo bản build.
+          # Đã đo: `cyclonedx-gomod -licenses` trả về 0/10 trường giấy phép, im
+          # lặng — nên SBOM một mình KHÔNG đủ để phát hành đúng luật.
+          go run ./tools/giayphep -kiem
+          cp THONG-BAO-GIAY-PHEP.txt dist/
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          cyclonedx-gomod app -json -licenses -main cmd/sagent -output dist/sbom.cdx.json .
+
       - name: Bảng băm
         shell: bash
         run: |
@@ -60,6 +74,8 @@ jobs:
             dist/sagent-windows-amd64.exe
             dist/sagent-windows-arm64.exe
             dist/SHA256SUMS.txt
+            dist/THONG-BAO-GIAY-PHEP.txt
+            dist/sbom.cdx.json
             dist/cai-dat.ps1
             dist/get.ps1
           generate_release_notes: true

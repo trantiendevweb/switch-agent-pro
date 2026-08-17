@@ -789,6 +789,54 @@ Chạy thật trên máy dev: `✓ Không có tiến trình mồ côi nào` — 
 `lost` nào còn con sống. Đường **có** mồ côi mới chỉ được test bao, chưa chạy thật trên
 `state.db` thật (dựng phiên `lost` giả trong đó sẽ làm bẩn dữ liệu người dùng).
 
+### SBOM + thông báo giấy phép — ĐÃ LÀM, VÀ SỔ VIẾT TAY ĐÃ TRÔI THẬT (2026-08-17, Pha 7)
+
+Dự án có `docs/OPEN_SOURCE_LEDGER.md` từ sớm, viết tay. Trước khi thêm SBOM, đo lại xem
+nó còn đúng không — bằng `go list -deps ./cmd/sagent`, tức những module **thật sự đi vào
+binary** chứ không phải mọi thứ có mặt trong `go.mod`:
+
+| Sổ viết tay nói | Thực tế |
+|---|---|
+| có `github.com/google/uuid` | **KHÔNG** được liên kết vào binary |
+| `golang.org/x/sys` là phụ thuộc *gián tiếp* | đã thành **trực tiếp** (ACL + GetProcessTimes) |
+| lý do chọn SQLite thuần Go: "build thẳng cho Windows và Linux" | Linux **đã bỏ** từ sáng cùng ngày |
+
+Ba lỗi trên một trang. **Một sổ giấy phép sai thì tệ hơn không có sổ: nó tạo cảm giác đã
+kiểm.** Nên tách đôi:
+
+- **Phần "vì sao" viết tay** — vì sao cần dependency này, vì sao không dùng stdlib. Máy
+  không sinh được, và đó mới là phần đáng đọc.
+- **Phần "cái gì" do máy sinh** — `tools/giayphep` đọc `go list -deps`, tìm file LICENSE
+  trong module cache, xuất `THONG-BAO-GIAY-PHEP.txt` (10 phụ thuộc, 16 KB toàn văn).
+  Thiếu giấy phép của module nào thì **dừng và báo tên**, không im lặng bỏ qua.
+
+CI chạy `go run ./tools/giayphep -kiem` nên file đó không trôi được nữa. Đã chứng minh
+bước kiểm bắt được lỗi: thêm một dòng rác vào file thì nó đỏ ngay.
+
+**SBOM không thay được thông báo giấy phép.** Đây là điểm dễ nhầm nhất, và có số đo:
+
+```
+$ cyclonedx-gomod app -json -licenses -main cmd/sagent -output sbom.cdx.json .
+$ jq '[.components[] | select(.licenses)] | length, (.components|length)' sbom.cdx.json
+  0
+  10
+```
+
+Cờ `-licenses` trả về **0/10** trường giấy phép, **im lặng, không báo lỗi**. Nếu đính kèm
+SBOM rồi coi như xong nghĩa vụ attribution thì đã phát hành thiếu — mà không có gì báo.
+
+Hai thứ trả lời hai câu khác nhau:
+
+| | Trả lời | Ai đòi |
+|---|---|---|
+| `sbom.cdx.json` | *bên trong có những gì* | chuỗi cung ứng, quét lỗ hổng |
+| `THONG-BAO-GIAY-PHEP.txt` | *và đây là văn bản giấy phép của chúng* | chính giấy phép MIT/BSD |
+
+Điểm cộng bất ngờ: SBOM đếm được **10 thành phần**, đúng bằng số công cụ tự viết tìm ra.
+Hai đường đo độc lập cho cùng một con số — nếu lệch thì một trong hai đã sai.
+
+Cả hai file được đính kèm mọi bản phát hành.
+
 ---
 
 ## Việc cần bạn hỗ trợ
