@@ -18,8 +18,9 @@ import (
 // thật mà không cần khởi động agent nào, và sau này đường API (model route) cắm
 // vào cùng chỗ.
 type AgentRunner interface {
-	// RunAgents bật n agent với prompt, ĐỢI xong, trả về lỗi nếu có.
-	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree bool) error
+	// RunAgents bật n agent với prompt, ĐỢI xong, trả về kết quả gộp (để bước
+	// sau dùng qua {{steps.x.output}}) và lỗi nếu có.
+	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree bool) (string, error)
 }
 
 // Runner thực thi một flow.
@@ -96,6 +97,13 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 	if err != nil {
 		return Result{}, err
 	}
+	// Kết quả các bước đã chạy — kể cả từ lần chạy trước, nên resume vẫn dùng lại được.
+	outputs := map[string]string{}
+	for id, st := range done {
+		if st.Output != "" {
+			outputs[id] = st.Output
+		}
+	}
 	isDone := func(id string) bool {
 		s, ok := done[id]
 		return ok && (s.State == store.StepDone || s.State == store.StepSkipped)
@@ -146,8 +154,11 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 			return Result{RunID: runID, State: store.RunWaiting, Waiting: s.ID}, nil
 		}
 
-		state, msg := r.runStep(ctx, runID, f, s, vars)
-		done[s.ID] = store.StepRun{StepID: s.ID, State: state, Msg: msg}
+		state, msg, out := r.runStep(ctx, runID, f, s, vars, outputs)
+		done[s.ID] = store.StepRun{StepID: s.ID, State: state, Msg: msg, Output: out}
+		if out != "" {
+			outputs[s.ID] = out
+		}
 
 		if state == store.StepFailed {
 			switch s.OnFailure {
@@ -172,7 +183,10 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 }
 
 // runStep chạy một bước, có timeout và retry.
-func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step, vars map[string]string) (string, string) {
+func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
+	vars map[string]string, outputs map[string]string) (state, msg, output string) {
+	// Bước sau dùng được kết quả bước trước.
+	env := WithOutputs(vars, outputs)
 	tries := s.Retry + 1
 	if tries < 1 {
 		tries = 1
@@ -188,16 +202,19 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step, vars 
 		if s.TimeoutSec > 0 {
 			stepCtx, cancel = context.WithTimeout(ctx, time.Duration(s.TimeoutSec)*time.Second)
 		}
-		err := r.do(stepCtx, s, vars)
+		out, err := r.do(stepCtx, s, env)
 		if cancel != nil {
 			cancel()
 		}
 
 		if err == nil {
 			_ = r.DB.SetStep(runID, s.ID, store.StepDone, "", attempt)
+			if out != "" {
+				_ = r.DB.SetStepOutput(runID, s.ID, out)
+			}
 			r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
 				SessionID: runID, Msg: "xong"})
-			return store.StepDone, ""
+			return store.StepDone, "", out
 		}
 		lastErr = err
 		if attempt < tries {
@@ -211,18 +228,18 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step, vars 
 			}
 		}
 	}
-	msg := lastErr.Error()
-	_ = r.DB.SetStep(runID, s.ID, store.StepFailed, msg, tries)
-	r.Bus.Failuref("%s.%s: %s", f.Name, s.ID, msg)
-	return store.StepFailed, msg
+	emsg := lastErr.Error()
+	_ = r.DB.SetStep(runID, s.ID, store.StepFailed, emsg, tries)
+	r.Bus.Failuref("%s.%s: %s", f.Name, s.ID, emsg)
+	return store.StepFailed, emsg, ""
 }
 
 // do thực thi đúng một lần, theo loại node.
-func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) error {
+func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (string, error) {
 	switch s.Type {
 	case TypeAgent, TypeReview:
 		if r.Agent == nil {
-			return fmt.Errorf("không có bộ chạy agent")
+			return "", fmt.Errorf("không có bộ chạy agent")
 		}
 		n := s.Copies
 		if n < 1 {
@@ -236,7 +253,7 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) error {
 
 	case TypeShell:
 		if len(s.Run) == 0 {
-			return fmt.Errorf("thiếu run")
+			return "", fmt.Errorf("thiếu run")
 		}
 		// argv, KHÔNG qua shell — flow là file người ta gửi cho nhau được.
 		args := make([]string, len(s.Run))
@@ -244,22 +261,23 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) error {
 			args[i] = Expand(a, vars)
 		}
 		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-		out, err := cmd.CombinedOutput()
+		raw, err := cmd.CombinedOutput()
 		if err != nil {
-			line := strings.TrimSpace(lastLine(string(out)))
+			line := strings.TrimSpace(lastLine(string(raw)))
 			if line != "" {
-				return fmt.Errorf("%v — %s", err, line)
+				return "", fmt.Errorf("%v — %s", err, line)
 			}
-			return err
+			return "", err
 		}
-		return nil
+		return strings.TrimRight(string(raw), "\r\n"), nil
 
 	case TypeNotify:
-		r.Bus.Infof("%s", Expand(s.Message, vars))
-		return nil
+		m := Expand(s.Message, vars)
+		r.Bus.Infof("%s", m)
+		return m, nil
 
 	default:
-		return fmt.Errorf("type %q chưa chạy được ở bản này", s.Type)
+		return "", fmt.Errorf("type %q chưa chạy được ở bản này", s.Type)
 	}
 }
 

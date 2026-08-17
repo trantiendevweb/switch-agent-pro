@@ -138,7 +138,16 @@ var migrations = []string{
 		PRIMARY KEY (run_id, step_id)
 	);
 	CREATE INDEX IF NOT EXISTS idx_runs_state ON flow_runs(state);`,
+
+	// v4 — kết quả của mỗi bước, để bước sau dùng lại ({{steps.x.output}})
+	`ALTER TABLE flow_steps ADD COLUMN output TEXT;`,
 }
+
+// MaxStepOutput là trần kích thước kết quả lưu cho mỗi bước.
+//
+// Có trần vì output của agent có thể rất dài; để nguyên thì phình DB và làm
+// chậm mọi truy vấn. Cắt phần ĐẦU, giữ phần CUỐI — kết luận thường nằm ở cuối.
+const MaxStepOutput = 32 * 1024
 
 // Trạng thái một lần chạy flow và từng bước.
 const (
@@ -174,6 +183,7 @@ type StepRun struct {
 	State   string
 	Attempt int
 	Msg     string
+	Output  string
 }
 
 // CreateRun mở một lần chạy mới.
@@ -254,10 +264,21 @@ func (d *DB) SetStep(runID int64, stepID, state, msg string, attempt int) error 
 	return err
 }
 
+// SetStepOutput lưu kết quả một bước (đã cắt theo trần).
+func (d *DB) SetStepOutput(runID int64, stepID, output string) error {
+	if len(output) > MaxStepOutput {
+		output = "…(đã cắt bớt phần đầu)…\n" + output[len(output)-MaxStepOutput:]
+	}
+	_, err := d.db.Exec(`UPDATE flow_steps SET output=? WHERE run_id=? AND step_id=?`,
+		output, runID, stepID)
+	return err
+}
+
 // Steps đọc trạng thái mọi bước của một lần chạy.
 func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 	rows, err := d.db.Query(
-		`SELECT run_id,step_id,state,attempt,COALESCE(msg,'') FROM flow_steps WHERE run_id=?`, runID)
+		`SELECT run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,'')
+		   FROM flow_steps WHERE run_id=?`, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +286,7 @@ func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 	out := map[string]StepRun{}
 	for rows.Next() {
 		var s StepRun
-		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg); err != nil {
+		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output); err != nil {
 			return nil, err
 		}
 		out[s.StepID] = s

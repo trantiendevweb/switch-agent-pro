@@ -427,25 +427,67 @@ type agentBridge struct {
 	fallback Addr
 }
 
-func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree bool) error {
+func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree bool) (string, error) {
 	addr := b.fallback
 	if profileStr != "" {
 		addr = ParseAddr(profileStr)
 	}
 	if addr.Account == "" {
-		return fmt.Errorf("bước agent chưa biết chạy bằng tài khoản nào — đặt `profile` trong flow hoặc truyền --profile")
+		return "", fmt.Errorf("bước agent chưa biết chạy bằng tài khoản nào — đặt `profile` trong flow hoặc truyền --profile")
 	}
 	res, err := b.a.FleetStart(FleetRequest{
 		Addr: addr, Copies: copies, Worktree: worktree,
 		Args: []string{"-p", prompt},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if res.Started == 0 {
-		return fmt.Errorf("không bật được phiên nào")
+		return "", fmt.Errorf("không bật được phiên nào")
 	}
-	return b.a.waitSessions(ctx, res.IDs)
+	// Ghi lại đường dẫn log TRƯỚC khi đợi: xong việc thì phiên đã rời sổ
+	// "đang chạy", lúc đó hỏi lại là không còn.
+	logs := b.a.sessionLogs(res.IDs)
+	if err := b.a.waitSessions(ctx, res.IDs); err != nil {
+		return "", err
+	}
+	return readLogs(logs), nil
+}
+
+// sessionLogs lấy đường dẫn log của các phiên vừa bật.
+func (a *API) sessionLogs(ids []int64) []string {
+	want := map[int64]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	running, err := a.db.Running()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, s := range running {
+		if want[s.ID] && s.Log != "" {
+			out = append(out, s.Log)
+		}
+	}
+	return out
+}
+
+// readLogs gộp log của các agent thành kết quả cho bước sau dùng.
+func readLogs(paths []string) string {
+	var sb strings.Builder
+	for i, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		if len(paths) > 1 {
+			fmt.Fprintf(&sb, "===== agent %d =====\n", i+1)
+		}
+		sb.Write(data)
+		sb.WriteString("\n")
+	}
+	return strings.TrimSpace(sb.String())
 }
 
 // waitSessions đợi các phiên kết thúc. Không có daemon nên hỏi sổ theo nhịp —

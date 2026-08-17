@@ -525,7 +525,11 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li class="task done"><span class="box"></span>Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.</li>
 <li class="task"><span class="box"></span>Chạy <strong>song song nhiều bước</strong> cùng lúc (v1 tuần tự theo topo; song song
       thật nằm trong bước agent qua <code>copies</code>).</li>
-<li class="task"><span class="box"></span>Truyền dữ liệu giữa các bước (<code>{{steps.x.output}}</code>).</li>
+<li class="task done"><span class="box"></span><strong>Truyền dữ liệu giữa các bước</strong>: <code>{{steps.&lt;id&gt;.output}}</code>. Kết quả lưu ở
+  SQLite (migration v4) nên <strong>sống sót qua resume</strong>. shell lấy stdout+stderr,
+  agent gộp log các phiên, notify lấy chính lời nhắn. Có hai trần: lưu 32KB,
+  nhét vào prompt 6KB — giữ phần CUỐI (kết luận thường ở đó) và <strong>nói rõ đã cắt</strong>.
+  Tham chiếu sai id thì giữ nguyên chuỗi để người viết thấy, không im lặng nuốt.</li>
 <li class="task"><span class="box"></span>Workflow board (mặt 4).</li>
 <li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>

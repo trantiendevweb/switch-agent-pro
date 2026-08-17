@@ -368,6 +368,12 @@ func knownTypes() []string {
 	return out
 }
 
+// MaxInject là trần phần kết quả được nhét vào prompt của bước sau.
+//
+// Nhỏ hơn trần lưu trữ: agent có thể xuất hàng chục nghìn ký tự, nhét hết vào
+// prompt là đốt ngữ cảnh (và tiền) mà thường chỉ phần cuối mới có kết luận.
+const MaxInject = 6000
+
 // Expand thay {{bien}} bằng giá trị trong vars (và ghi đè từ tham số dòng lệnh).
 func Expand(s string, vars map[string]string) string {
 	for k, v := range vars {
@@ -375,3 +381,27 @@ func Expand(s string, vars map[string]string) string {
 	}
 	return s
 }
+
+// WithOutputs trả về bản sao của vars, thêm khoá `steps.<id>.output` để bước sau
+// dùng được kết quả bước trước:
+//
+//	prompt = "Đọc kết quả rà soát rồi tóm tắt: {{steps.ra-soat.output}}"
+//
+// Kết quả dài thì cắt phần ĐẦU, giữ phần CUỐI (kết luận thường ở cuối) và nói
+// rõ là đã cắt — thà mất phần giữa còn hơn để người đọc tưởng đó là toàn bộ.
+func WithOutputs(vars map[string]string, outputs map[string]string) map[string]string {
+	out := make(map[string]string, len(vars)+len(outputs))
+	for k, v := range vars {
+		out[k] = v
+	}
+	for id, o := range outputs {
+		if len(o) > MaxInject {
+			o = "…(đã cắt bớt phần đầu, giữ " + itoa(MaxInject) + " ký tự cuối)…\n" +
+				o[len(o)-MaxInject:]
+		}
+		out["steps."+id+".output"] = o
+	}
+	return out
+}
+
+func itoa(n int) string { return fmt.Sprintf("%d", n) }

@@ -391,7 +391,11 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.
 - [ ] Chạy **song song nhiều bước** cùng lúc (v1 tuần tự theo topo; song song
       thật nằm trong bước agent qua `copies`).
-- [ ] Truyền dữ liệu giữa các bước (`{{steps.x.output}}`).
+- [x] **Truyền dữ liệu giữa các bước**: `{{steps.<id>.output}}`. Kết quả lưu ở
+  SQLite (migration v4) nên **sống sót qua resume**. shell lấy stdout+stderr,
+  agent gộp log các phiên, notify lấy chính lời nhắn. Có hai trần: lưu 32KB,
+  nhét vào prompt 6KB — giữ phần CUỐI (kết luận thường ở đó) và **nói rõ đã cắt**.
+  Tham chiếu sai id thì giữ nguyên chuỗi để người viết thấy, không im lặng nuốt.
 - [ ] Workflow board (mặt 4).
 - **DoD:** thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh **approval không thể bị bỏ qua**.

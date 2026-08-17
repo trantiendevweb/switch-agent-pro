@@ -15,15 +15,16 @@ type fakeAgent struct {
 	calls   int
 	prompts []string
 	fail    bool
+	output  string // kết quả giả agent trả về
 }
 
-func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _ bool) error {
+func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _ bool) (string, error) {
 	f.calls += copies
 	f.prompts = append(f.prompts, prompt)
 	if f.fail {
-		return context.DeadlineExceeded
+		return "", context.DeadlineExceeded
 	}
-	return nil
+	return f.output, nil
 }
 
 func newRunner(t *testing.T) (*Runner, *fakeAgent, *store.DB) {
