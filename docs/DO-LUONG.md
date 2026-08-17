@@ -116,11 +116,32 @@ Bản đo: `@openai/codex` 0.147.0, cài qua npm global.
 - [x] **Xoá clone an toàn.** Đặt mồi `~/.claude/__clean_bait.txt`, chạy
   `sagent clean claude:phu` → xoá 3 clone, **mồi còn nguyên**, số mục trong
   `~/.claude` không đổi (20/20).
-- [ ] ⚠ **Concurrent refresh — CHƯA ĐO.** Token bị chép ra N chỗ; khi hết hạn,
-  N tiến trình có thể cùng gọi refresh. Chưa biết nhà cung cấp xử lý thế nào
-  (có thể thu hồi refresh token cũ → các phiên khác văng). `fleet` **in cảnh báo
-  này mỗi lần chạy** thay vì hứa an toàn. Cần một phiên chạy đủ dài qua mốc hết
-  hạn token để đo.
+### Refresh token khi chạy song song — ĐO ĐƯỢC MỘT PHẦN (2026-08-17)
+
+**Đo được: cửa sổ hết hạn.** Đọc thẳng từ file token (chỉ đọc dấu thời gian,
+không đụng giá trị token):
+
+| Provider | Trường | Hạn access token | Ghi chú |
+|---|---|---|---|
+| Claude | `claudeAiOauth.expiresAt` | **~7,5 giờ** | `refreshTokenExpiresAt` còn 26 ngày |
+| Codex | `exp` trong JWT `access_token` | **~6,5 ngày** | `last_refresh` cách đó 4 ngày |
+
+→ **Claude là rủi ro thật**: một hạm đội chạy qua đêm CHẮC CHẮN vượt mốc refresh.
+Codex thì hiếm khi chạm tới.
+
+**Chắc chắn đúng, không cần thí nghiệm: refresh trong bản clone bị MẤT.**
+`clone` chép token ra N thư mục riêng. Nếu một bản clone tự refresh, hồ sơ gốc
+không hề biết — lần chạy sau vẫn dùng token cũ. Đây là suy ra từ chính thiết kế,
+không phải phỏng đoán về hành vi nhà cung cấp.
+
+- [x] Cửa sổ hết hạn của cả hai provider — đã đo.
+- [x] Mất refresh khi dùng clone — chắc chắn theo thiết kế; đã xử lý bằng cách
+      **ghi ngược token mới nhất về hồ sơ gốc** (xem `profile.SyncBackTokens`).
+- [ ] ⚠ **Nhà cung cấp có XOAY refresh token không — VẪN CHƯA ĐO.** Nếu có xoay
+      (bản refresh mới làm bản cũ hết hiệu lực) thì N clone cùng refresh sẽ chỉ
+      một bản sống, các bản khác văng. Muốn đo phải để một hạm đội chạy vắt qua
+      mốc 7,5 giờ của Claude rồi xem từng bản clone còn gọi được không. Chưa làm.
+      Vì vậy `fleet` vẫn **cảnh báo** thay vì hứa an toàn.
 
 ---
 

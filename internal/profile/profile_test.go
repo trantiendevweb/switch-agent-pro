@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
@@ -24,6 +25,7 @@ func (f fakeAdapter) BaseDir() string          { return f.base }
 func (f fakeAdapter) IdentitySource() string   { return "" }
 func (f fakeAdapter) Identity(string) string   { return "" }
 func (f fakeAdapter) HasToken(string) bool     { return f.hasToken }
+func (f fakeAdapter) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
 func (f fakeAdapter) Verify() []provider.Check { return nil }
 
 // Phép đo an toàn quan trọng nhất (DoD Pha 1): thư mục hồ sơ toàn junction/symlink

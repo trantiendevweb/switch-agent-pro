@@ -317,6 +317,13 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   riêng nên **không đua ghi**); `fleet` — bật N phiên nền, log ra file;
   `status`; `stop <số|all>`; `clean` — xoá clone **an toàn** (không xuyên junction).
 - [x] Cảnh báo thẳng: tiêu hạn mức gấp N, và **concurrent refresh chưa đo**.
+- [x] **Cảnh báo token sắp hết hạn** trước khi bật hạm đội — đã đo được Claude
+  hết hạn sau ~7,5 giờ (Codex ~6,5 ngày), nên đội chạy dài chắc chắn vượt mốc.
+  `TokenExpiry()` vào interface adapter, CHỈ đọc dấu thời gian.
+- [x] **Mang token đã refresh từ bản clone về hồ sơ gốc** (`SyncBackTokens`):
+  clone giữ bản token riêng nên refresh trong clone vốn bị mất trắng — đây là hệ
+  quả thẳng của thiết kế, không phải phỏng đoán. So **nội dung** chứ không chỉ
+  mtime (clone luôn có mtime mới hơn), có sao lưu trước khi đè.
 - [x] Sửa bug thật: tài khoản di trú từ v1 không chạy được vì `Dir()` chỉ trỏ
   kho mới → thêm `ResolveDir()` dùng chung cho mọi verb.
 - [x] **Workspace backend: git worktree** (`--worktree`) — mỗi phiên một cây làm

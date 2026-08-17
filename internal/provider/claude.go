@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 )
@@ -79,6 +80,24 @@ func (c claude) Verify() []Check {
 	_, e3 := os.Stat(c.IdentitySource())
 	out = append(out, Check{"đọc được file danh tính gốc", e3 == nil, c.IdentitySource()})
 	return out
+}
+
+// TokenExpiry đọc claudeAiOauth.expiresAt (mili-giây từ epoch).
+// Đã đo 2026-08-17: cửa sổ khoảng 7,5 giờ.
+func (claude) TokenExpiry(dir string) (time.Time, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, ".credentials.json"))
+	if err != nil {
+		return time.Time{}, false
+	}
+	var f struct {
+		ClaudeAiOauth struct {
+			ExpiresAt int64 `json:"expiresAt"`
+		} `json:"claudeAiOauth"`
+	}
+	if json.Unmarshal(data, &f) != nil || f.ClaudeAiOauth.ExpiresAt == 0 {
+		return time.Time{}, false
+	}
+	return time.UnixMilli(f.ClaudeAiOauth.ExpiresAt), true
 }
 
 func (claude) SharedKeys() []string { return claudeSharedKeys }

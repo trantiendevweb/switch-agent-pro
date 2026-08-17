@@ -324,6 +324,21 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 			return fleet.Result{}, fmt.Errorf("đã đạt trần %d phiên đang chạy — dừng bớt rồi thử lại (sagent stop all)", m)
 		}
 	}
+	// Cảnh báo nếu token sắp hết hạn: hạm đội chạy dài sẽ vượt mốc refresh, mà
+	// hành vi khi nhiều bản clone cùng refresh thì CHƯA ĐO (docs/DO-LUONG.md).
+	if dir, ok := profile.ResolveDir(req.Addr.Provider, req.Addr.Account); ok {
+		if exp, ok := ad.TokenExpiry(dir); ok {
+			left := time.Until(exp)
+			switch {
+			case left <= 0:
+				a.bus.Warnf("token của %s ĐÃ HẾT HẠN — chạy `sagent %s` một lần để làm mới trước.", req.Addr, req.Addr)
+			case left < 2*time.Hour:
+				a.bus.Warnf("token của %s còn %s. Hạm đội chạy lâu hơn thế sẽ phải refresh, "+
+					"mà hành vi khi nhiều bản clone cùng refresh CHƯA ĐO.", req.Addr, left.Truncate(time.Minute))
+			}
+		}
+	}
+
 	return fleet.FanOut(a.db, a.bus, ad, req.Addr.Account, fleet.Opts{
 		Copies: req.Copies, Worktree: req.Worktree,
 	}, req.Args)
@@ -385,6 +400,14 @@ func (a *API) ClonesClean(addr Addr, workDir string, force bool) (CleanResult, e
 				a.bus.Publish(events.Event{Type: events.WorktreeGone, Addr: addr.String(),
 					Msg: "đã gỡ worktree", Detail: map[string]string{"path": dir}})
 			}
+		}
+	}
+
+	// Mang token đã refresh trong clone về hồ sơ gốc TRƯỚC khi xoá clone đi —
+	// nếu không thì công refresh mất trắng.
+	if ad, err := adapterOf(addr.Provider); err == nil {
+		if name, err := profile.SyncBackTokens(ad, addr.Account); err == nil && name != "" {
+			a.bus.Infof("đã mang %s mới nhất từ bản clone về %s", name, addr)
 		}
 	}
 

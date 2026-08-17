@@ -3,6 +3,8 @@
 // mọi khác biệt nằm trong adapter.
 package provider
 
+import "time"
+
 // Check là một phép đo trong bộ "đã đo" của adapter.
 type Check struct {
 	Name   string
@@ -42,6 +44,13 @@ type Adapter interface {
 
 	Identity(configDir string) string // email/định danh để hiển thị; "" nếu chưa đăng nhập
 	HasToken(configDir string) bool
+
+	// TokenExpiry cho biết token còn hạn tới bao giờ (ok=false nếu không đọc được).
+	//
+	// CHỈ đọc dấu thời gian, không bao giờ trả về hay ghi log giá trị token.
+	// Dùng để cảnh báo trước khi bật hạm đội chạy dài: đã đo được Claude hết hạn
+	// sau ~7,5 giờ, nên một đội chạy qua đêm chắc chắn vượt mốc refresh.
+	TokenExpiry(configDir string) (time.Time, bool)
 
 	// Verify chứng minh trên MÁY NÀY việc tách thư mục là tách thật.
 	Verify() []Check

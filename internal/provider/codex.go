@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 )
@@ -150,6 +151,34 @@ func short(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+// TokenExpiry đọc claim `exp` trong JWT access_token.
+// Đã đo 2026-08-17: cửa sổ khoảng 6,5 ngày — dài hơn Claude rất nhiều.
+func (c codex) TokenExpiry(dir string) (time.Time, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, "auth.json"))
+	if err != nil {
+		return time.Time{}, false
+	}
+	var a codexAuth
+	if json.Unmarshal(data, &a) != nil {
+		return time.Time{}, false
+	}
+	parts := strings.Split(a.Tokens.AccessToken, ".")
+	if len(parts) < 2 {
+		return time.Time{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return time.Time{}, false
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if json.Unmarshal(raw, &claims) != nil || claims.Exp == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(claims.Exp, 0), true
 }
 
 func (c codex) Verify() []Check {

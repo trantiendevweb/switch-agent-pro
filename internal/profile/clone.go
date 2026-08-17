@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
@@ -67,6 +68,96 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 		dirs = append(dirs, dir)
 	}
 	return dirs, nil
+}
+
+// SyncBackTokens mang token đã được làm mới trong bản clone về hồ sơ gốc.
+//
+// Vì sao cần: `clone` chép token ra N thư mục riêng (bắt buộc, nếu không N tiến
+// trình sẽ đua ghi). Nhưng khi một bản clone tự refresh, hồ sơ gốc KHÔNG hề
+// biết — lần chạy sau vẫn dùng token cũ và có thể đã hết hạn. Đây không phải
+// phỏng đoán về nhà cung cấp mà là hệ quả thẳng của thiết kế.
+//
+// Cách xử lý: tìm bản clone có file token MỚI NHẤT; nếu mới hơn bản ở hồ sơ gốc
+// thì chép ngược về (có sao lưu). Nhiều clone cùng refresh thì lấy bản mới nhất
+// — đó là phỏng đoán tốt nhất có thể khi chưa đo được nhà cung cấp có xoay
+// refresh token hay không.
+//
+// Trả về tên file đã mang về (rỗng nếu không có gì mới).
+func SyncBackTokens(a provider.Adapter, account string) (string, error) {
+	base, ok := ResolveDir(a.Name(), account)
+	if !ok {
+		return "", nil
+	}
+	root := filepath.Join(ClonesRoot(), a.Name(), account)
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return "", nil // chưa clone bao giờ — không có gì phải làm
+	}
+
+	// Chỉ quan tâm file token; danh tính/khoá/DB thì không mang về.
+	tokenFile := a.PrivateFiles()
+	if len(tokenFile) == 0 {
+		return "", nil
+	}
+	name := tokenFile[0] // theo quy ước, file đầu tiên là file token
+
+	basePath := filepath.Join(base, name)
+	baseTime := time.Time{}
+	if st, err := os.Stat(basePath); err == nil {
+		baseTime = st.ModTime()
+	}
+
+	newest, newestTime := "", baseTime
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		p := filepath.Join(root, e.Name(), name)
+		st, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		if st.ModTime().After(newestTime) {
+			newest, newestTime = p, st.ModTime()
+		}
+	}
+	if newest == "" {
+		return "", nil
+	}
+
+	data, err := os.ReadFile(newest)
+	if err != nil {
+		return "", err
+	}
+
+	// So NỘI DUNG, không chỉ dấu thời gian.
+	//
+	// Bản thân việc clone đã ghi file token mới toanh nên mtime của nó LUÔN mới
+	// hơn bản gốc — chỉ dựa vào thời gian thì lần nào cũng tưởng là "đã refresh",
+	// đè token vô cớ và đẻ ra một file .bak mỗi lần. Chỉ mang về khi token THẬT
+	// SỰ khác đi.
+	old := mustRead(basePath)
+	if string(old) == string(data) {
+		return "", nil
+	}
+
+	// Sao lưu bản cũ trước khi đè — đây là token, hỏng là phải đăng nhập lại.
+	if len(old) > 0 {
+		_ = os.WriteFile(basePath+".bak-"+time.Now().Format("20060102-150405"), old, 0o600)
+	}
+	tmp := basePath + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, basePath); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+func mustRead(p string) []byte {
+	b, _ := os.ReadFile(p)
+	return b
 }
 
 // CleanClones xoá mọi bản clone của một tài khoản, AN TOÀN.

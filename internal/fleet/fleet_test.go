@@ -36,6 +36,7 @@ func (f fakeAgent) BaseDir() string        { return f.base }
 func (fakeAgent) IdentitySource() string   { return "" }
 func (fakeAgent) Identity(string) string   { return "" }
 func (fakeAgent) HasToken(string) bool     { return true }
+func (fakeAgent) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
 func (fakeAgent) Verify() []provider.Check { return nil }
 
 // setup dựng HOME giả + hồ sơ gốc có token + một store tạm.

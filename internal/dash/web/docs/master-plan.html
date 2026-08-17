@@ -449,6 +449,13 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   riêng nên <strong>không đua ghi</strong>); <code>fleet</code> — bật N phiên nền, log ra file;
   <code>status</code>; <code>stop &lt;số|all&gt;</code>; <code>clean</code> — xoá clone <strong>an toàn</strong> (không xuyên junction).</li>
 <li class="task done"><span class="box"></span>Cảnh báo thẳng: tiêu hạn mức gấp N, và <strong>concurrent refresh chưa đo</strong>.</li>
+<li class="task done"><span class="box"></span><strong>Cảnh báo token sắp hết hạn</strong> trước khi bật hạm đội — đã đo được Claude
+  hết hạn sau ~7,5 giờ (Codex ~6,5 ngày), nên đội chạy dài chắc chắn vượt mốc.
+  <code>TokenExpiry()</code> vào interface adapter, CHỈ đọc dấu thời gian.</li>
+<li class="task done"><span class="box"></span><strong>Mang token đã refresh từ bản clone về hồ sơ gốc</strong> (<code>SyncBackTokens</code>):
+  clone giữ bản token riêng nên refresh trong clone vốn bị mất trắng — đây là hệ
+  quả thẳng của thiết kế, không phải phỏng đoán. So <strong>nội dung</strong> chứ không chỉ
+  mtime (clone luôn có mtime mới hơn), có sao lưu trước khi đè.</li>
 <li class="task done"><span class="box"></span>Sửa bug thật: tài khoản di trú từ v1 không chạy được vì <code>Dir()</code> chỉ trỏ
   kho mới → thêm <code>ResolveDir()</code> dùng chung cho mọi verb.</li>
 <li class="task done"><span class="box"></span><strong>Workspace backend: git worktree</strong> (<code>--worktree</code>) — mỗi phiên một cây làm
