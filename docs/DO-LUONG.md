@@ -631,10 +631,57 @@ Nên phải là **hai file**, và lý do đó viết thẳng vào đầu mỗi f
   `cai-dat.ps1` về file tạm rồi gọi bằng `&` — lúc đó đọc từ file nên BOM lại là thứ
   *cần*. Tham số truyền qua biến môi trường (`SAGENT_PHIEN`, `SAGENT_TU_NGUON`).
 
-Bài học chung cho cả ba cái bẫy trong mục này: **cả ba đều là "code trông đúng, chạy mới
+#### Cái bẫy thứ tư: `irm | iex` và `iex (irm)` không như nhau
+
+Vẫn chưa xong. Mồi ASCII ở trên vẫn hỏng, và lần này không phải vì BOM:
+
+```
+$ irm .../get.ps1 | iex
+Invoke-Expression : Cannot bind argument to parameter 'Command' because it is an empty string.
+iex : At line:1 char:5
++ try {
+      Missing closing '}' in statement block or type definition.
+```
+
+Ba giả thuyết của tôi lần lượt **sai**, mỗi cái chết vì một phép đo:
+
+| Giả thuyết | Phép đo | Kết quả |
+|---|---|---|
+| `irm` trả về mảng từng dòng | `@(irm $u).Count` | `1` — sai |
+| Thiếu `-UseBasicParsing` | so ba dạng gọi | cả ba đều `System.String` — sai |
+| Nội dung tải về bị cắt | `irm \| %{ $_.Length }` | `1645`, nguyên vẹn — sai |
+
+Thứ phân biệt được đúng/sai chỉ có một: **cách đưa chuỗi vào `iex`.**
+
+```
+iex $t                      ->  CHẠY   (cùng nội dung, gán vào biến trước)
+iex (irm $u)                ->  CHẠY
+iex (iwr -useb $u).Content  ->  CHẠY
+irm $u | iex                ->  HỎNG
+```
+
+Cùng một chuỗi 1645 ký tự, chỉ khác đường vào. Nên lệnh cài chính thức là
+**`iex (irm <url>)`** chứ không phải `irm <url> | iex` — dù dạng pipe mới là dạng người
+ta hay chép trên mạng.
+
+Đo lần cuối, máy sạch, tải thật từ GitHub Releases:
+
+```
+  ✓ Bản: v0.1.0 (amd64)
+  ✓ Đã tải 11.1 MB
+  ✓ SHA256 khớp
+  ✓ Đã cài: ~\bin\sagent.exe
+  sagent v0.1.0 (50e4e3b) · 2026-08-17
+
+  >>> TỔNG THỜI GIAN: 3,4 giây
+```
+
+Bài học chung cho cả bốn cái bẫy trong mục này: **cả bốn đều là "code trông đúng, chạy mới
 biết"** — file Go biến mất khỏi build, script vỡ cú pháp ở dòng không liên quan, lệnh cài
-chết ngay dòng đầu. Không cái nào lộ ra khi đọc lại, và cái thứ ba chỉ lộ vì đã bấm chạy
-đúng cái lệnh mà người dùng sẽ bấm.
+chết ngay dòng đầu, rồi cùng một chuỗi lúc chạy lúc không tuỳ đường đưa vào. Không cái
+nào lộ ra khi đọc lại. Hai cái cuối chỉ lộ vì đã bấm chạy **đúng cái lệnh người dùng sẽ
+bấm** — và cái thứ tư được phát hiện SAU khi đã phát hành v0.1.0, nghĩa là bản v0.1.0 ra
+đời với một lệnh cài ghi trong README mà không chạy được.
 
 ---
 

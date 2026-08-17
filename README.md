@@ -50,7 +50,7 @@ chỉ khác ở auth, protocol và cách agent/model được thực thi.
 Một dòng. **Không cần Go, không cần quyền quản trị, không cần cài gì trước.**
 
 ```powershell
-irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1 | iex
+iex (irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1)
 ```
 
 Nó tải một file `.exe` (~11 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
@@ -68,7 +68,7 @@ Qua lệnh một dòng thì không truyền được tham số, nên dùng biế
 
 ```powershell
 $env:SAGENT_PHIEN = 'v0.2.0'
-irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1 | iex
+iex (irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1)
 ```
 
 Gỡ: xoá `%USERPROFILE%\bin\sagent.exe`. Dữ liệu nằm ở `~/.ai-accounts` — xoá riêng nếu muốn.

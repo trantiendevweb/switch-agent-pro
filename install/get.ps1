@@ -1,4 +1,4 @@
-# get.ps1 - moi cai dat, danh cho `irm ... | iex`.
+# get.ps1 - moi cai dat, danh cho:  iex (irm <url cua file nay>)
 #
 # TAI SAO CAN FILE NAY (da do, khong doan):
 #
@@ -6,7 +6,7 @@
 #   Viet UTF-8 bien thanh dau nhay cong va script VO CU PHAP. Vi vay cai-dat.ps1
 #   bat buoc phai co BOM.
 #
-#   Nhung `irm <url> | iex` thi NGUOC LAI: irm tra ve chuoi bat dau bang U+FEFF
+#   Nhung `iex (irm <url>)` thi NGUOC LAI: irm tra ve chuoi bat dau bang U+FEFF
 #   va Invoke-Expression khong parse duoc ky tu do. Da do:
 #       iex (script khong BOM)  -> chay
 #       iex (BOM + script)      -> hong
@@ -39,3 +39,8 @@ try {
 } finally {
   Remove-Item -Force $tmp -ErrorAction SilentlyContinue
 }
+
+# LUU Y ve cach goi: PHAI dung `iex (irm <url>)`, KHONG dung `irm <url> | iex`.
+# Da do: dang pipe hong voi "Cannot bind argument to parameter 'Command' because
+# it is an empty string" roi parse loi tu giua file, trong khi dang ngoac don
+# chay dung. Cung mot noi dung, khac moi cach dua vao iex.
