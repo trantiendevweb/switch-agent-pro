@@ -165,11 +165,22 @@ SameSite=Lax, hết hạn sau 12 giờ và mất khi tắt server; sai nhiều l
 sagent dash --host 0.0.0.0 --port 8787
 ```
 
-> ⚠ Lúc này **mật khẩu là hàng rào duy nhất**, và HTTP **không mã hoá** nó trên
-> đường truyền: ai đoán được đều bật/dừng được agent của bạn và tiêu hạn mức. Đặt
-> mật khẩu dài, và đóng cổng khi xong. An toàn hơn hẳn thì đừng phơi cổng mà dùng
-> SSH tunnel: `ssh -L 4600:127.0.0.1:4600 user@server` rồi mở `http://127.0.0.1:4600`
-> ở máy bạn.
+Phơi ra mạng thì **HTTPS là mặc định** — chứng chỉ tự ký sinh tự động, phủ mọi IP của
+máy. Vì tự ký nên trình duyệt sẽ cảnh báo; công cụ in **vân tay SHA-256** ra terminal để
+bạn đối chiếu trong hộp thoại xem chứng chỉ trước khi bấm "vẫn tiếp tục":
+
+```
+    17:BD:F4:E5:10:1F:43:18:F5:63:63:7A:8C:53:46:00:AA:BE:A7:4D:...
+```
+
+> ⚠ **Không đối chiếu vân tay thì TLS chỉ chống nghe lén, không chống kẻ đứng giữa.**
+> Và mật khẩu vẫn là hàng rào duy nhất: ai đoán được đều bật/dừng được agent của bạn và
+> tiêu hạn mức. Đặt mật khẩu dài, đóng cổng khi xong.
+
+Muốn HTTP trần (đã có SSH tunnel/VPN bọc ngoài) thì phải gõ thêm `--http-tran`; không gõ
+thì server **từ chối chạy** chứ không lặng lẽ gửi mật khẩu dạng chữ thường. Kín hơn cả
+là đừng phơi cổng: `ssh -L 4600:127.0.0.1:4600 user@server` rồi mở `http://127.0.0.1:4600`
+ở máy bạn.
 
 > File cấu hình **không bao giờ chứa secret** — API key/token chỉ được tham chiếu bằng ID.
 
@@ -229,7 +240,7 @@ Không tô hồng:
 | Sao lưu / khôi phục `state.db`, chặn hạ cấp binary | ✅ |
 | Provider Codex | ✅ stable · Gemini/Cursor ⬜ chưa có CLI để đo |
 | Đường API (nhiều AI API) | ⬜ chưa có API key để verify |
-| TLS cho dashboard | ⬜ **chưa có** — `--host 0.0.0.0` gửi mật khẩu dạng trần |
+| TLS cho dashboard | ✅ HTTPS mặc định khi phơi ra mạng (chứng chỉ tự ký, in vân tay) |
 
 **Đang bị chặn:** chưa có API key thật để verify đường API. Provider ngoài Claude/Codex
 giữ nhãn `experimental` vì chưa có CLI để đo.

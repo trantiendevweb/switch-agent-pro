@@ -36,6 +36,9 @@ type Server struct {
 	mux     *http.ServeMux
 	exposed bool // true = nghe ngoài loopback (phải chủ động bật)
 
+	dungTLS  bool // phục vụ HTTPS bằng chứng chỉ tự ký
+	chiuTran bool // người dùng CHỦ ĐỘNG chấp nhận HTTP trần khi phơi ra mạng
+
 	auth *Auth     // nil = chưa đặt mật khẩu → server từ chối chạy
 	sess *sessions // phiên đăng nhập bằng cookie
 
@@ -155,13 +158,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.noteOK()
-	setCookie(w, s.sess.create())
+	setCookie(w, s.sess.create(), s.dungTLS)
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	s.sess.drop(cookieID(r))
-	clearCookie(w)
+	clearCookie(w, s.dungTLS)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -236,6 +239,11 @@ code{background:#272F42;padding:2px 6px;border-radius:5px;font-size:.9em;color:#
 // ServeHTTP để test dùng httptest mà không cần mở cổng thật.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
 
+// DungTLS bật/tắt HTTPS. ChiuHTTPTran là lối thoát CÓ Ý THỨC cho người chấp nhận
+// gửi mật khẩu dạng trần (LAN kín, hoặc đã có đường hầm mã hoá ở ngoài).
+func (s *Server) DungTLS(v bool) { s.dungTLS = v }
+func (s *Server) ChiuHTTPTran()  { s.chiuTran = true }
+
 // Run bind vào host:port rồi phục vụ tới khi tiến trình dừng.
 //
 // host ngoài loopback = CHẾ ĐỘ PHƠI RA MẠNG. Lúc đó mật khẩu là hàng rào DUY
@@ -248,9 +256,33 @@ func (s *Server) Run(host string, port int) error {
 	}
 	s.exposed = !isLoopbackAddr(host)
 
+	// Phơi ra mạng mà không mã hoá thì mọi thứ đã làm để bảo vệ mật khẩu — băm
+	// PBKDF2 210k vòng, siết ACL, bỏ token khỏi URL — đều vô nghĩa: nó đi qua
+	// dây dưới dạng chữ thường. Chặn ở ĐÂY chứ không chỉ cảnh báo ở CLI, vì đây
+	// là chỗ không đi vòng được.
+	if s.exposed && !s.dungTLS && !s.chiuTran {
+		return errors.New("phơi ra mạng mà không có TLS — mật khẩu sẽ đi dạng trần.\n" +
+			"     Bỏ cờ --http-tran để dùng HTTPS (mặc định), hoặc giữ nó nếu bạn đã có\n" +
+			"     đường hầm mã hoá ở ngoài (SSH tunnel, VPN)")
+	}
+
+	var certFile, keyFile, vanTay string
+	if s.dungTLS {
+		var err error
+		certFile, keyFile, vanTay, err = EnsureCert()
+		if err != nil {
+			return fmt.Errorf("không dựng được chứng chỉ TLS: %w", err)
+		}
+	}
+
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return fmt.Errorf("không mở được cổng %d: %w (thử --port khác)", port, err)
+	}
+
+	giaoThuc := "http"
+	if s.dungTLS {
+		giaoThuc = "https"
 	}
 
 	fmt.Println()
@@ -259,18 +291,37 @@ func (s *Server) Run(host string, port int) error {
 		fmt.Println("  ║  ⚠  DASHBOARD ĐANG PHƠI RA MẠNG                              ║")
 		fmt.Println("  ╚══════════════════════════════════════════════════════════════╝")
 		fmt.Println("  Ai đăng nhập được đều BẬT/DỪNG được agent của bạn và tiêu hạn mức.")
-		fmt.Printf("  Mật khẩu của %q là hàng rào DUY NHẤT — và HTTP KHÔNG mã hoá nó\n", s.auth.User)
-		fmt.Println("  trên đường truyền. Xong việc thì Ctrl+C để đóng cổng.")
+		if s.dungTLS {
+			fmt.Printf("  Mật khẩu của %q là hàng rào DUY NHẤT. Đường truyền đã mã hoá.\n", s.auth.User)
+		} else {
+			fmt.Printf("  Mật khẩu của %q là hàng rào DUY NHẤT — và HTTP KHÔNG mã hoá nó\n", s.auth.User)
+			fmt.Println("  trên đường truyền (bạn đã chọn --http-tran).")
+		}
+		fmt.Println("  Xong việc thì Ctrl+C để đóng cổng.")
 		fmt.Println()
-		fmt.Printf("  Mở trên điện thoại/máy khác:\n    http://<IP-máy-này>:%d/\n", port)
+		fmt.Printf("  Mở trên điện thoại/máy khác:\n    %s://<IP-máy-này>:%d/\n", giaoThuc, port)
 	} else {
 		fmt.Println("  Dashboard đang chạy — mở link này trên trình duyệt (cùng máy):")
-		fmt.Printf("    http://%s/\n", ln.Addr().String())
+		fmt.Printf("    %s://%s/\n", giaoThuc, ln.Addr().String())
 		fmt.Println()
 		fmt.Printf("  Chỉ nghe ở loopback; đăng nhập bằng tài khoản %q.\n", s.auth.User)
 	}
+
+	if s.dungTLS {
+		fmt.Println()
+		fmt.Println("  Chứng chỉ TỰ KÝ nên trình duyệt sẽ cảnh báo. Trước khi bấm \"vẫn tiếp tục\",")
+		fmt.Println("  mở phần xem chứng chỉ và đối chiếu vân tay SHA-256 với dòng dưới đây.")
+		fmt.Println("  Không đối chiếu thì TLS chỉ chống nghe lén, không chống kẻ đứng giữa.")
+		fmt.Println()
+		fmt.Printf("    %s\n", vanTay)
+		fmt.Printf("    (chứng chỉ: %s)\n", certFile)
+	}
+
 	fmt.Println()
 	fmt.Println("  Ctrl+C để dừng.")
+	if s.dungTLS {
+		return http.ServeTLS(ln, s, certFile, keyFile)
+	}
 	return http.Serve(ln, s)
 }
 

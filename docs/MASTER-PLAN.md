@@ -584,8 +584,12 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   - ⬜ Còn lại: quét mồ côi của phiên `lost` · upgrade/provider-drift verify · SBOM +
     license notices · **ký số** binary (đã có băm, chưa có chữ ký) · migration guide v1.
   - ~~symlink-escape Linux~~ — bỏ cùng nhánh Linux.
-  - ⚠ **HTTP không mã hoá.** `--host 0.0.0.0` gửi mật khẩu dạng trần trên đường truyền.
-    Chưa có TLS — phải giải quyết trước khi gọi là "phát hành được".
+  - ✅ **TLS cho dashboard** — phơi ra mạng giờ **mặc định HTTPS**, chứng chỉ tự ký sinh
+    tự động, phủ mọi IP của máy, in vân tay SHA-256 ra terminal để đối chiếu. Muốn HTTP
+    trần phải gõ `--http-tran`, và chốt từ chối nằm trong `Server.Run` chứ không chỉ ở
+    CLI. Đo trên cổng thật: `200 HTTPS`. Số đo ở `docs/DO-LUONG.md`.
+  - ⚠ **Chứng chỉ TỰ KÝ, không phải CA công cộng.** Trình duyệt vẫn cảnh báo; người dùng
+    phải đối chiếu vân tay. Không đối chiếu = chống được nghe lén, không chống kẻ đứng giữa.
 
 ---
 

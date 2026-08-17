@@ -67,20 +67,25 @@ func (s *sessions) drop(id string) {
 
 // setCookie đặt cookie phiên. HttpOnly để JS không đọc được (giảm thiệt hại nếu
 // có XSS); SameSite=Lax để trình duyệt không gửi kèm khi trang khác POST sang.
-func setCookie(w http.ResponseWriter, id string) {
+//
+// Secure chỉ bật khi ĐANG chạy TLS. Bật vô điều kiện thì trên http://127.0.0.1
+// trình duyệt sẽ vứt cookie đi và không ai đăng nhập được — "an toàn hơn" kiểu
+// đó chỉ làm người ta tắt bảo mật cho xong.
+func setCookie(w http.ResponseWriter, id string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    id,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(sessionMaxAge.Seconds()),
 	})
 }
 
-func clearCookie(w http.ResponseWriter) {
+func clearCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
-		Name: cookieName, Value: "", Path: "/", HttpOnly: true,
+		Name: cookieName, Value: "", Path: "/", HttpOnly: true, Secure: secure,
 		SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})
 }

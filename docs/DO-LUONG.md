@@ -683,6 +683,72 @@ nào lộ ra khi đọc lại. Hai cái cuối chỉ lộ vì đã bấm chạy 
 bấm** — và cái thứ tư được phát hiện SAU khi đã phát hành v0.1.0, nghĩa là bản v0.1.0 ra
 đời với một lệnh cài ghi trong README mà không chạy được.
 
+### TLS cho dashboard — ĐÃ LÀM, ĐÃ ĐO TRÊN CỔNG THẬT (2026-08-17, Pha 7)
+
+Đây là cảnh báo treo lâu nhất của dự án: `--host 0.0.0.0` gửi mật khẩu **dạng trần**.
+Mọi thứ đã làm để bảo vệ nó — băm PBKDF2 210k vòng, siết ACL file, bỏ token khỏi URL —
+đều vô nghĩa nếu ai ngồi cùng đường mạng đọc được nó lúc đăng nhập.
+
+Mức độ không phải lý thuyết: SAN của chứng chỉ vừa sinh trên máy dev có
+**`103.97.134.90`** — một IP **công cộng**. Máy này nằm thẳng trên internet, không sau NAT.
+
+**Vì sao tự ký chứ không Let's Encrypt.** Dashboard chạy trên máy cá nhân, thường không
+có tên miền, nghe trên IP. ACME không cấp cho địa chỉ kiểu đó. Cái giá của tự ký là trình
+duyệt sẽ cảnh báo — nên công cụ **in vân tay SHA-256 ra terminal** để đối chiếu. Nói thẳng
+trong chính dòng in: không đối chiếu thì TLS chỉ chống nghe lén thụ động, **không** chống
+được kẻ đứng giữa.
+
+**Chính sách, một chỗ duy nhất** (`cmdDash`):
+
+| host | mặc định | vì sao |
+|---|---|---|
+| ngoài loopback | **HTTPS** | mật khẩu đi qua dây thì phải mã hoá |
+| loopback | HTTP | gói tin không rời máy; `--tls` nếu vẫn muốn |
+
+Muốn kém an toàn hơn thì phải **gõ thêm chữ**: `--http-tran`. Và chốt từ chối nằm trong
+`Server.Run` chứ không chỉ ở CLI — đó là chỗ không đi vòng được.
+
+Ba chi tiết dễ bỏ sót, mỗi cái có test riêng:
+
+1. **Cert phải phủ MỌI IP của máy, không chỉ `localhost`.** Mở dashboard từ điện thoại là
+   gõ IP LAN; cert không phủ IP đó thì trình duyệt báo sai tên miền và người dùng tưởng
+   mình đang bị tấn công. Sinh lại khi máy có IP mới (đổi Wi-Fi) chứ không chỉ khi hết hạn.
+2. **Dùng lại cert cũ, không sinh mới mỗi lần chạy.** Sinh mới thì vân tay đổi liên tục,
+   người dùng quen tay bấm "vẫn tiếp tục", và cả cơ chế đối chiếu thành vô dụng.
+3. **`Secure` trên cookie phải bám theo TLS thật, không bật vô điều kiện.** Bật cứng thì
+   trên `http://127.0.0.1` trình duyệt vứt cookie đi và không ai đăng nhập được — "an toàn
+   hơn" kiểu đó chỉ khiến người ta tắt bảo mật cho xong.
+
+Khoá riêng nằm ở `~/.ai-accounts/dash-tls/`, siết ACL **trước khi ghi khoá vào** chứ không
+phải sau. Đo lại trên máy thật: `Administrator` + `SYSTEM` + `Administrators`, không còn
+cờ `(I)` — kế thừa đã cắt.
+
+**Đo trên cổng thật**, không phải httptest:
+
+```
+$ sagent dash --host 0.0.0.0 --port 4699
+  Mật khẩu của "Admin" là hàng rào DUY NHẤT. Đường truyền đã mã hoá.
+    https://<IP-máy-này>:4699/
+    17:BD:F4:E5:10:1F:43:18:F5:63:63:7A:8C:53:46:00:AA:BE:A7:4D:7D:75:A4:9F:A3:F8:D6:FB:A6:CF:C6:E2
+
+$ curl -sk -w "%{http_code} %{scheme}" https://127.0.0.1:4699/login
+  200 HTTPS
+```
+
+Vân tay in ra khớp đúng vân tay tính từ file cert trên đĩa, và test `TestBatTayTLSThat`
+ghim chứng chỉ rồi so vân tay **trên dây** với vân tay đã in — nếu hai cái lệch thì việc
+đối chiếu bằng mắt chẳng chứng minh được gì.
+
+#### Một test hỏng-kiểu-treo còn tệ hơn không có test
+
+Khi thử gỡ lá chắn để kiểm chứng test có bắt được lỗi không, test **treo 7 phút** rồi bị
+giết, thay vì đỏ. Lý do: nó gọi thẳng `s.Run(...)` và chờ lỗi trả về — gỡ lá chắn thì
+`Run` phục vụ thật và không bao giờ trả về.
+
+Đã sửa: chạy `Run` trong goroutine kèm hạn 3 giây. Giờ gỡ lá chắn là **đỏ trong 3,2 giây**
+với đúng câu cần đọc. Bài học: test cho một lá chắn phải hỏng **nhanh và ồn**, vì cách nó
+hỏng chính là thứ người ta sẽ nhìn thấy lúc 2 giờ sáng.
+
 ---
 
 ## Việc cần bạn hỗ trợ
