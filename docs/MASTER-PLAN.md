@@ -452,8 +452,14 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
   chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.
 - [x] Đã chạy thật qua HTTP: `shell → approve → shell`, dừng đúng ở gate, duyệt
   trên web thì chạy nốt và về `completed`.
-- [ ] Kéo/nối node để **dựng** flow mới bằng giao diện (hiện mới chạy + duyệt;
-  sửa flow vẫn bằng cách sửa `flows.toml`).
+- [x] **Trình soạn thảo node trực quan**: kéo node từ bảng trái vào canvas, kéo
+  từ cổng ra sang cổng vào để nối (= `needs`), bấm dây để bỏ nối, kéo node để
+  sắp xếp, pan/zoom, cột phải sửa mọi thuộc tính. **Chặn vòng lặp ngay trên bảng**
+  trước khi gửi lên server.
+- [x] Lưu ghi thẳng vào `flows.toml` (kèm toạ độ `x`/`y` để mở lại đúng chỗ) —
+  bảng vẽ KHÔNG có kho riêng, nên flow dựng bằng giao diện và flow viết tay là
+  MỘT thứ. Đã kiểm vòng tròn: bảng vẽ → file → `sagent flow show` thấy y hệt.
+- [x] Trạng thái khi chạy hiện ngay trên node (chấm ✓/●/?/✗).
 *DoD:* flow tạo từ board và flow viết tay chạy y hệt nhau.
 
 **5d · Cấu hình theo project.** `[ui]` trong `.sagent/project.toml` (mặt mặc định,

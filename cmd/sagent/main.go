@@ -57,6 +57,8 @@ func init() {
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},
 		"__frun":  {"flow.run", "chạy một workflow", nil},
 		"__fruns": {"flow.runs", "lịch sử chạy workflow", nil},
+		"__fsave": {"flow.save", "luu flow vao flows.toml", nil},
+		"__fdel":  {"flow.delete", "xoa flow khoi flows.toml", nil},
 		"__fapp":  {"flow.approve", "duyệt/từ chối bước đang chờ", nil},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},

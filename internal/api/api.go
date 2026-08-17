@@ -57,6 +57,8 @@ var Actions = []string{
 	"flow.run",
 	"flow.runs",
 	"flow.approve",
+	"flow.save",
+	"flow.delete",
 }
 
 // API gom mọi thứ một mặt cần. Tạo bằng New, nhớ Close.
@@ -577,6 +579,15 @@ func (a *API) FlowRunDetail(runID int64) (store.Run, map[string]store.StepRun, f
 func (a *API) FlowApproveOnly(runID int64, stepID, by string) error {
 	return a.runner(Addr{}).Approve(runID, stepID, by)
 }
+
+// FlowSave — action "flow.save". Ghi flow vào flows.toml (nguồn sự thật).
+func (a *API) FlowSave(dir string, f flow.Flow) (string, error) { return flow.Save(dir, f) }
+
+// FlowDelete — action "flow.delete". Xoá flow khỏi flows.toml.
+func (a *API) FlowDelete(dir, name string) (string, error) { return flow.Delete(dir, name) }
+
+// FlowImport nạp một file flows.toml rời vào dự án.
+func (a *API) FlowImport(dir, src string) (string, []string, error) { return flow.Import(dir, src) }
 
 // FlowRuns — action "flow.runs". Lịch sử các lần chạy.
 func (a *API) FlowRuns(limit int) ([]store.Run, error) { return a.db.ListRuns(limit) }

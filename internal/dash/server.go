@@ -70,6 +70,9 @@ func NewWithToken(a *api.API, token string) *Server {
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
 	m.HandleFunc("/api/flow/run", s.guard(s.handleFlowRun))
 	m.HandleFunc("/api/flow/decide", s.guard(s.handleFlowDecide))
+	m.HandleFunc("/api/flow/save", s.guard(s.handleFlowSave))
+	m.HandleFunc("/api/flow/delete", s.guard(s.handleFlowDelete))
+	m.HandleFunc("/api/flow/def", s.guard(s.handleFlowDef))
 
 	m.HandleFunc("/login", s.handleLogin)
 	m.HandleFunc("/logout", s.handleLogout)

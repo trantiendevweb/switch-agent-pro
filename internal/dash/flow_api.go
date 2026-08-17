@@ -3,6 +3,7 @@ package dash
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -154,6 +155,62 @@ func (s *Server) handleFlowDecide(w http.ResponseWriter, r *http.Request) {
 	}()
 	writeJSON(w, map[string]string{"decided": "approved"})
 }
+
+// GET /api/flow/def?name=x — định nghĩa đầy đủ của một flow, để bảng vẽ dựng lại.
+func (s *Server) handleFlowDef(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	flows, _, err := s.api.FlowList(s.workDir())
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	f, ok := flows[name]
+	if !ok {
+		writeErr(w, errNotFound(name))
+		return
+	}
+	writeJSON(w, map[string]any{
+		"name": name, "desc": f.Desc, "vars": f.Vars, "steps": f.Steps,
+		"builtin": flow.IsBuiltin(name),
+	})
+}
+
+// POST /api/flow/save — ghi flow từ bảng vẽ xuống flows.toml.
+//
+// Bảng vẽ KHÔNG có kho riêng: nó đọc/ghi đúng file mà người dùng sửa tay được.
+// Nhờ vậy flow dựng bằng giao diện và flow viết tay là một thứ.
+func (s *Server) handleFlowSave(w http.ResponseWriter, r *http.Request) {
+	var f flow.Flow
+	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
+		writeErr(w, err)
+		return
+	}
+	path, err := s.api.FlowSave(s.workDir(), f)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, map[string]string{"saved": f.Name, "file": path})
+}
+
+// POST /api/flow/delete — xoá flow khỏi flows.toml.
+func (s *Server) handleFlowDelete(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	path, err := s.api.FlowDelete(s.workDir(), req.Name)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, map[string]string{"deleted": req.Name, "file": path})
+}
+
+func errNotFound(name string) error { return fmt.Errorf("không có flow %q", name) }
 
 // who ghi lại ai đã duyệt. Có đăng nhập thì lấy tên tài khoản đó.
 func (s *Server) who() string {

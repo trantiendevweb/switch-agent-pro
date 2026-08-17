@@ -52,36 +52,45 @@ const (
 )
 
 // Step là một node trong DAG.
+//
+// Có CẢ thẻ toml lẫn json: toml cho file người dùng sửa tay, json cho bảng vẽ
+// trên web. Hai bên phải khớp tên, nếu không thì flow lưu từ giao diện sẽ khác
+// flow viết tay — đúng cái bug đã dính.
 type Step struct {
-	ID    string   `toml:"id"`
-	Type  string   `toml:"type"`
-	Needs []string `toml:"needs"` // các bước phải xong trước
+	ID    string   `toml:"id" json:"id"`
+	Type  string   `toml:"type" json:"type"`
+	Needs []string `toml:"needs,omitempty" json:"needs"` // các bước phải xong trước
 
 	// agent / review
-	Profile  string `toml:"profile"`  // "claude:phu"; rỗng = lấy mặc định lúc chạy
-	Prompt   string `toml:"prompt"`   // hỗ trợ {{bien}}
-	Copies   int    `toml:"copies"`   // số agent song song, mặc định 1
-	Worktree bool   `toml:"worktree"` // mỗi agent một git worktree
+	Profile  string `toml:"profile,omitempty" json:"profile,omitempty"`   // "claude:phu"; rỗng = mặc định lúc chạy
+	Prompt   string `toml:"prompt,omitempty" json:"prompt,omitempty"`     // hỗ trợ {{bien}}
+	Copies   int    `toml:"copies,omitempty" json:"copies,omitempty"`     // số agent song song, mặc định 1
+	Worktree bool   `toml:"worktree,omitempty" json:"worktree,omitempty"` // mỗi agent một git worktree
 
 	// shell
-	Run []string `toml:"run"` // argv — CỐ Ý không nhận chuỗi shell (tránh injection)
+	Run []string `toml:"run,omitempty" json:"run,omitempty"` // argv — CỐ Ý không nhận chuỗi shell
 
 	// approve / notify
-	Message string `toml:"message"`
+	Message string `toml:"message,omitempty" json:"message,omitempty"`
 
 	// điều khiển chung
-	TimeoutSec int    `toml:"timeout_sec"`
-	Retry      int    `toml:"retry"`
-	OnFailure  string `toml:"on_failure"` // stop | continue | fallback
-	Fallback   string `toml:"fallback"`   // id bước chạy khi hỏng (với on_failure=fallback)
+	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
+	Retry      int    `toml:"retry,omitempty" json:"retry,omitempty"`
+	OnFailure  string `toml:"on_failure,omitempty" json:"on_failure,omitempty"` // stop | continue | fallback
+	Fallback   string `toml:"fallback,omitempty" json:"fallback,omitempty"`
+
+	// Vị trí trên bảng vẽ. Chỉ để trình soạn thảo bày lại đúng chỗ; bộ thực thi
+	// hoàn toàn bỏ qua. Sửa file bằng tay mà không có x/y thì bảng tự xếp.
+	X int `toml:"x,omitempty" json:"x,omitempty"`
+	Y int `toml:"y,omitempty" json:"y,omitempty"`
 }
 
 // Flow là một workflow.
 type Flow struct {
-	Name  string            `toml:"-"`
-	Desc  string            `toml:"desc"`
-	Vars  map[string]string `toml:"vars"`
-	Steps []Step            `toml:"step"`
+	Name  string            `toml:"-" json:"name"`
+	Desc  string            `toml:"desc" json:"desc"`
+	Vars  map[string]string `toml:"vars,omitempty" json:"vars"`
+	Steps []Step            `toml:"step" json:"step"`
 }
 
 // File là nội dung một flows.toml.
