@@ -1026,6 +1026,47 @@ Nhận xét về việc dùng agent khác để soát: codex chỉ ra **6/6 đú
 kèm mấy trích dẫn file HTML chẳng liên quan, và không tự biết cái nào nghiêm trọng. Giá trị
 nằm ở chỗ **bắt tôi đi kiểm**, không phải ở chỗ kết luận thay tôi.
 
+### Soát store bằng codex — 6/7 đúng (2026-08-18, phiên tự chạy)
+
+Vòng hai: `internal/store/store.go` + `backup.go`. Codex trả 7 mục, **6 đúng, 1 sai**.
+Con số đó quan trọng hơn con số 6/6 ở vòng trước: nó nhắc rằng phải kiểm từng cái.
+
+| # | Cáo buộc | Phán quyết |
+|---|---|---|
+| 1 | Migration đọc `schema_version` NGOÀI giao dịch → hai tiến trình cùng nâng v1→v2 | **đúng** |
+| 2 | UPSERT giữ `ended` cũ khi bước quay về `running` | **đúng một nửa** — code cố ý giữ, nhưng bước thử lại thì đó là sai |
+| 3 | `_, _ = d.db.Exec(...)` nuốt lỗi khi đánh dấu `lost` | **đúng** |
+| 4 | Xoá bản sao lưu đích TRƯỚC khi `VACUUM INTO` | **đúng** |
+| 5 | TOCTOU giữa `inspect(src)` và lúc chép | **đúng nhưng bỏ qua** — xem dưới |
+| 6 | File tạm `.dang-ghi` dùng chung tên | **đúng** |
+| 7 | Mọi lỗi `os.Stat` bị coi là "không ai dùng" | **đúng** |
+
+**Mục 4 là cái đắt nhất.** Người dùng gõ `sagent db backup`, đĩa hết chỗ, và kết quả là
+**không còn bản sao lưu nào** — bản cũ đã bị xoá trước khi bản mới kịp hỏng. Vá: `VACUUM
+INTO` ra file tạm rồi `os.Rename` đè lên đích. Đổi tên là nguyên tử: hoặc có bản mới, hoặc
+vẫn còn bản cũ.
+
+**Mục 7 là lá chắn tự tắt đúng lúc cần nhất.** `InUse` coi mọi lỗi `Stat` — kể cả thiếu
+quyền hay ổ mạng rớt — là "đường quang", nên `db restore` ghi đè trong khi không hề biết ai
+đang mở file. Giờ chỉ `IsNotExist` mới là "không ai giữ".
+
+**Mục 5 bỏ qua có chủ đích.** TOCTOU giữa kiểm và chép là thật, nhưng đây là CLI chạy trên
+máy cá nhân: kẻ nào thay được file giữa hai thao tác thì đã ghi được vào thư mục đó rồi,
+tức đã thắng từ trước. Vá nó cần giữ handle xuyên suốt và làm rối `Restore` mà không đổi
+được kết cục. Ghi ra đây để lần sau không phải nghĩ lại.
+
+#### Test tự tan
+
+Test cho mục 4 cần ép `VACUUM INTO` hỏng. Lần đầu tôi chiếm chỗ file tạm bằng một **thư mục
+rỗng** — và test **xanh**, vì `os.Remove` xoá được thư mục rỗng: cái bẫy tự dọn chính nó rồi
+sao lưu chạy ngon. Phải để một file bên trong thư mục thì `os.Remove` mới chịu hỏng.
+
+Sau đó mới chứng minh được test có giá trị: quay `tam := dst + ".dang-chup"` về `tam := dst`
+(tức cách cũ) thì nó đỏ ngay.
+
+Lại đúng bài học cũ, ở dạng khác: **một cái bẫy dựng sai thì test xanh, và cái xanh đó
+không có nghĩa gì.**
+
 ---
 
 ## Việc cần bạn hỗ trợ

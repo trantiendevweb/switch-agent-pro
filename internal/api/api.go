@@ -349,7 +349,17 @@ func khoHoSoCheck() provider.Check {
 // ---------------------------- phiên ----------------------------
 
 // SessionList — action "session.list". Luôn đối chiếu PID thật.
-func (a *API) SessionList() ([]store.Session, error) { return a.db.Running() }
+func (a *API) SessionList() ([]store.Session, error) {
+	list, err := a.db.Running()
+	// `Running` có thể trả về danh sách ĐÚNG kèm một lỗi: nó không đánh dấu nổi
+	// mấy phiên đã chết thành `lost` (DB bị khoá chẳng hạn). Đó không phải lý do
+	// để `sagent status` gãy — thao tác đó lặp lại được và lần sau tự sửa. Nhưng
+	// cũng không được im: cảnh báo lên bus, còn danh sách vẫn trả về.
+	if err != nil {
+		a.bus.Warnf("không cập nhật được trạng thái phiên đã chết: %v", err)
+	}
+	return list, nil
+}
 
 // SessionStop — action "session.stop". id < 0 nghĩa là dừng tất cả.
 func (a *API) SessionStop(id int64) (int, error) {

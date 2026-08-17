@@ -266,7 +266,7 @@ func (d *DB) SetStep(runID int64, stepID, state, msg string, attempt int) error 
 		VALUES(?,?,?,?,?,?,?)
 		ON CONFLICT(run_id,step_id) DO UPDATE SET
 			state=excluded.state, attempt=excluded.attempt, msg=excluded.msg,
-			ended=CASE WHEN excluded.state IN ('done','failed','skipped') THEN excluded.ended ELSE flow_steps.ended END`,
+			ended=CASE WHEN excluded.state IN ('done','failed','skipped') THEN excluded.ended ELSE NULL END`,
 		runID, stepID, state, attempt, msg, now,
 		map[bool]string{true: now, false: ""}[state == StepDone || state == StepFailed || state == StepSkipped])
 	return err
@@ -346,6 +346,19 @@ func migrate(db *sql.DB, path string) error {
 		tx, err := db.Begin()
 		if err != nil {
 			return err
+		}
+		// Đọc LẠI phiên bản bên trong transaction. `cur` ở trên đọc ngoài giao
+		// dịch, nên hai tiến trình sagent khởi động cùng lúc có thể cùng thấy
+		// cur=1 rồi cùng chạy migration v2 — đứa sau nhận `duplicate column name`
+		// và không mở được DB. Hiếm, nhưng đúng lúc tệ nhất: ngay sau khi nâng cấp.
+		var trong int
+		if trong, err = schemaVersion(tx); err != nil {
+			tx.Rollback()
+			return err
+		}
+		if trong > i {
+			tx.Rollback()
+			continue // tiến trình khác vừa làm bước này rồi
 		}
 		if _, err := tx.Exec(migrations[i]); err != nil {
 			tx.Rollback()
@@ -436,10 +449,17 @@ func (d *DB) Running() ([]Session, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// KHÔNG nuốt lỗi ở đây. Đánh dấu `lost` hỏng thì lần sau gọi lại sẽ tự sửa
+	// (thao tác này lặp lại được), nhưng im lặng thì không ai biết DB đang bị
+	// khoá quá lâu. Trả kèm lỗi; tầng api quyết định cảnh báo hay bỏ qua — nó có
+	// bus sự kiện, còn store thì không.
+	var loiDanhDau error
 	for _, id := range dead {
-		_, _ = d.db.Exec(`UPDATE sessions SET state=? WHERE id=?`, StateLost, id)
+		if _, err := d.db.Exec(`UPDATE sessions SET state=? WHERE id=?`, StateLost, id); err != nil {
+			loiDanhDau = err
+		}
 	}
-	return out, nil
+	return out, loiDanhDau
 }
 
 // SetState đổi trạng thái một phiên.

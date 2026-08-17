@@ -24,7 +24,13 @@ func LatestSchema() int { return len(migrations) }
 // SchemaVersion đọc phiên bản schema đang nằm trong file.
 func (d *DB) SchemaVersion() (int, error) { return schemaVersion(d.db) }
 
-func schemaVersion(db *sql.DB) (int, error) {
+// querier là phần chung của *sql.DB và *sql.Tx — nhờ vậy đọc được phiên bản
+// schema cả ngoài lẫn TRONG một giao dịch, mà không phải viết hai hàm.
+type querier interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func schemaVersion(db querier) (int, error) {
 	var s string
 	err := db.QueryRow(`SELECT value FROM meta WHERE key='schema_version'`).Scan(&s)
 	if err == sql.ErrNoRows {
@@ -53,15 +59,24 @@ func snapshot(db *sql.DB, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	// VACUUM INTO từ chối ghi đè file đã có — dọn trước cho thao tác lặp lại được.
-	if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
+	// Chụp ra file TẠM rồi mới đổi tên đè lên đích.
+	//
+	// Bản trước xoá đích trước rồi mới VACUUM. Nếu VACUUM hỏng — hết đĩa là đủ —
+	// thì bản sao lưu CŨ đã mất mà bản mới chưa có. Người dùng đi sao lưu và kết
+	// quả là không còn bản nào. Đổi tên là thao tác nguyên tử: hoặc có bản mới,
+	// hoặc vẫn còn bản cũ.
+	tam := dst + ".dang-chup"
+	if err := os.Remove(tam); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	// VACUUM INTO không nhận tham số bind, phải nối chuỗi. Nháy đơn trong đường
 	// dẫn nhân đôi theo đúng luật của SQL — đường dẫn đến từ người dùng
 	// (`sagent db backup <file>`), nên chỗ này là chỗ tiêm SQL nếu ẩu.
-	_, err := db.Exec(`VACUUM INTO '` + strings.ReplaceAll(dst, "'", "''") + `'`)
-	return err
+	if _, err := db.Exec(`VACUUM INTO '` + strings.ReplaceAll(tam, "'", "''") + `'`); err != nil {
+		os.Remove(tam)
+		return err
+	}
+	return os.Rename(tam, dst)
 }
 
 // Restore ghi đè cơ sở dữ liệu ở dst bằng bản sao lưu src.
@@ -137,7 +152,9 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	tmp := dst + ".dang-ghi"
+	// Tên file tạm phải DUY NHẤT. Dùng chung một tên thì hai lần khôi phục chạy
+	// cùng lúc sẽ cắt xén file tạm của nhau rồi đổi tên ra một DB hỏng.
+	tmp := fmt.Sprintf("%s.dang-ghi-%d", dst, os.Getpid())
 	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
@@ -172,7 +189,13 @@ func copyFile(src, dst string) error {
 // không phát hiện một tiến trình sagent vừa đóng kết nối và sắp mở lại.
 func InUse(path string) error {
 	if _, err := os.Stat(path); err != nil {
-		return nil // chưa có file thì không ai giữ
+		if os.IsNotExist(err) {
+			return nil // chưa có file thì thật sự không ai giữ
+		}
+		// Mọi lỗi khác (thiếu quyền, ổ mạng rớt) KHÔNG phải là "đường quang".
+		// Coi nó như an toàn nghĩa là cho `db restore` ghi đè trong khi không hề
+		// biết ai đang mở file — lá chắn tự tắt đúng lúc cần nhất.
+		return fmt.Errorf("không đọc được %s để kiểm ai đang dùng: %w", path, err)
 	}
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(0)")
 	if err != nil {
