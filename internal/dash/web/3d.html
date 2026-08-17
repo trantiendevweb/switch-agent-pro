@@ -72,14 +72,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
-const TOKEN = new URLSearchParams(location.search).get('t') || '';
-const H = { 'X-Sagent-Token': TOKEN, 'Content-Type': 'application/json' };
+// Xác thực bằng cookie phiên HttpOnly — trình duyệt tự gửi kèm. Không còn
+// token trên URL, nên link điều hướng cũng không phải mang theo gì.
+const H = { 'Content-Type': 'application/json' };
 const $ = id => document.getElementById(id);
 
-// Giữ token khi về 2D.
-$('to2d').href = './?t=' + encodeURIComponent(TOKEN);
-$('toflow').href = 'flow.html?t=' + encodeURIComponent(TOKEN);
-document.querySelector('#fallback a').href = './?t=' + encodeURIComponent(TOKEN);
+$('to2d').href = './';
+$('toflow').href = 'flow.html';
+document.querySelector('#fallback a').href = './';
 
 // Không có Three (offline/CDN chặn) thì rơi về 2D thay vì màn hình trống.
 if (typeof THREE === 'undefined') { $('fallback').style.display = 'grid'; throw new Error('no three'); }
@@ -204,7 +204,7 @@ async function refresh(){
   try{ const r=await fetch('/api/state',{headers:H}); if(!r.ok)throw 0; build(await r.json()); }catch(_){}
 }
 function connect(){
-  const es=new EventSource('/api/events?t='+encodeURIComponent(TOKEN));
+  const es=new EventSource('/api/events');
   es.onopen=()=>{ $('conn').classList.add('on'); $('conntext').textContent='đã kết nối'; };
   es.onerror=()=>{ $('conn').classList.remove('on'); $('conntext').textContent='mất kết nối'; };
   es.onmessage=ev=>{ let e; try{e=JSON.parse(ev.data)}catch(_){return}

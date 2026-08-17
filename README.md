@@ -116,26 +116,27 @@ default_surface = "tui"       # tui | dashboard | workflow | 3d
 
 ### Dashboard
 
-```bash
-sagent dash            # in ra URL kèm token, mở trên trình duyệt (cùng máy)
-```
-
-Dashboard 2D xem phiên đang chạy, bật/dừng hạm đội, nhật ký sự kiện realtime; bấm
-nút **3D** để xem dạng không gian (orb = phiên thật, bấm orb để dừng đúng phiên đó).
-Mặc định chỉ nghe `127.0.0.1`, mỗi lần chạy một token ngẫu nhiên, chặn Host/Origin
-lạ, DTO allowlist nên không gửi token/API key ra trình duyệt. Assets nhúng trong
-binary (không cần Node).
-
-**Đăng nhập bằng form** (thay vì dán token vào URL):
+Cửa vào **duy nhất** là form đăng nhập. Phải đặt mật khẩu trước, không thì server
+từ chối chạy:
 
 ```bash
 sagent dash --set-password        # hỏi tên đăng nhập + mật khẩu, lưu ĐÃ BĂM
                                   # ở ~/.ai-accounts/dash-auth.json (ngoài repo)
+sagent dash                       # in ra URL, mở trên trình duyệt (cùng máy)
 ```
 
-Sau đó mở dashboard sẽ hiện form. Mật khẩu băm bằng PBKDF2-HMAC-SHA256 210k vòng;
-phiên giữ bằng cookie HttpOnly, hết hạn sau 12 giờ và mất khi tắt server. Token vẫn
-dùng được cho script/curl qua header `X-Sagent-Token`.
+Dashboard 2D xem phiên đang chạy, bật/dừng hạm đội, nhật ký sự kiện realtime; bấm
+nút **3D** để xem dạng không gian (orb = phiên thật, bấm orb để dừng đúng phiên đó).
+Mặc định chỉ nghe `127.0.0.1`, chặn Host/Origin lạ, DTO allowlist nên không gửi
+token/API key ra trình duyệt. Assets nhúng trong binary (không cần Node).
+
+Mật khẩu băm bằng PBKDF2-HMAC-SHA256 210k vòng; phiên giữ bằng cookie HttpOnly
+SameSite=Lax, hết hạn sau 12 giờ và mất khi tắt server; sai nhiều lần thì bị bắt chờ.
+
+> **Không còn token trong URL.** Trước đây `/?t=<token>` và header `X-Sagent-Token`
+> cũng mở được dashboard — đã bỏ hẳn. Một secret nằm trong địa chỉ sẽ rơi vào log
+> proxy, lịch sử trình duyệt và ảnh chụp màn hình. Script/curl bây giờ đăng nhập
+> qua `POST /login` rồi giữ cookie (`curl -c/-b`).
 
 **Xem từ máy khác / điện thoại** — khi bạn làm việc trên server không có màn hình:
 
@@ -143,10 +144,11 @@ dùng được cho script/curl qua header `X-Sagent-Token`.
 sagent dash --host 0.0.0.0 --port 8787
 ```
 
-> ⚠ Lúc này **token là hàng rào duy nhất**: ai có link đều bật/dừng được agent của
-> bạn và tiêu hạn mức. Đừng dán link vào chat công khai hay ảnh chụp màn hình, và
-> đóng cổng khi xong. An toàn hơn thì dùng SSH tunnel:
-> `ssh -L 4600:127.0.0.1:4600 user@server` rồi mở `http://127.0.0.1:4600` ở máy bạn.
+> ⚠ Lúc này **mật khẩu là hàng rào duy nhất**, và HTTP **không mã hoá** nó trên
+> đường truyền: ai đoán được đều bật/dừng được agent của bạn và tiêu hạn mức. Đặt
+> mật khẩu dài, và đóng cổng khi xong. An toàn hơn hẳn thì đừng phơi cổng mà dùng
+> SSH tunnel: `ssh -L 4600:127.0.0.1:4600 user@server` rồi mở `http://127.0.0.1:4600`
+> ở máy bạn.
 
 > File cấu hình **không bao giờ chứa secret** — API key/token chỉ được tham chiếu bằng ID.
 

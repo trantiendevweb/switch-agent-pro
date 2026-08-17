@@ -156,10 +156,11 @@
 <div id="toast"></div>
 
 <script>
-const TOKEN = new URLSearchParams(location.search).get('t') || '';
-const H = {'X-Sagent-Token':TOKEN,'Content-Type':'application/json'};
+// Xác thực bằng cookie phiên HttpOnly — trình duyệt tự gửi kèm. Không còn
+// token trên URL, nên link điều hướng cũng không phải mang theo gì.
+const H = {'Content-Type':'application/json'};
 const $ = s => document.querySelector(s);
-if (TOKEN){ $('#n2d').href='./?t='+encodeURIComponent(TOKEN); $('#n3d').href='3d.html?t='+encodeURIComponent(TOKEN); }
+$('#n2d').href='./'; $('#n3d').href='3d.html';
 
 // ---- loại node ----
 const TYPES = {
@@ -666,7 +667,7 @@ function logLine(e){
   while(box.children.length>60) box.removeChild(box.lastChild);
 }
 function connect_sse(){
-  const es=new EventSource('/api/events?t='+encodeURIComponent(TOKEN));
+  const es=new EventSource('/api/events');
   es.onopen=()=>$('#conn').textContent='● đã kết nối';
   es.onerror=()=>$('#conn').textContent='○ mất kết nối';
   es.onmessage=ev=>{

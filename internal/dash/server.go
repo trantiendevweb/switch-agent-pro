@@ -3,17 +3,15 @@
 // Nó KHÔNG mở đường riêng vào store — mọi thứ đi qua api, đúng luật "một hợp
 // đồng duy nhất" (MASTER-PLAN mục 2c). Nhờ vậy dashboard và CLI luôn ngang quyền.
 //
-// Bảo mật (mục 5b): chỉ bind loopback, token ngẫu nhiên trong URL, chặn Host lạ
+// Bảo mật (mục 5b): chỉ bind loopback, đăng nhập bằng tên + mật khẩu (băm), chặn Host lạ
 // (chống DNS-rebind) và Origin lạ (chống CSRF), và TUYỆT ĐỐI không gửi secret —
 // mọi thứ trả về đều qua DTO liệt kê tường minh từng trường.
 package dash
 
 import (
-	"crypto/rand"
-	"crypto/subtle"
 	"embed"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io/fs"
@@ -35,28 +33,22 @@ var webFS embed.FS
 // Server phục vụ dashboard. Tạo bằng New, chạy bằng Run.
 type Server struct {
 	api     *api.API
-	token   string
 	mux     *http.ServeMux
 	exposed bool // true = nghe ngoài loopback (phải chủ động bật)
 
-	auth *Auth     // nil = chưa đặt mật khẩu, chỉ dùng token
+	auth *Auth     // nil = chưa đặt mật khẩu → server từ chối chạy
 	sess *sessions // phiên đăng nhập bằng cookie
 
 	failMu sync.Mutex
-	fails  int       // số lần sai token/mật khẩu liên tiếp
+	fails  int       // số lần sai mật khẩu liên tiếp
 	failAt time.Time // lần sai gần nhất
 }
 
-// New dựng server với token ngẫu nhiên mới.
-func New(a *api.API) *Server { return NewWithToken(a, "") }
-
-// NewWithToken cho phép đặt token cố định (để dán link vào điện thoại mà không
-// phải lấy lại mỗi lần khởi động). Rỗng = sinh ngẫu nhiên.
-func NewWithToken(a *api.API, token string) *Server {
-	if token == "" {
-		token = randToken()
-	}
-	s := &Server{api: a, token: token, auth: LoadAuth(), sess: newSessions()}
+// New dựng server. Cửa vào DUY NHẤT là form đăng nhập — tên + mật khẩu băm
+// PBKDF2 ở ~/.ai-accounts/dash-auth.json. Không còn token trên URL: một secret
+// nằm trong địa chỉ sẽ rơi vào log proxy, lịch sử trình duyệt và ảnh chụp màn hình.
+func New(a *api.API) *Server {
+	s := &Server{api: a, auth: LoadAuth(), sess: newSessions()}
 	sub, _ := fs.Sub(webFS, "web")
 	files := http.FileServer(http.FS(sub))
 
@@ -78,12 +70,12 @@ func NewWithToken(a *api.API, token string) *Server {
 	m.HandleFunc("/logout", s.handleLogout)
 
 	// /docs/ là vùng CÔNG KHAI: kế hoạch, thiết kế, master plan — chỉ để đọc.
-	// Cố ý không đòi token để chia sẻ link kế hoạch KHÔNG đồng nghĩa trao quyền
+	// Cố ý không đòi đăng nhập để chia sẻ link kế hoạch KHÔNG đồng nghĩa trao quyền
 	// điều khiển agent. Đằng nào nội dung này cũng nằm công khai trên GitHub.
 	m.Handle("/docs/", files)
 
-	// Mọi thứ còn lại (dashboard 2D, 3D) cần token. Riêng trang gốc khi chưa có
-	// token thì hiện trang giới thiệu thay vì ném 401 trần trụi.
+	// Mọi thứ còn lại (dashboard 2D, 3D) cần đăng nhập. Riêng trang gốc thì đưa
+	// tới form thay vì ném 401 trần trụi.
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" && !s.authorized(r) {
 			if s.auth != nil {
@@ -108,17 +100,9 @@ func (s *Server) workDir() string {
 	return wd
 }
 
-func (s *Server) hasToken(r *http.Request) bool {
-	tok := r.Header.Get("X-Sagent-Token")
-	if tok == "" {
-		tok = r.URL.Query().Get("t")
-	}
-	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1
-}
-
-// authorized: có phiên đăng nhập hợp lệ, hoặc có token đúng.
+// authorized: một cửa duy nhất — cookie phiên do form đăng nhập cấp.
 func (s *Server) authorized(r *http.Request) bool {
-	return s.sess.valid(cookieID(r)) || s.hasToken(r)
+	return s.sess.valid(cookieID(r))
 }
 
 // wantsHTML đoán request đến từ thanh địa chỉ trình duyệt (để chuyển hướng tới
@@ -151,7 +135,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "chỉ nhận GET/POST", http.StatusMethodNotAllowed)
 		return
 	}
-	// Chống dò mật khẩu: dùng chung bộ đếm với token.
+	// Chống dò mật khẩu: dùng chung bộ đếm với lá chắn guard.
 	if wait := s.throttle(); wait > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
 		s.loginPage(w, next, fmt.Sprintf("Sai nhiều lần — thử lại sau %d giây.", int(wait.Seconds())+1))
@@ -227,8 +211,8 @@ a{color:#7dd3fc;font-size:13px;display:inline-block;margin-top:16px;text-decorat
 </div></body></html>`, banner, url.QueryEscape(next), warn)
 }
 
-// landing là trang cho người ghé mà không có token: chỉ đường tới tài liệu công
-// khai, và nói rõ dashboard cần token — chứ không phơi bày gì thêm.
+// landing chỉ hiện khi CHƯA đặt mật khẩu (server sẽ không chạy ở trạng thái đó,
+// nên đây là lưới an toàn cho test): chỉ đường tới tài liệu công khai.
 func (s *Server) landing(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -245,21 +229,23 @@ code{background:#272F42;padding:2px 6px;border-radius:5px;font-size:.9em;color:#
 <h1>Switch-Agent-Pro</h1>
 <p>Control plane điều phối nhiều coding agent và nhiều AI API.</p>
 <a href="/docs/">Xem kế hoạch &amp; thiết kế →</a>
-<p style="margin-top:22px;font-size:13px">Dashboard điều khiển cần token:<br><code>/?t=&lt;token&gt;</code></p>
+<p style="margin-top:22px;font-size:13px">Dashboard chưa đặt mật khẩu. Trên máy chủ chạy:<br><code>sagent dash --set-password</code></p>
 </div></body></html>`)
 }
-
-// Token là mã ngẫu nhiên phải có trong mọi request.
-func (s *Server) Token() string { return s.token }
 
 // ServeHTTP để test dùng httptest mà không cần mở cổng thật.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
 
-// Run bind vào host:port, in URL kèm token, rồi phục vụ tới khi tiến trình dừng.
+// Run bind vào host:port rồi phục vụ tới khi tiến trình dừng.
 //
-// host ngoài loopback = CHẾ ĐỘ PHƠI RA MẠNG. Lúc đó token là hàng rào DUY NHẤT,
-// nên phải in cảnh báo thật rõ chứ không được để người dùng tưởng nó vẫn kín.
+// host ngoài loopback = CHẾ ĐỘ PHƠI RA MẠNG. Lúc đó mật khẩu là hàng rào DUY
+// NHẤT, nên phải in cảnh báo thật rõ chứ không được để người dùng tưởng nó kín.
 func (s *Server) Run(host string, port int) error {
+	// Token đã bị bỏ, nên chưa đặt mật khẩu nghĩa là KHÔNG còn cửa nào. Thà
+	// không chạy còn hơn mở một dashboard điều khiển agent mà ai vào cũng được.
+	if s.auth == nil {
+		return errors.New("chưa đặt mật khẩu dashboard — chạy: sagent dash --set-password")
+	}
 	s.exposed = !isLoopbackAddr(host)
 
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
@@ -272,16 +258,16 @@ func (s *Server) Run(host string, port int) error {
 		fmt.Println("  ╔══════════════════════════════════════════════════════════════╗")
 		fmt.Println("  ║  ⚠  DASHBOARD ĐANG PHƠI RA MẠNG                              ║")
 		fmt.Println("  ╚══════════════════════════════════════════════════════════════╝")
-		fmt.Println("  Ai có link này đều BẬT/DỪNG được agent của bạn và tiêu hạn mức.")
-		fmt.Println("  Token trong URL là hàng rào duy nhất — đừng dán vào chat công khai,")
-		fmt.Println("  ảnh chụp màn hình hay issue. Xong việc thì Ctrl+C để đóng cổng.")
+		fmt.Println("  Ai đăng nhập được đều BẬT/DỪNG được agent của bạn và tiêu hạn mức.")
+		fmt.Printf("  Mật khẩu của %q là hàng rào DUY NHẤT — và HTTP KHÔNG mã hoá nó\n", s.auth.User)
+		fmt.Println("  trên đường truyền. Xong việc thì Ctrl+C để đóng cổng.")
 		fmt.Println()
-		fmt.Printf("  Mở trên điện thoại/máy khác:\n    http://<IP-máy-này>:%d/?t=%s\n", port, s.token)
+		fmt.Printf("  Mở trên điện thoại/máy khác:\n    http://<IP-máy-này>:%d/\n", port)
 	} else {
 		fmt.Println("  Dashboard đang chạy — mở link này trên trình duyệt (cùng máy):")
-		fmt.Printf("    http://%s/?t=%s\n", ln.Addr().String(), s.token)
+		fmt.Printf("    http://%s/\n", ln.Addr().String())
 		fmt.Println()
-		fmt.Println("  Chỉ nghe ở loopback; link có token ngẫu nhiên.")
+		fmt.Printf("  Chỉ nghe ở loopback; đăng nhập bằng tài khoản %q.\n", s.auth.User)
 	}
 	fmt.Println()
 	fmt.Println("  Ctrl+C để dừng.")
@@ -304,24 +290,20 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Ở chế độ kín, Host phải là loopback (chống DNS-rebind: tên miền lạ trỏ
 		// về 127.0.0.1). Ở chế độ phơi ra mạng thì Host là IP/tên miền thật nên
-		// không kiểm được — lúc đó token mới là hàng rào, và vì token nằm ở URL
-		// (không phải cookie) nên rebinding cũng chẳng lấy được gì.
+		// không kiểm được — lúc đó mật khẩu + cookie SameSite=Lax là hàng rào.
 		if !s.exposed && !loopbackHost(r.Host) {
 			http.Error(w, "chỉ phục vụ ở loopback", http.StatusForbidden)
 			return
 		}
 
-		// Chống dò token: sai nhiều lần liên tiếp thì bắt chờ.
+		// Chống dò mật khẩu: sai nhiều lần liên tiếp thì bắt chờ.
 		if wait := s.throttle(); wait > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
 			http.Error(w, "thử lại sau", http.StatusTooManyRequests)
 			return
 		}
 
-		// Ba đường vào, theo thứ tự ưu tiên:
-		//   1. cookie phiên (người dùng đã đăng nhập bằng form)
-		//   2. header X-Sagent-Token (script/curl)
-		//   3. token trên URL (link chia sẻ nhanh)
+		// Một đường vào duy nhất: cookie phiên do form đăng nhập cấp.
 		if !s.authorized(r) {
 			s.noteFail()
 			// Trình duyệt gõ đường dẫn thì đưa tới form đăng nhập cho tử tế;
@@ -345,7 +327,7 @@ func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// throttle trả về thời gian còn phải chờ, sau khi đã sai token nhiều lần.
+// throttle trả về thời gian còn phải chờ, sau khi đã sai mật khẩu nhiều lần.
 func (s *Server) throttle() time.Duration {
 	s.failMu.Lock()
 	defer s.failMu.Unlock()
@@ -391,7 +373,7 @@ func loopbackHost(host string) bool {
 func sameOrigin(r *http.Request) bool {
 	o := r.Header.Get("Origin")
 	if o == "" {
-		return true // curl / client dòng lệnh: đã qua cửa token là đủ
+		return true // curl / client dòng lệnh: đã qua cửa đăng nhập là đủ
 	}
 	u, err := url.Parse(o)
 	if err != nil {
@@ -541,12 +523,6 @@ func writeErr(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-}
-
-func randToken() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }
 
 // splitArgs tách chuỗi lệnh thành đối số, biết tôn trọng dấu ngoặc kép để

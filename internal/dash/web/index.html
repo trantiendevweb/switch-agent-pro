@@ -132,12 +132,12 @@
 </div>
 
 <script>
-const TOKEN = new URLSearchParams(location.search).get('t') || '';
-const H = { 'X-Sagent-Token': TOKEN, 'Content-Type': 'application/json' };
+// Xác thực bằng cookie phiên HttpOnly — trình duyệt tự gửi kèm. Không còn
+// token trên URL, nên link điều hướng cũng không phải mang theo gì.
+const H = { 'Content-Type': 'application/json' };
 const $ = id => document.getElementById(id);
-// Giữ token khi chuyển sang 3D (token nằm trong URL, không mang theo là mất).
-$('to3d').href = '3d.html?t=' + encodeURIComponent(TOKEN);
-$('toflow').href = 'flow.html?t=' + encodeURIComponent(TOKEN);
+$('to3d').href = '3d.html';
+$('toflow').href = 'flow.html';
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({ headers: H }, opts||{}));
@@ -213,7 +213,7 @@ function logEvent(ev){
 
 // SSE: đọc snapshot trước (ở trên), rồi dùng event để cập nhật.
 function connect(){
-  const es = new EventSource('/api/events?t='+encodeURIComponent(TOKEN));
+  const es = new EventSource('/api/events');
   es.onopen = ()=>{ $('conn').classList.add('on'); $('conntext').textContent='đã kết nối'; };
   es.onerror = ()=>{ $('conn').classList.remove('on'); $('conntext').textContent='mất kết nối — đang thử lại'; };
   es.onmessage = ev=>{

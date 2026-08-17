@@ -402,13 +402,11 @@ func cmdDash(args []string) {
 		return
 	}
 	port, args := intFlag(args, "--port", 4600)
-	host, args := strFlag(args, "--host", "127.0.0.1")
-	token, _ := strFlag(args, "--token", os.Getenv("SAGENT_DASH_TOKEN"))
+	host, _ := strFlag(args, "--host", "127.0.0.1")
 
-	// Phơi ra mạng thì token là hàng rào DUY NHẤT — không cho đặt token yếu.
-	if host != "127.0.0.1" && host != "localhost" && host != "::1" &&
-		token != "" && len(token) < 16 {
-		fail(fmt.Errorf("--token quá ngắn (%d ký tự) cho chế độ phơi ra mạng — cần ≥16, hoặc bỏ cờ để tự sinh", len(token)))
+	// Cửa vào duy nhất là mật khẩu — chưa đặt thì đừng mở cổng.
+	if dash.LoadAuth() == nil {
+		fail(fmt.Errorf("chưa đặt mật khẩu dashboard — chạy: sagent dash --set-password"))
 	}
 
 	// Mở API TRỰC TIẾP (không gắn bộ vẽ terminal): dashboard tiêu thụ event qua
@@ -419,7 +417,7 @@ func cmdDash(args []string) {
 		fail(err)
 	}
 	defer a.Close()
-	if err := dash.NewWithToken(a, token).Run(host, port); err != nil {
+	if err := dash.New(a).Run(host, port); err != nil {
 		fail(err)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,12 +12,18 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 )
 
-// newTestServer dựng một server thật (API + store trong HOME tạm) để test lá chắn.
+const matKhauTest = "matkhau-thu-nghiem"
+
+// newTestServer dựng một server thật (API + store trong HOME tạm) đã đặt sẵn
+// mật khẩu, để test lá chắn. Không còn token nên mọi test đều phải đăng nhập.
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	if err := SetPassword("Admin", matKhauTest); err != nil {
+		t.Fatal(err)
+	}
 	a, err := api.New(home)
 	if err != nil {
 		t.Fatal(err)
@@ -25,36 +32,70 @@ func newTestServer(t *testing.T) *Server {
 	return New(a)
 }
 
+// dangNhap đi qua đúng form đăng nhập và trả về cookie phiên — cửa vào DUY NHẤT.
+func dangNhap(t *testing.T, s *Server, host string) *http.Cookie {
+	t.Helper()
+	form := url.Values{"user": {"Admin"}, "password": {matKhauTest}}
+	r := httptest.NewRequest("POST", "/login", strings.NewReader(form.Encode()))
+	r.Host = host
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Origin", "http://"+host)
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	for _, c := range w.Result().Cookies() {
+		if c.Name == cookieName && c.Value != "" {
+			return c
+		}
+	}
+	t.Fatalf("đăng nhập không cấp cookie (mã %d)", w.Code)
+	return nil
+}
+
 func req(method, target string) *http.Request {
 	r := httptest.NewRequest(method, target, nil)
 	r.Host = "127.0.0.1:4600" // giả lập loopback
 	return r
 }
 
-// Không có token thì mọi cửa đều đóng.
-func TestThieuTokenBiChan(t *testing.T) {
+// Chưa đăng nhập thì mọi cửa đều đóng.
+func TestChuaDangNhapBiChan(t *testing.T) {
 	s := newTestServer(t)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, req("GET", "/api/state"))
 	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("không token phải 401, được %d", w.Code)
+		t.Fatalf("chưa đăng nhập phải 401, được %d", w.Code)
 	}
 }
 
-func TestTokenSaiBiChan(t *testing.T) {
+// Cookie bịa ra thì không qua.
+func TestCookieGiaBiChan(t *testing.T) {
+	s := newTestServer(t)
+	r := req("GET", "/api/state")
+	r.AddCookie(&http.Cookie{Name: cookieName, Value: "bia-ra-thoi"})
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("cookie giả phải 401, được %d", w.Code)
+	}
+}
+
+// Token trên URL KHÔNG còn là cửa vào — có `?t=` cũng vẫn bị chặn.
+func TestTokenTrenURLKhongConTacDung(t *testing.T) {
 	s := newTestServer(t)
 	w := httptest.NewRecorder()
-	s.ServeHTTP(w, req("GET", "/api/state?t=saibet"))
+	s.ServeHTTP(w, req("GET", "/api/state?t=batkychuoinao"))
 	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("token sai phải 401, được %d", w.Code)
+		t.Fatalf("token trên URL phải hết tác dụng (401), được %d", w.Code)
 	}
 }
 
-// Đúng token thì /api/state trả JSON có mảng profiles + sessions.
+// Đăng nhập rồi thì /api/state trả JSON có mảng profiles + sessions.
 func TestStateTraJSON(t *testing.T) {
 	s := newTestServer(t)
+	r := req("GET", "/api/state")
+	r.AddCookie(dangNhap(t, s, "127.0.0.1:4600"))
 	w := httptest.NewRecorder()
-	s.ServeHTTP(w, req("GET", "/api/state?t="+s.Token()))
+	s.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("phải 200, được %d — %s", w.Code, w.Body.String())
 	}
@@ -74,8 +115,10 @@ func TestStateTraJSON(t *testing.T) {
 // Chống DNS-rebind: Host là tên miền lạ (dù trỏ về loopback) thì bị chặn.
 func TestHostLaBiChan(t *testing.T) {
 	s := newTestServer(t)
-	r := httptest.NewRequest("GET", "/api/state?t="+s.Token(), nil)
+	ck := dangNhap(t, s, "127.0.0.1:4600")
+	r := httptest.NewRequest("GET", "/api/state", nil)
 	r.Host = "evil.example.com"
+	r.AddCookie(ck)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
@@ -83,12 +126,14 @@ func TestHostLaBiChan(t *testing.T) {
 	}
 }
 
-// Chống CSRF: POST từ gốc khác (dù đúng token) bị chặn.
+// Chống CSRF: POST từ gốc khác (dù đã đăng nhập) bị chặn.
 func TestOriginLaBiChanTrenPOST(t *testing.T) {
 	s := newTestServer(t)
-	r := httptest.NewRequest("POST", "/api/stop?t="+s.Token(), strings.NewReader(`{"all":true}`))
+	ck := dangNhap(t, s, "127.0.0.1:4600")
+	r := httptest.NewRequest("POST", "/api/stop", strings.NewReader(`{"all":true}`))
 	r.Host = "127.0.0.1:4600"
 	r.Header.Set("Origin", "http://evil.example.com")
+	r.AddCookie(ck)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
@@ -99,9 +144,11 @@ func TestOriginLaBiChanTrenPOST(t *testing.T) {
 // POST cùng gốc loopback thì qua được (stop all với 0 phiên trả stopped:0).
 func TestPOSTcungGocQua(t *testing.T) {
 	s := newTestServer(t)
-	r := httptest.NewRequest("POST", "/api/stop?t="+s.Token(), strings.NewReader(`{"all":true}`))
+	ck := dangNhap(t, s, "127.0.0.1:4600")
+	r := httptest.NewRequest("POST", "/api/stop", strings.NewReader(`{"all":true}`))
 	r.Host = "127.0.0.1:4600"
 	r.Header.Set("Origin", "http://127.0.0.1:4600")
+	r.AddCookie(ck)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
@@ -109,17 +156,18 @@ func TestPOSTcungGocQua(t *testing.T) {
 	}
 }
 
-// Chế độ phơi ra mạng: Host là IP thật thì phải QUA, nhưng token vẫn bắt buộc.
-func TestCheDoPhoiChoHostThatNhungVanDoiToken(t *testing.T) {
+// Chế độ phơi ra mạng: Host là IP thật thì phải QUA, nhưng vẫn đòi đăng nhập.
+func TestCheDoPhoiChoHostThatNhungVanDoiDangNhap(t *testing.T) {
 	s := newTestServer(t)
 	s.exposed = true // như khi chạy --host 0.0.0.0
 
-	r := httptest.NewRequest("GET", "/api/state?t="+s.Token(), nil)
+	r := httptest.NewRequest("GET", "/api/state", nil)
 	r.Host = "103.97.134.90:8788"
+	r.AddCookie(dangNhap(t, s, "103.97.134.90:8788"))
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
-		t.Fatalf("phơi ra mạng + đúng token phải 200, được %d", w.Code)
+		t.Fatalf("phơi ra mạng + đã đăng nhập phải 200, được %d", w.Code)
 	}
 
 	r2 := httptest.NewRequest("GET", "/api/state", nil)
@@ -127,7 +175,7 @@ func TestCheDoPhoiChoHostThatNhungVanDoiToken(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	s.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusUnauthorized {
-		t.Fatalf("phơi ra mạng mà thiếu token phải 401, được %d", w2.Code)
+		t.Fatalf("phơi ra mạng mà chưa đăng nhập phải 401, được %d", w2.Code)
 	}
 }
 
@@ -135,9 +183,11 @@ func TestCheDoPhoiChoHostThatNhungVanDoiToken(t *testing.T) {
 func TestCheDoPhoiVanChanOriginLa(t *testing.T) {
 	s := newTestServer(t)
 	s.exposed = true
-	r := httptest.NewRequest("POST", "/api/stop?t="+s.Token(), strings.NewReader(`{"all":true}`))
+	ck := dangNhap(t, s, "103.97.134.90:8788")
+	r := httptest.NewRequest("POST", "/api/stop", strings.NewReader(`{"all":true}`))
 	r.Host = "103.97.134.90:8788"
 	r.Header.Set("Origin", "http://evil.example.com")
+	r.AddCookie(ck)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
@@ -145,18 +195,20 @@ func TestCheDoPhoiVanChanOriginLa(t *testing.T) {
 	}
 }
 
-// Dò token nhiều lần thì bị bắt chờ (429) — token 128-bit vốn đã khó dò, đây là
-// lớp phòng thủ thêm khi cổng nằm ngoài internet.
-func TestDoTokenNhieuLanBiChan(t *testing.T) {
+// Dò nhiều lần thì bị bắt chờ (429). Quan trọng gấp bội so với thời còn token:
+// mật khẩu do người đặt nên entropy thấp hơn hẳn 128 bit ngẫu nhiên.
+func TestDoNhieuLanBiChan(t *testing.T) {
 	s := newTestServer(t)
 	s.exposed = true
+	ck := dangNhap(t, s, "103.97.134.90:8788") // lấy cookie TRƯỚC: đăng nhập đúng sẽ reset bộ đếm
 	for i := 0; i < 5; i++ {
-		r := httptest.NewRequest("GET", "/api/state?t=sai"+strconv.Itoa(i), nil)
+		r := httptest.NewRequest("GET", "/api/state?lan="+strconv.Itoa(i), nil)
 		r.Host = "103.97.134.90:8788"
 		s.ServeHTTP(httptest.NewRecorder(), r)
 	}
-	r := httptest.NewRequest("GET", "/api/state?t="+s.Token(), nil)
+	r := httptest.NewRequest("GET", "/api/state", nil)
 	r.Host = "103.97.134.90:8788"
+	r.AddCookie(ck)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusTooManyRequests {
