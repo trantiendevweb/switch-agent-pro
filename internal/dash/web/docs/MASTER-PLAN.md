@@ -376,7 +376,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.
 - **Ánh xạ:** thay thế prototype `registry`/`fleet` hiện tại.
 
-### Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  🟡 Codex xong
+### Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  ✅ xong
 - [x] **Đo Codex trên Windows** (`@openai/codex` 0.147.0) — xem `docs/DO-LUONG.md`.
   Phép đo quyết định: `CODEX_HOME` trỏ vào thư mục rỗng thì `codex login status`
   báo "Not logged in" dù `~/.codex` thật đang đăng nhập → **tách thật**.
@@ -460,7 +460,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - **DoD:** thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh **approval không thể bị bỏ qua**.
 
-### Pha 4 — Mở rộng harness + AI API
+### Pha 4 — Mở rộng harness + AI API  🟡 một phần
 - Subscription: **Gemini CLI, Cursor**, OpenCode (nếu đo được).
 - API: **Google Gemini, xAI/Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI**,
   generic OpenAI-compatible; Azure/Bedrock/Vertex ở lớp plugin/enterprise nếu cần.
@@ -469,6 +469,21 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   OpenAI-compatible hoạt động với custom base URL/model/headers; fallback không mất
   correlation ID/usage/error gốc; thêm model/provider chỉ khác endpoint bằng manifest;
   chưa xác minh giữ `experimental`/`unknown`.
+- **Trạng thái (2026-08-18):**
+  - ✅ **Năm harness chạy được**: claude · codex · cursor · antigravity · grok. Bảng đo
+    đầy đủ (danh tính nằm ở đâu, tách được hay không) ở `docs/DO-LUONG.md`.
+    Gemini CLI **bỏ** — Google cắt khỏi gói miễn phí cho cá nhân.
+  - ✅ **Generic OpenAI-compatible qua API**: `internal/aiapi` + `sagent api <route>`.
+    Custom base URL/model, key tham chiếu bằng `key_id`, lỗi giữ nguyên văn (còn
+    request id), trả `usage`. Đo thật trên `modelapi.vn`: 1195 token / 11,8s.
+  - ⬜ **Chưa có streaming.** Cố ý dừng: làm nửa vời thì mất `usage`, mà `usage` mới là
+    thứ đáng giá nhất của đường API.
+  - ⬜ **Chưa có fallback route.** `default_route` đọc được nhưng chưa dùng để chuyển
+    tiếp khi route chính hỏng. DoD đòi "fallback không mất correlation ID/usage/error
+    gốc" — chưa làm thì chưa nhận.
+  - ⬜ Chưa ghi lịch sử lời gọi API vào `state.db`.
+  - ⬜ DeepSeek/OpenRouter/Ollama: chưa đo. Cấu trúc đã generic nên nhiều khả năng chỉ
+    là thêm route, nhưng **chưa đo thì chưa nói là chạy được**.
 
 ### Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)
 🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng

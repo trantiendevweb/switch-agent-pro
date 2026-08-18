@@ -504,7 +504,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.</li>
 <li><strong>Ánh xạ:</strong> thay thế prototype <code>registry</code>/<code>fleet</code> hiện tại.</li>
 </ul>
-<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  🟡 Codex xong</h3>
+<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  ✅ xong</h3>
 <ul>
 <li class="task done"><span class="box"></span><strong>Đo Codex trên Windows</strong> (<code>@openai/codex</code> 0.147.0) — xem <code>docs/DO-LUONG.md</code>.
   Phép đo quyết định: <code>CODEX_HOME</code> trỏ vào thư mục rỗng thì <code>codex login status</code>
@@ -594,7 +594,7 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 <li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>
 </ul>
-<h3>Pha 4 — Mở rộng harness + AI API</h3>
+<h3>Pha 4 — Mở rộng harness + AI API  🟡 một phần</h3>
 <ul>
 <li>Subscription: <strong>Gemini CLI, Cursor</strong>, OpenCode (nếu đo được).</li>
 <li>API: <strong>Google Gemini, xAI/Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI</strong>,
@@ -604,6 +604,21 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
   OpenAI-compatible hoạt động với custom base URL/model/headers; fallback không mất
   correlation ID/usage/error gốc; thêm model/provider chỉ khác endpoint bằng manifest;
   chưa xác minh giữ <code>experimental</code>/<code>unknown</code>.</li>
+<li><strong>Trạng thái (2026-08-18):</strong></li>
+<li>✅ <strong>Năm harness chạy được</strong>: claude · codex · cursor · antigravity · grok. Bảng đo
+    đầy đủ (danh tính nằm ở đâu, tách được hay không) ở <code>docs/DO-LUONG.md</code>.
+    Gemini CLI <strong>bỏ</strong> — Google cắt khỏi gói miễn phí cho cá nhân.</li>
+<li>✅ <strong>Generic OpenAI-compatible qua API</strong>: <code>internal/aiapi</code> + <code>sagent api &lt;route&gt;</code>.
+    Custom base URL/model, key tham chiếu bằng <code>key_id</code>, lỗi giữ nguyên văn (còn
+    request id), trả <code>usage</code>. Đo thật trên <code>modelapi.vn</code>: 1195 token / 11,8s.</li>
+<li>⬜ <strong>Chưa có streaming.</strong> Cố ý dừng: làm nửa vời thì mất <code>usage</code>, mà <code>usage</code> mới là
+    thứ đáng giá nhất của đường API.</li>
+<li>⬜ <strong>Chưa có fallback route.</strong> <code>default_route</code> đọc được nhưng chưa dùng để chuyển
+    tiếp khi route chính hỏng. DoD đòi "fallback không mất correlation ID/usage/error
+    gốc" — chưa làm thì chưa nhận.</li>
+<li>⬜ Chưa ghi lịch sử lời gọi API vào <code>state.db</code>.</li>
+<li>⬜ DeepSeek/OpenRouter/Ollama: chưa đo. Cấu trúc đã generic nên nhiều khả năng chỉ
+    là thêm route, nhưng <strong>chưa đo thì chưa nói là chạy được</strong>.</li>
 </ul>
 <h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
 <p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng

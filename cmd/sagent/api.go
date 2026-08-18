@@ -102,26 +102,15 @@ func apiDs() {
 
 func apiGoi(ten string, args []string) {
 	if len(args) == 0 {
-		fail(fmt.Errorf(`thiếu prompt: sagent api %s "câu hỏi"`, ten))
+		fail(fmt.Errorf("thiếu prompt: sagent api %s \"câu hỏi\"", ten))
 	}
 	a, done := open()
 	defer done()
-	c := a.Config()
+
+	// Gọi qua api.AICall chứ không tự tìm route: chỗ đó mới biết default_route và
+	// fallback_routes. Tự dựng Route ở đây là bỏ qua fallback mà không ai thấy.
+	kq, err := a.AICall(context.Background(), ten, strings.Join(args, " "))
 	done()
-
-	var r aiapi.Route
-	var thay bool
-	for _, x := range c.AI.Routes {
-		if x.Ten == ten {
-			r = aiapi.Route{Ten: x.Ten, BaseURL: x.BaseURL, Model: x.Model, KeyID: x.KeyID}
-			thay = true
-		}
-	}
-	if !thay {
-		fail(fmt.Errorf("không có route %q — xem: sagent api ds", ten))
-	}
-
-	kq, err := aiapi.Goi(context.Background(), r, strings.Join(args, " "))
 	if err != nil {
 		fail(err)
 	}
@@ -130,6 +119,6 @@ func apiGoi(ten string, args []string) {
 	fmt.Println()
 	// Đường API tiêu TIỀN theo token, khác đường CLI tiêu hạn mức. Không in ra
 	// thì người dùng không biết mình vừa tiêu gì.
-	fmt.Printf("  %s · %s · vào %d, ra %d, tổng %d token · %.1fs\n",
-		r.Ten, kq.Model, kq.Usage.Vao, kq.Usage.Ra, kq.Usage.Tong, kq.Mat.Seconds())
+	fmt.Printf("  %s · vào %d, ra %d, tổng %d token · %.1fs\n",
+		kq.Model, kq.Usage.Vao, kq.Usage.Ra, kq.Usage.Tong, kq.Mat.Seconds())
 }

@@ -54,7 +54,8 @@ type Config struct {
 	// "file cấu hình không bao giờ chứa secret" (MASTER-PLAN mục 0) — file này
 	// đi vào git của người dùng, còn key thì nằm trong kho đã siết ACL.
 	AI struct {
-		DefaultRoute string `toml:"default_route"`
+		DefaultRoute   string   `toml:"default_route"`
+		FallbackRoutes []string `toml:"fallback_routes"`
 		Routes       []struct {
 			Ten     string `toml:"ten"`
 			BaseURL string `toml:"base_url"`

@@ -439,14 +439,62 @@ func (a *API) AIRoutes() []aiapi.Route {
 	return out
 }
 
-// AICall — action "api.call". Gọi thẳng AI API theo route đã cấu hình.
+// AICall — action "api.call". Gọi thẳng AI API theo route, tự chuyển sang route
+// dự phòng nếu route chính hỏng.
+//
+// route rỗng = dùng `default_route`, rồi tới `fallback_routes` theo thứ tự.
+//
+// Điều kiện khó nhất của DoD Pha 4: "fallback KHÔNG mất correlation ID / usage /
+// error gốc". Nên khi mọi route đều hỏng, lỗi trả về mang NGUYÊN VĂN lỗi của
+// từng route — kể cả request id của nhà cung cấp. Gộp thành "tất cả đều hỏng" là
+// vứt đúng thứ cần để đi hỏi họ.
 func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, error) {
-	for _, r := range a.AIRoutes() {
-		if r.Ten == route {
-			return aiapi.Goi(ctx, r, prompt)
+	routes := a.AIRoutes()
+	tim := func(ten string) (aiapi.Route, bool) {
+		for _, r := range routes {
+			if r.Ten == ten {
+				return r, true
+			}
+		}
+		return aiapi.Route{}, false
+	}
+
+	var thuTu []string
+	if route != "" {
+		thuTu = []string{route}
+	} else {
+		if a.cfg.AI.DefaultRoute != "" {
+			thuTu = append(thuTu, a.cfg.AI.DefaultRoute)
+		}
+		thuTu = append(thuTu, a.cfg.AI.FallbackRoutes...)
+	}
+	if len(thuTu) == 0 {
+		return aiapi.KetQua{}, fmt.Errorf("chưa cấu hình route nào — xem: sagent api ds")
+	}
+
+	var loi []string
+	for i, ten := range thuTu {
+		r, ok := tim(ten)
+		if !ok {
+			loi = append(loi, fmt.Sprintf("%s: không có route này", ten))
+			continue
+		}
+		kq, err := aiapi.Goi(ctx, r, prompt)
+		if err == nil {
+			if i > 0 {
+				// Nói ra là đã chuyển route. Im lặng đổi nhà cung cấp nghĩa là
+				// người dùng không biết câu trả lời đến từ đâu và tốn tiền của ai.
+				a.bus.Warnf("route %q hỏng, đã chuyển sang %q", thuTu[0], ten)
+			}
+			return kq, nil
+		}
+		loi = append(loi, err.Error())
+		// Ngữ cảnh bị huỷ thì dừng hẳn — thử tiếp chỉ tốn thêm tiền.
+		if ctx.Err() != nil {
+			break
 		}
 	}
-	return aiapi.KetQua{}, fmt.Errorf("không có route %q — xem: sagent api ds", route)
+	return aiapi.KetQua{}, fmt.Errorf("mọi route đều hỏng:\n     - %s", strings.Join(loi, "\n     - "))
 }
 
 // DBInfo — phần ĐỌC của action "db.admin": schema hiện tại, schema mà bản binary
