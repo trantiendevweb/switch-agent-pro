@@ -122,6 +122,30 @@
         </form>
       </div>
 
+      <h2>Hỏi thẳng AI API</h2>
+      <div class="card">
+        <form id="aiform">
+          <div class="row">
+            <div><label>Route</label><select id="ai-route"></select></div>
+          </div>
+          <label>Câu hỏi</label>
+          <input type="text" id="ai-prompt" placeholder="tóm tắt repo này trong 1 câu">
+          <div class="warnbox">Đường này tiêu <b>tiền theo token</b>, khác hạm đội tiêu hạn mức thuê bao. Số token hiện ra sau khi chạy.</div>
+          <button class="go" type="submit">Gửi</button>
+        </form>
+        <div id="ai-out" class="empty">Chưa hỏi gì.</div>
+      </div>
+
+      <h2>Máy &amp; dọn dẹp</h2>
+      <div class="card">
+        <div id="dbinfo" class="empty">đang đọc…</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="quet">Quét tiến trình mồ côi</button>
+          <button class="btn danger" id="quetgiet" disabled>Dừng những cái tìm được</button>
+        </div>
+        <div id="quetout" class="empty">Chưa quét.</div>
+      </div>
+
       <h2>Nhật ký sự kiện</h2>
       <div class="card"><div id="log"></div></div>
       <div style="margin-top:10px;text-align:right">
@@ -138,6 +162,77 @@ const H = { 'Content-Type': 'application/json' };
 const $ = id => document.getElementById(id);
 $('to3d').href = '3d.html';
 $('toflow').href = 'flow.html';
+
+// ---- ba mặt mới: AI API, quét mồ côi, thông tin DB ----
+//
+// Cùng đi qua /api/* như mọi thứ khác, nên chúng ngang quyền với CLI chứ không
+// phải tính năng hạng hai gắn thêm.
+
+async function napRoute(){
+  try{
+    const d = await api('/api/ai');
+    const sel = $('ai-route');
+    sel.innerHTML = '';
+    if(!d.route || !d.route.length){
+      sel.innerHTML = '<option value="">(chưa cấu hình route nào)</option>';
+      return;
+    }
+    for(const r of d.route){
+      const o = document.createElement('option');
+      o.value = r.ten; o.textContent = r.ten + ' · ' + r.model;
+      sel.appendChild(o);
+    }
+  }catch(e){ /* chưa cấu hình thì im, không bắn lỗi đỏ vào mặt người dùng */ }
+}
+
+async function napDB(){
+  try{
+    const d = await api('/api/db');
+    $('dbinfo').className = '';
+    $('dbinfo').textContent = 'state.db · schema v' + d.schema +
+      (d.can_nang_cap ? ' (bản binary này biết tới v' + d.schema_moi + ' — sẽ nâng khi mở)' : ' — mới nhất') +
+      ' · ' + d.duong_dan;
+  }catch(e){ $('dbinfo').textContent = 'không đọc được: ' + e.message; }
+}
+
+let moCoiCo = 0;
+async function quet(giet){
+  const out = $('quetout');
+  out.className = ''; out.textContent = 'đang quét…';
+  try{
+    const d = await api('/api/quet', giet ? {method:'POST', body: JSON.stringify({giet:true})} : undefined);
+    moCoiCo = (d.muc||[]).reduce((n,m)=> n + (m.procs||[]).length, 0);
+    $('quetgiet').disabled = moCoiCo === 0;
+    if(!moCoiCo){ out.className='empty'; out.textContent = giet ? 'Đã dừng xong.' : 'Không có tiến trình mồ côi nào.'; return; }
+    const dong = [];
+    for(const m of d.muc){
+      dong.push('#' + m.session_id + ' ' + m.addr + ' (PID cũ ' + m.pid_cu + ')');
+      for(const p of m.procs) dong.push('   PID ' + p.pid + '  ' + p.ten + '  bắt đầu ' + p.bat_dau);
+    }
+    dong.push(d.da_giet ? '→ đã dừng ' + moCoiCo + ' tiến trình.'
+                        : '→ thấy ' + moCoiCo + ' tiến trình. Windows dùng lại PID nên xem kỹ tên và giờ trước khi dừng.');
+    out.textContent = dong.join('
+');
+    out.style.whiteSpace = 'pre';
+  }catch(e){ out.textContent = 'lỗi: ' + e.message; }
+}
+
+$('quet').onclick = () => quet(false);
+$('quetgiet').onclick = () => { if(confirm('Dừng ' + moCoiCo + ' tiến trình đã tìm được?')) quet(true); };
+
+$('aiform').onsubmit = async ev => {
+  ev.preventDefault();
+  const out = $('ai-out'); out.className=''; out.textContent = 'đang hỏi…';
+  try{
+    const d = await api('/api/ai', {method:'POST', body: JSON.stringify({
+      route: $('ai-route').value, prompt: $('ai-prompt').value })});
+    out.style.whiteSpace = 'pre-wrap';
+    out.textContent = d.noi_dung + '
+
+— ' + d.model + ' · vào ' + d.usage.vao +
+      ', ra ' + d.usage.ra + ', tổng ' + d.usage.tong + ' token · ' + d.giay.toFixed(1) + 's';
+  }catch(e){ out.textContent = 'lỗi: ' + e.message; }
+};
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({ headers: H }, opts||{}));
@@ -221,6 +316,11 @@ function connect(){
     logEvent(e);
     // trạng thái đổi thì đọc lại ảnh chụp đầy đủ (không dựng UI chỉ từ event)
     if(['session.started','session.stopped','clones.cleaned','worktree.removed'].includes(e.type)) refresh();
+// Hai cái này đọc một lần lúc mở: route và schema hiếm khi đổi giữa chừng, nên
+// nhét vào vòng poll 5 giây chỉ tốn request. Quét mồ côi thì CỐ Ý không tự chạy —
+// nó đọc bảng tiến trình cả máy, phải do người dùng bấm.
+napRoute();
+napDB();
   };
 }
 
