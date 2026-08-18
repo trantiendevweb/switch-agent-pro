@@ -52,6 +52,19 @@ type Adapter interface {
 	// sau ~7,5 giờ, nên một đội chạy qua đêm chắc chắn vượt mốc refresh.
 	TokenExpiry(configDir string) (time.Time, bool)
 
+	// TachDuocTaiKhoan: provider này có chạy được NHIỀU tài khoản trên cùng một
+	// máy không.
+	//
+	// Nằm trong interface chứ không phải một cái bảng ở đâu đó, vì đây là tính
+	// chất ĐO ĐƯỢC của từng provider và lõi không được có nhánh
+	// `if provider == "antigravity"`.
+	//
+	// false = token nằm ở chỗ dùng chung toàn máy (Antigravity giữ nó trong
+	// Windows Credential Manager dưới khoá tên cố định). Với provider như vậy,
+	// `fleet --copies N` là lời hứa hão: N tiến trình sẽ giành nhau đúng một
+	// danh tính. Thà từ chối và nói rõ.
+	TachDuocTaiKhoan() bool
+
 	// Version là chuỗi phiên bản của CLI bên dưới.
 	//
 	// Nằm trong interface chứ không phải một helper dùng chung, vì cách hỏi có

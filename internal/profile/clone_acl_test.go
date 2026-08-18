@@ -170,6 +170,7 @@ func (adapterLong) Name() string                     { return "long" }
 func (adapterLong) EnvVar() string                   { return "APPDATA" }
 func (adapterLong) Command() (string, error)         { return "", nil }
 func (adapterLong) Version() (string, error)         { return "long 0.0.0", nil }
+func (adapterLong) TachDuocTaiKhoan() bool           { return true }
 func (adapterLong) HeadlessArgs(p string) []string   { return []string{"-p", p} }
 func (adapterLong) PrivateFiles() []string           { return []string{filepath.Join("Cursor", "auth.json")} }
 func (adapterLong) SharedKeys() []string             { return nil }

@@ -28,6 +28,7 @@ type fakeAgent struct{ base string }
 
 func (fakeAgent) Name() string             { return "fake" }
 func (fakeAgent) Version() (string, error) { return "fake 0.0.0", nil }
+func (fakeAgent) TachDuocTaiKhoan() bool { return true }
 func (fakeAgent) EnvVar() string           { return "FAKE_CONFIG_DIR" }
 func (fakeAgent) Command() (string, error) { return os.Executable() }
 func (fakeAgent) HeadlessArgs(p string) []string { return []string{"-p", p} }

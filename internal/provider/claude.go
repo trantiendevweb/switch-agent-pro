@@ -135,3 +135,6 @@ var claudeSharedKeys = []string{
 	"claudeInChromeDefaultEnabled",
 	"cachedChromeExtensionInstalled",
 }
+
+// Token là file trong thư mục config, tách bằng CLAUDE_CONFIG_DIR — đã đo.
+func (claude) TachDuocTaiKhoan() bool { return true }

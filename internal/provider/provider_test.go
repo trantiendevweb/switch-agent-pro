@@ -12,8 +12,15 @@ func TestAdapterKhaiBaoDu(t *testing.T) {
 		if ad.EnvVar() == "" {
 			t.Fatalf("%s: thiếu EnvVar() — không có biến thì không tách được thư mục", name)
 		}
-		if len(ad.PrivateFiles()) == 0 {
-			t.Fatalf("%s: PrivateFiles() rỗng — token sẽ bị nối link dùng chung", name)
+		// PrivateFiles rỗng chỉ được phép khi adapter TỰ KHAI là không tách được
+		// tài khoản. Ràng buộc thật nằm ở đây: đã hứa tách được thì phải nói rõ
+		// file nào là riêng, không thì LinkShared sẽ nối link cả token.
+		//
+		// Antigravity khai false vì token của nó nằm trong Windows Credential
+		// Manager chứ không phải file — rỗng là mô tả ĐÚNG, không phải thiếu sót.
+		if len(ad.PrivateFiles()) == 0 && ad.TachDuocTaiKhoan() {
+			t.Fatalf("%s: hứa tách được tài khoản nhưng PrivateFiles() rỗng — "+
+				"token sẽ bị nối link dùng chung", name)
 		}
 		if ad.BaseDir() == "" {
 			t.Fatalf("%s: thiếu BaseDir()", name)
@@ -45,5 +52,33 @@ func TestMoiProviderCoCachChayHeadlessRieng(t *testing.T) {
 	// Claude dùng cờ, Codex dùng lệnh con — nếu ai đó "gộp cho gọn" thì test đỏ.
 	if seen["claude"] == seen["codex"] {
 		t.Fatalf("claude và codex phải khác cách chạy headless, cả hai đang là %q", seen["claude"])
+	}
+}
+
+// Provider không tách được tài khoản thì `fleet --copies N` phải TỪ CHỐI, không
+// được bật lên rồi để N tiến trình giành nhau một danh tính.
+//
+// Đây là bài học đắt: hai client Claude giành một device slot 1866 lần trong 18
+// tiếng rồi làm rơi phiên remote (xem docs/DO-LUONG.md). Cùng một hình dạng lỗi.
+func TestKhaiKhongTachDuocThiPhaiNoiRa(t *testing.T) {
+	var coCaiKhongTach bool
+	for _, name := range Names() {
+		ad, _ := Get(name)
+		if !ad.TachDuocTaiKhoan() {
+			coCaiKhongTach = true
+			// Bộ đo của nó phải NÓI RA điều đó, chứ không giấu trong tài liệu.
+			var noiRa bool
+			for _, c := range ad.Verify() {
+				if !c.OK && len(c.Detail) > 0 {
+					noiRa = true
+				}
+			}
+			if !noiRa {
+				t.Errorf("%s không tách được tài khoản mà Verify() không có ô nào báo điều đó", name)
+			}
+		}
+	}
+	if !coCaiKhongTach {
+		t.Skip("chưa có provider nào khai không tách được — không có gì để đo")
 	}
 }

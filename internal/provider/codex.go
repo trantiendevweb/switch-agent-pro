@@ -206,3 +206,6 @@ func (c codex) Verify() []Check {
 
 	return out
 }
+
+// Token là file trong thư mục config, tách bằng CODEX_HOME — đã đo.
+func (codex) TachDuocTaiKhoan() bool { return true }

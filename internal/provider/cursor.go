@@ -132,3 +132,7 @@ func (c cursor) Verify() []Check {
 	out = append(out, tk)
 	return out
 }
+
+// Token là file Cursor\auth.json trong thư mục APPDATA — đã đo: chép file đó
+// sang APPDATA giả là danh tính đi theo, hồ sơ mới thì "Not logged in".
+func (cursor) TachDuocTaiKhoan() bool { return true }
