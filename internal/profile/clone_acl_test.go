@@ -186,3 +186,5 @@ func (adapterLong) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 func (adapterLong) ArgsThuMuc(string) []string { return nil }
 
 func (adapterLong) ArgsHoSo(string) []string { return nil }
+
+func (adapterLong) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }

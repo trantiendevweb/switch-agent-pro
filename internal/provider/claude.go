@@ -51,7 +51,17 @@ func (c claude) Version() (string, error) {
 }
 
 // Đã đo: `claude -p "<prompt>"` chạy không tương tác và in kết quả ra stdout.
-func (claude) HeadlessArgs(prompt string) []string { return []string{"-p", prompt} }
+// HeadlessArgs bật NDJSON có cấu trúc thay vì chữ trơn.
+//
+// Đo 18/08: dòng cuối `{"type":"result"}` mang is_error, subtype, stop_reason,
+// terminal_reason, permission_denials, api_error_status, usage, total_cost_usd —
+// đủ để biết lượt chạy hỏng hay không mà KHÔNG cần dò chuỗi tiếng Anh.
+// `--verbose` là bắt buộc: thiếu nó thì stream-json chỉ ra mỗi dòng cuối.
+func (claude) HeadlessArgs(prompt string) []string {
+	return []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
+}
+
+func (claude) DocKetQua(raw string) (KetQua, bool) { return docKetQuaClaude(raw) }
 
 func (claude) PrivateFiles() []string { return []string{".credentials.json", ".claude.json"} }
 

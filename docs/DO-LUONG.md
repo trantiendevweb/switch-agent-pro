@@ -1737,3 +1737,61 @@ mức tin cậy chưa có.
 
 Bước Agent Deck vẫn **chưa học được gì** (hết giờ giữa việc, nhánh không commit).
 Hàng #2 trong bảng ưu tiên còn nguyên.
+
+## 18/08 — Bỏ dò chuỗi, đọc dữ liệu có cấu trúc: đo được, làm được ngay
+
+Bản tổng hợp của đội học xếp việc này lên đầu. Đo trước khi làm.
+
+**Không CLI nào trên máy nói ACP.** `claude --help`, `codex --help`, `agy --help`
+đều không có. Nhưng cả ba đều có đường khác, sẵn hôm nay:
+
+| CLI | Có gì |
+|---|---|
+| claude | `--output-format stream-json` + `--verbose` |
+| agy | `--output-format text\|json\|stream-json`, `--input-format`, `--json-schema` |
+| codex | `mcp-server` (stdio MCP) |
+
+Nên đích đến không phải ACP — mà là **dữ liệu có cấu trúc**, và nó có sẵn.
+
+**Đo `claude -p --output-format stream-json --verbose`.** Dòng cuối
+`{"type":"result", ...}` mang đủ mọi thứ mà cả ngày nay phải đoán bằng chuỗi:
+
+```
+is_error: false        subtype: "success"          stop_reason: "end_turn"
+terminal_reason: "completed"   api_error_status: null   permission_denials: []
+num_turns: 1           total_cost_usd: 0.08446     result: "OK"
+usage: {input_tokens, output_tokens, cache_*}
+```
+
+Kèm sự kiện riêng `rate_limit_event` có `resetsAt` và `rateLimitType` — nói được
+"hạn mức quay lại lúc mấy giờ" thay vì chỉ báo hỏng.
+
+Đối chiếu bốn kiểu hỏng đã gặp trong ngày:
+
+| Kiểu hỏng | Trước: dò chuỗi | Sau: đọc trường |
+|---|---|---|
+| bị chặn quyền | `"no output produced"`… | `permission_denials` khác rỗng |
+| hết hạn đăng nhập | `"failed to authenticate"`… | `is_error` + `api_error_status` |
+| quẩn vòng gọi tool | `"maximum tool execution rounds reached"` | `subtype = error_max_turns` |
+| dừng giữa việc | `"timeout waiting for response"` | `is_error` + `terminal_reason` |
+
+Bốn chuỗi tiếng Anh, mỗi chuỗi là chữ ký của MỘT provider ở MỘT phiên bản → bốn
+trường có tên. Provider đổi câu chữ cũng không rơi lá chắn.
+
+Đã thêm `provider.KetQua` + `DocKetQua(raw)` vào interface. Claude đọc được; bốn
+provider kia trả `ok=false` (**chưa đo**, không phải không có — agy có
+stream-json, chỉ là chưa đo cách đọc). Cầu nối ƯU TIÊN cấu trúc, dò chuỗi chỉ còn
+là đường lui, và chỉ dùng khi provider chưa đo được.
+
+**Hai thứ được thêm miễn phí:**
+1. Output của bước giờ là CÂU TRẢ LỜI THẬT (trường `result`), không phải cả bản
+   ghi NDJSON. Bước sau nhận dữ liệu sạch.
+2. Theo dõi chi phí — món nợ từ đầu dự án. Nghiệm thu lần chạy #26:
+   `claude:tns: 6 lượt, 10 token vào / 905 ra, 0.1809 USD`.
+
+Test dùng NGUYÊN VĂN dòng result đo được, không phải JSON tự bịa. Có cả ca "bản
+ghi không có dòng result" → phải nói thẳng KHÔNG ĐỌC ĐƯỢC, không được đoán.
+
+**Bẫy đã dính khi kiểm:** `sagent fleet <tk> -- -p "..."` truyền đối số TAY nên
+bỏ qua `HeadlessArgs` — đo bằng đường đó thì thấy log chữ trơn và tưởng bản vá
+hỏng. Chỉ đường flow mới gọi `HeadlessArgs`. Phải đo đúng đường mà tính năng đi qua.

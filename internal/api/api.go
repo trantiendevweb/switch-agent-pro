@@ -781,7 +781,22 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 		return "", err
 	}
 	out := readLogs(logs)
-	if ly := khongCoKetQua(out); ly != "" {
+
+	// ƯU TIÊN dữ liệu có cấu trúc. Dò chuỗi chỉ là đường lui cho provider chưa đo
+	// được — xem provider.KetQua và docs/DU-AN-THAM-KHAO.md ("hỏng phải là cấu
+	// trúc dữ liệu, không phải chữ trong văn bản").
+	if k, ok := ad.DocKetQua(out); ok {
+		if ly := k.Hong(); ly != "" {
+			return out, fmt.Errorf("%s (profile %s)", ly, addr)
+		}
+		// Câu trả lời thật, đã tách khỏi đống sự kiện NDJSON. Bước sau nhận cái
+		// này chứ không phải cả bản ghi.
+		out = k.TraLoi
+		if k.ChiPhiUSD > 0 {
+			b.a.bus.Infof("%s: %d lượt, %d token vào / %d ra, %.4f USD",
+				addr, k.SoLuotTu, k.TokenVao, k.TokenRa, k.ChiPhiUSD)
+		}
+	} else if ly := khongCoKetQua(out); ly != "" {
 		return out, fmt.Errorf("%s (profile %s)", ly, addr)
 	}
 	// Gắn BẰNG CHỨNG GIT vào cuối kết quả. Lời agent kể không đáng tin: lần chạy

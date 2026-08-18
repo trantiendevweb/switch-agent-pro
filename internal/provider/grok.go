@@ -214,3 +214,6 @@ func (grok) ArgsHoSo(dir string) []string {
 	}
 	return []string{"-m", c.DefaultModel}
 }
+
+// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
+func (grok) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }

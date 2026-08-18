@@ -196,3 +196,5 @@ func (fakeAgent) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 func (fakeAgent) ArgsThuMuc(string) []string { return nil }
 
 func (fakeAgent) ArgsHoSo(string) []string { return nil }
+
+func (fakeAgent) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }

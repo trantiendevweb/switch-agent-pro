@@ -434,3 +434,15 @@ Yêu cầu:
 4. Chưa chép dòng mã nào thì nói rõ là chưa cần ghi OPEN_SOURCE_LEDGER.md.
 
 Trả về nguyên văn phần markdown để dán vào tài liệu, không lời dẫn."""
+
+# Phép thử nhỏ cho đường NDJSON có cấu trúc của Claude. Giữ lại vì mỗi lần đổi
+# HeadlessArgs hoặc cách đọc kết quả đều cần một lượt chạy thật để nghiệm thu.
+  [flow.thu-claude]
+    desc = "Một bước Claude, để nghiệm thu đường đọc kết quả có cấu trúc"
+
+    [[flow.thu-claude.step]]
+      id = "hoi"
+      type = "agent"
+      profile = "claude:tns"
+      timeout_sec = 600
+      prompt = "Ngon ngu lap trinh chinh cua repo nay la gi? Tra loi dung mot tu."

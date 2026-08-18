@@ -65,6 +65,11 @@ type Adapter interface {
 	// → trả lời đúng. Trả nil = không cần.
 	ArgsHoSo(dir string) []string
 
+	// DocKetQua đọc kết quả CÓ CẤU TRÚC từ bản ghi của một lượt chạy headless.
+	// ok=false nghĩa là provider này chưa phát ra dữ liệu có cấu trúc (hoặc chưa
+	// đo được cách đọc) — người gọi phải quay về cách cũ và nói rõ là kém tin cậy.
+	DocKetQua(raw string) (KetQua, bool)
+
 	// PrivateFiles là các file KHÔNG dùng chung (token + danh tính).
 	PrivateFiles() []string
 

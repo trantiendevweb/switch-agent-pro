@@ -214,9 +214,14 @@ func (codex) TachDuocTaiKhoan() bool { return true }
 // `--sandbox read-only|workspace-write|danger-full-access` và
 // `--ask-for-approval untrusted|on-request|never`. CHƯA chạy thật được để xác
 // nhận hành vi (hết hạn mức tới 20/08) — xem docs/DO-LUONG.md
-func (codex) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dangerously-bypass-approvals-and-sandbox"}, true }
+func (codex) ArgsTuDuyetQuyen() ([]string, bool) {
+	return []string{"--dangerously-bypass-approvals-and-sandbox"}, true
+}
 
 // ArgsThuMuc: đo `codex --help`: "-C, --cd <DIR>". CHƯA chạy thật (hết hạn mức tới 20/08)
 func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
 
 func (codex) ArgsHoSo(string) []string { return nil }
+
+// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
+func (codex) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }

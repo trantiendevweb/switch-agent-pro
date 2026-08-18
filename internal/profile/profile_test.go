@@ -74,3 +74,5 @@ func (fakeAdapter) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 func (fakeAdapter) ArgsThuMuc(string) []string { return nil }
 
 func (fakeAdapter) ArgsHoSo(string) []string { return nil }
+
+func (fakeAdapter) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }

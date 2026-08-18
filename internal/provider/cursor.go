@@ -144,3 +144,6 @@ func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 func (cursor) ArgsThuMuc(dir string) []string { return nil }
 
 func (cursor) ArgsHoSo(string) []string { return nil }
+
+// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
+func (cursor) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
