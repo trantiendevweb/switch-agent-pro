@@ -3,6 +3,7 @@ package fleet
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -198,3 +199,88 @@ func (fakeAgent) ArgsThuMuc(string) []string { return nil }
 func (fakeAgent) ArgsHoSo(string) []string { return nil }
 
 func (fakeAgent) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }
+// khoTokenChung là adapter giả cho lớp provider giữ token ở kho dùng chung toàn
+// máy (Antigravity: Windows Credential Manager). Dấu hiệu ĐO ĐƯỢC của lớp này
+// là `PrivateFiles()` rỗng — không có file nào để chép sang bản clone.
+type khoTokenChung struct{ fakeAgent }
+
+func (khoTokenChung) PrivateFiles() []string { return nil }
+
+// gomEvent hút hết event đang nằm trong kênh ra một lát cắt.
+func gomEvent(ch <-chan events.Event) []events.Event {
+	var out []events.Event
+	for {
+		select {
+		case e, ok := <-ch:
+			if !ok {
+				return out
+			}
+			out = append(out, e)
+		default:
+			return out
+		}
+	}
+}
+
+func coCauChepRa(evs []events.Event) bool {
+	for _, e := range evs {
+		if strings.Contains(e.Msg, "chép ra") {
+			return true
+		}
+	}
+	return false
+}
+
+// Provider KHÔNG có file riêng: fleet không được nói "Token được chép ra N chỗ"
+// — `profile.Clone` chỉ chép những gì `PrivateFiles()` khai, mà ở đây là rỗng,
+// nên câu đó là SAI SỰ THẬT.
+func TestFanOutKhongNoiChepTokenKhiAdapterKhongCoFileRieng(t *testing.T) {
+	db, bus, a := setup(t)
+	ch, huy := bus.Subscribe(256)
+	defer huy()
+
+	if _, err := FanOut(db, bus, khoTokenChung{a}, "phu", Opts{Copies: 1}, []string{"-test.run=TestHelperProcess"}); err != nil {
+		t.Fatal(err)
+	}
+
+	evs := gomEvent(ch)
+	if coCauChepRa(evs) {
+		t.Fatalf("adapter khai PrivateFiles() rỗng mà fleet vẫn nói token bị chép ra: %v", evs)
+	}
+	// Và phải nói ĐÚNG sự thật thay thế, chứ không phải im lặng bỏ qua.
+	var coCauDung bool
+	for _, e := range evs {
+		if strings.Contains(e.Msg, "kho dùng chung toàn máy") && strings.Contains(e.Msg, "một danh tính") {
+			coCauDung = true
+		}
+	}
+	if !coCauDung {
+		t.Fatalf("thiếu câu nói rõ token nằm ở kho dùng chung và mọi phiên chung một danh tính: %v", evs)
+	}
+}
+
+// Provider CÓ file riêng: câu cảnh báo cũ phải còn nguyên — token thật sự bị
+// nhân ra N bản và hành vi refresh đồng thời thì CHƯA ĐO.
+func TestFanOutVanCanhBaoChepTokenKhiAdapterCoFileRieng(t *testing.T) {
+	db, bus, a := setup(t)
+	ch, huy := bus.Subscribe(256)
+	defer huy()
+
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 2}, []string{"-test.run=TestHelperProcess"}); err != nil {
+		t.Fatal(err)
+	}
+
+	evs := gomEvent(ch)
+	if !coCauChepRa(evs) {
+		t.Fatalf("adapter có file riêng mà mất cảnh báo token bị chép ra: %v", evs)
+	}
+	var coChuaDo bool
+	for _, e := range evs {
+		if strings.Contains(e.Msg, "chép ra 2 chỗ") && strings.Contains(e.Msg, "CHƯA ĐO") {
+			coChuaDo = true
+		}
+	}
+	if !coChuaDo {
+		t.Fatalf("cảnh báo phải nói đúng số bản và giữ chữ CHƯA ĐO: %v", evs)
+	}
+}

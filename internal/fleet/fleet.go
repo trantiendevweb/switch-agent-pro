@@ -86,7 +86,18 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 
 	// Nói thẳng hai điều, không giấu — và nói bằng event nên mặt nào cũng thấy.
 	bus.Warnf("%d phiên trên MỘT tài khoản %s — tiêu hạn mức gấp %d lần.", o.Copies, addr, o.Copies)
-	bus.Warnf("Token được chép ra %d chỗ; hành vi khi nhiều phiên cùng refresh CHƯA ĐO.", o.Copies)
+	// Câu về token phải SUY TỪ ADAPTER, không nói bừa. `profile.Clone` chỉ chép
+	// những gì `PrivateFiles()` khai; provider khai rỗng (Antigravity giữ token
+	// trong Windows Credential Manager) thì KHÔNG có file nào được chép, và câu
+	// "chép ra N chỗ" là một câu SAI SỰ THẬT in ra mỗi lần chạy.
+	//
+	// Rẽ theo năng lực của adapter chứ không theo tên provider: lõi không được
+	// có nhánh `if provider == "antigravity"` (luật ở internal/provider/adapter.go).
+	if len(a.PrivateFiles()) == 0 {
+		bus.Warnf("Token của %s nằm ở kho dùng chung toàn máy, không chép đi đâu; mọi phiên dùng chung một danh tính.", a.Name())
+	} else {
+		bus.Warnf("Token được chép ra %d chỗ; hành vi khi nhiều phiên cùng refresh CHƯA ĐO.", o.Copies)
+	}
 	if o.Worktree {
 		bus.Infof("Mỗi phiên một git worktree riêng từ %s", repoRoot)
 	} else {
