@@ -48,6 +48,7 @@
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
     Switch-Agent-Pro <small>3D · dữ liệu thật</small>
   </div>
+  <div id="flowname" style="font-size:12px;color:#7dd3fc;font-weight:600"></div>
   <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
   <div class="nav"><a id="to2d" href="./">2D</a><a class="on" href="3d.html">3D</a><a id="toflow" href="flow.html">Workflow</a><a href="/docs/">Plan</a><a href="/logout">Thoát</a></div>
 </div>
@@ -130,49 +131,131 @@ function mascotTex(key,tint){
 const orbGeo = new THREE.SphereGeometry(0.42, 22, 22);
 let orbGroup = new THREE.Group(); scene.add(orbGroup);
 let clusterGroup = new THREE.Group(); scene.add(clusterGroup);
+let luongGroup = new THREE.Group(); scene.add(luongGroup);
+const duongTruyen = []; // {cur, hat, pha} — hạt chạy dọc cạnh needs
 let clickable = []; // {mesh, session}
 const labels = [];  // {el, pos}
 
 function clearGroup(g){ while(g.children.length){ const c=g.children.pop(); if(c.geometry&&c.geometry!==orbGeo)c.geometry.dispose(); if(c.material)c.material.dispose(); } }
 function clearLabels(){ labels.forEach(l=>l.el.remove()); labels.length=0; }
 
+// Trạng thái của lượt chạy flow mới nhất — thứ cho biết AI ĐANG LÀM GÌ.
+// Không có nó thì cảnh 3D chỉ là mấy hình hộp đứng im, nhìn không biết ai chỉ huy
+// ai, ai đang chạy, dữ liệu đi từ đâu tới đâu.
+let flowSteps = [];   // [{id,type,needs,state,profile,output}]
+let flowName  = '';
+let agents    = {};   // addr -> {mesh, ring, pos, base, step, state, vai}
+
+// vaiTro suy từ ĐỒ THỊ của flow, không bịa khái niệm mới vào file flow.
+function vaiTro(st){
+  const nhan = (st.needs||[]).length;
+  const giao = flowSteps.filter(x=>(x.needs||[]).includes(st.id)).length;
+  if(!nhan && giao) return 'giao việc';
+  if(nhan && !giao) return 'chốt';
+  if(nhan && giao) return 'nhận rồi giao';
+  return '';
+}
+
+function buocCuaAddr(addr){
+  // Bước ĐANG CHẠY được ưu tiên; không có thì lấy bước gần nhất của tài khoản đó.
+  const cua = flowSteps.filter(s=>s.profile===addr);
+  return cua.find(s=>s.state==='running') || cua.filter(s=>s.state).pop() || cua[0] || null;
+}
+
+const MAU_TT = {running:0x22C55E, done:0x38BDF8, failed:0xEF4444, pending:0x64748B, '':0x64748B};
+
 function build(state){
-  clearGroup(orbGroup); clearGroup(clusterGroup); clearLabels(); clickable=[];
+  clearGroup(orbGroup); clearGroup(clusterGroup); clearLabels(); clickable=[]; agents={};
   const sessions = state.sessions||[];
   const profiles = state.profiles||[];
   $('scount').textContent = sessions.length + ' phiên';
 
-  // gom provider từ profiles + sessions
-  const provs = [...new Set([...profiles.map(p=>p.provider), ...sessions.map(s=>s.addr.split(':')[0])])];
-  const pos = {};
-  provs.forEach((p,i)=>{
-    const a = provs.length===1 ? 0 : (i/provs.length)*Math.PI*2;
-    const R = provs.length===1 ? 0.0001 : 7;
+  // MỘT NODE MỖI TÀI KHOẢN, không gộp theo provider: đội của bạn có hai tài khoản
+  // Claude khác nhau, gộp lại thì không nhìn ra ai là người giao việc, ai là thợ.
+  const addrs = [...new Set([...profiles.map(p=>p.addr), ...sessions.map(s=>s.addr.split('#')[0])])].sort();
+
+  addrs.forEach((addr,i)=>{
+    const prov = addr.split(':')[0];
+    const a = addrs.length===1 ? 0 : (i/addrs.length)*Math.PI*2;
+    const R = addrs.length===1 ? 0.0001 : 8;
     const c = new THREE.Vector3(Math.cos(a)*R, 0.4, Math.sin(a)*R);
-    pos[p] = c;
-    // mascot
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:mascotTex(p, TINT[p]||0x94A3B8), transparent:true, depthWrite:false}));
-    sp.scale.set(3,3,1); sp.position.set(c.x, 1.7, c.z); clusterGroup.add(sp);
-    // nhãn
-    const el=document.createElement('div'); el.className='lbl'; el.innerHTML=p+'<small>'+sessions.filter(s=>s.addr.startsWith(p+':')).length+' phiên</small>';
-    document.body.appendChild(el); labels.push({el, pos:c.clone().setY(3.2)});
+
+    const st = buocCuaAddr(addr);
+    const tt = st ? st.state||'pending' : '';
+    const dangChay = tt==='running' || sessions.some(x=>x.addr.split('#')[0]===addr);
+
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map:mascotTex(prov, TINT[prov]||0x94A3B8), transparent:true, depthWrite:false}));
+    sp.scale.set(3,3,1); sp.position.set(c.x, 1.7, c.z);
+    clusterGroup.add(sp);
+
+    // Vòng dưới chân: màu theo trạng thái bước. Nhìn màu là biết đang chạy/xong/hỏng.
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.5, 0.07, 8, 48),
+      new THREE.MeshStandardMaterial({color:MAU_TT[tt], emissive:MAU_TT[tt],
+        emissiveIntensity: dangChay?0.9:0.25, transparent:true, opacity: dangChay?1:0.45}));
+    ring.rotation.x = Math.PI/2; ring.position.set(c.x, 0.06, c.z);
+    clusterGroup.add(ring);
+
+    agents[addr] = {sp, ring, pos:c, base:1.7, step:st, state:tt, dangChay,
+                    vai: st?vaiTro(st):''};
+
+    // Nhãn: TÀI KHOẢN · vai trò · việc đang làm
+    const el=document.createElement('div'); el.className='lbl';
+    const vai = agents[addr].vai ? '<i style="color:#7fd1a6;font-style:normal">'+agents[addr].vai+'</i> · ' : '';
+    const viec = st ? (st.id+' <b style="color:'+('#'+MAU_TT[tt].toString(16).padStart(6,'0'))+'">'+(tt||'chờ')+'</b>')
+                    : (sessions.some(x=>x.addr.split('#')[0]===addr) ? 'đang chạy' : 'rảnh');
+    el.innerHTML = addr + '<small>' + vai + viec + '</small>';
+    document.body.appendChild(el);
+    labels.push({el, pos:c.clone().setY(3.4)});
   });
 
-  // orb cho mỗi phiên, xoay quanh provider của nó
-  const perProv = {};
+  // ---- LUỒNG TRAO ĐỔI: bước A xong → bước B nhận kết quả của A ----
+  // Vẽ đúng theo cạnh `needs` của flow, nên nó là quan hệ THẬT chứ không phải
+  // hiệu ứng trang trí. Hạt chạy dọc đường cong theo hướng A → B.
+  duongTruyen.length = 0;
+  clearGroup(luongGroup);
+  flowSteps.forEach(b=>{
+    (b.needs||[]).forEach(idA=>{
+      const a = flowSteps.find(x=>x.id===idA);
+      if(!a || !a.profile || !b.profile || a.profile===b.profile) return;
+      const A = agents[a.profile], B = agents[b.profile];
+      if(!A || !B) return;
+      const p0 = A.pos.clone().setY(1.2), p2 = B.pos.clone().setY(1.2);
+      const p1 = p0.clone().add(p2).multiplyScalar(0.5).setY(3.6);
+      const cur = new THREE.QuadraticBezierCurve3(p0,p1,p2);
+      const song = (a.state==='done') && (b.state==='running' || b.state==='done');
+      const mau = song ? 0x38BDF8 : 0x475569;
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(cur.getPoints(40)),
+        new THREE.LineBasicMaterial({color:mau, transparent:true, opacity: song?0.8:0.25}));
+      luongGroup.add(line);
+      if(song){
+        const hat = new THREE.Mesh(new THREE.SphereGeometry(0.16,10,10),
+          new THREE.MeshBasicMaterial({color:0x7dd3fc}));
+        luongGroup.add(hat);
+        duongTruyen.push({cur, hat, pha: Math.random()});
+      }
+    });
+  });
+
+  // orb cho mỗi phiên, xoay quanh TÀI KHOẢN của nó
+  const perAddr = {};
   sessions.forEach(s=>{
-    const prov = s.addr.split(':')[0];
-    const c = pos[prov] || new THREE.Vector3(0,0.4,0);
-    const k = (perProv[prov] = (perProv[prov]||0)); perProv[prov]++;
-    const count = sessions.filter(x=>x.addr.split(':')[0]===prov).length;
+    const addr = s.addr.split('#')[0];
+    const A = agents[addr];
+    const c = A ? A.pos : new THREE.Vector3(0,0.4,0);
+    const k = (perAddr[addr] = (perAddr[addr]||0)); perAddr[addr]++;
+    const count = sessions.filter(x=>x.addr.split('#')[0]===addr).length;
     const ang = count>1 ? (k/count)*Math.PI*2 : 0;
-    const rad = 2.6;
     const m = new THREE.Mesh(orbGeo, new THREE.MeshStandardMaterial({
       color:0x22C55E, emissive:0x22C55E, emissiveIntensity:.4, metalness:.2, roughness:.4}));
-    m.position.set(c.x+Math.cos(ang)*rad, 0.9, c.z+Math.sin(ang)*rad);
+    m.position.set(c.x+Math.cos(ang)*2.4, 0.9, c.z+Math.sin(ang)*2.4);
     m.userData.session = s;
     orbGroup.add(m); clickable.push(m);
   });
+
+  $('flowname').textContent = flowName ? ('flow: '+flowName) : '';
 }
 
 // ---- tương tác: bấm orb để dừng ----
@@ -201,14 +284,32 @@ $('d-stop').onclick = async ()=>{ if(!selected)return;
 
 // ---- dữ liệu ----
 async function refresh(){
-  try{ const r=await fetch('/api/state',{headers:H}); if(!r.ok)throw 0; build(await r.json()); }catch(_){}
+  try{
+    // Lấy lượt chạy flow mới nhất TRƯỚC khi dựng cảnh: build() cần biết bước nào
+    // của ai đang chạy mới vẽ được vai trò và luồng trao đổi.
+    try{
+      const fr = await fetch('/api/flows',{headers:H});
+      if(fr.ok){
+        const fd = await fr.json();
+        const runs = fd.runs||[];
+        const run = runs.find(r=>r.state==='running') || runs[0];
+        if(run){
+          flowName = run.flow;
+          const dr = await fetch('/api/run?id='+run.id,{headers:H});
+          if(dr.ok){ flowSteps = (await dr.json()).steps || []; }
+        } else { flowName=''; flowSteps=[]; }
+      }
+    }catch(_){ }
+    const r=await fetch('/api/state',{headers:H}); if(!r.ok)throw 0; build(await r.json());
+  }catch(_){}
 }
 function connect(){
   const es=new EventSource('/api/events');
   es.onopen=()=>{ $('conn').classList.add('on'); $('conntext').textContent='đã kết nối'; };
   es.onerror=()=>{ $('conn').classList.remove('on'); $('conntext').textContent='mất kết nối'; };
   es.onmessage=ev=>{ let e; try{e=JSON.parse(ev.data)}catch(_){return}
-    if(['session.started','session.stopped','worktree.removed','clones.cleaned','profile.created','profile.removed'].includes(e.type)) refresh(); };
+    if(String(e.type).startsWith('flow.') ||
+       ['session.started','session.stopped','worktree.removed','clones.cleaned','profile.created','profile.removed'].includes(e.type)) refresh(); };
 }
 
 // ---- vòng lặp ----
@@ -218,7 +319,32 @@ function project(){ labels.forEach(l=>{ const v=l.pos.clone().project(camera);
 let t=0;
 function tick(){ requestAnimationFrame(tick); t+=0.016;
   if(!RM){ orch.rotation.y+=0.006;
-    orbGroup.children.forEach((m,i)=>{ const p=0.5+0.5*Math.sin(t*2.4+i); m.material.emissiveIntensity=0.3+p*0.5; m.scale.setScalar(1+p*0.08); }); }
+    orbGroup.children.forEach((m,i)=>{ const p=0.5+0.5*Math.sin(t*2.4+i); m.material.emissiveIntensity=0.3+p*0.5; m.scale.setScalar(1+p*0.08); });
+
+    // Agent CỬ ĐỘNG theo việc nó đang làm, không phải nhấp nháy vô nghĩa:
+    // đang chạy thì nhấp nhô nhanh + phình nhẹ + vòng dưới chân quay;
+    // rảnh thì thở chậm và mờ. Nhìn là biết con nào đang làm.
+    let k=0;
+    for(const addr in agents){
+      const A=agents[addr]; k++;
+      const nhanh = A.dangChay ? 3.2 : 0.9;
+      const bien  = A.dangChay ? 0.22 : 0.07;
+      const s0 = Math.sin(t*nhanh + k*1.7);
+      A.sp.position.y = A.base + s0*bien;
+      A.sp.scale.setScalar(A.dangChay ? 3 + 0.12*(0.5+0.5*s0) : 3);
+      if(A.ring){
+        A.ring.rotation.z += A.dangChay ? 0.03 : 0.004;
+        A.ring.material.emissiveIntensity = A.dangChay ? 0.6+0.5*(0.5+0.5*s0) : 0.25;
+      }
+    }
+    // Hạt chạy dọc cạnh needs: A xong → B nhận. Hướng đi chính là hướng dữ liệu.
+    duongTruyen.forEach((d,i)=>{
+      d.pha = (d.pha + 0.006) % 1;
+      const v = d.cur.getPoint(d.pha);
+      d.hat.position.copy(v);
+      d.hat.scale.setScalar(0.8 + 0.4*Math.sin(t*6+i));
+    });
+  }
   if(hover){ hover.scale.setScalar(1.3); }
   controls.update(); project(); renderer.render(scene,camera); }
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });

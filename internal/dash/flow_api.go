@@ -31,6 +31,10 @@ type stepDTO struct {
 	// agent chỉ trả về câu từ chối quyền. Không đọc được kết quả thì không cách
 	// nào biết flow chạy thật hay chạy suông.
 	Output string `json:"output,omitempty"`
+	// Profile: TÀI KHOẢN làm bước này. Thiếu nó thì mặt 3D không biết gán bước
+	// cho agent nào — cả cảnh chỉ còn là mấy hình hộp đứng im, đúng thứ người
+	// dùng phàn nàn: "ai là leader, ai là nhân viên, nhiệm vụ ra sao".
+	Profile string `json:"profile,omitempty"`
 }
 
 type flowDTO struct {
@@ -86,7 +90,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	order, _ := flow.Order(def)
 	out := make([]stepDTO, 0, len(order))
 	for _, st := range order {
-		d := stepDTO{ID: st.ID, Type: st.Type, Needs: st.Needs, State: "pending"}
+		d := stepDTO{ID: st.ID, Type: st.Type, Needs: st.Needs, State: "pending", Profile: st.Profile}
 		if got, ok := steps[st.ID]; ok {
 			d.State, d.Msg, d.Attempt = got.State, got.Msg, got.Attempt
 			d.Output = got.Output

@@ -150,6 +150,13 @@
       background:#12141a;border-radius:5px;padding:5px 7px;max-height:150px;overflow:auto}
     #ketqua .trong{color:#e0a04a}
     #ketqua .mu{color:#8b93a7}
+    .node .vt{padding:2px 10px 0;font-size:10.5px;color:#7fd1a6;letter-spacing:.2px}
+    .node .ai{padding:3px 10px 0;display:flex;gap:5px;flex-wrap:wrap}
+    .node .ai span{font-size:10px;padding:1px 6px;border-radius:4px;line-height:1.5}
+    .node .acc{background:#1d3a5c;color:#9fd0ff;font-weight:600}
+    .node .acc.chua{background:#4a2b2b;color:#f0a0a0;font-weight:400}
+    .node .quyen{background:#4a3a1a;color:#f0c060}
+    .node .wt{background:#26303f;color:#93a0b8}
   </style>
   <div id="mid">
     <div id="world">
@@ -313,7 +320,7 @@ function addNode(type, x, y){
   const n = Object.assign({
     id: uid({agent:'agent',shell:'lenh',approve:'duyet',notify:'bao',test:'test',lint:'lint',review:'review'}[type]||'buoc'),
     type, x:Math.round(x), y:Math.round(y), needs:[], copies:1, worktree:true,
-    timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:'', when:'', profile:'', foreach:''
+    timeout_sec:0, retry:0, on_failure:'stop', prompt:'', run:'', message:'', when:'', profile:'', foreach:'', tuDuyetQuyen:false
   }, d);
   nodes.push(n); pushHist(); render(); select(n.id);
 }
@@ -335,6 +342,22 @@ function removeNode(id){
 }
 
 // ---- vẽ ----
+const LOAI_AGENT = {agent:1, review:1};
+
+// vaiTro suy ra TỪ ĐỒ THỊ, không bịa thêm khái niệm mới vào file flow:
+//   - không phụ thuộc ai, mà có người phụ thuộc mình  -> người giao việc
+//   - có người giao cho mình, và không ai chờ mình     -> thợ / người nhận việc
+//   - vừa nhận vừa giao                                -> ở giữa
+// Nhờ vậy nhìn bảng vẽ là biết ngay ai chỉ huy ai, kể cả với flow người khác gửi.
+function vaiTro(n){
+  const nhan = (n.needs||[]).length;
+  const giao = nodes.filter(x=>(x.needs||[]).includes(n.id)).length;
+  if(!nhan && giao) return '👑 giao việc cho '+giao+' bước';
+  if(nhan && !giao) return '🎯 nhận việc · bước cuối nhánh';
+  if(nhan && giao) return '↔ nhận việc rồi giao tiếp cho '+giao+' bước';
+  return '';
+}
+
 function render(){
   // node
   world.querySelectorAll('.node').forEach(e=>e.remove());
@@ -347,12 +370,21 @@ function render(){
       : (n.type==='agent'||n.type==='review') ? n.prompt
       : (n.type==='test'||n.type==='lint') ? (n.run || '(lấy lệnh từ project.toml)')
       : n.message;
+    // AI làm bước này, và bước này CHỈ HUY ai. Thiếu hai dòng đó thì nhìn bảng vẽ
+    // chỉ thấy hình hộp nối nhau, không biết ai là người giao việc, ai là thợ.
+    const nhan = vaiTro(n);
     el.innerHTML =
       '<div class="bar" style="background:'+d.color+'"></div>'+
       '<div class="st">'+(STATE_MARK[liveStates[n.id]]||'')+'</div>'+
       '<div class="hd"><span class="ic" style="background:'+d.color+'22">'+icon(d.icon,d.color,13)+'</span>'+
         esc(n.id)+(n.foreach?'<span class="ty" style="color:var(--warn)">⟳ lặp</span>':'')+
         '<span class="ty">'+d.name+'</span></div>'+
+      (nhan ? '<div class="vt">'+nhan+'</div>' : '')+
+      (LOAI_AGENT[n.type] ? '<div class="ai">'+(n.profile
+          ? '<span class="acc">'+esc(n.profile)+'</span>'
+          : '<span class="acc chua">chưa gán tài khoản</span>')+
+        (n.tuDuyetQuyen?'<span class="quyen">⚠ toàn quyền</span>':'')+
+        (n.worktree?'<span class="wt">worktree riêng</span>':'')+'</div>' : '')+
       '<div class="bd">'+esc(body||'—')+'</div>'+
       '<div class="port in" data-port="in"></div><div class="port out" data-port="out"></div>';
     world.appendChild(el);
@@ -538,7 +570,13 @@ function inspector(){
         '<input type="number" id="p-timeout" min="0" value="'+(n.timeout_sec||0)+'"></div></div>'+
       '<label class="chk"><input type="checkbox" id="p-wt" '+(n.worktree?'checked':'')+'> mỗi agent một git worktree</label>'+
       '<div class="fld"><label>Tài khoản (để trống = mặc định khi chạy)</label>'+
-        '<input id="p-profile" placeholder="claude:phu" value="'+esc(n.profile||'')+'"></div>'+
+        '<input id="p-profile" placeholder="claude:phu" value="'+esc(n.profile||'')+'">'+
+        '<div class="hint">Ai làm bước này. Bỏ trống thì dùng --profile lúc chạy.</div></div>'+
+        '<div class="fld"><label><input type="checkbox" id="p-quyen"'+(n.tuDuyetQuyen?' checked':'')+'> '+
+        'Cho agent tự duyệt mọi quyền</label>'+
+        '<div class="hint" style="color:var(--warn)">⚠ Agent được xoá file và chạy lệnh tuỳ ý. '+
+        'Không bật thì nhiều agent không đọc nổi file nào ở chế độ headless. '+
+        'Luôn chạy trong worktree riêng nên không đụng cây làm việc chính.</div></div>'+
       '<div class="hint">Dùng <code>{{steps.&lt;id&gt;.output}}</code> để nhận kết quả bước trước.</div>';
   } else if(n.type==='test'||n.type==='lint'){
     body =
@@ -585,6 +623,9 @@ function inspector(){
   };};
   bind('p-prompt','prompt'); bind('p-run','run'); bind('p-message','message');
   bind('p-when','when'); bind('p-profile','profile'); bind('p-foreach','foreach');
+  const q=$('#p-quyen');
+  if(q) q.onchange=()=>{ const n=nodes.find(x=>x.id===sel); if(!n) return;
+    push(); n.tuDuyetQuyen=q.checked; dirty=true; render(); };
   bind('p-copies','copies',v=>Math.max(1,parseInt(v)||1));
   bind('p-timeout','timeout_sec',v=>Math.max(0,parseInt(v)||0));
   bind('p-retry','retry',v=>Math.max(0,parseInt(v)||0));
@@ -624,6 +665,7 @@ async function loadFlow(name){
       copies:s.copies||1, worktree:!!s.worktree, timeout_sec:s.timeout_sec||0,
       retry:s.retry||0, on_failure:s.on_failure||'stop',
       when:s.when||'', profile:s.profile||'', foreach:s.foreach||'',
+      tuDuyetQuyen:!!s.tuDuyetQuyen,
       x: s.x || (80 + i*270), y: s.y || (90 + (i%2)*150)
     }));
     sel=null; dirty=false; liveStates={}; resetHist(); render(); inspector(); fit();
