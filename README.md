@@ -39,7 +39,7 @@ phần còn lại nối link về `~/.claude` nên sửa một chỗ mọi tài 
 
 | | Subscription | API trực tiếp |
 |---|---|---|
-| Chạy cái gì | Claude Code, Codex CLI, Gemini CLI, Cursor | Anthropic, OpenAI, Gemini, Grok, DeepSeek, OpenAI-compatible |
+| Chạy cái gì | Claude Code, Codex CLI, Cursor CLI, Antigravity CLI, Grok CLI | Anthropic, OpenAI, Gemini, Grok, DeepSeek, OpenAI-compatible |
 | Xác thực bằng | credential của chính CLI đó | API key riêng |
 
 Hai đường **dùng chung** Project · Task · Workspace · Flow · Scheduler · Event · Dashboard —
@@ -99,6 +99,37 @@ Gỡ: xoá `%USERPROFILE%\bin\sagent.exe`. Dữ liệu nằm ở `~/.ai-accounts
 
 Địa chỉ hoá `provider:account`, nên `sagent phu` == `sagent claude:phu`.
 Claude Code lấy **thư mục hiện tại** làm nơi làm việc — `cd` vào dự án rồi mới gọi.
+
+### Năm provider — dùng cái nào khi cái kia hết hạn mức
+
+```powershell
+sagent goc                                   # claude (tài khoản gốc)
+sagent goc codex exec "việc cần làm"
+sagent goc cursor --trust -p "việc cần làm"
+sagent goc antigravity -p "việc cần làm"
+sagent goc grok -m grok-4.5 -p "việc cần làm"
+```
+
+`sagent goc <provider>` chạy **tài khoản gốc** — tức tài khoản mà chính CLI đó dùng khi
+không có `sagent`. Không cần tạo hồ sơ gì.
+
+Tạo hồ sơ chỉ cần khi bạn có **nhiều tài khoản cùng một provider**:
+
+```powershell
+sagent them cursor:acc2      # tạo hồ sơ rỗng, rồi đăng nhập vào nó
+sagent cursor:acc2           # chạy bằng acc2 — token riêng, không đè acc1
+sagent ds                    # xem hết
+```
+
+Vài chỗ **phải biết trước**, đều là giới hạn của CLI bên dưới chứ không phải của `sagent`:
+
+| Provider | Lưu ý |
+|---|---|
+| **antigravity** | **Một máy một tài khoản.** Token nằm trong Windows Credential Manager theo khoá cố định, không theo thư mục hồ sơ. `fleet --copies 2` sẽ từ chối. |
+| **grok** | Phải truyền `-m <model>`. CLI **bỏ qua** `defaultModel` trong chính file cấu hình của nó và dùng `grok-code-fast-1` dựng sẵn; endpoint nào không bán model đó sẽ trả `503 No available channel`. |
+| **cursor** | Cần `--trust` để chạy headless. Cố ý **không** dùng `--yolo`/`-f` — hai cờ đó nghĩa là *chạy mọi lệnh không hỏi*. |
+
+`sagent verify` in ra đúng những giới hạn này cho từng provider, nên không phải nhớ.
 
 ### Chạy nhiều agent song song
 
@@ -261,12 +292,16 @@ Không tô hồng:
 | Quyền truy cập kho token (ACL, không phải `0o600` giả) | ✅ |
 | Dừng phiên kèm cả cây tiến trình con | ✅ |
 | Sao lưu / khôi phục `state.db`, chặn hạ cấp binary | ✅ |
-| Provider Codex | ✅ stable · Gemini/Cursor ⬜ chưa có CLI để đo |
+| Provider | ✅ **5**: claude · codex · cursor · antigravity · grok |
+| Chạy nhiều tài khoản một provider | ✅ 4/5 — Antigravity **không** (token ở Credential Manager) |
 | Đường API (nhiều AI API) | ⬜ chưa có API key để verify |
 | TLS cho dashboard | ✅ HTTPS mặc định khi phơi ra mạng (chứng chỉ tự ký, in vân tay) |
 
-**Đang bị chặn:** chưa có API key thật để verify đường API. Provider ngoài Claude/Codex
-giữ nhãn `experimental` vì chưa có CLI để đo.
+**Đang bị chặn:** đường AI API (Pha 4) chưa làm — nhưng key Grok đã đo được nên hết
+chặn về mặt dữ liệu.
+
+> **Năm provider giấu danh tính ở năm chỗ khác nhau**, và ba trong số đó khác với thứ
+> tài liệu của họ gợi ý. Bảng đo đầy đủ ở [`docs/DO-LUONG.md`](docs/DO-LUONG.md).
 
 ## Tài liệu
 

@@ -7,15 +7,35 @@
 
 ## Bảng trạng thái
 
-| Provider | Windows | Linux | Nhãn |
-|---|---|---|---|
-| Claude | ✅ đo | ⬜ chưa đo | Windows `stable`, Linux `experimental` |
-| Codex  | ✅ đo | ⬜ chưa đo | Windows `stable`, Linux `experimental` |
-| Gemini | ⬜ chưa đo | ⬜ chưa đo | `unknown` — CLI chưa có trên máy đo |
-| Cursor | ⬜ chưa đo | ⬜ chưa đo | `unknown` — CLI chưa có trên máy đo |
+Đã bỏ cột Linux (xem khối quyết định trong `MASTER-PLAN.md`). Cột **Tách tài khoản**
+là câu quan trọng nhất: provider giấu danh tính ở đâu quyết định việc chạy được
+mấy tài khoản trên một máy.
 
-> Đã kiểm ngày 2026-08-17: máy đo chỉ có `claude` và `codex`; `gemini`, `cursor`,
-> `opencode`, `aider` đều không cài. Không đo được thì để `unknown`, không đoán.
+| Provider | Trạng thái | Danh tính nằm ở | Biến tách | Tách nhiều tài khoản |
+|---|---|---|---|---|
+| Claude | ✅ `stable` | `.credentials.json` trong hồ sơ | `CLAUDE_CONFIG_DIR` | ✅ |
+| Codex | ✅ `stable` | `auth.json` trong hồ sơ | `CODEX_HOME` | ✅ |
+| Cursor | ✅ `stable` | `Cursor\auth.json` | **`APPDATA`** | ✅ |
+| Grok | ✅ `stable` | `.grok\user-settings.json` (API key) | `USERPROFILE` | ✅ |
+| Antigravity | ✅ `stable` | **Windows Credential Manager** | `USERPROFILE`¹ | ❌ **một máy một tài khoản** |
+| Gemini CLI | 🚫 **bỏ** | — | — | — |
+
+¹ `USERPROFILE` tách được thư mục làm việc (hội thoại, cache) nhưng **không** tách được
+danh tính — token đọc từ Credential Manager theo khoá cố định `gemini:antigravity`.
+
+**Không có quy luật chung.** Năm provider giấu danh tính ở năm chỗ khác nhau, và ba
+trong số đó khác với thứ tài liệu của họ gợi ý. Chỉ đo mới biết:
+
+- **Cursor**: đổi `USERPROFILE` thì `status` VẪN báo đã đăng nhập — suýt kết luận nhầm
+  là không tách được. Phải thử từng biến một mới thấy `APPDATA` mới là cái điều khiển.
+- **Antigravity**: đổi cả `USERPROFILE` + `APPDATA` + `LOCALAPPDATA` sang HOME giả mà
+  vẫn chạy đúng danh tính. Đó là bằng chứng dứt điểm cho việc nó dùng kho của Windows.
+- **Grok**: `base_url` KHÔNG phải `api.x.ai`. Chính xAI từ chối key bằng "Incorrect API
+  key provided"; key mua qua dịch vụ trung gian nên endpoint nằm trong cấu hình.
+
+**Gemini CLI bị bỏ** (2026-08-18): Google cắt bản CLI khỏi gói miễn phí cho cá nhân —
+`IneligibleTierError / UNSUPPORTED_CLIENT / free-tier`. Đăng nhập Google thành công, chỉ
+là không được cấp quyền dùng. Thay bằng Antigravity.
 
 ---
 
@@ -1140,6 +1160,53 @@ bẫy. Sau đó nó mới đỏ đúng chỗ: `cấp quyền cho [Users]`.
 Ba lần trong hai ngày, cùng một dạng: **bẫy dựng sai → test xanh → tưởng đã chứng minh.**
 Câu hỏi phải hỏi mỗi lần viết test cho một lá chắn: *nếu gỡ lá chắn ra, test này có đỏ không?*
 Nếu không thử thì không biết.
+
+### Grok — provider thứ năm, và cái bẫy model (2026-08-18)
+
+Provider đầu tiên dùng **API key** thay vì đăng nhập OAuth.
+
+**Endpoint không phải `api.x.ai`.** Key mua qua dịch vụ trung gian; chính xAI từ chối nó:
+
+```
+{"code":"invalid-argument","error":"Incorrect API key provided. You can obtain an API key from https://console.x.ai."}
+```
+
+Đúng endpoint (`https://modelapi.vn/v1`) thì `GET /v1/models` trả **HTTP 200** với
+`grok-4.5`, `grok-4.6`; gọi thẳng API trả lời trong **3,6 giây**, qua CLI là 21,9 giây
+(nó là agent chứ không phải wrapper mỏng).
+
+#### Cái bẫy tốn thời gian nhất: model
+
+`grok -p "..."` **không dùng** `defaultModel` trong `~/.grok/user-settings.json`. Nó dùng
+`grok-code-fast-1` dựng sẵn, và endpoint không bán model đó nên trả:
+
+```
+503 No available channel for model grok-code-fast-1 under group grok (distributor)
+```
+
+Một thông điệp chẳng chỉ ra nguyên nhân. Đọc mã nguồn CLI mới rõ:
+`modelToUse = model || savedModel || "grok-code-fast-1"`.
+
+Và có một vế nữa, chỉ lộ ra khi chạy từ thư mục **hoàn toàn sạch**: CLI **tự tạo**
+`.grok/settings.json` ngay tại thư mục làm việc, ghim `{"model": "grok-code-fast-1"}`.
+Nghĩa là mỗi thư mục agent bước vào đều bị ghim sai model — sửa cấu hình người dùng
+không cứu được, vì cái ghim theo-thư-mục thắng.
+
+Kéo theo một quyết định thiết kế: adapter **cố ý không tự thêm `-m`**. Model là thuộc
+tính của từng hồ sơ (mỗi hồ sơ có thể trỏ endpoint khác, bán model khác), mà
+`HeadlessArgs` chỉ nhận prompt và chạy ở tiến trình **cha** — nơi `USERPROFILE` vẫn là
+của tài khoản gốc. Đọc cấu hình ở đó rồi áp cho mọi hồ sơ là đoán, và đoán sai model thì
+lỗi hiện ra ở tận endpoint. `Verify()` nói thẳng thay vì đoán hộ.
+
+Chạy đúng: `sagent goc grok -m grok-4.5 -p "..."`
+
+#### Bẫy BOM, lần thứ ba
+
+Sửa `user-settings.json` bằng `Set-Content -Encoding UTF8` của PowerShell 5.1 → thêm BOM
+→ JSON hỏng (`"b"... is not valid JSON`). Đã ghi trong chính tài liệu này từ hôm trước mà
+vẫn dẫm. Ghi thêm lần nữa cho thấm: **trên PowerShell 5.1, muốn UTF-8 không BOM thì phải
+`[IO.File]::WriteAllText($f, $s, (New-Object Text.UTF8Encoding($false)))`** — không có
+đường tắt bằng cmdlet.
 
 ---
 
