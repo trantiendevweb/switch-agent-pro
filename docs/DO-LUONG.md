@@ -1848,3 +1848,39 @@ không — nên không suy.
 chung: hai provider, hai lược đồ, và một cái nói dối bằng trường `status`.
 
 Nghiệm thu lần chạy #27: output bước là câu trả lời sạch, không còn NDJSON.
+
+## 18/08 — Học "skill uxui": nó là design-system trong repo, và tôi đã vi phạm
+
+"skill uxui" chủ dự án nhắc chính là `design-system/switch-agent-pro/MASTER.md` —
+có bảng token màu/khoảng cách, quy cách component, mục "Anti-Patterns (Do NOT Use)"
+và checklist trước khi giao. Sinh ngày 16/08, và chưa từng ai kiểm chiếu.
+
+Rà lại thì thấy tôi vi phạm ngay trong lượt làm giao diện hôm nay:
+
+| Cấm | Tôi đã dùng | Sửa thành |
+|---|---|---|
+| emoji làm icon | 👑 🎯 ⚠ (vai trò + cảnh báo quyền) | path SVG kiểu Lucide qua hàm `icon()` có sẵn |
+| ký tự lạ làm icon | ↶ ↷ ▶ ✓ ✗ ● ○ | SVG cho nút, chấm CSS đổi màu cho trạng thái |
+| thiếu prefers-reduced-motion | index.html, flow.html | thêm khối `@media` tôn trọng |
+
+Bắt được thêm một lỗi CÓ SẴN không liên quan design system: `esc()` được gọi ở
+index.html (thẻ workflow tôi thêm lượt trước) nhưng **chưa hề định nghĩa** — tên
+flow/lỗi có ký tự `<` `>` sẽ vỡ layout, tệ hơn là chèn được thẻ lạ. Đã thêm hàm
+escape thật.
+
+**Biến checklist thành test** — `internal/dash/uxui_test.go`:
+- `TestKhongDungEmojiLamIcon`: quét mọi `web/*.html`, thấy ký tự U+2000↑ thuộc
+  nhóm So/Sk hoặc dải emoji thì báo lỗi (chừa mũi tên/dấu nhấn trong câu văn).
+- `TestTonTrongReducedMotion`: trang có `@keyframes`/`animation`/`transition` mà
+  không có `prefers-reduced-motion` thì báo lỗi.
+
+Hai test này BẮT ĐƯỢC NGAY hai vi phạm còn sót trong index.html khi chạy lần đầu —
+đúng thứ chúng sinh ra để bắt.
+
+Thêm Motion 6/10 đúng như dial: thẻ trồi lên khi tải, so le nhẹ, dùng
+`cubic-bezier(0.16,1,0.3,1)` chứ KHÔNG `back.out` — design system cấm overshoot
+trên bảng dữ liệu dày.
+
+Bài học: **giao diện là chỗ dễ trôi khỏi quy chuẩn nhất** vì Go không build ra nó.
+Nay checklist của design system có ba mục được máy canh, không còn trông vào việc
+người nhớ đọc.

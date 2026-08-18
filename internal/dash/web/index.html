@@ -25,6 +25,12 @@
   #conn.on .d{background:var(--run)}
   h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin:22px 0 10px}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  /* Motion 6/10 (Standard) theo design system: thẻ nhẹ nhàng trồi lên khi tải.
+     So le nhẹ để mắt đi từ trên xuống, KHÔNG dùng back.out vì đây là bảng dữ
+     liệu dày (design system cấm: overshoot đọc như cẩu thả trên UI thông tin). */
+  @keyframes vaosan{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .grid > div{animation:vaosan .34s var(--ease) both}
+  .grid > div:nth-child(2){animation-delay:.06s}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{text-align:left;padding:10px 13px;border-bottom:1px solid rgba(71,85,105,.35)}
   th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;white-space:nowrap}
@@ -60,6 +66,12 @@
   .e.warning{color:var(--warn)} .e.failure{color:var(--limit)} .e.session\.started{color:var(--run)}
   .banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:#fecaca;
     border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;display:none}
+  /* Design system: chuyển động phải tôn trọng lựa chọn của người dùng.
+     Ai bật "giảm chuyển động" ở hệ điều hành thường là vì chóng mặt thật. */
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms !important;animation-iteration-count:1 !important;
+      transition-duration:.001ms !important;scroll-behavior:auto !important}
+  }
 </style>
 </head>
 <body>
@@ -201,6 +213,9 @@
 // token trên URL, nên link điều hướng cũng không phải mang theo gì.
 const H = { 'Content-Type': 'application/json' };
 const $ = id => document.getElementById(id);
+// esc: chèn dữ liệu do agent/route trả về vào innerHTML một cách an toàn. Thiếu
+// nó thì tên flow hay lỗi có ký tự < > sẽ vỡ layout, tệ hơn là chèn được thẻ lạ.
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 $('to3d').href = '3d.html';
 $('toflow').href = 'flow.html';
 
@@ -301,7 +316,9 @@ async function api(path, opts){
   if(!r.ok){ const b = await r.json().catch(()=>({error:r.statusText})); throw new Error(b.error||('HTTP '+r.status)); }
   return r.headers.get('content-type')?.includes('json') ? r.json() : r.text();
 }
-function showErr(m){ const e=$('err'); e.textContent='✗ '+m; e.style.display='block'; setTimeout(()=>e.style.display='none',6000); }
+function showErr(m){ const e=$('err');
+  e.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' + esc(m);
+  e.style.display='block'; setTimeout(()=>e.style.display='none',6000); }
 
 function elapsed(startUnix, now){ let s=Math.max(0,now-startUnix); if(s<60)return s+'s'; if(s<3600)return Math.floor(s/60)+'m'+(s%60)+'s'; return Math.floor(s/3600)+'h'+Math.floor((s%3600)/60)+'m'; }
 
