@@ -321,3 +321,116 @@ COMMIT: <mã commit ngắn, lấy bằng git rev-parse --short HEAD>"""
 Rồi trả lời đúng hai dòng:
 THAY DOI: <có / không có commit nào>
 NOI DUNG: <nội dung file THU-CO-CHE.md nếu thấy, hoặc "khong thay">"""
+
+# ---------------------------------------------------------------------------
+# ĐỘI ĐI HỌC: mỗi agent đọc MỘT dự án mã nguồn mở rồi mang bài học về.
+#
+# Nguồn danh sách: docs/DU-AN-THAM-KHAO.md, xếp theo LỖ HỔNG ĐÃ ĐO của sagent
+# chứ không theo số sao. Ba dự án đứng đầu, mỗi con một dự án, chạy song song.
+#
+# Luật giấy phép (docs/KE-HOACH-GOC.md mục 2): học và tái triển khai NGUYÊN LÝ
+# thì thoải mái; chép mã trực tiếp thì phải ghi nguồn/license/commit vào
+# docs/OPEN_SOURCE_LEDGER.md. Cả ba dự án dưới đều MIT hoặc Apache-2.0.
+  [flow.hoc]
+    desc = "Ba agent đọc ba dự án mã nguồn mở song song, rồi tổng hợp bài học áp dụng được"
+
+    [[flow.hoc.step]]
+      id = "hoc-acp"
+      type = "agent"
+      profile = "claude:tns"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 3000
+      on_failure = "continue"
+      prompt = """Nghiên cứu Agent Client Protocol và SDK Go của nó:
+  https://github.com/agentclientprotocol/agent-client-protocol  (Apache-2.0)
+  https://github.com/coder/acp-go-sdk  (Apache-2.0)
+
+Clone nông vào thư mục tạm mà đọc. CHỈ ĐỌC hai repo đó, đừng sửa gì trong repo này.
+
+VÌ SAO CẦN: sagent hiện chỉ biết một bước đang `running` hay `done`. Output agent
+là một khối chữ, nên phải đoán bằng cách dò chuỗi ký tự để biết agent có làm việc
+thật không — xem `khongCoKetQua` trong internal/api/api.go. Đó là chữa cháy.
+Ngày 18/08 đã có ba kiểu hỏng lọt lưới: bị chặn quyền, hết hạn đăng nhập, quẩn
+vòng gọi tool 399 lần — cả ba đều báo `done`.
+
+TRẢ LỜI ĐÚNG BỐN MỤC, ngắn gọn, có trích dẫn file:dòng của repo upstream:
+1. ACP định nghĩa những loại sự kiện nào trong một phiên agent? Liệt kê tên thật.
+2. Sự kiện nào cho biết agent ĐANG làm gì (đọc file, chạy lệnh, xin quyền)?
+3. Nếu sagent nói ACP, ba kiểu hỏng trên có bị bắt không? Từng cái một, có/không và vì sao.
+4. Việc nhỏ nhất để bắt đầu là gì? Nêu đúng một bước đầu tiên, đo được."""
+
+    [[flow.hoc.step]]
+      id = "hoc-deck"
+      type = "agent"
+      profile = "antigravity:may"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 3000
+      on_failure = "continue"
+      prompt = """Nghiên cứu https://github.com/asheshgoplani/agent-deck (MIT, viết bằng Go).
+
+Clone nông vào thư mục tạm mà đọc. CHỈ ĐỌC, đừng sửa gì trong repo này.
+
+VÌ SAO CẦN: đây là dự án gần sagent nhất — cũng Go, cũng quản nhiều phiên agent,
+cũng dùng git worktree. sagent đã có fleet và worktree nhưng CHƯA có: fork/resume
+một phiên, gom phiên theo project, và bảng điều khiển web đọc được trạng thái thật.
+
+TRẢ LỜI ĐÚNG BỐN MỤC, có trích dẫn file:dòng:
+1. Nó lưu trạng thái phiên ở đâu và bằng cấu trúc gì?
+2. Fork và resume một phiên hoạt động thế nào?
+3. Nó biết một agent đang bận hay rảnh bằng cách nào?
+4. Ba thứ đáng mang về sagent nhất, xếp theo dễ làm trước."""
+
+    [[flow.hoc.step]]
+      id = "hoc-gastown"
+      type = "agent"
+      profile = "claude:phu"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 3000
+      on_failure = "continue"
+      prompt = """Nghiên cứu https://github.com/gastownhall/gastown (MIT).
+
+Clone nông vào thư mục tạm mà đọc. CHỈ ĐỌC, đừng sửa gì trong repo này.
+
+VÌ SAO CẦN: chủ dự án nhìn giao diện sagent và hỏi "ai là leader, ai là nhân viên,
+nhiệm vụ ra sao". Gas Town có sẵn khái niệm agent identity, handoff, merge queue.
+sagent hiện cho mỗi thợ commit lên nhánh sagent/<tài khoản>-1 nhưng KHÔNG có hàng
+đợi trộn, và vai trò chỉ suy từ cạnh needs của đồ thị.
+
+TRẢ LỜI ĐÚNG BỐN MỤC, có trích dẫn file:dòng:
+1. Nó mô tả vai trò một agent bằng cấu trúc gì? Vai trò là dữ liệu hay chỉ là quy ước?
+2. Handoff giữa hai agent diễn ra thế nào — cái gì được truyền?
+3. Merge queue quyết định nhánh nào được trộn dựa trên gì?
+4. Ba thứ đáng mang về sagent nhất, và một thứ RÕ RÀNG KHÔNG nên mang (kèm lý do)."""
+
+    [[flow.hoc.step]]
+      id = "tong-hop"
+      type = "agent"
+      profile = "claude:phu"
+      needs = ["hoc-acp", "hoc-deck", "hoc-gastown"]
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 2400
+      prompt = """Gộp ba bản nghiên cứu dưới thành một mục bổ sung cho
+docs/DU-AN-THAM-KHAO.md, phần "Đã học được gì".
+
+--- ACP (claude:tns) ---
+{{steps.hoc-acp.output}}
+
+--- Agent Deck (antigravity:may) ---
+{{steps.hoc-deck.output}}
+
+--- Gas Town (claude:phu) ---
+{{steps.hoc-gastown.output}}
+
+Yêu cầu:
+1. Bước nào KHÔNG trả về nghiên cứu thật (rỗng, báo lỗi, hoặc chỉ nói lý thuyết
+   không có trích dẫn file:dòng) thì GHI THẲNG là chưa học được, đừng bịa cho đủ.
+2. Mỗi bài học phải kèm: nguyên lý, trích dẫn upstream, và nó vá lỗ hổng ĐO ĐƯỢC
+   nào của sagent.
+3. Kết bằng bảng: việc nên làm tiếp, xếp theo (giá trị / công sức).
+4. Chưa chép dòng mã nào thì nói rõ là chưa cần ghi OPEN_SOURCE_LEDGER.md.
+
+Trả về nguyên văn phần markdown để dán vào tài liệu, không lời dẫn."""

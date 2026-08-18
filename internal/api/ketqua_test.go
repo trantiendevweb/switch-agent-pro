@@ -69,3 +69,33 @@ func TestNoiVeDangNhapKhongBiBatNham(t *testing.T) {
 		}
 	}
 }
+
+
+// Ca BAO DONG GIA do duoc o lan chay #23: buoc `hoc-acp` clone xong hai repo va
+// viet bao cao that, nhung GIUA DUONG co mot lan bi chan quyen. La chan ban dau
+// soi ca ban ghi nen giet oan ca buoc.
+//
+// Agent gap tro ngai roi di duong khac la chuyen binh thuong. Chi khi no KET
+// THUC bang cau hong thi moi la hong.
+func TestGapTroNgaiGiuaDuongVanLaThanhCong(t *testing.T) {
+	out := `Bat dau doc repo.
+jetski: no output produced - a tool required the "command" permission that headless mode cannot prompt for, so it was auto-denied.
+Doi cach: dung cong cu doc file thay cho shell.
+Da clone nong vao /tmp/acp-study, chi doc.
+
+## 1. ACP dinh nghia cac loai su kien
+session/update, session/request_permission, tool_call - xem schema.json:120.
+## 4. Viec nho nhat de bat dau: boc mot adapter ACP cho Claude Code.`
+	if ly := khongCoKetQua(out); ly != "" {
+		t.Fatalf("agent gap tro ngai giua duong roi van lam xong ma bi coi la hong: %s", ly)
+	}
+}
+
+// Nhung KET THUC bang cau bi chan quyen thi van phai bat - du truoc do co lam gi.
+func TestKetThucBangBiChanQuyenVanBiBat(t *testing.T) {
+	out := `Dang doc repo, da liet ke 40 file.
+` + outThatBiChanQuyen
+	if khongCoKetQua(out) == "" {
+		t.Fatal("agent ket thuc bang cau tu choi quyen ma van tinh la xong")
+	}
+}

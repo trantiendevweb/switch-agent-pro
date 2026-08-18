@@ -761,6 +761,7 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	// Ghi lại đường dẫn log TRƯỚC khi đợi: xong việc thì phiên đã rời sổ
 	// "đang chạy", lúc đó hỏi lại là không còn.
 	logs := b.a.sessionLogs(res.IDs)
+	wts := b.a.sessionWorktrees(res.IDs)
 	if err := b.a.waitSessions(ctx, res.IDs); err != nil {
 		return "", err
 	}
@@ -768,7 +769,34 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	if ly := khongCoKetQua(out); ly != "" {
 		return out, fmt.Errorf("%s (profile %s)", ly, addr)
 	}
+	// Gắn BẰNG CHỨNG GIT vào cuối kết quả. Lời agent kể không đáng tin: lần chạy
+	// #21 có bước trả về "I am waiting for `go test` to complete", được đánh dấu
+	// xong, mà nhánh không có commit nào. Dòng này nói sự thật đo được, và vì nó
+	// nằm trong output nên bước SAU (người soi) cũng đọc thấy.
+	if bc := b.a.bangChungWorktree(wts); bc != "" {
+		out += "\n\n--- bằng chứng git ---\n" + bc
+	}
 	return out, nil
+}
+
+// bangChungWorktree đọc trạng thái git của các worktree vừa dùng.
+func (a *API) bangChungWorktree(dirs []string) string {
+	if len(dirs) == 0 {
+		return ""
+	}
+	goc := "main"
+	if wd, err := os.Getwd(); err == nil {
+		if root, ok := workspace.RepoRoot(wd); ok {
+			if n, err := workspace.NhanhMacDinh(root); err == nil && n != "" {
+				goc = n
+			}
+		}
+	}
+	var dong []string
+	for _, d := range dirs {
+		dong = append(dong, workspace.Xem(d, goc).MotDong())
+	}
+	return strings.Join(dong, "\n")
 }
 
 // argsChoBuoc ghép đối số chạy agent cho một bước, và trả thêm lời cảnh báo nếu
@@ -815,11 +843,35 @@ func khongCoKetQua(out string) string {
 	if t == "" {
 		return "agent chạy xong nhưng không in ra gì — coi như thất bại, không phải thành công"
 	}
+	// Câu hỏi đúng KHÔNG phải "trong bản ghi có chữ ký hỏng không", mà là
+	// "sau chữ ký đó agent còn làm được gì nữa không".
+	//
+	// Bản trước soi cả bản ghi và giết oan một bước làm được việc thật: lần chạy
+	// #23, bước `hoc-acp` clone xong hai repo rồi viết báo cáo, nhưng giữa đường
+	// có một lần bị chặn quyền — chữ ký nằm lẫn ở giữa nên lá chắn tưởng cả bước
+	// hỏng. Bản sau đó soi 800 ký tự cuối cũng sai: output ngắn thì "đuôi" là cả
+	// bài, vẫn giết oan.
+	//
+	// Agent gặp trở ngại rồi ĐỔI CÁCH là chuyện bình thường và đáng mừng. Chỉ khi
+	// nó DỪNG LẠI ở đó mới là hỏng. Nên: tìm lần xuất hiện CUỐI CÙNG của chữ ký,
+	// rồi xem còn bao nhiêu nội dung phía sau.
 	l := strings.ToLower(t)
-	// Chữ ký headless bị chặn quyền: agent không hỏi được nên tự từ chối.
-	if strings.Contains(l, "no output produced") ||
-		strings.Contains(l, "auto-denied") ||
-		strings.Contains(l, "headless mode cannot prompt") {
+	ketThucBang := func(chuKy ...string) (bool, string) {
+		for _, k := range chuKy {
+			i := strings.LastIndex(l, k)
+			if i < 0 {
+				continue
+			}
+			// Còn hơn 200 ký tự phía sau nghĩa là agent đã đi tiếp, không chết ở đây.
+			if len(t)-(i+len(k)) > 200 {
+				continue
+			}
+			return true, k
+		}
+		return false, ""
+	}
+
+	if co, _ := ketThucBang("no output produced", "auto-denied", "headless mode cannot prompt"); co {
 		return "agent bị chặn quyền trong chế độ headless nên không làm gì: " + motDong(t)
 	}
 	// Hỏng XÁC THỰC. Đo tại lần chạy #21: bước `gop` trả nguyên câu
@@ -827,17 +879,13 @@ func khongCoKetQua(out string) string {
 	// mà vẫn được đánh dấu `done`, và cả flow vẫn `completed`. Token trong bản
 	// sao hồ sơ hết hạn mà không tự làm mới được — đúng rủi ro kế hoạch gốc
 	// cảnh báo: "không xem clone credential là an toàn nếu chưa đo concurrent refresh".
-	if strings.Contains(l, "failed to authenticate") ||
-		strings.Contains(l, "session expired") ||
-		strings.Contains(l, "please run /login") ||
-		strings.Contains(l, "not logged in") {
+	if co, _ := ketThucBang("failed to authenticate", "session expired", "please run /login", "not logged in"); co {
 		return "agent KHÔNG đăng nhập được: " + motDong(t)
 	}
 	// Cụt vòng gọi tool. Cũng đo tại #21: bước `soi` (grok) gọi `ls -la` 399 lần
 	// liên tiếp — lệnh Unix không có trên cmd của Windows — rồi bị trần
 	// --max-tool-rounds chặn. Nó KHÔNG làm được việc, nhưng vẫn `done`.
-	if strings.Contains(l, "maximum tool execution rounds reached") ||
-		strings.Contains(l, "stopping to prevent infinite loops") {
+	if co, _ := ketThucBang("maximum tool execution rounds reached", "stopping to prevent infinite loops"); co {
 		return "agent quẩn vòng gọi tool tới khi hết trần, không hoàn thành việc: " + motDong(t)
 	}
 	return ""
@@ -852,6 +900,26 @@ func motDong(s string) string {
 		s = s[:200] + "…"
 	}
 	return s
+}
+
+// sessionWorktrees lấy đường dẫn worktree của các phiên vừa bật. Cũng phải hỏi
+// TRƯỚC khi đợi, vì xong việc là phiên rời sổ "đang chạy".
+func (a *API) sessionWorktrees(ids []int64) []string {
+	want := map[int64]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	running, err := a.db.Running()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, s := range running {
+		if want[s.ID] && s.Worktree != "" {
+			out = append(out, s.Worktree)
+		}
+	}
+	return out
 }
 
 // sessionLogs lấy đường dẫn log của các phiên vừa bật.

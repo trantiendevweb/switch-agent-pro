@@ -1590,3 +1590,55 @@ Phản chứng: dựng lại đúng lỗi cũ → test đỏ và chỉ đúng d�
 Bài học: **giao diện không có test thì hỏng im lặng.** Go có `go build` bắt lỗi cú
 pháp ngay; HTML/JS nhúng thì không ai bắt. Từ nay mọi file web đều đi qua phép
 kiểm này.
+
+## 18/08 — Lượt chạy dài: đội đi học 3 dự án, và lá chắn giết oan một bước
+
+Flow `hoc` (lần chạy #23): ba agent đọc ba dự án song song, rồi tổng hợp.
+
+| Bước | Tài khoản | Kết quả |
+|---|---|---|
+| hoc-gastown | claude:phu | **THẬT** — trích `internal/config/roles.go:20-41`, kết luận vai trò là DỮ LIỆU (TOML nhúng binary), không phải quy ước |
+| hoc-deck | antigravity:may | dừng giữa việc, chỉ có dòng "Đang tải shallow clone…" |
+| hoc-acp | claude:tns | **BỊ GIẾT OAN** — xem dưới |
+| tong-hop | claude:phu | không chạy: bước cha `hoc-acp` failed nên bị bỏ, dù khai `on_failure = "continue"` |
+
+### Lá chắn của chính tôi giết oan một bước làm được việc
+
+`hoc-acp` clone xong hai repo, viết báo cáo, nhưng GIỮA ĐƯỜNG có một lần bị chặn
+quyền. Lá chắn soi toàn bộ bản ghi nên thấy chữ ký đó và giết cả bước.
+
+Sửa lần một: chỉ soi 800 ký tự cuối. **Vẫn sai** — output ngắn thì "đuôi" là cả
+bài, vẫn giết oan. Test bắt được ngay, nên bản sai không đi xa.
+
+Sửa lần hai, đúng câu hỏi: **không phải "trong bản ghi có chữ ký hỏng không", mà
+là "sau chữ ký đó agent còn làm được gì nữa không".** Tìm lần xuất hiện CUỐI
+CÙNG, nếu còn hơn 200 ký tự nội dung phía sau thì agent đã đổi cách và đi tiếp —
+không tính là hỏng. Gặp trở ngại rồi đổi cách là chuyện đáng mừng, không phải lỗi.
+
+8 test cho lá chắn, gồm cả ca báo động giả này với nguyên văn output thật.
+
+### Bằng chứng git thay cho lời agent kể
+
+Thêm `workspace.Xem(dir, goc)` đọc trạng thái git thật của worktree: tên nhánh,
+số commit đi trước nhánh gốc, còn thay đổi chưa commit hay không. Kết quả gắn vào
+cuối output mỗi bước agent, nên bước SAU (người soi) cũng đọc thấy.
+
+Có vì lần chạy #21: bước `tho-2` trả "I am waiting for `go test` to complete",
+được đánh dấu `done`, mà nhánh `sagent/may-1` KHÔNG có commit nào. Không cách nào
+biết nếu chỉ đọc chữ agent in ra. Test dựng repo git thật cho ba tình huống đã
+gặp: có commit / không commit / sửa mà quên commit.
+
+`NhanhMacDinh` hỏi `origin/HEAD` trước rồi mới thử `main`/`master` — đoán sai
+nhánh nền thì số commit đếm ra vô nghĩa mà lại trông rất thuyết phục.
+
+### Nguyên nhân gốc của MỌI lỗi escape hôm nay
+
+Ký tự gạch chéo ngược trong heredoc bị nuốt một lớp trước khi tới Python. Nên mọi
+lần tôi viết chuỗi có `\n` để sinh mã Go/JS, nó thành xuống dòng THẬT trong file:
+rune literal trong Go, chuỗi JS đứt làm chết cả trang 2D, và ba lần liên tiếp ở
+lượt này.
+
+Cách tránh: **không viết dấu gạch chéo ngược trong script sinh mã.** Dùng
+`chr(92)` khi cần ký tự đó, và dùng chuỗi thô (dấu huyền trong Go, backtick trong
+JS) để khỏi cần escape. Đã sửa được 3 chỗ bằng cách này sau khi 5 lần thử theo
+lối cũ đều thất bại.
