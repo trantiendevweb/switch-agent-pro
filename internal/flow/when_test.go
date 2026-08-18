@@ -122,7 +122,7 @@ type slowAgent struct {
 	maxSeen int
 }
 
-func (s *slowAgent) RunAgents(_ context.Context, _, prompt string, copies int, _, _ bool) (string, error) {
+func (s *slowAgent) RunAgents(_ context.Context, _, prompt string, copies int, _, _ bool) (KetQuaAgent, error) {
 	s.mu.Lock()
 	s.now++
 	if s.now > s.maxSeen {
@@ -135,7 +135,7 @@ func (s *slowAgent) RunAgents(_ context.Context, _, prompt string, copies int, _
 	s.mu.Lock()
 	s.now--
 	s.mu.Unlock()
-	return prompt, nil
+	return KetQuaAgent{Output: prompt}, nil
 }
 
 // Ba nhánh độc lập phải chạy CÙNG LÚC, không xếp hàng.

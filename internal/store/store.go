@@ -149,6 +149,13 @@ var migrations = []string{
 
 	// v4 — kết quả của mỗi bước, để bước sau dùng lại ({{steps.x.output}})
 	`ALTER TABLE flow_steps ADD COLUMN output TEXT;`,
+
+	// v5 — chi phí và token của mỗi bước. Đọc được từ dữ liệu CÓ CẤU TRÚC của
+	// agent (trường total_cost_usd/usage), không phải đoán. Lưu để cộng dồn theo
+	// ngày/tài khoản và để dashboard hiện "lượt này tốn bao nhiêu".
+	`ALTER TABLE flow_steps ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0;
+	 ALTER TABLE flow_steps ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0;
+	 ALTER TABLE flow_steps ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0;`,
 }
 
 // MaxStepOutput là trần kích thước kết quả lưu cho mỗi bước.
@@ -186,12 +193,15 @@ type Run struct {
 
 // StepRun là trạng thái một bước trong một lần chạy.
 type StepRun struct {
-	RunID   int64
-	StepID  string
-	State   string
-	Attempt int
-	Msg     string
-	Output  string
+	RunID     int64
+	StepID    string
+	State     string
+	Attempt   int
+	Msg       string
+	Output    string
+	CostUSD   float64
+	TokensIn  int
+	TokensOut int
 }
 
 // CreateRun mở một lần chạy mới.
@@ -282,10 +292,21 @@ func (d *DB) SetStepOutput(runID int64, stepID, output string) error {
 	return err
 }
 
+// SetStepCost ghi chi phí và token của một bước. Tách khỏi SetStepOutput vì
+// output đến từ bản ghi còn chi phí đến từ dòng result có cấu trúc — hai nguồn,
+// và không phải provider nào cũng cho được chi phí (chỉ ghi khi > 0).
+func (d *DB) SetStepCost(runID int64, stepID string, costUSD float64, tokIn, tokOut int) error {
+	_, err := d.db.Exec(
+		`UPDATE flow_steps SET cost_usd=?, tokens_in=?, tokens_out=? WHERE run_id=? AND step_id=?`,
+		costUSD, tokIn, tokOut, runID, stepID)
+	return err
+}
+
 // Steps đọc trạng thái mọi bước của một lần chạy.
 func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 	rows, err := d.db.Query(
-		`SELECT run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,'')
+		`SELECT run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,''),
+		        COALESCE(cost_usd,0),COALESCE(tokens_in,0),COALESCE(tokens_out,0)
 		   FROM flow_steps WHERE run_id=?`, runID)
 	if err != nil {
 		return nil, err
@@ -294,7 +315,8 @@ func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 	out := map[string]StepRun{}
 	for rows.Next() {
 		var s StepRun
-		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output); err != nil {
+		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output,
+			&s.CostUSD, &s.TokensIn, &s.TokensOut); err != nil {
 			return nil, err
 		}
 		out[s.StepID] = s

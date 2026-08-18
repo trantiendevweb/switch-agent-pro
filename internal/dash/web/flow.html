@@ -150,6 +150,9 @@
       background:#12141a;border-radius:5px;padding:5px 7px;max-height:150px;overflow:auto}
     #ketqua .trong{color:#e0a04a}
     #ketqua .mu{color:#8b93a7}
+    /* Nhan chi phi: mau tien (xanh --run) de doc luot thay ngay "ton bao nhieu". */
+    #ketqua .tien{color:var(--run);font-variant-numeric:tabular-nums}
+    #ketqua .b.tong{border-bottom:1px solid #2c3040;padding-bottom:6px;font-weight:600}
     /* Cham trang thai thay cho ky tu la: doi mau duoc, chinh kich thuoc duoc,
        khong phu thuoc phong chu he thong. */
     .m{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
@@ -743,23 +746,38 @@ async function pollRun(){
     currentRun=mine[0].id;
     const det=await call('/api/run?id='+currentRun);
     liveStates={}; (det.steps||[]).forEach(s=>{ if(s.state!=='pending') liveStates[s.id]=s.state; });
-    veKetQua(det.steps||[]);
+    veKetQua(det.steps||[], det.cost);
     render();
   }catch(_){}
 }
 // veKetQua bày output từng bước. Bước `done` mà rỗng thì nói thẳng là rỗng —
 // im lặng ở đây chính là cách lần chạy #8 trông như đã thành công.
-function veKetQua(steps){
+// chiPhiNhan trả về một nhãn chi phí "0,0042 USD · 1,2k→340 tok" hoặc rỗng nếu
+// provider không đo được. Chỉ hiện khi có số thật, để không ai tưởng là miễn phí.
+function chiPhiNhan(usd, tin, tout){
+  if(!usd && !tin && !tout) return '';
+  const s=(usd?usd.toFixed(4)+' USD':'');
+  const tk=(tin||tout?(s?' · ':'')+(tin||0)+'→'+(tout||0)+' tok':'');
+  return '<span class="mu tien">'+s+tk+'</span>';
+}
+function veKetQua(steps, cost){
   const box=$('#ketqua'), than=$('#ketqua-than');
   const co=steps.filter(s=>s.state && s.state!=='pending');
   if(!co.length){ box.hidden=true; return; }
   box.hidden=false;
-  than.innerHTML=co.map(s=>{
+  // Tổng cả lượt lên đầu: chủ dự án hỏi "lượt này tốn bao nhiêu" — trả lời ngay
+  // dòng đầu, không bắt cộng nhẩm từng bước.
+  let tong='';
+  if(cost && (cost.usd||cost.tokens_in||cost.tokens_out)){
+    tong='<div class="b tong">Cả lượt: '+chiPhiNhan(cost.usd, cost.tokens_in, cost.tokens_out)+'</div>';
+  }
+  than.innerHTML=tong+co.map(s=>{
     let t;
     if(s.output) t='<pre>'+esc(s.output)+'</pre>';
     else if(s.state==='done') t='<pre class="trong">(không có output — bước xong nhưng không trả về gì)</pre>';
     else t='';
-    return '<div class="b"><b>'+esc(s.id)+'</b> <span class="mu">'+esc(s.state)+'</span>'+
+    return '<div class="b"><b>'+esc(s.id)+'</b> <span class="mu">'+esc(s.state)+'</span> '+
+           chiPhiNhan(s.cost_usd, s.tokens_in, s.tokens_out)+
            (s.msg?' <span class="trong">'+esc(s.msg)+'</span>':'')+t+'</div>';
   }).join('');
 }

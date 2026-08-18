@@ -22,7 +22,7 @@ type stepDTO struct {
 	ID      string   `json:"id"`
 	Type    string   `json:"type"`
 	Needs   []string `json:"needs,omitempty"`
-	State   string   `json:"state"`   // pending|running|done|failed|skipped|waiting
+	State   string   `json:"state"` // pending|running|done|failed|skipped|waiting
 	Msg     string   `json:"msg,omitempty"`
 	Attempt int      `json:"attempt,omitempty"`
 	Detail  string   `json:"detail,omitempty"` // prompt / lệnh / lời nhắn, đã rút gọn
@@ -35,6 +35,12 @@ type stepDTO struct {
 	// cho agent nào — cả cảnh chỉ còn là mấy hình hộp đứng im, đúng thứ người
 	// dùng phàn nàn: "ai là leader, ai là nhân viên, nhiệm vụ ra sao".
 	Profile string `json:"profile,omitempty"`
+	// Chi phí đo được của bước, đọc từ dữ liệu CÓ CẤU TRÚC của agent (không đoán).
+	// 0 nghĩa là provider không cho biết — bỏ khỏi JSON để mặt web khỏi hiện
+	// "0,0000 USD" gây tưởng là miễn phí trong khi thật ra là chưa đo được.
+	CostUSD   float64 `json:"cost_usd,omitempty"`
+	TokensIn  int     `json:"tokens_in,omitempty"`
+	TokensOut int     `json:"tokens_out,omitempty"`
 }
 
 type flowDTO struct {
@@ -89,11 +95,19 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 	order, _ := flow.Order(def)
 	out := make([]stepDTO, 0, len(order))
+	// Tổng cả lượt: chủ dự án hỏi "lượt này tốn bao nhiêu" — cộng dồn từ các bước
+	// thật đã đo, không phải ước lượng.
+	var tongChiPhi float64
+	var tongVao, tongRa int
 	for _, st := range order {
 		d := stepDTO{ID: st.ID, Type: st.Type, Needs: st.Needs, State: "pending", Profile: st.Profile}
 		if got, ok := steps[st.ID]; ok {
 			d.State, d.Msg, d.Attempt = got.State, got.Msg, got.Attempt
 			d.Output = got.Output
+			d.CostUSD, d.TokensIn, d.TokensOut = got.CostUSD, got.TokensIn, got.TokensOut
+			tongChiPhi += got.CostUSD
+			tongVao += got.TokensIn
+			tongRa += got.TokensOut
 		}
 		switch st.Type {
 		case flow.TypeAgent, flow.TypeReview:
@@ -106,8 +120,9 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		out = append(out, d)
 	}
 	writeJSON(w, map[string]any{
-		"run": runDTO{ID: run.ID, Flow: run.Flow, State: run.State, Started: run.Started.Unix()},
+		"run":   runDTO{ID: run.ID, Flow: run.Flow, State: run.State, Started: run.Started.Unix()},
 		"steps": out,
+		"cost":  map[string]any{"usd": tongChiPhi, "tokens_in": tongVao, "tokens_out": tongRa},
 	})
 }
 

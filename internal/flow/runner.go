@@ -15,9 +15,19 @@ import (
 // thật mà không cần khởi động agent nào, và sau này đường API (model route) cắm
 // vào cùng chỗ.
 type AgentRunner interface {
-	// RunAgents bật n agent với prompt, ĐỢI xong, trả về kết quả gộp (để bước
-	// sau dùng qua {{steps.x.output}}) và lỗi nếu có.
-	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree, tuDuyetQuyen bool) (string, error)
+	// RunAgents bật n agent với prompt, ĐỢI xong, trả về kết quả và lỗi nếu có.
+	// Kết quả mang cả output (cho {{steps.x.output}}) lẫn chi phí đo được — chi
+	// phí phải đi CÙNG output vì cả hai sinh ra trong cùng một lượt chạy; tách
+	// ra hai đường thì bước nào tính tiền bước nấy sẽ lệch.
+	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree, tuDuyetQuyen bool) (KetQuaAgent, error)
+}
+
+// KetQuaAgent là những gì một lượt chạy agent trả về cho bộ thực thi flow.
+type KetQuaAgent struct {
+	Output    string  // kết quả cho bước sau dùng
+	ChiPhiUSD float64 // 0 nếu provider không cho biết chi phí
+	TokenVao  int
+	TokenRa   int
 }
 
 // Runner thực thi một flow.
@@ -165,4 +175,3 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		Msg: fmt.Sprintf("xong #%d", runID)})
 	return Result{RunID: runID, State: store.RunDone}, nil
 }
-

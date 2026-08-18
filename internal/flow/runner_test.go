@@ -29,7 +29,7 @@ type fakeAgent struct {
 	quyen   []bool // cờ tự-duyệt-quyền của TỪNG lượt gọi
 }
 
-func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _, tuDuyetQuyen bool) (string, error) {
+func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _, tuDuyetQuyen bool) (KetQuaAgent, error) {
 	f.mu.Lock()
 	f.calls += copies
 	f.prompts = append(f.prompts, prompt)
@@ -37,9 +37,9 @@ func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies
 	fail, out := f.fail, f.output
 	f.mu.Unlock()
 	if fail {
-		return "", context.DeadlineExceeded
+		return KetQuaAgent{}, context.DeadlineExceeded
 	}
-	return out, nil
+	return KetQuaAgent{Output: out}, nil
 }
 
 // soLanGoi và cacPrompt đọc có khoá — test cũng là một goroutine khác.

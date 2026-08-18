@@ -144,6 +144,8 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 
 	results := make([]string, len(items))
 	var firstErr string
+	var chiPhi float64
+	var tokVao, tokRa int // cộng dồn chi phí mọi lượt của bước lặp
 
 	for i, item := range items {
 		i, item := i, item
@@ -162,7 +164,7 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 			if s.TimeoutSec > 0 {
 				stepCtx, cancel = context.WithTimeout(ctx, time.Duration(s.TimeoutSec)*time.Second)
 			}
-			out, err := r.do(stepCtx, s, env)
+			kq, err := r.do(stepCtx, s, env)
 			if cancel != nil {
 				cancel()
 			}
@@ -176,7 +178,10 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 				results[i] = "=== " + item + " === LỖI: " + err.Error()
 				return
 			}
-			results[i] = "=== " + item + " ===\n" + out
+			results[i] = "=== " + item + " ===\n" + kq.Output
+			chiPhi += kq.ChiPhiUSD
+			tokVao += kq.TokenVao
+			tokRa += kq.TokenRa
 		}()
 	}
 	wg.Wait()
@@ -192,6 +197,9 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 	}
 	_ = r.DB.SetStep(runID, s.ID, store.StepDone, fmt.Sprintf("xong %d mục", len(items)), 1)
 	_ = r.DB.SetStepOutput(runID, s.ID, combined)
+	if chiPhi > 0 || tokVao > 0 || tokRa > 0 {
+		_ = r.DB.SetStepCost(runID, s.ID, chiPhi, tokVao, tokRa)
+	}
 	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
 		SessionID: runID, Msg: fmt.Sprintf("xong %d mục", len(items))})
 	return store.StepDone, "", combined
@@ -233,19 +241,22 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 		if s.TimeoutSec > 0 {
 			stepCtx, cancel = context.WithTimeout(ctx, time.Duration(s.TimeoutSec)*time.Second)
 		}
-		out, err := r.do(stepCtx, s, env)
+		kq, err := r.do(stepCtx, s, env)
 		if cancel != nil {
 			cancel()
 		}
 
 		if err == nil {
 			_ = r.DB.SetStep(runID, s.ID, store.StepDone, "", attempt)
-			if out != "" {
-				_ = r.DB.SetStepOutput(runID, s.ID, out)
+			if kq.Output != "" {
+				_ = r.DB.SetStepOutput(runID, s.ID, kq.Output)
+			}
+			if kq.ChiPhiUSD > 0 || kq.TokenVao > 0 || kq.TokenRa > 0 {
+				_ = r.DB.SetStepCost(runID, s.ID, kq.ChiPhiUSD, kq.TokenVao, kq.TokenRa)
 			}
 			r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
 				SessionID: runID, Msg: "xong"})
-			return store.StepDone, "", out
+			return store.StepDone, "", kq.Output
 		}
 		lastErr = err
 		if attempt < tries {
@@ -266,11 +277,11 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 }
 
 // do thực thi đúng một lần, theo loại node.
-func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (string, error) {
+func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQuaAgent, error) {
 	switch s.Type {
 	case TypeAgent, TypeReview:
 		if r.Agent == nil {
-			return "", fmt.Errorf("không có bộ chạy agent")
+			return KetQuaAgent{}, fmt.Errorf("không có bộ chạy agent")
 		}
 		n := s.Copies
 		if n < 1 {
@@ -293,7 +304,7 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (string
 				argv = r.Commands["lint"]
 			}
 			if len(argv) == 0 {
-				return "", fmt.Errorf("bước %s cần `run`, hoặc khai `commands.%s` trong .sagent/project.toml", s.Type, s.Type)
+				return KetQuaAgent{}, fmt.Errorf("bước %s cần `run`, hoặc khai `commands.%s` trong .sagent/project.toml", s.Type, s.Type)
 			}
 		}
 		s.Run = argv
@@ -307,19 +318,19 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (string
 		if err != nil {
 			line := strings.TrimSpace(lastLine(string(raw)))
 			if line != "" {
-				return "", fmt.Errorf("%v — %s", err, line)
+				return KetQuaAgent{}, fmt.Errorf("%v — %s", err, line)
 			}
-			return "", err
+			return KetQuaAgent{}, err
 		}
-		return strings.TrimRight(string(raw), "\r\n"), nil
+		return KetQuaAgent{Output: strings.TrimRight(string(raw), "\r\n")}, nil
 
 	case TypeNotify:
 		m := Expand(s.Message, vars)
 		r.Bus.Infof("%s", m)
-		return m, nil
+		return KetQuaAgent{Output: m}, nil
 
 	default:
-		return "", fmt.Errorf("type %q chưa chạy được ở bản này", s.Type)
+		return KetQuaAgent{}, fmt.Errorf("type %q chưa chạy được ở bản này", s.Type)
 	}
 }
 
@@ -335,4 +346,3 @@ func lastLine(s string) string {
 	}
 	return lines[len(lines)-1]
 }
-

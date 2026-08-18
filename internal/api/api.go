@@ -744,21 +744,21 @@ type agentBridge struct {
 	fallback Addr
 }
 
-func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree, tuDuyetQuyen bool) (string, error) {
+func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree, tuDuyetQuyen bool) (flow.KetQuaAgent, error) {
 	addr := b.fallback
 	if profileStr != "" {
 		addr = ParseAddr(profileStr)
 	}
 	if addr.Account == "" {
-		return "", fmt.Errorf("bước agent chưa biết chạy bằng tài khoản nào — đặt `profile` trong flow hoặc truyền --profile")
+		return flow.KetQuaAgent{}, fmt.Errorf("bước agent chưa biết chạy bằng tài khoản nào — đặt `profile` trong flow hoặc truyền --profile")
 	}
 	ad, err := adapterOf(addr.Provider)
 	if err != nil {
-		return "", err
+		return flow.KetQuaAgent{}, err
 	}
 	args, canhBao, err := argsChoBuoc(ad, prompt, tuDuyetQuyen)
 	if err != nil {
-		return "", err
+		return flow.KetQuaAgent{}, err
 	}
 	if canhBao != "" {
 		b.a.bus.Warnf("%s", canhBao)
@@ -768,36 +768,39 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 		Args: args,
 	})
 	if err != nil {
-		return "", err
+		return flow.KetQuaAgent{}, err
 	}
 	if res.Started == 0 {
-		return "", fmt.Errorf("không bật được phiên nào")
+		return flow.KetQuaAgent{}, fmt.Errorf("không bật được phiên nào")
 	}
 	// Ghi lại đường dẫn log TRƯỚC khi đợi: xong việc thì phiên đã rời sổ
 	// "đang chạy", lúc đó hỏi lại là không còn.
 	logs := b.a.sessionLogs(res.IDs)
 	wts := b.a.sessionWorktrees(res.IDs)
 	if err := b.a.waitSessions(ctx, res.IDs); err != nil {
-		return "", err
+		return flow.KetQuaAgent{}, err
 	}
 	out := readLogs(logs)
+	var chiPhi float64
+	var tokVao, tokRa int
 
 	// ƯU TIÊN dữ liệu có cấu trúc. Dò chuỗi chỉ là đường lui cho provider chưa đo
 	// được — xem provider.KetQua và docs/DU-AN-THAM-KHAO.md ("hỏng phải là cấu
 	// trúc dữ liệu, không phải chữ trong văn bản").
 	if k, ok := ad.DocKetQua(out); ok {
 		if ly := k.Hong(); ly != "" {
-			return out, fmt.Errorf("%s (profile %s)", ly, addr)
+			return flow.KetQuaAgent{Output: out}, fmt.Errorf("%s (profile %s)", ly, addr)
 		}
 		// Câu trả lời thật, đã tách khỏi đống sự kiện NDJSON. Bước sau nhận cái
 		// này chứ không phải cả bản ghi.
 		out = k.TraLoi
+		chiPhi, tokVao, tokRa = k.ChiPhiUSD, k.TokenVao, k.TokenRa
 		if k.ChiPhiUSD > 0 {
 			b.a.bus.Infof("%s: %d lượt, %d token vào / %d ra, %.4f USD",
 				addr, k.SoLuotTu, k.TokenVao, k.TokenRa, k.ChiPhiUSD)
 		}
 	} else if ly := khongCoKetQua(out); ly != "" {
-		return out, fmt.Errorf("%s (profile %s)", ly, addr)
+		return flow.KetQuaAgent{Output: out}, fmt.Errorf("%s (profile %s)", ly, addr)
 	}
 	// Gắn BẰNG CHỨNG GIT vào cuối kết quả. Lời agent kể không đáng tin: lần chạy
 	// #21 có bước trả về "I am waiting for `go test` to complete", được đánh dấu
@@ -806,7 +809,7 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	if bc := b.a.bangChungWorktree(wts); bc != "" {
 		out += "\n\n--- bằng chứng git ---\n" + bc
 	}
-	return out, nil
+	return flow.KetQuaAgent{Output: out, ChiPhiUSD: chiPhi, TokenVao: tokVao, TokenRa: tokRa}, nil
 }
 
 // bangChungWorktree đọc trạng thái git của các worktree vừa dùng.

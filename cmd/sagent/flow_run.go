@@ -176,6 +176,8 @@ func flowRunChiTiet(arg string) {
 	// Đi theo thứ tự ĐỊNH NGHĨA để đọc được mạch trên xuống dưới, rồi mới vét
 	// những bước có trong DB mà flows.toml đã bỏ (flow sửa sau khi chạy).
 	xong := map[string]bool{}
+	var tongChiPhi float64
+	var tongVao, tongRa int
 	in := func(id string, s store.StepRun, def *flow.Step) {
 		xong[id] = true
 		mark := marks[s.State]
@@ -193,6 +195,14 @@ func flowRunChiTiet(arg string) {
 		}
 		if s.Attempt > 1 {
 			dong += fmt.Sprintf(" · lần thử %d", s.Attempt)
+		}
+		// Chi phí đo được của bước — chỉ hiện khi provider cho biết (>0), đừng in
+		// "0 USD" để khỏi hiểu nhầm là chạy không tốn gì.
+		if s.CostUSD > 0 || s.TokensIn > 0 || s.TokensOut > 0 {
+			dong += fmt.Sprintf(" · %.4f USD (%d→%d tok)", s.CostUSD, s.TokensIn, s.TokensOut)
+			tongChiPhi += s.CostUSD
+			tongVao += s.TokensIn
+			tongRa += s.TokensOut
 		}
 		fmt.Println(dong)
 		if s.Msg != "" {
@@ -218,5 +228,9 @@ func flowRunChiTiet(arg string) {
 		if !xong[id] {
 			in(id, s, nil)
 		}
+	}
+	if tongChiPhi > 0 || tongVao > 0 || tongRa > 0 {
+		fmt.Printf("   ── cả lượt: %.4f USD · %d token vào / %d ra\n\n",
+			tongChiPhi, tongVao, tongRa)
 	}
 }
