@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
+	"github.com/trantiendevweb/switch-agent-pro/internal/link"
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
@@ -48,6 +50,11 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return dirs, err
 		}
+		// Đây là chỗ NHÂN TOKEN ra N bản. `profile.Create` đã siết ACL từ trước,
+		// nhưng chỗ này thì quên — mà nó còn nguy hiểm hơn: một hồ sơ hở là hở
+		// một token, một kho clone hở là hở N bản. Trên Windows `0o755`/`0o600`
+		// không bảo vệ gì (đã đo, xem internal/acl).
+		_ = acl.Restrict(dir)
 		// Phần dùng chung: nối link như hồ sơ thường.
 		if _, err := LinkShared(a, dir); err != nil {
 			return dirs, err
@@ -59,7 +66,13 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 			src := filepath.Join(base, name)
 			data, err := os.ReadFile(src)
 			if err != nil {
-				continue // chưa có thì thôi, không phải lỗi
+				if os.IsNotExist(err) {
+					continue // chưa có file đó thì thôi, không phải lỗi
+				}
+				// Thiếu quyền, file đang bị khoá… KHÔNG được im lặng bỏ qua:
+				// clone sẽ chạy mà không có token, agent đăng nhập hụt, và người
+				// dùng đi tìm nguyên nhân ở tận đâu.
+				return dirs, fmt.Errorf("không đọc được %s: %w", src, err)
 			}
 			if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
 				return dirs, err
@@ -143,9 +156,16 @@ func SyncBackTokens(a provider.Adapter, account string) (string, error) {
 
 	// Sao lưu bản cũ trước khi đè — đây là token, hỏng là phải đăng nhập lại.
 	if len(old) > 0 {
-		_ = os.WriteFile(basePath+".bak-"+time.Now().Format("20060102-150405"), old, 0o600)
+		bak := basePath + ".bak-" + time.Now().Format("20060102-150405")
+		if err := os.WriteFile(bak, old, 0o600); err != nil {
+			// Đây là TOKEN. Không cứu được bản cũ thì đừng đè lên nó — hỏng là
+			// người dùng phải đăng nhập lại, mà lúc đó chẳng còn gì để quay về.
+			return "", fmt.Errorf("không sao lưu được token cũ ra %s, KHÔNG ghi đè: %w", bak, err)
+		}
 	}
-	tmp := basePath + ".tmp"
+	// Tên file tạm phải duy nhất: hai lần đồng bộ chạy cùng lúc mà chung một tên
+	// thì cái này ghi đè cái kia rồi đổi tên ra một token lai.
+	tmp := fmt.Sprintf("%s.tmp-%d", basePath, os.Getpid())
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return "", err
 	}
@@ -168,6 +188,16 @@ func mustRead(p string) []byte {
 // sạch, rồi mới xoá.
 func CleanClones(prov, account string) (int, error) {
 	root := filepath.Join(ClonesRoot(), prov, account)
+	// Kiểm chính `root` TRƯỚC khi ReadDir. Cùng lớp lỗi đã vá ở `Remove`, nhưng
+	// sót ở tầng gốc: nếu root là junction trỏ ra ngoài thì ReadDir đi xuyên, và
+	// mỗi thư mục con THẬT bên kia sẽ bị Remove xoá — trong khi đường dẫn vẫn
+	// nằm gọn trong kho nên `insideStore` chẳng thấy gì bất thường.
+	if isLink, _ := link.IsLink(root); isLink {
+		if err := link.Unlink(root, true); err != nil {
+			return 0, fmt.Errorf("%s là link, không gỡ được: %w", root, err)
+		}
+		return 0, nil
+	}
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		if os.IsNotExist(err) {

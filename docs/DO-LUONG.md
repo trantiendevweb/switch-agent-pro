@@ -1101,6 +1101,46 @@ thì phải chụp ảnh định nghĩa flow lúc `Start` và đối chiếu khi
 một **khẳng định cụ thể để đập**. Vòng này cho kết quả sắc hơn hẳn — nó không kể ra một
 danh sách, nó chỉ đúng vào khoảng cách giữa *điều code làm* và *điều tài liệu hứa*.
 
+### Soát chỗ chạm token — 6/7 đúng (2026-08-18, vòng 4)
+
+`internal/profile/clone.go` + `profile.go` + `internal/fleet/fleet.go`. Đây là code **chép
+token** và **xoá thư mục** — hai việc nguy hiểm nhất trong dự án.
+
+**Cái đau nhất là một chỗ TÔI TỰ BỎ SÓT.** Hôm trước vá "0o600 không bảo vệ gì trên
+Windows", tôi nối `acl.Restrict` vào `profile.Create`, `store.OpenAt`, `dash.SetPassword` —
+và **quên `clone.go`**, đúng cái chỗ token bị **nhân ra N bản**. Một hồ sơ hở là hở một
+token; một kho clone hở là hở N. Bản vá lúc đó có test riêng cho package `acl` và test đó
+xanh — nhưng không test nào hỏi "còn chỗ nào ghi token mà chưa siết không".
+
+| # | Cáo buộc | Phán quyết |
+|---|---|---|
+| 1 | `clone.go` không gọi `acl.Restrict` | **đúng — nghiêm trọng nhất** |
+| 3 | `CleanClones` không kiểm chính `root` có phải link không | **đúng — cùng lớp lỗi đã xoá `~/.claude`** |
+| 5 | Nuốt lỗi khi sao lưu token cũ; file tạm trùng tên | **đúng** |
+| 6 | Mọi lỗi đọc token bị coi là "chưa có" | **đúng** |
+| 2, 4 | TOCTOU trên thư mục đích | **đúng nhưng bỏ qua** — kẻ tạo được junction trong kho thì đã thắng từ trước |
+| 7 | `fleet` nuốt lỗi ghi DB | **SAI** — code đã báo lên bus, codex đọc sót |
+
+**Mục 3 là lớp lỗi đã nổ thật một lần.** `Remove` đã được vá để không đi xuyên junction,
+nhưng `CleanClones` gọi `os.ReadDir(root)` **trước** khi bất cứ ai kiểm `root`. Root là
+junction trỏ ra ngoài thì ReadDir đi xuyên, và mỗi thư mục con THẬT bên kia bị `Remove` xoá
+— trong khi đường dẫn vẫn nằm gọn trong kho nên `insideStore` chẳng thấy gì bất thường.
+
+Đã chứng minh bằng cách gỡ lá chắn: test đỏ với `DỮ LIỆU THẬT BỊ XOÁ QUA JUNCTION Ở GỐC`.
+
+**Mục 5:** sao lưu token cũ hỏng thì **không được đè lên nó**. Token hỏng là phải đăng nhập
+lại, mà lúc đó chẳng còn gì để quay về. Trước đây lỗi bị `_ =` nuốt rồi ghi đè tiếp.
+
+#### Lại một test rỗng nghĩa, lần thứ ba
+
+Test cho mục 1 lúc đầu **xanh cả khi bản vá bị vô hiệu** — vì thư mục clone vốn đã kín nhờ
+kế thừa từ `~/.ai-accounts`. Phải **nới lỏng ACL thư mục cha trước** thì mới dựng được cái
+bẫy. Sau đó nó mới đỏ đúng chỗ: `cấp quyền cho [Users]`.
+
+Ba lần trong hai ngày, cùng một dạng: **bẫy dựng sai → test xanh → tưởng đã chứng minh.**
+Câu hỏi phải hỏi mỗi lần viết test cho một lá chắn: *nếu gỡ lá chắn ra, test này có đỏ không?*
+Nếu không thử thì không biết.
+
 ---
 
 ## Việc cần bạn hỗ trợ
