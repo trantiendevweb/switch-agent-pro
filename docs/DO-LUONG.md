@@ -1556,3 +1556,37 @@ khuôn hai dòng. Trước đó là 399 vòng `ls -la` vô ích.
 Còn nợ: kiểu hỏng thứ ba (agent dừng giữa việc, nhánh rỗng, vẫn `done`) chưa bắt
 được bằng chuỗi. Bằng chứng đúng cho bước code là `git log main..sagent/<tk>-1`
 có commit hay không — phải kiểm nhánh, không tin lời agent kể.
+
+## 18/08 — Chuỗi JS đứt giữa chừng làm CHẾT cả trang 2D, sống qua nhiều bản build
+
+Chủ dự án mở dash bản mới: bảng tài khoản trống, ô chọn trống, dòng
+"đang kết nối…" mãi không dứt. Nhìn như lỗi mạng.
+
+Thật ra là lỗi cú pháp. `internal/dash/web/index.html` có hai chỗ viết xuống dòng
+THẬT bên trong chuỗi nháy đơn thay vì `\n`:
+
+```js
+out.textContent = dong.join('
+');
+out.textContent = d.noi_dung + '
+
+— ' + d.model + ...
+```
+
+Một chuỗi đứt làm **toàn bộ script của trang chết**, không phải chỉ dòng đó. Khung
+HTML vẫn hiện nên trông như trang đã tải xong.
+
+Có từ commit `fe94ebf` và sống qua nhiều bản build. Dash cũ ở cổng 8787 chạy bản
+17/08 nên KHÔNG dính — đó là lý do bản cũ trông vẫn ổn còn bản mới thì trống trơn,
+và cũng là lý do mãi không ai phát hiện.
+
+Cùng một cái bẫy escape đã hại nhiều lần trong ngày (rune literal trong Go, `\`
+trong heredoc, BOM của PowerShell).
+
+**Đã thêm `TestFileWebKhongCoChuoiDut`**: quét mọi file `web/*.html`, đếm nháy đơn
+không bị escape trên từng dòng, lẻ là báo lỗi. Rẻ, không cần chạy JS trong CI.
+Phản chứng: dựng lại đúng lỗi cũ → test đỏ và chỉ đúng dòng 279.
+
+Bài học: **giao diện không có test thì hỏng im lặng.** Go có `go build` bắt lỗi cú
+pháp ngay; HTML/JS nhúng thì không ai bắt. Từ nay mọi file web đều đi qua phép
+kiểm này.

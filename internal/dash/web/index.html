@@ -81,6 +81,34 @@
 
   <div id="err" class="banner"></div>
 
+  <!-- Hướng dẫn nằm NGAY TRÊN, không giấu trong tài liệu: người mở dashboard lần
+       đầu nhìn thấy ba ô "Bật hạm đội / Chạy workflow / Hỏi AI API" mà không biết
+       khác nhau chỗ nào, cái nào tiêu hạn mức thuê bao, cái nào tiêu tiền. -->
+  <details id="huongdan" class="card" style="margin-bottom:16px" open>
+    <summary style="cursor:pointer;font-weight:700;font-size:15px">Bắt đầu từ đâu — đọc 30 giây</summary>
+    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:var(--sub)">
+      <b style="color:var(--fg)">1. Bạn có ba cách giao việc, khác nhau về TIỀN:</b>
+      <table style="margin:8px 0 12px;width:100%">
+        <tr><td style="width:150px"><b style="color:var(--fg)">Bật hạm đội</b></td>
+            <td>Bật N phiên agent song song trên MỘT tài khoản. Tiêu <b>hạn mức thuê bao</b>. Dùng khi muốn nhiều agent cùng cày một việc.</td></tr>
+        <tr><td><b style="color:var(--fg)">Chạy workflow</b></td>
+            <td>Chạy một quy trình nhiều bước, mỗi bước một tài khoản khác nhau. Đây là cách dùng chính: một agent chia việc, vài agent làm, một agent soi.</td></tr>
+        <tr><td><b style="color:var(--fg)">Hỏi thẳng AI API</b></td>
+            <td>Gọi thẳng model qua API key. Tiêu <b>tiền theo token</b>, không đụng hạn mức thuê bao. Hợp với việc ngắn.</td></tr>
+      </table>
+      <b style="color:var(--fg)">2. Mỗi agent chạy trong git worktree riêng</b> — nhánh <code>sagent/&lt;tài khoản&gt;-1</code>.
+      Chúng không đụng thư mục làm việc chính của bạn. Xong việc thì xem
+      <code>git log main..sagent/&lt;tài khoản&gt;-1</code> rồi tự quyết có trộn hay không.
+      <br><br>
+      <b style="color:var(--fg)">3. Muốn xem ai đang làm gì</b> — mở tab <b>3D</b>: mỗi tài khoản một robot,
+      đang làm việc thì gõ tay, đang chuyển kết quả cho bước sau thì vung tay về phía người nhận.
+      Tab <b>Workflow</b> để sửa quy trình bằng cách kéo thả.
+      <br><br>
+      <span style="color:var(--warn)">Cột "chưa đăng nhập" của antigravity là ĐÚNG và không sửa được:
+      nó giữ token trong Windows Credential Manager nên không đọc ra danh tính. Nó vẫn chạy bình thường.</span>
+    </div>
+  </details>
+
   <div class="grid">
     <div>
       <h2>Phiên đang chạy · <span id="scount">0</span></h2>
@@ -120,6 +148,19 @@
           <div class="warnbox">N phiên trên một tài khoản tiêu hạn mức gấp N. Hành vi khi nhiều phiên cùng refresh token <b>chưa được đo</b>.</div>
           <button class="go" type="submit">Bật hạm đội</button>
         </form>
+      </div>
+
+      <h2>Chạy workflow</h2>
+      <div class="card">
+        <label>Quy trình</label>
+        <select id="wf-ten"></select>
+        <div id="wf-mota" class="hint" style="min-height:18px"></div>
+        <label>Việc cần làm <span class="hint">(thay biến <code>viec</code>, để trống thì dùng mặc định của flow)</span></label>
+        <input id="wf-viec" placeholder="Rà lại internal/store và chỉ ra chỗ đáng sửa nhất">
+        <div class="warn">Mỗi bước chạy bằng một tài khoản riêng, trong worktree riêng.
+          Xem <b>3D</b> để nhìn chúng làm việc, hoặc <b>Workflow</b> để sửa quy trình.</div>
+        <button id="wf-chay" class="go">Chạy workflow</button>
+        <div id="wf-ket" class="hint" style="margin-top:10px"></div>
       </div>
 
       <h2>Hỏi thẳng AI API</h2>
@@ -168,6 +209,29 @@ $('toflow').href = 'flow.html';
 // Cùng đi qua /api/* như mọi thứ khác, nên chúng ngang quyền với CLI chứ không
 // phải tính năng hạng hai gắn thêm.
 
+// napFlow đổ danh sách quy trình vào ô chọn, kèm mô tả và số bước — để người ta
+// biết mình sắp chạy cái gì trước khi bấm, thay vì đoán theo tên.
+let flowMota = {};
+async function napFlow(){
+  try{
+    const d = await api('/api/flows');
+    const sel = $('#wf-ten'); sel.innerHTML = '';
+    (d.flows||[]).forEach(f=>{
+      flowMota[f.name] = (f.desc||'') + ' · ' + f.steps + ' bước';
+      const o = document.createElement('option'); o.value = f.name; o.textContent = f.name;
+      sel.appendChild(o);
+    });
+    veMotaFlow();
+    // lần chạy gần nhất, để bấm xong biết đường xem tiếp
+    const r = (d.runs||[])[0];
+    if(r) $('#wf-ket').innerHTML = 'Gần nhất: #'+r.id+' · '+esc(r.flow)+' · '+esc(r.state);
+  }catch(e){ }
+}
+function veMotaFlow(){
+  const n = $('#wf-ten').value;
+  $('#wf-mota').textContent = flowMota[n] || '';
+}
+
 async function napRoute(){
   try{
     const d = await api('/api/ai');
@@ -211,8 +275,7 @@ async function quet(giet){
     }
     dong.push(d.da_giet ? '→ đã dừng ' + moCoiCo + ' tiến trình.'
                         : '→ thấy ' + moCoiCo + ' tiến trình. Windows dùng lại PID nên xem kỹ tên và giờ trước khi dừng.');
-    out.textContent = dong.join('
-');
+    out.textContent = dong.join(String.fromCharCode(10));
     out.style.whiteSpace = 'pre';
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 }
@@ -227,9 +290,8 @@ $('aiform').onsubmit = async ev => {
     const d = await api('/api/ai', {method:'POST', body: JSON.stringify({
       route: $('ai-route').value, prompt: $('ai-prompt').value })});
     out.style.whiteSpace = 'pre-wrap';
-    out.textContent = d.noi_dung + '
-
-— ' + d.model + ' · vào ' + d.usage.vao +
+    const xd = String.fromCharCode(10, 10) + '— ';
+    out.textContent = d.noi_dung + xd + d.model + ' · vào ' + d.usage.vao +
       ', ra ' + d.usage.ra + ', tổng ' + d.usage.tong + ' token · ' + d.giay.toFixed(1) + 's';
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
@@ -276,6 +338,21 @@ function render(state){
   if(cur) sel.value=cur;
 }
 
+$('#wf-ten').onchange = veMotaFlow;
+$('#wf-chay').onclick = async ()=>{
+  const ten = $('#wf-ten').value;
+  if(!ten){ showErr('chưa chọn quy trình'); return; }
+  const b = $('#wf-chay'); b.disabled = true; b.textContent = 'đang chạy…';
+  $('#wf-ket').textContent = 'Đã gửi. Mỗi bước một agent — mở tab 3D để xem chúng làm việc.';
+  try{
+    const viec = $('#wf-viec').value.trim();
+    const d = await api('/api/flow/run', {method:'POST', headers:H,
+      body: JSON.stringify({name:ten, vars: viec ? {viec} : {}})});
+    $('#wf-ket').innerHTML = 'Lần chạy <b>#'+(d.run||d.id||'?')+'</b> đang chạy. Xem kết quả từng bước ở tab Workflow, hoặc dòng lệnh: <code>sagent flow runs '+(d.run||d.id||'')+'</code>';
+  }catch(e){ showErr(e.message); $('#wf-ket').textContent=''; }
+  b.disabled = false; b.textContent = 'Chạy workflow';
+};
+
 async function refresh(){
   try{ render(await api('/api/state')); }catch(e){ showErr(e.message); }
 }
@@ -319,7 +396,7 @@ function connect(){
 // Hai cái này đọc một lần lúc mở: route và schema hiếm khi đổi giữa chừng, nên
 // nhét vào vòng poll 5 giây chỉ tốn request. Quét mồ côi thì CỐ Ý không tự chạy —
 // nó đọc bảng tiến trình cả máy, phải do người dùng bấm.
-napRoute();
+napFlow(); napRoute();
 napDB();
   };
 }

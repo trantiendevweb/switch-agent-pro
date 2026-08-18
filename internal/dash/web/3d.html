@@ -146,6 +146,66 @@ let flowSteps = [];   // [{id,type,needs,state,profile,output}]
 let flowName  = '';
 let agents    = {};   // addr -> {mesh, ring, pos, base, step, state, vai}
 
+// taoRobot dựng linh vật bằng KHỐI 3D THẬT, không phải ảnh phẳng dán lên.
+//
+// Bản trước dùng THREE.Sprite — một tấm ảnh luôn quay mặt về camera. Sprite thì
+// vĩnh viễn không có tay chân, và xoay góc nhìn kiểu gì nó cũng dẹt. Muốn robot
+// vung tay lúc gửi tin thì phải có KHỚP thật, nên phải là Group phân cấp: vai là
+// cha của cánh tay, xoay vai thì cả tay đi theo — đúng cách xương hoạt động.
+//
+// Chỉ dùng hình học có trong three.js r128 (bản đang nhúng). CapsuleGeometry chỉ
+// có từ r140 nên không dùng được ở đây.
+function taoRobot(tint){
+  const g = new THREE.Group();
+  const than = new THREE.MeshStandardMaterial({color:0x0F172A, metalness:.35, roughness:.45});
+  const vien = new THREE.MeshStandardMaterial({color:tint, emissive:tint, emissiveIntensity:.3,
+                                               metalness:.4, roughness:.35});
+  const sang = new THREE.MeshStandardMaterial({color:tint, emissive:tint, emissiveIntensity:1.2});
+
+  // CHÂN — pivot ở hông để bước được
+  const hongT = new THREE.Group(), hongP = new THREE.Group();
+  hongT.position.set(-0.22, 0.62, 0); hongP.position.set(0.22, 0.62, 0);
+  [hongT, hongP].forEach(h=>{
+    const chan = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.55, 0.22), vien);
+    chan.position.y = -0.3; h.add(chan);
+    const ban = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.34), than);
+    ban.position.set(0, -0.6, 0.05); h.add(ban);
+    g.add(h);
+  });
+
+  // THÂN + đèn ngực (nhịp "tim")
+  const nguoi = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.7, 0.42), than);
+  nguoi.position.y = 1.0; g.add(nguoi);
+  const nguc = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.06), sang);
+  nguc.position.set(0, 1.06, 0.22); g.add(nguc);
+
+  // TAY — pivot ở vai để vung được
+  const vaiT = new THREE.Group(), vaiP = new THREE.Group();
+  vaiT.position.set(-0.42, 1.25, 0); vaiP.position.set(0.42, 1.25, 0);
+  [vaiT, vaiP].forEach(v=>{
+    const tay = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.6, 0.18), vien);
+    tay.position.y = -0.32; v.add(tay);
+    const ban = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), than);
+    ban.position.y = -0.66; v.add(ban);
+    g.add(v);
+  });
+
+  // ĐẦU
+  const dau = new THREE.Group(); dau.position.y = 1.72; g.add(dau);
+  const so = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.64, 0.48), than); dau.add(so);
+  const matT = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 14), sang);
+  const matP = matT.clone();
+  matT.position.set(-0.17, 0.03, 0.25); matP.position.set(0.17, 0.03, 0.25);
+  dau.add(matT); dau.add(matP);
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 8), vien);
+  can.position.y = 0.45; dau.add(can);
+  const bong = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), sang);
+  bong.position.y = 0.62; dau.add(bong);
+
+  g.userData = {vaiT, vaiP, hongT, hongP, dau, nguc, bong, sang, vien};
+  return g;
+}
+
 // vaiTro suy từ ĐỒ THỊ của flow, không bịa khái niệm mới vào file flow.
 function vaiTro(st){
   const nhan = (st.needs||[]).length;
@@ -184,10 +244,10 @@ function build(state){
     const tt = st ? st.state||'pending' : '';
     const dangChay = tt==='running' || sessions.some(x=>x.addr.split('#')[0]===addr);
 
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-      map:mascotTex(prov, TINT[prov]||0x94A3B8), transparent:true, depthWrite:false}));
-    sp.scale.set(3,3,1); sp.position.set(c.x, 1.7, c.z);
-    clusterGroup.add(sp);
+    const bot = taoRobot(TINT[prov]||0x94A3B8);
+    bot.position.set(c.x, 0.15, c.z);
+    bot.lookAt(0, bot.position.y, 0); // quay mặt vào giữa sân để chúng nhìn nhau
+    clusterGroup.add(bot);
 
     // Vòng dưới chân: màu theo trạng thái bước. Nhìn màu là biết đang chạy/xong/hỏng.
     const ring = new THREE.Mesh(
@@ -197,8 +257,8 @@ function build(state){
     ring.rotation.x = Math.PI/2; ring.position.set(c.x, 0.06, c.z);
     clusterGroup.add(ring);
 
-    agents[addr] = {sp, ring, pos:c, base:1.7, step:st, state:tt, dangChay,
-                    vai: st?vaiTro(st):''};
+    agents[addr] = {bot, ring, pos:c, base:0.15, step:st, state:tt, dangChay,
+                    vai: st?vaiTro(st):'', ph:i*1.9, gui:0};
 
     // Nhãn: TÀI KHOẢN · vai trò · việc đang làm
     const el=document.createElement('div'); el.className='lbl';
@@ -234,7 +294,10 @@ function build(state){
         const hat = new THREE.Mesh(new THREE.SphereGeometry(0.16,10,10),
           new THREE.MeshBasicMaterial({color:0x7dd3fc}));
         luongGroup.add(hat);
-        duongTruyen.push({cur, hat, pha: Math.random()});
+        duongTruyen.push({cur, hat, pha: Math.random(), tu:a.profile, den:b.profile});
+        A.gui = 1;              // A đang GỬI -> vung tay
+        A.huong = B.pos.clone(); // vung về phía người nhận
+        B.nhan = 1;              // B đang NHẬN -> ngửa tay đón
       }
     });
   });
@@ -321,20 +384,54 @@ function tick(){ requestAnimationFrame(tick); t+=0.016;
   if(!RM){ orch.rotation.y+=0.006;
     orbGroup.children.forEach((m,i)=>{ const p=0.5+0.5*Math.sin(t*2.4+i); m.material.emissiveIntensity=0.3+p*0.5; m.scale.setScalar(1+p*0.08); });
 
-    // Agent CỬ ĐỘNG theo việc nó đang làm, không phải nhấp nháy vô nghĩa:
-    // đang chạy thì nhấp nhô nhanh + phình nhẹ + vòng dưới chân quay;
-    // rảnh thì thở chậm và mờ. Nhìn là biết con nào đang làm.
-    let k=0;
+    // BA ĐIỆU KHÁC NHAU, mỗi điệu ứng với một việc thật — không phải nhấp nháy
+    // trang trí. Nhìn dáng là đoán được nó đang làm gì mà chưa cần đọc nhãn:
+    //   rảnh    : thở chậm, tay buông, thỉnh thoảng nghiêng đầu
+    //   làm việc: hai tay gõ so le, người hơi chúi tới, chân nhún, mắt sáng
+    //   gửi tin : xoay người về phía người nhận rồi VUNG một tay lên
     for(const addr in agents){
-      const A=agents[addr]; k++;
-      const nhanh = A.dangChay ? 3.2 : 0.9;
-      const bien  = A.dangChay ? 0.22 : 0.07;
-      const s0 = Math.sin(t*nhanh + k*1.7);
-      A.sp.position.y = A.base + s0*bien;
-      A.sp.scale.setScalar(A.dangChay ? 3 + 0.12*(0.5+0.5*s0) : 3);
+      const A = agents[addr]; const u = A.bot.userData; const ph = A.ph;
+
+      if(A.gui){
+        // GỬI: quay mặt về người nhận, vung tay phải theo nhịp
+        if(A.huong){
+          const m = Math.atan2(A.huong.x-A.pos.x, A.huong.z-A.pos.z);
+          A.bot.rotation.y += (m - A.bot.rotation.y) * 0.08;
+        }
+        const v = Math.sin(t*4.5+ph);
+        u.vaiP.rotation.x = -2.1 + v*0.35;   // giơ cao
+        u.vaiP.rotation.z = -0.25;
+        u.vaiT.rotation.x = 0.15*v;
+        u.dau.rotation.x  = -0.12;
+        A.bot.position.y  = A.base + Math.abs(v)*0.05;
+      } else if(A.dangChay){
+        // LÀM VIỆC: gõ hai tay so le
+        const g1 = Math.sin(t*7.5+ph), g2 = Math.sin(t*7.5+ph+Math.PI);
+        u.vaiT.rotation.x = -1.05 + g1*0.28;
+        u.vaiP.rotation.x = -1.05 + g2*0.28;
+        u.vaiT.rotation.z =  0.22; u.vaiP.rotation.z = -0.22;
+        u.hongT.rotation.x =  g2*0.08; u.hongP.rotation.x = g1*0.08;
+        u.dau.rotation.x  = 0.16 + g1*0.05;   // chúi xuống như đang nhìn màn hình
+        A.bot.position.y  = A.base + Math.abs(g1)*0.045;
+      } else {
+        // RẢNH: thở, tay buông, thỉnh thoảng nghiêng đầu
+        const b = Math.sin(t*1.05+ph);
+        u.vaiT.rotation.x = 0.06*b;  u.vaiP.rotation.x = -0.06*b;
+        u.vaiT.rotation.z = 0.08;    u.vaiP.rotation.z = -0.08;
+        u.hongT.rotation.x = 0; u.hongP.rotation.x = 0;
+        u.dau.rotation.x = 0.03*b;
+        u.dau.rotation.z = 0.10*Math.sin(t*0.34+ph); // ngó nghiêng
+        A.bot.position.y = A.base + b*0.035;
+      }
+
+      // đèn ngực + đèn ăng-ten: nhịp tim nhanh khi bận
+      const nhip = 0.5 + 0.5*Math.sin(t*(A.dangChay||A.gui ? 6.5 : 1.4) + ph);
+      u.nguc.material.emissiveIntensity = 0.5 + nhip*1.5;
+      u.bong.scale.setScalar(0.85 + nhip*0.35);
+
       if(A.ring){
-        A.ring.rotation.z += A.dangChay ? 0.03 : 0.004;
-        A.ring.material.emissiveIntensity = A.dangChay ? 0.6+0.5*(0.5+0.5*s0) : 0.25;
+        A.ring.rotation.z += (A.dangChay||A.gui) ? 0.03 : 0.004;
+        A.ring.material.emissiveIntensity = (A.dangChay||A.gui) ? 0.6+0.5*nhip : 0.25;
       }
     }
     // Hạt chạy dọc cạnh needs: A xong → B nhận. Hướng đi chính là hướng dữ liệu.
