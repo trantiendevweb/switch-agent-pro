@@ -22,7 +22,25 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: go test
-        run: go test ./...
+        shell: bash
+        # Ghi kết quả vào JOB SUMMARY khi hỏng.
+        #
+        # Vì sao cần: log đầy đủ của Actions chỉ tải được nếu CÓ QUYỀN ADMIN repo
+        # (`/actions/jobs/{id}/logs` trả 403 "Must have admin rights"). Ai không
+        # phải chủ repo — kể cả người đang sửa lỗi — chỉ thấy đúng một dòng
+        # "Process completed with exit code 1". Đã tốn một vòng đoán mò vì chuyện
+        # này. Job summary thì đọc được qua API công khai.
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee test-output.txt || {
+            {
+              echo '## go test ĐỎ'
+              echo '```'
+              grep -E "^(---|\s+.*_test\.go:|FAIL|panic)" test-output.txt | head -60
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
       - name: go build
         run: go build ./cmd/sagent
       - name: thông báo giấy phép còn khớp phụ thuộc?
