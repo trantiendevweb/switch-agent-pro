@@ -37,3 +37,35 @@ func TestKetQuaThatDiLot(t *testing.T) {
 		}
 	}
 }
+
+// Hai chuỗi NGUYÊN VĂN đo được ở lần chạy #21. Cả hai bước đều bị đánh dấu
+// `done` và cả flow vẫn `completed` — tức lá chắn cũ bỏ lọt hai kiểu hỏng.
+const (
+	outThatHongXacThuc = `Failed to authenticate: OAuth session expired and could not be refreshed`
+	outThatQuanVong    = `{"role":"assistant","content":"Maximum tool execution rounds reached. Stopping to prevent infinite loops."}`
+)
+
+func TestHongXacThucKhongPhaiThanhCong(t *testing.T) {
+	if khongCoKetQua(outThatHongXacThuc) == "" {
+		t.Fatal("agent KHÔNG đăng nhập được mà vẫn tính là xong — đúng lỗi lần chạy #21")
+	}
+}
+
+func TestQuanVongGoiToolKhongPhaiThanhCong(t *testing.T) {
+	if khongCoKetQua(outThatQuanVong) == "" {
+		t.Fatal("agent quẩn vòng tới khi hết trần mà vẫn tính là xong — đúng lỗi lần chạy #21")
+	}
+}
+
+// Vẫn không được bắt nhầm: nói VỀ đăng nhập thì khác với hỏng đăng nhập.
+func TestNoiVeDangNhapKhongBiBatNham(t *testing.T) {
+	that := []string{
+		"Đã thêm test cho luồng đăng nhập, tất cả xanh.",
+		"Hàm này trả lỗi khi session hết hiệu lực; đã có test.",
+	}
+	for _, out := range that {
+		if ly := khongCoKetQua(out); ly != "" {
+			t.Fatalf("kết quả thật %q bị coi là hỏng: %s", out, ly)
+		}
+	}
+}

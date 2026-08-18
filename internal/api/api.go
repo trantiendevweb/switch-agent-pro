@@ -822,6 +822,24 @@ func khongCoKetQua(out string) string {
 		strings.Contains(l, "headless mode cannot prompt") {
 		return "agent bị chặn quyền trong chế độ headless nên không làm gì: " + motDong(t)
 	}
+	// Hỏng XÁC THỰC. Đo tại lần chạy #21: bước `gop` trả nguyên câu
+	// "Failed to authenticate: OAuth session expired and could not be refreshed"
+	// mà vẫn được đánh dấu `done`, và cả flow vẫn `completed`. Token trong bản
+	// sao hồ sơ hết hạn mà không tự làm mới được — đúng rủi ro kế hoạch gốc
+	// cảnh báo: "không xem clone credential là an toàn nếu chưa đo concurrent refresh".
+	if strings.Contains(l, "failed to authenticate") ||
+		strings.Contains(l, "session expired") ||
+		strings.Contains(l, "please run /login") ||
+		strings.Contains(l, "not logged in") {
+		return "agent KHÔNG đăng nhập được: " + motDong(t)
+	}
+	// Cụt vòng gọi tool. Cũng đo tại #21: bước `soi` (grok) gọi `ls -la` 399 lần
+	// liên tiếp — lệnh Unix không có trên cmd của Windows — rồi bị trần
+	// --max-tool-rounds chặn. Nó KHÔNG làm được việc, nhưng vẫn `done`.
+	if strings.Contains(l, "maximum tool execution rounds reached") ||
+		strings.Contains(l, "stopping to prevent infinite loops") {
+		return "agent quẩn vòng gọi tool tới khi hết trần, không hoàn thành việc: " + motDong(t)
+	}
 	return ""
 }
 

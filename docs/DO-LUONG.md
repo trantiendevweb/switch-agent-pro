@@ -1498,3 +1498,42 @@ có nhiều chỗ `dp0` (`:find_dp0`, `SET dp0=%~dp0`) và `[^"]*` vắt qua c�
 dòng nên bám nhầm. Build được, chạy được, chỉ là không gỡ gì cả — và tôi suýt
 tin vì flow vẫn "completed". Phải in thẳng `LookPath` + kết quả regex mới thấy.
 Test bây giờ dùng NGUYÊN VĂN vỏ npm thật trên máy, không dùng vỏ tự bịa.
+
+## 18/08 — Lần chạy `code` #21: flow báo `completed`, thật ra 3/5 bước hỏng
+
+Lượt chạy thật đầu tiên có đủ 4 agent. Kết quả trên màn hình: `completed`, cả
+năm bước `done`. Kiểm từng cái thì:
+
+| Bước | Tài khoản | Màn hình | Sự thật |
+|---|---|---|---|
+| ke-hoach | claude:phu | done | **THẬT** — clone cc-switch về đọc, rút 3 nguyên lý có trích dẫn file:dòng |
+| tho-1 | claude:tns | done | **THẬT** — commit `161e79e`, sửa `fleet.go` + 87 dòng test |
+| tho-2 | antigravity:may | done | **RỖNG** — nhánh `sagent/may-1` không có commit nào; output cuối là "I am waiting for `go test ./...` to complete" |
+| soi | grok:api | done | **QUẨN VÒNG** — gọi `ls -la` 399 lần liên tiếp rồi bị trần `--max-tool-rounds` chặn |
+| gop | claude:phu | done | **HỎNG XÁC THỰC** — "Failed to authenticate: OAuth session expired and could not be refreshed" |
+
+Ba kiểu hỏng mới, cả ba đều lọt qua lá chắn `khongCoKetQua` cũ (chỉ bắt output
+rỗng và chữ ký bị-chặn-quyền):
+
+1. **Hỏng xác thực.** Token trong bản sao hồ sơ hết hạn giữa chừng và không tự
+   làm mới được — `ke-hoach` (cùng tài khoản claude:phu) chạy được lúc 16:19,
+   `gop` thì hỏng khoảng 40 phút sau. Đúng rủi ro kế hoạch gốc cảnh báo: *"không
+   xem clone credential là an toàn nếu chưa đo concurrent refresh"*.
+2. **Quẩn vòng gọi tool.** Tool `bash` của Grok chạy qua `cmd.exe` nên mọi lệnh
+   Unix đều trượt, mà nó không thích nghi — lặp đúng một lệnh 399 lần. Trần
+   `--max-tool-rounds` (mặc định 400) là thứ duy nhất cứu.
+3. **Hết giờ giữa việc.** Antigravity dừng khi đang đợi `go test`, không commit
+   gì, vẫn `done`.
+
+Đã mở rộng lá chắn cho (1) và (2), có test dùng nguyên văn chuỗi đo được.
+
+**Bài học lớn hơn: với bước CODE thì output chữ là bằng chứng yếu.** Bằng chứng
+mạnh là *nhánh có commit hay không* — `git log main..sagent/<tk>-1`. Hai bước
+nói "xong" nhưng một bước nhánh rỗng. Nên kiểm nhánh, đừng tin lời kể.
+
+### Badge "sẵn sàng" cũng nói dối
+
+`sagent ds` hiện `claude:phu … sẵn sàng` trong khi chạy thật trả
+`OAuth session expired`. `HasToken` chỉ kiểm **file token có tồn tại**, không
+kiểm nó còn dùng được. Kế hoạch gốc mục 1.6 đòi "trung thực về năng lực" —
+chỗ này đang vi phạm. Chưa sửa: cần một phép kiểm nhẹ, không tốn hạn mức.
