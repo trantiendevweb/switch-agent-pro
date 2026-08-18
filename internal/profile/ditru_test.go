@@ -134,3 +134,5 @@ func (adapterMoiTruong) Verify() []provider.Check             { return nil }
 func (adapterMoiTruong) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 
 func (adapterMoiTruong) ArgsThuMuc(string) []string { return nil }
+
+func (adapterMoiTruong) ArgsHoSo(string) []string { return nil }

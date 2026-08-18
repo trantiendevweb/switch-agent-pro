@@ -218,3 +218,5 @@ func (codex) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dangerousl
 
 // ArgsThuMuc: đo `codex --help`: "-C, --cd <DIR>". CHƯA chạy thật (hết hạn mức tới 20/08)
 func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
+
+func (codex) ArgsHoSo(string) []string { return nil }

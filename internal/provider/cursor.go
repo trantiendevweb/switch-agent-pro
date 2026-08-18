@@ -142,3 +142,5 @@ func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 
 // ArgsThuMuc: CHƯA ĐO: máy này không cài cursor-agent
 func (cursor) ArgsThuMuc(dir string) []string { return nil }
+
+func (cursor) ArgsHoSo(string) []string { return nil }

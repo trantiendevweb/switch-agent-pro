@@ -115,6 +115,12 @@ func flowShow(name string) {
 			if s.Worktree {
 				wt = " · worktree riêng"
 			}
+			// Cờ toàn quyền PHẢI hiện khi xem flow: người ta đọc `flow show` đúng lúc
+			// quyết định có chạy hay không. Giấu ở đây thì phải mở flows.toml mới biết
+			// bước nào được xoá file và chạy lệnh tuỳ ý.
+			if s.TuDuyetQuyen {
+				wt += " · ⚠ TỰ DUYỆT MỌI QUYỀN"
+			}
 			fmt.Printf("      %d agent%s\n      prompt: %s\n", n, wt, truncate(flow.Expand(s.Prompt, f.Vars), 70))
 		case flow.TypeShell, flow.TypeTest, flow.TypeLint:
 			fmt.Printf("      chạy: %s\n", strings.Join(s.Run, " "))

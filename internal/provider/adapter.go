@@ -56,6 +56,15 @@ type Adapter interface {
 	// 4/4 đúng. Trả nil = provider không cần / chưa đo.
 	ArgsThuMuc(dir string) []string
 
+	// ArgsHoSo là đối số suy ra từ CHÍNH thư mục hồ sơ đang chạy (mỗi tài khoản
+	// một cấu hình riêng), nên phải đọc lúc bật phiên chứ không đoán từ máy chủ.
+	//
+	// Có vì Grok: chế độ `-p` BỎ QUA `defaultModel` trong user-settings.json và
+	// tự dùng `grok-code-fast-1`. Đo 18/08 trên nhà bán lại modelapi.vn: không cờ
+	// → `503 No available channel for model grok-code-fast-1`; thêm `-m grok-4.5`
+	// → trả lời đúng. Trả nil = không cần.
+	ArgsHoSo(dir string) []string
+
 	// PrivateFiles là các file KHÔNG dùng chung (token + danh tính).
 	PrivateFiles() []string
 

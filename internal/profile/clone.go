@@ -238,7 +238,10 @@ func StartDetached(a provider.Adapter, dir string, args []string, logPath, workD
 	if err != nil {
 		return 0, err
 	}
-	c := exec.Command(cmdPath, args...)
+	// Gỡ vỏ .cmd trước: vỏ batch cắt đối số nhiều dòng, agent chỉ nhận dòng đầu
+	// rồi vẫn trả lời như thường. Xem vo_boc_windows.go.
+	thuc, dau := GoiThat(cmdPath)
+	c := exec.Command(thuc, append(append([]string{}, dau...), args...)...)
 	c.Stdout, c.Stderr = f, f
 	// Stdin nối vào NUL/dev-null chứ không để nil: Codex thấy stdin là ống dẫn
 	// thì ngồi "Reading additional input from stdin..." chờ dữ liệu không bao

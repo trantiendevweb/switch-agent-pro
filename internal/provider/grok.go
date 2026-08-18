@@ -185,3 +185,23 @@ func (grok) ArgsTuDuyetQuyen() ([]string, bool) { return nil, true }
 
 // ArgsThuMuc: đo `grok --help`: "-d, --directory <dir>  set working directory"
 func (grok) ArgsThuMuc(dir string) []string { return []string{"-d", dir} }
+
+// ArgsHoSo ép model theo user-settings.json của CHÍNH hồ sơ này.
+//
+// `grok -p` bỏ qua defaultModel (đo 18/08): nó tự chọn grok-code-fast-1, model
+// mà modelapi.vn không phục vụ, nên trả 503 — và vì grok in lỗi ra như một câu
+// trả lời bình thường, bước vẫn tính là xong. Không ép model thì mọi bước Grok
+// đều hỏng lặng lẽ.
+func (grok) ArgsHoSo(dir string) []string {
+	b, err := os.ReadFile(filepath.Join(dir, ".grok", "user-settings.json"))
+	if err != nil {
+		return nil
+	}
+	var c struct {
+		DefaultModel string `json:"defaultModel"`
+	}
+	if err := json.Unmarshal(b, &c); err != nil || c.DefaultModel == "" {
+		return nil
+	}
+	return []string{"-m", c.DefaultModel}
+}

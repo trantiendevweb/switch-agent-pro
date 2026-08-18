@@ -126,3 +126,194 @@ Trả lời đúng 2 dòng, mỗi dòng một phần, không giải thích thêm
       type = "notify"
       needs = ["tho-anti"]
       message = "Đội hình đã chạy xong — xem log từng phiên trong dashboard."
+
+# ---------------------------------------------------------------------------
+# ĐỘI 4 AGENT ĐỂ CODE THẬT.
+#
+#   ke-hoach  claude:phu       đọc repo + dự án tham khảo, chia việc làm 2 phần
+#   tho-1     claude:tns   ┐   hai thợ làm SONG SONG, mỗi người một worktree
+#   tho-2     antigravity:may ┘
+#   soi       grok:api         soi diff của cả hai bằng mắt của hãng KHÁC
+#   gop       claude:phu       gộp lại, nói rõ nhánh nào đáng trộn
+#
+# VÌ SAO THỢ PHẢI COMMIT: mỗi phiên chạy trong git worktree riêng, nhánh
+# `sagent/<tài khoản>-1`. Thay đổi CHƯA commit nằm im trong worktree đó — người
+# soi ở worktree khác không thấy gì cả. Commit lên nhánh thì `git diff` từ đâu
+# cũng đọc được, vì nhánh dùng chung cả repo.
+#
+# VÌ SAO BẬT tu_duyet_quyen: đo ngày 18/08 — headless không hỏi được quyền nên
+# tự từ chối, agent không đọc nổi một file nào. Antigravity không có nấc trung
+# gian (7 biến thể allow-list đều bị chặn). Bù lại, mọi bước đều chạy trong
+# worktree riêng nên không đụng cây làm việc chính của bạn.
+#
+# GROK KHÔNG CÓ RÀO QUYỀN NÀO — không khai cờ thì nó vẫn toàn quyền. Đó là lý do
+# nó được giao việc CHỈ ĐỌC (soi diff), không giao việc sửa file.
+  [flow.code]
+    desc = "Đội 4 agent code thật: 1 lập kế hoạch, 2 làm song song, 1 soi, rồi gộp"
+    [flow.code.vars]
+      viec = "Mô tả việc cần làm ở đây"
+      tham_khao = "https://github.com/farion1231/cc-switch"
+
+    [[flow.code.step]]
+      id = "ke-hoach"
+      type = "agent"
+      profile = "claude:phu"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 1800
+      on_failure = "stop"
+      prompt = """Bạn là người điều phối. KHÔNG viết code ở bước này.
+
+VIỆC CẦN LÀM: {{viec}}
+
+DỰ ÁN THAM KHẢO: {{tham_khao}}
+Nếu có link, hãy xem nó (clone nông vào thư mục tạm) và rút ra thứ ĐÁNG HỌC cho
+việc trên. Bỏ qua nếu không truy cập được — đừng bịa.
+
+Đọc repo hiện tại trước. Rồi chia VIỆC CẦN LÀM thành ĐÚNG HAI phần:
+- độc lập nhau, không sửa cùng một file;
+- mỗi phần tự nó hoàn chỉnh, làm xong là chạy được;
+- ghi rõ phần nào đụng file nào.
+
+Trả lời đúng khuôn:
+PHẦN 1: <mô tả> | file: <danh sách>
+PHẦN 2: <mô tả> | file: <danh sách>
+GHI CHÚ: <thứ học được từ dự án tham khảo, hoặc "không có">"""
+
+    [[flow.code.step]]
+      id = "tho-1"
+      type = "agent"
+      profile = "claude:tns"
+      needs = ["ke-hoach"]
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 3600
+      on_failure = "continue"
+      prompt = """Làm PHẦN 1 trong kế hoạch dưới đây. CHỈ phần 1, đừng đụng phần 2.
+
+{{steps.ke-hoach.output}}
+
+Yêu cầu bắt buộc:
+1. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra — không chứng minh
+   được điều đó thì đừng bảo là đã xong.
+2. Chạy `go build ./...` và `go test ./...`, phải xanh.
+3. XONG THÌ COMMIT lên nhánh hiện tại:
+   git add -A && git commit -m "<mô tả ngắn>"
+   Không commit thì người soi ở worktree khác KHÔNG thấy việc bạn làm.
+4. Trả lời: tên nhánh, các file đã sửa, và những gì CHƯA làm được (nói thẳng)."""
+
+    [[flow.code.step]]
+      id = "tho-2"
+      type = "agent"
+      profile = "antigravity:may"
+      needs = ["ke-hoach"]
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 3600
+      on_failure = "continue"
+      prompt = """Làm PHẦN 2 trong kế hoạch dưới đây. CHỈ phần 2, đừng đụng phần 1.
+
+{{steps.ke-hoach.output}}
+
+Yêu cầu bắt buộc:
+1. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra.
+2. Chạy `go build ./...` và `go test ./...`, phải xanh.
+3. XONG THÌ COMMIT lên nhánh hiện tại:
+   git add -A && git commit -m "<mô tả ngắn>"
+   Không commit thì người soi KHÔNG thấy việc bạn làm.
+4. Trả lời: tên nhánh, các file đã sửa, và những gì CHƯA làm được (nói thẳng)."""
+
+    [[flow.code.step]]
+      id = "soi"
+      type = "agent"
+      profile = "grok:api"
+      needs = ["tho-1", "tho-2"]
+      worktree = true
+      timeout_sec = 1800
+      on_failure = "continue"
+      prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm. Việc
+của bạn là TÌM LỖI, không phải khen. CHỈ ĐỌC — tuyệt đối không sửa, không commit.
+
+Đọc thay đổi của cả hai bằng git:
+    git log --oneline main..sagent/tns-1
+    git diff main...sagent/tns-1
+    git log --oneline main..sagent/may-1
+    git diff main...sagent/may-1
+
+Nếu một nhánh không có commit nào thì NÓI THẲNG là người đó chưa làm gì — đừng
+đoán từ lời họ kể.
+
+Với mỗi thay đổi, trả lời:
+- Có test không, và test đó có thật sự đỏ khi gỡ phần sửa ra không?
+- Chỗ nào sai, chỗ nào thiếu, chỗ nào chỉ trông có vẻ đúng?
+- Hai phần có giẫm chân nhau không?
+
+Kết bằng: NÊN TRỘN / CẦN SỬA THÊM / VỨT — kèm lý do."""
+
+    [[flow.code.step]]
+      id = "gop"
+      type = "agent"
+      profile = "claude:phu"
+      needs = ["soi"]
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 1800
+      prompt = """Gộp thành một báo cáo ngắn cho người chủ dự án.
+
+--- phần 1 (claude:tns, nhánh sagent/tns-1) ---
+{{steps.tho-1.output}}
+
+--- phần 2 (antigravity:may, nhánh sagent/may-1) ---
+{{steps.tho-2.output}}
+
+--- người soi (grok) ---
+{{steps.soi.output}}
+
+Báo cáo phải trả lời đúng ba câu, không lan man:
+1. Nhánh nào TRỘN ĐƯỢC ngay, lệnh git cụ thể là gì?
+2. Nhánh nào CẦN SỬA THÊM, sửa gì?
+3. Việc gì CHƯA ai làm?"""
+
+# ---------------------------------------------------------------------------
+# Bản THỬ CƠ CHẾ của flow `code`, không dùng Claude.
+#
+# Có mặt để kiểm đúng một thứ khó nhất và dễ hỏng nhất trong flow `code`:
+# thợ commit lên nhánh riêng → người soi ở worktree KHÁC có đọc được không.
+# Không dùng Claude vì chạy Claude headless có thể tranh device slot với phiên
+# remote đang mở (đã đo sự cố rớt phiên 15:04:16).
+  [flow.code-thu]
+    desc = "Thử cơ chế của flow code (thợ commit lên nhánh, người soi đọc bằng git diff) — không dùng Claude"
+
+    [[flow.code-thu.step]]
+      id = "tho"
+      type = "agent"
+      profile = "antigravity:may"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 1200
+      on_failure = "stop"
+      prompt = """Tạo file `THU-CO-CHE.md` ở gốc thư mục làm việc, nội dung đúng một dòng:
+`day la file do agent tao de thu co che`
+
+Rồi COMMIT lên nhánh hiện tại:
+    git add -A && git commit -m "thu co che: them THU-CO-CHE.md"
+
+Trả lời đúng hai dòng:
+NHANH: <tên nhánh hiện tại, lấy bằng git branch --show-current>
+COMMIT: <mã commit ngắn, lấy bằng git rev-parse --short HEAD>"""
+
+    [[flow.code-thu.step]]
+      id = "soi"
+      type = "agent"
+      profile = "grok:api"
+      needs = ["tho"]
+      worktree = true
+      timeout_sec = 1200
+      prompt = """CHỈ ĐỌC, không sửa gì. Chạy đúng hai lệnh này:
+
+    git log --oneline main..sagent/may-1
+    git diff main...sagent/may-1
+
+Rồi trả lời đúng hai dòng:
+THAY DOI: <có / không có commit nào>
+NOI DUNG: <nội dung file THU-CO-CHE.md nếu thấy, hoặc "khong thay">"""

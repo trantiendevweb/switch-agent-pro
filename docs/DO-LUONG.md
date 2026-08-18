@@ -1444,3 +1444,57 @@ Bài học lặp lại lần thứ ba trong ngày: **lỗi chập chờn thì m�
 chứng minh được gì.** Cả ba lỗi hôm nay đều thế — con flake CI (8/8 xanh khi
 chạy riêng), luật allow-list (một lượt làm tôi kết luận ngược), và cái này
 (#10, #11 xanh liền hai lượt trong khi lỗi vẫn còn nguyên).
+
+## 18/08 — Vỏ bọc .cmd CẮT prompt nhiều dòng: agent chỉ nhận DÒNG ĐẦU
+
+Lỗi nặng nhất tìm được hôm nay, và nó im lặng tuyệt đối.
+
+Dựng flow `code` (4 agent), thử cơ chế bằng Antigravity + Grok. Grok trả lời
+"Bạn chưa chỉ định hai lệnh cụ thể" — mà prompt ghi rõ hai lệnh git. Nhìn log
+JSON của grok thì thấy nó nhận đúng MỘT dòng đầu:
+
+```
+{"role":"user","content":"CHỈ ĐỌC, không sửa gì. Chạy đúng hai lệnh này:"}
+```
+
+Đo bằng vỏ giả, chạy qua đúng đường của `profile.StartDetached`:
+
+```
+gửi  "DONG MOT\nDONG HAI\nDONG BA"
+vỏ .cmd nhận  "DONG MOT"
+```
+
+Trên máy này `exec.LookPath` trả về:
+
+| Lệnh | Đường thật | Có bị cắt |
+|---|---|---|
+| claude | `C:\Users\Administrator\bin\claude.cmd` | **CÓ** |
+| grok | `...\npm\grok.cmd` | **CÓ** |
+| codex | `...\npm\codex.cmd` | **CÓ** |
+| agy | `...\agy\bin\agy.exe` | không |
+
+PATHEXT có `.CMD` mà không có `.PS1`, nên Go luôn chọn vỏ batch. **Chỉ
+Antigravity là .exe thật — đó là lý do suốt hôm nay chỉ mình nó nhận đủ prompt
+nhiều dòng, còn ba cái kia im lặng nhận một mẩu rồi trả lời tự tin.**
+
+Nếu không bắt được, flow `code` sẽ hỏng ngầm toàn bộ: mọi prompt trong đó đều
+nhiều dòng, nên hai thợ Claude chỉ nhận được dòng "Làm PHẦN 1 trong kế hoạch
+dưới đây." — không có kế hoạch, không có yêu cầu test, không có lệnh commit.
+
+Sửa hai chỗ:
+1. `profile.GoiThat` gỡ vỏ npm (`"%dp0%\...\index.js" %*`) để gọi thẳng
+   `node <script>`, đối số đi qua CreateProcess chứ không qua trình thông dịch
+   batch. Không nhận ra kiểu vỏ thì trả nguyên đường cũ.
+2. `claude.Command()` ưu tiên `claude.exe` thật trong gói MSIX
+   (`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\...\claude-code\<ver>\claude.exe`)
+   thay vì vỏ .cmd. Vỏ claude.cmd là bản tự viết, không phải kiểu npm nên bộ gỡ
+   trên không đụng tới.
+
+Kiểm chứng: chạy lại flow, prompt 8 dòng tới grok NGUYÊN VẸN (`\n` còn đủ), nó
+chạy được `git log main..sagent/may-1` và thấy đúng commit.
+
+**Bản đầu của bộ gỡ TRƯỢT mà vẫn xanh.** Regex bám vào chuỗi `dp0`, nhưng vỏ npm
+có nhiều chỗ `dp0` (`:find_dp0`, `SET dp0=%~dp0`) và `[^"]*` vắt qua cả xuống
+dòng nên bám nhầm. Build được, chạy được, chỉ là không gỡ gì cả — và tôi suýt
+tin vì flow vẫn "completed". Phải in thẳng `LookPath` + kết quả regex mới thấy.
+Test bây giờ dùng NGUYÊN VĂN vỏ npm thật trên máy, không dùng vỏ tự bịa.

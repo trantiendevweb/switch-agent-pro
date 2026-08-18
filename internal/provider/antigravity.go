@@ -126,3 +126,5 @@ func (antigravity) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dang
 // ArgsThuMuc: đo `agy --help`: "--add-dir  Add a directory to the workspace". Chạy thật ở
 // worktree: không có cờ 1/3 đúng, có cờ 4/4 đúng.
 func (antigravity) ArgsThuMuc(dir string) []string { return []string{"--add-dir", dir} }
+
+func (antigravity) ArgsHoSo(string) []string { return nil }

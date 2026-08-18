@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
@@ -20,6 +21,13 @@ func (claude) Name() string   { return "claude" }
 func (claude) EnvVar() string { return "CLAUDE_CONFIG_DIR" }
 
 func (claude) Command() (string, error) {
+	// ƯU TIÊN .exe THẬT hơn vỏ .cmd. Trên máy này `claude` trên PATH là một vỏ
+	// batch tự viết, mà vỏ batch CẮT đối số nhiều dòng: đo 18/08, gửi 3 dòng thì
+	// chương trình nhận đúng dòng đầu. Prompt của flow luôn nhiều dòng, nên đi
+	// qua vỏ là agent nhận một mẩu rồi vẫn trả lời tự tin — hỏng lặng lẽ.
+	if p := timClaudeExe(); p != "" {
+		return p, nil
+	}
 	if p, err := exec.LookPath("claude"); err == nil {
 		return p, nil
 	}
@@ -140,7 +148,45 @@ var claudeSharedKeys = []string{
 func (claude) TachDuocTaiKhoan() bool { return true }
 
 // ArgsTuDuyetQuyen: đo `claude --help`: "--dangerously-skip-permissions  Bypass all permission checks."
-func (claude) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dangerously-skip-permissions"}, true }
+func (claude) ArgsTuDuyetQuyen() ([]string, bool) {
+	return []string{"--dangerously-skip-permissions"}, true
+}
 
 // ArgsThuMuc: đo `claude --help`: "--add-dir <directories...>  Additional directories to allow tool"
 func (claude) ArgsThuMuc(dir string) []string { return []string{"--add-dir", dir} }
+
+func (claude) ArgsHoSo(string) []string { return nil }
+
+// timClaudeExe dò bản Claude Code đóng gói. Hai chỗ, vì gói Microsoft Store
+// (MSIX) đổi hướng ghi sang LocalCache riêng chứ không nằm ở %APPDATA%.
+// Trong mỗi chỗ, mỗi phiên bản một thư mục con — lấy bản MỚI NHẤT theo tên.
+func timClaudeExe() string {
+	var goc []string
+	if la := os.Getenv("LOCALAPPDATA"); la != "" {
+		goc = append(goc, filepath.Join(la, "Packages", "Claude_pzs8sxrjxfjjc",
+			"LocalCache", "Roaming", "Claude", "claude-code"))
+	}
+	if ad := os.Getenv("APPDATA"); ad != "" {
+		goc = append(goc, filepath.Join(ad, "Claude", "claude-code"))
+	}
+	for _, g := range goc {
+		ents, err := os.ReadDir(g)
+		if err != nil {
+			continue
+		}
+		names := make([]string, 0, len(ents))
+		for _, e := range ents {
+			if e.IsDir() {
+				names = append(names, e.Name())
+			}
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(names)))
+		for _, n := range names {
+			p := filepath.Join(g, n, "claude.exe")
+			if _, err := os.Stat(p); err == nil {
+				return p
+			}
+		}
+	}
+	return ""
+}
