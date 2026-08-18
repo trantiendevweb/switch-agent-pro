@@ -74,7 +74,13 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 				// dùng đi tìm nguyên nhân ở tận đâu.
 				return dirs, fmt.Errorf("không đọc được %s: %w", src, err)
 			}
-			if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
+			// PrivateFiles có thể là đường dẫn LỒNG (Cursor/auth.json), nên phải
+			// tạo thư mục cha trước — os.WriteFile không tự tạo.
+			dst := filepath.Join(dir, name)
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return dirs, err
+			}
+			if err := os.WriteFile(dst, data, 0o600); err != nil {
 				return dirs, err
 			}
 		}

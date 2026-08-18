@@ -2,6 +2,7 @@ package profile
 
 import (
 	"os"
+	"time"
 	"os/exec"
 	"runtime"
 	"path/filepath"
@@ -125,3 +126,56 @@ func noiLongCho(t *testing.T, dir string) {
 	}
 	_ = exec.Command("icacls", dir, "/grant", "*S-1-5-32-545:(OI)(CI)F").Run()
 }
+
+// Token khai bằng ĐƯỜNG DẪN LỒNG (Cursor/auth.json) vẫn phải được coi là RIÊNG.
+//
+// Lỗi đã đo trên máy: `LinkShared` so tên cơ sở `auth.json` với danh sách riêng
+// tư `Cursor\auth.json`, không khớp, nên token bị NỐI LINK về file gốc. Hồ sơ mới
+// hiện `auth.json [SymbolicLink]`. Nghĩa là mọi hồ sơ dùng chung một danh tính —
+// đúng thứ công cụ này sinh ra để tránh.
+//
+// Nó vô hại chỉ vì Cursor tìm token ở tầng khác, tức là MAY chứ không phải đúng.
+func TestTokenKhaiDuongDanLongVanLaRiengTu(t *testing.T) {
+	home := homeGia(t)
+
+	// Base có đúng một file, và file đó là token.
+	base := filepath.Join(home, "base-long")
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "auth.json"), []byte(`{"t":"TOKEN"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(home, "ho-so")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	n, err := LinkShared(adapterLong{base: base}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("nối %d mục dùng chung — token lẽ ra phải bị coi là riêng tư", n)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "auth.json")); err == nil {
+		t.Fatal("token đã bị nối link vào hồ sơ mới — mọi hồ sơ sẽ dùng chung một danh tính")
+	}
+}
+
+// adapterLong khai token bằng đường dẫn lồng, y như adapter cursor thật.
+type adapterLong struct{ base string }
+
+func (adapterLong) Name() string                     { return "long" }
+func (adapterLong) EnvVar() string                   { return "APPDATA" }
+func (adapterLong) Command() (string, error)         { return "", nil }
+func (adapterLong) Version() (string, error)         { return "long 0.0.0", nil }
+func (adapterLong) HeadlessArgs(p string) []string   { return []string{"-p", p} }
+func (adapterLong) PrivateFiles() []string           { return []string{filepath.Join("Cursor", "auth.json")} }
+func (adapterLong) SharedKeys() []string             { return nil }
+func (a adapterLong) BaseDir() string                { return a.base }
+func (adapterLong) IdentitySource() string           { return "" }
+func (adapterLong) Identity(string) string           { return "" }
+func (adapterLong) HasToken(string) bool             { return false }
+func (adapterLong) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
+func (adapterLong) Verify() []provider.Check         { return nil }

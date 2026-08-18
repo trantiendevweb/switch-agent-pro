@@ -61,7 +61,16 @@ func LinkShared(a provider.Adapter, dir string) (int, error) {
 	priv := a.PrivateFiles()
 	n := 0
 	for _, e := range entries {
-		if contains(priv, e.Name()) {
+		// So bằng TÊN CƠ SỞ, vì PrivateFiles có thể là đường dẫn lồng.
+		//
+		// Cursor khai `Cursoruth.json` (token nằm trong thư mục con của thư mục
+		// config). So nguyên chuỗi thì không khớp `auth.json` mà ReadDir trả về,
+		// nên TOKEN BỊ COI LÀ DÙNG CHUNG và được nối link về file gốc — tức mọi
+		// hồ sơ dùng chung một danh tính, đúng thứ công cụ này sinh ra để tránh.
+		//
+		// Đã đo: hồ sơ mới hiện `auth.json [SymbolicLink]`. Nó vô hại chỉ vì
+		// Cursor tìm ở tầng khác, tức là may chứ không phải đúng.
+		if riengTu(priv, e.Name()) {
 			continue
 		}
 		dst := filepath.Join(dir, e.Name())
@@ -261,4 +270,17 @@ func filterEnv(env []string, key string) []string {
 		out = append(out, e)
 	}
 	return out
+}
+
+// riengTu: tên file này có nằm trong danh sách "không dùng chung" không.
+//
+// Khớp cả khi danh sách khai đường dẫn lồng (`Cursor/auth.json`) lẫn khai tên
+// trần (`.credentials.json`).
+func riengTu(priv []string, ten string) bool {
+	for _, p := range priv {
+		if p == ten || filepath.Base(p) == ten {
+			return true
+		}
+	}
+	return false
 }
