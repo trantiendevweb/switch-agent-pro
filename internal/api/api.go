@@ -900,8 +900,9 @@ func khongCoKetQua(out string) string {
 	// Cụt vòng gọi tool. Cũng đo tại #21: bước `soi` (grok) gọi `ls -la` 399 lần
 	// liên tiếp — lệnh Unix không có trên cmd của Windows — rồi bị trần
 	// --max-tool-rounds chặn. Nó KHÔNG làm được việc, nhưng vẫn `done`.
-	if co, _ := ketThucBang("maximum tool execution rounds reached", "stopping to prevent infinite loops"); co {
-		return "agent quẩn vòng gọi tool tới khi hết trần, không hoàn thành việc: " + motDong(t)
+	if co, _ := ketThucBang("maximum tool execution rounds reached", "stopping to prevent infinite loops",
+		"timeout waiting for response"); co {
+		return "agent dừng giữa việc, không hoàn thành: " + motDong(t)
 	}
 	return ""
 }

@@ -99,3 +99,19 @@ func TestKetThucBangBiChanQuyenVanBiBat(t *testing.T) {
 		t.Fatal("agent ket thuc bang cau tu choi quyen ma van tinh la xong")
 	}
 }
+
+
+// Chu ky thu tu, do tai lan chay #24: buoc hoc Agent Deck (antigravity:may) tuong
+// thuat y dinh ba dong roi ket thuc bang "Error: timeout waiting for response".
+// Nhanh sagent/may-1 khong co commit nao. Van duoc danh dau `done`.
+//
+// La chan cu bo lot vi chi biet ba chu ky truoc. Day la kieu hong pho bien nhat
+// cua Antigravity trong viec dai.
+func TestHetGioGiuaViecKhongPhaiThanhCong(t *testing.T) {
+	out := `Dang tai (shallow clone) ma nguon repository agent-deck vao thu muc tam...
+Dang tim dinh nghia ham quan ly profile...
+Error: timeout waiting for response`
+	if khongCoKetQua(out) == "" {
+		t.Fatal("agent dung giua viec vi het gio ma van tinh la xong")
+	}
+}

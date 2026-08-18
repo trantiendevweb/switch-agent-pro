@@ -1701,3 +1701,39 @@ máy chủ. Muốn biết chắc thì phải gọi thật, mà gọi thật thì
 Chạy lại `hoc` sau khi sửa lá chắn: `hoc-acp` (claude:tns), `hoc-deck`
 (antigravity:may), `hoc-gastown` (claude:phu) đều `done`, `tong-hop` chạy tiếp.
 So với #23 (1 hỏng oan, 1 dở dang, bước gộp không chạy).
+
+## 18/08 — Lần chạy #24: đội học đủ bốn bước, và bài học lớn nhất trong ngày
+
+Cả bốn bước `done`. Bản tổng hợp 14.000 ký tự đã đưa vào `docs/DU-AN-THAM-KHAO.md`.
+
+Điều đáng giá nhất KHÔNG phải danh sách bài học, mà là kết luận mà **hai agent
+độc lập cùng rút ra**, và nó chỉ thẳng vào chỗ yếu của chính sagent:
+
+> Hỏng phải là **cấu trúc dữ liệu**, không phải **chữ trong văn bản**.
+
+ACP nói điều đó bằng ví dụ thuận: `auth_required` là mã JSON-RPC `-32000`
+(`gosdk/errors.go:66-68`), cụt vòng gọi tool là enum `stopReason = max_turn_requests`
+(`gosdk/types_gen.go:6149`). Gas Town nói bằng phản ví dụ: họ nhét 21 trường vào
+`description` rồi tách theo dấu hai chấm, và trả giá bằng `strings.HasPrefix` để
+tra cứu.
+
+`khongCoKetQua` của sagent đang đứng đúng phía sai của cả hai. Nó dò chuỗi tiếng
+Anh — mà chuỗi đó là chữ ký của MỘT provider ở MỘT phiên bản. Provider đổi câu chữ
+là lá chắn rơi im lặng, không ai biết. Nó là lá chắn tốt cho hôm nay và phải giữ,
+nhưng **nó không phải đích đến**.
+
+Bằng chứng ngay trong chính lượt này: bước học Agent Deck kết thúc bằng
+`Error: timeout waiting for response` — chuỗi thứ TƯ, không nằm trong ba chữ ký đã
+biết, nên vẫn `done`. Vừa thêm vào, kèm test. Nhưng đó đúng là trò đuổi bắt mà ACP
+nói là không cần chơi.
+
+Ranh giới cả hai agent tự rút ra độc lập: **mang mảnh rời, đừng mang cụm.** Ba thứ
+chọn mang từ Gas Town đều dưới 100 dòng và không kéo theo gì; thứ bị loại
+(issue-tracker-làm-database) kéo theo tất cả.
+
+Và bản tổng hợp tự ghi rủi ro của chính nó: *"cả 7 bài học đều là kết luận đọc mã,
+chưa cái nào chạy"*. Đúng tinh thần "đo, không đoán" — nó không tự phong cho mình
+mức tin cậy chưa có.
+
+Bước Agent Deck vẫn **chưa học được gì** (hết giờ giữa việc, nhánh không commit).
+Hàng #2 trong bảng ưu tiên còn nguyên.
