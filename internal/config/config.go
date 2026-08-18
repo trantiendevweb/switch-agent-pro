@@ -48,6 +48,21 @@ type Config struct {
 		Theme          string `toml:"theme"`
 	} `toml:"ui"`
 
+	// AI là ĐƯỜNG THỨ HAI: gọi thẳng API thay vì qua CLI agent.
+	//
+	// `key_id` là TÊN file trong ~/.ai-accounts/api-keys, KHÔNG phải key. Luật
+	// "file cấu hình không bao giờ chứa secret" (MASTER-PLAN mục 0) — file này
+	// đi vào git của người dùng, còn key thì nằm trong kho đã siết ACL.
+	AI struct {
+		DefaultRoute string `toml:"default_route"`
+		Routes       []struct {
+			Ten     string `toml:"ten"`
+			BaseURL string `toml:"base_url"`
+			Model   string `toml:"model"`
+			KeyID   string `toml:"key_id"`
+		} `toml:"route"`
+	} `toml:"ai"`
+
 	// Nguồn đã đọc, theo thứ tự áp dụng — để `sagent config` in ra cho người
 	// dùng biết giá trị đến từ đâu thay vì phải đoán.
 	Sources []string `toml:"-"`

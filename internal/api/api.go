@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
+	"github.com/trantiendevweb/switch-agent-pro/internal/aiapi"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/drift"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
@@ -58,6 +59,10 @@ var Actions = []string{
 	// khi người dùng báo lỗi, câu hỏi đầu tiên luôn là "bản nào" — và dashboard
 	// nên trả lời được câu đó mà không bắt họ mở terminal.
 	"config.version",
+	// Đường THỨ HAI của dự án: gọi thẳng AI API thay vì qua CLI agent. Khác bản
+	// chất với `profile.run` — đường kia tiêu hạn mức thuê bao, đường này tiêu
+	// tiền theo token.
+	"api.call",
 	// Quét tiến trình mồ côi: phiên tự chết thì `session.list` không còn thấy nó,
 	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
 	// động này thì không mặt nào nhìn ra chúng.
@@ -423,6 +428,25 @@ func (a *API) SessionStop(id int64) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// AIRoutes liệt kê route API đã cấu hình. KHÔNG kèm key.
+func (a *API) AIRoutes() []aiapi.Route {
+	var out []aiapi.Route
+	for _, x := range a.cfg.AI.Routes {
+		out = append(out, aiapi.Route{Ten: x.Ten, BaseURL: x.BaseURL, Model: x.Model, KeyID: x.KeyID})
+	}
+	return out
+}
+
+// AICall — action "api.call". Gọi thẳng AI API theo route đã cấu hình.
+func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, error) {
+	for _, r := range a.AIRoutes() {
+		if r.Ten == route {
+			return aiapi.Goi(ctx, r, prompt)
+		}
+	}
+	return aiapi.KetQua{}, fmt.Errorf("không có route %q — xem: sagent api ds", route)
 }
 
 // DBInfo — phần ĐỌC của action "db.admin": schema hiện tại, schema mà bản binary

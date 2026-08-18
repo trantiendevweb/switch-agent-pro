@@ -62,6 +62,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/stop", s.guard(s.handleStop))
 	m.HandleFunc("/api/quet", s.guard(s.handleQuet))
 	m.HandleFunc("/api/db", s.guard(s.handleDB))
+	m.HandleFunc("/api/ai", s.guard(s.handleAI))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
@@ -619,6 +620,52 @@ func (s *Server) handleQuet(w http.ResponseWriter, r *http.Request) {
 			PIDCu: m.Session.PID, Procs: ps})
 	}
 	writeJSON(w, map[string]any{"muc": out, "da_giet": req.Giet})
+}
+
+// handleAI — action "api.call": gọi thẳng AI API.
+//
+// GET liệt kê route (không bao giờ trả key_id ra ngoài đã đủ, nhưng vẫn không trả
+// key). POST mới gọi thật — vì lời gọi TIÊU TIỀN theo token, không phải thao tác
+// đọc. Trả kèm usage để người bấm biết vừa tiêu gì.
+func (s *Server) handleAI(w http.ResponseWriter, r *http.Request) {
+	routes := s.api.AIRoutes()
+	if r.Method != http.MethodPost {
+		type rDTO struct {
+			Ten     string `json:"ten"`
+			BaseURL string `json:"base_url"`
+			Model   string `json:"model"`
+		}
+		out := make([]rDTO, 0, len(routes))
+		for _, x := range routes {
+			// KHÔNG trả key_id: nó là tên file bí mật trong kho, không việc gì
+			// phải để trình duyệt biết.
+			out = append(out, rDTO{Ten: x.Ten, BaseURL: x.BaseURL, Model: x.Model})
+		}
+		writeJSON(w, map[string]any{"route": out})
+		return
+	}
+
+	var req struct {
+		Route  string `json:"route"`
+		Prompt string `json:"prompt"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	kq, err := s.api.AICall(r.Context(), req.Route, req.Prompt)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"noi_dung": kq.NoiDung,
+		"model":    kq.Model,
+		"usage": map[string]int{
+			"vao": kq.Usage.Vao, "ra": kq.Usage.Ra, "tong": kq.Usage.Tong,
+		},
+		"giay": kq.Mat.Seconds(),
+	})
 }
 
 // handleDB — action "db.admin", CHỈ phần đọc.

@@ -66,6 +66,7 @@ func init() {
 		"init":    {"config.init", "tạo .sagent/project.toml", func(a []string) { cmdInit() }},
 		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
 		"db":      {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
+		"api":     {"api.call", "gọi thẳng AI API (đường thứ hai)", cmdAPI},
 		"version": {"config.version", "phiên bản của binary này", func(a []string) { cmdVersion() }},
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
