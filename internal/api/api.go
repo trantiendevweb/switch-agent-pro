@@ -337,12 +337,37 @@ func khoHoSoCheck() provider.Check {
 		c.OK, c.Detail = true, "chưa có kho — sẽ được siết khi tạo"
 		return c
 	}
-	ok, detail, err := acl.Check(root)
-	if err != nil {
-		c.OK, c.Detail = false, "không đọc được quyền: "+err.Error()
+
+	// Quét CẢ CÂY, không chỉ thư mục gốc.
+	//
+	// Vì sao: bản vá ACL đầu tiên nối `acl.Restrict` vào ba chỗ tạo thư mục và
+	// BỎ SÓT `clone.go` — đúng chỗ token bị nhân ra N bản. Ô kiểm lúc đó chỉ soi
+	// thư mục gốc nên nó vẫn xanh. Một phép kiểm chỉ nhìn một điểm thì không phát
+	// hiện được "quên một chỗ", mà "quên một chỗ" mới là kiểu hỏng hay xảy ra.
+	//
+	// Quét cây thì mỗi thư mục mới thêm vào sau này cũng tự nằm trong tầm kiểm,
+	// không cần ai nhớ cập nhật danh sách.
+	var ho []string
+	_ = filepath.Walk(root, func(p string, fi os.FileInfo, err error) error {
+		if err != nil || !fi.IsDir() {
+			return nil
+		}
+		if ok, _, err := acl.Check(p); err == nil && !ok {
+			ho = append(ho, p)
+		}
+		return nil
+	})
+	if len(ho) > 0 {
+		c.OK = false
+		g := ho[0]
+		if len(ho) > 1 {
+			c.Detail = fmt.Sprintf("%d thư mục đang hở, ví dụ %s — chạy `sagent verify` lại sau khi sửa", len(ho), g)
+		} else {
+			c.Detail = "thư mục đang hở: " + g
+		}
 		return c
 	}
-	c.OK, c.Detail = ok, detail
+	c.OK, c.Detail = true, "cả cây chỉ chủ sở hữu, SYSTEM và nhóm quản trị"
 	return c
 }
 
