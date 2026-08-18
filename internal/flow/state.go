@@ -67,13 +67,14 @@ func (s *runState) readySteps(steps []Step) (ready []Step, waiting string) {
 		}
 		ok := true
 		for _, n := range step.Needs {
-			if !s.finished(n) {
-				ok = false
-				if s.state(n) == store.StepWaiting {
-					waiting = n
-				}
-				break
+			if s.finished(n) || choDiTiep(steps, n, s.state(n)) {
+				continue
 			}
+			ok = false
+			if s.state(n) == store.StepWaiting {
+				waiting = n
+			}
+			break
 		}
 		if ok {
 			ready = append(ready, step)
@@ -84,3 +85,26 @@ func (s *runState) readySteps(steps []Step) (ready []Step, waiting string) {
 
 // runWave chạy một đợt bước song song, có trần đồng thời. Trả về id bước làm cả
 // flow phải dừng (rỗng nếu không có).
+
+// choDiTiep: bước phụ thuộc HỎNG nhưng chính nó khai `on_failure = "continue"`
+// thì vẫn cho bước sau chạy.
+//
+// Trước đây không có hàm này và hậu quả im lặng: `finished()` chỉ tính done/skipped,
+// nên một bước cha `failed` khoá cứng mọi bước con — chúng không bao giờ đủ điều
+// kiện, runner hết việc, và lần chạy vẫn được ghi là `completed`. Đo tại lần chạy
+// #23: `hoc-acp` hỏng, `tong-hop` (cần cả ba bản nghiên cứu) hiện "(chưa chạy)"
+// mà không một dòng cảnh báo nào.
+//
+// Người viết flow gõ "continue" là đã nói rõ ý: hỏng thì cứ đi tiếp. Chặn bước
+// sau lại là làm ngược ý họ, và tệ hơn là làm ngược trong im lặng.
+func choDiTiep(steps []Step, id, state string) bool {
+	if state != store.StepFailed {
+		return false
+	}
+	for _, st := range steps {
+		if st.ID == id {
+			return st.OnFailure == OnFailContinue
+		}
+	}
+	return false
+}

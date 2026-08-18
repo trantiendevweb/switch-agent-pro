@@ -1642,3 +1642,31 @@ Cách tránh: **không viết dấu gạch chéo ngược trong script sinh mã.
 `chr(92)` khi cần ký tự đó, và dùng chuỗi thô (dấu huyền trong Go, backtick trong
 JS) để khỏi cần escape. Đã sửa được 3 chỗ bằng cách này sau khi 5 lần thử theo
 lối cũ đều thất bại.
+
+## 18/08 — `on_failure = "continue"` chỉ đúng một nửa, và nửa sai thì im lặng
+
+Đo tại lần chạy #23: `hoc-acp` hỏng, ba bước học đều khai `on_failure = "continue"`,
+nhưng `tong-hop` (cần cả ba) hiện **"(chưa chạy)"** — không một dòng cảnh báo, và
+lần chạy vẫn được ghi là `completed`.
+
+Gốc ở `runState.readySteps`: nó gọi `finished()`, mà hàm đó chỉ tính `done` và
+`skipped`. Một bước cha `failed` khoá cứng mọi bước con — chúng không bao giờ đủ
+điều kiện, runner hết việc rồi kết thúc êm ru.
+
+Nghĩa là `continue` mới làm được nửa việc: nó không dừng ĐỢT đang chạy, nhưng vẫn
+chặn mọi bước PHÍA SAU. Người viết flow gõ "continue" là đã nói rõ ý — hỏng thì cứ
+đi tiếp. Làm ngược ý họ đã tệ, làm ngược trong im lặng còn tệ hơn.
+
+Đã thêm `choDiTiep()`: bước phụ thuộc hỏng nhưng chính nó khai `continue` thì vẫn
+cho bước sau chạy (với output rỗng — bước sau tự xử, như prompt `tong-hop` đã dặn
+"bước nào không trả về nghiên cứu thật thì ghi thẳng là chưa học được, đừng bịa").
+
+Hai test, dựng đúng hình dạng của #23. Phản chứng: gỡ `choDiTiep` ra thì test đỏ
+đúng câu "BƯỚC SAU KHÔNG CHẠY dù bước trước khai on_failure=continue".
+
+Mặc định (`stop`) vẫn chặn bước sau như cũ — có test riêng cho chiều đó.
+
+### Kiểm chứng lá chắn đã sửa
+
+Lần chạy #24 (chạy lại `hoc` sau khi sửa): `hoc-acp` từ `failed` thành **`done`**.
+Cùng agent, cùng prompt, chỉ khác lá chắn — xác nhận lần trước đúng là báo động giả.
