@@ -1670,3 +1670,34 @@ Mặc định (`stop`) vẫn chặn bước sau như cũ — có test riêng cho
 
 Lần chạy #24 (chạy lại `hoc` sau khi sửa): `hoc-acp` từ `failed` thành **`done`**.
 Cùng agent, cùng prompt, chỉ khác lá chắn — xác nhận lần trước đúng là báo động giả.
+
+## 18/08 — Badge "sẵn sàng" nói dối cho token đã chết
+
+`sagent ds` và bảng web đều hiện `claude:phu … sẵn sàng` trong khi chạy thật trả
+`OAuth session expired and could not be refreshed`. Lý do: `HasToken` chỉ kiểm
+**file token có tồn tại**, không kiểm nó còn dùng được.
+
+Kế hoạch gốc mục 1.6 đòi "trung thực về năng lực" — báo sẵn sàng cho một token đã
+chết là vi phạm thẳng, và nó khiến người dùng giao việc cho một tài khoản không
+chạy được.
+
+Adapter đã có sẵn `TokenExpiry` (đo từ trước, Claude đọc `claudeAiOauth.expiresAt`)
+nhưng KHÔNG ai gọi. Nay `ProfileList` gọi nó và thêm hai trường:
+
+- `HetHan` — token còn đó nhưng quá hạn
+- `HanToi` — rỗng nghĩa là provider không đọc được hạn (đã đo, không phải thiếu sót)
+
+Ba trạng thái tách bạch, cả CLI lẫn web:
+`hết hạn — đăng nhập lại` / `sẵn sàng` / `chưa đăng nhập`.
+
+Test dựng hồ sơ giả với `expiresAt` lùi 24 giờ. Phản chứng: ép `HetHan = false`
+thì test đỏ đúng câu "token hết hạn từ hôm qua mà không báo hết hạn".
+
+Vẫn chưa bắt được: token **chưa quá hạn theo đồng hồ** nhưng đã bị thu hồi phía
+máy chủ. Muốn biết chắc thì phải gọi thật, mà gọi thật thì tốn hạn mức — để ngỏ.
+
+## 18/08 — Lần chạy #24: đội học đủ bốn bước
+
+Chạy lại `hoc` sau khi sửa lá chắn: `hoc-acp` (claude:tns), `hoc-deck`
+(antigravity:may), `hoc-gastown` (claude:phu) đều `done`, `tong-hop` chạy tiếp.
+So với #23 (1 hỏng oan, 1 dở dang, bước gộp không chạy).

@@ -495,6 +495,7 @@ type profileDTO struct {
 	Account  string `json:"account"`
 	Identity string `json:"identity"`
 	HasToken bool   `json:"hasToken"`
+	HetHan   bool   `json:"hetHan"` // token còn đó nhưng đã quá hạn
 	Active   bool   `json:"active"`
 }
 
@@ -522,7 +523,7 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	}
 	ps := make([]profileDTO, 0, len(profiles))
 	for _, p := range profiles {
-		ps = append(ps, profileDTO{p.Addr(), p.Provider, p.Account, p.Identity, p.HasToken, p.Active})
+		ps = append(ps, profileDTO{p.Addr(), p.Provider, p.Account, p.Identity, p.HasToken, p.HetHan, p.Active})
 	}
 	ss := make([]sessionDTO, 0, len(sessions))
 	for _, s := range sessions {

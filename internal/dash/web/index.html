@@ -324,7 +324,12 @@ function render(state){
   profiles = state.profiles||[];
   const pb=$('profiles'); pb.innerHTML='';
   profiles.forEach(p=>{
-    const tok = p.hasToken ? '<span class="pill ok">sẵn sàng</span>' : '<span class="pill off">chưa đăng nhập</span>';
+    // Ba trạng thái KHÁC NHAU, gộp lại là nói dối: ngày 18/08 bảng hiện claude:phu
+    // "sẵn sàng" trong khi chạy thật trả "OAuth session expired". hasToken chỉ kiểm
+    // file token có tồn tại, không kiểm nó còn dùng được.
+    const tok = p.hetHan ? '<span class="pill warn">hết hạn — đăng nhập lại</span>'
+              : p.hasToken ? '<span class="pill ok">sẵn sàng</span>'
+              : '<span class="pill off">chưa đăng nhập</span>';
     const act = p.active ? '<span class="dot" style="background:var(--run)"></span>' : '';
     const tr=document.createElement('tr');
     tr.innerHTML = `<td>${act}</td><td>${p.provider}</td><td>${p.account}</td><td style="color:var(--sub)">${p.identity||'—'}</td><td>${tok}</td>`;

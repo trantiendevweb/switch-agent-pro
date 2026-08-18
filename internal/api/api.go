@@ -160,6 +160,17 @@ type Profile struct {
 	Identity string // email; rỗng = chưa đăng nhập
 	HasToken bool
 	Active   bool // đang là tài khoản của tiến trình hiện tại
+
+	// HetHan: token CÒN ĐÓ nhưng đã quá hạn. Đây là chuyện khác hẳn "chưa đăng
+	// nhập", và nếu không tách ra thì bảng nói dối: ngày 18/08 `sagent ds` hiện
+	// claude:phu "sẵn sàng" trong khi chạy thật trả "OAuth session expired and
+	// could not be refreshed". HasToken chỉ kiểm FILE CÓ TỒN TẠI.
+	//
+	// Kế hoạch gốc mục 1.6 đòi "trung thực về năng lực" — báo sẵn sàng cho một
+	// token đã chết là vi phạm thẳng.
+	HetHan bool
+	// HanToi rỗng nghĩa là provider không đọc được hạn (đã đo, không phải thiếu sót).
+	HanToi time.Time
 }
 
 func (p Profile) Addr() string { return p.Provider + ":" + p.Account }
@@ -176,6 +187,10 @@ func (a *API) ProfileList() ([]Profile, error) {
 		if ad, ok := provider.Get(acc.Provider); ok {
 			p.Identity = ad.Identity(acc.Dir)
 			p.HasToken = ad.HasToken(acc.Dir)
+			if exp, ok := ad.TokenExpiry(acc.Dir); ok {
+				p.HanToi = exp
+				p.HetHan = time.Now().After(exp)
+			}
 			p.Active = currentConfigDir(ad) == strings.TrimRight(acc.Dir, `\/`)
 		}
 		out = append(out, p)

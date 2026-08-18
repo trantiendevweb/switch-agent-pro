@@ -197,6 +197,10 @@ func cmdList() {
 		if p.HasToken {
 			tok = "sẵn sàng"
 		}
+		// Token còn đó nhưng đã quá hạn KHÔNG phải "sẵn sàng". Xem Profile.HetHan.
+		if p.HetHan {
+			tok = "HẾT HẠN — đăng nhập lại"
+		}
 		if p.Active {
 			mark = "*"
 		}
