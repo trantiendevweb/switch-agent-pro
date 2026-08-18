@@ -9,6 +9,7 @@ import (
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
+	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
 // varFlags rút các cờ `--var ten=giatri`, trả về phần còn lại.
@@ -143,4 +144,79 @@ func flowRuns() {
 	fmt.Println()
 	fmt.Println("  Chờ duyệt thì: sagent flow approve <#> <bước>")
 	fmt.Println()
+}
+
+// flowRunChiTiet in kết quả TỪNG BƯỚC của một lần chạy.
+//
+// Có `FlowRunDetail` trong lõi từ lâu nhưng KHÔNG mặt nào gọi — nên chạy xong
+// một flow thì không có cách nào đọc được agent đã trả về cái gì. Đo được lần
+// chạy #8: `flow runs 8` chỉ in lại danh sách vì flowRuns() không nhận tham số.
+func flowRunChiTiet(arg string) {
+	id, err := strconv.ParseInt(strings.TrimPrefix(arg, "#"), 10, 64)
+	if err != nil {
+		fail(fmt.Errorf("số lần chạy phải là số, không phải %q. Ví dụ: sagent flow runs 8", arg))
+	}
+	a, done := open()
+	defer done()
+	run, steps, def, err := a.FlowRunDetail(id)
+	if err != nil {
+		fail(err)
+	}
+	done()
+
+	marks := map[string]string{
+		"completed": "✓", "failed": "✗", "waiting_approval": "⏸",
+		"cancelled": "⃠", "running": "…", "skipped": "–",
+	}
+	fmt.Println()
+	fmt.Printf("  Lần chạy #%d — %s (%s)\n", run.ID, run.Flow, run.State)
+	fmt.Printf("  Bắt đầu %s · thư mục %s\n", run.Started.Format("02/01 15:04:05"), run.Dir)
+	fmt.Println()
+
+	// Đi theo thứ tự ĐỊNH NGHĨA để đọc được mạch trên xuống dưới, rồi mới vét
+	// những bước có trong DB mà flows.toml đã bỏ (flow sửa sau khi chạy).
+	xong := map[string]bool{}
+	in := func(id string, s store.StepRun, def *flow.Step) {
+		xong[id] = true
+		mark := marks[s.State]
+		if mark == "" {
+			mark = " "
+		}
+		dong := fmt.Sprintf("   %s %s", mark, id)
+		if def != nil && def.Profile != "" {
+			dong += "  [" + def.Profile + "]"
+		}
+		if s.State == "" {
+			dong += "  (chưa chạy)"
+		} else {
+			dong += "  " + s.State
+		}
+		if s.Attempt > 1 {
+			dong += fmt.Sprintf(" · lần thử %d", s.Attempt)
+		}
+		fmt.Println(dong)
+		if s.Msg != "" {
+			fmt.Printf("      ! %s\n", s.Msg)
+		}
+		out := strings.TrimRight(s.Output, "\n")
+		if out == "" {
+			if s.State == "completed" {
+				fmt.Println("      (không có output — agent chạy xong nhưng không in gì)")
+			}
+		} else {
+			for _, d := range strings.Split(out, "\n") {
+				fmt.Printf("      │ %s\n", d)
+			}
+		}
+		fmt.Println()
+	}
+	for i := range def.Steps {
+		st := def.Steps[i]
+		in(st.ID, steps[st.ID], &st)
+	}
+	for id, s := range steps {
+		if !xong[id] {
+			in(id, s, nil)
+		}
+	}
 }

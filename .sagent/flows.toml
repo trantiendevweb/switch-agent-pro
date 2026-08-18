@@ -1,0 +1,128 @@
+# File này do `sagent` và trình soạn thảo workflow cùng dùng.
+# Sửa tay thoải mái — bảng vẽ đọc lại được, chỉ mất vị trí x/y nếu bạn xoá.
+
+version = 1
+
+[flow]
+  [flow.agents]
+    desc = "Bật một đội agent headless chạy song song, mỗi agent một worktree"
+    [flow.agents.vars]
+      copies = "4"
+      task = "Rà một phần của repo và báo cáo vấn đề tìm được."
+
+    [[flow.agents.step]]
+      id = "chay"
+      type = "agent"
+      prompt = "{{task}}"
+      copies = 4
+      worktree = true
+      timeout_sec = 3600
+      retry = 0
+      on_failure = "stop"
+      x = 80
+      y = 90
+
+    [[flow.agents.step]]
+      id = "bao"
+      type = "notify"
+      needs = ["chay"]
+      copies = 0
+      message = "Đội agent đã chạy xong — xem log từng phiên trong dashboard."
+      timeout_sec = 0
+      retry = 0
+      on_failure = "stop"
+      x = 350
+      y = 240
+
+# ---------------------------------------------------------------------------
+# Một Claude ĐIỀU KHIỂN hai agent: một Claude khác + một Antigravity.
+#
+# Hình dạng: lập kế hoạch -> hai thợ chạy SONG SONG -> tổng hợp.
+# Hai thợ chạy song song vì cả hai cùng `needs = ["ke-hoach"]` và không phụ
+# thuộc nhau — runner tự xếp cùng một đợt.
+#
+# Mỗi bước khai `profile` riêng, nên "điều khiển" ở đây là thật: bộ não và hai
+# tay chân là BA TÀI KHOẢN KHÁC NHAU, log riêng, hạn mức riêng.
+  [flow.doi-hinh]
+    desc = "Một Claude lập kế hoạch, hai agent làm song song (Claude + Antigravity), rồi tổng hợp"
+    [flow.doi-hinh.vars]
+      viec = "Rà soát repo này và chỉ ra những chỗ đáng sửa nhất"
+
+    [[flow.doi-hinh.step]]
+      id = "ke-hoach"
+      type = "agent"
+      profile = "claude:phu"
+      prompt = """Bạn là người điều phối. Việc cần làm: {{viec}}
+Hãy chia thành ĐÚNG HAI phần độc lập, không chồng nhau.
+Trả lời đúng 2 dòng, mỗi dòng một phần, không giải thích thêm."""
+      timeout_sec = 900
+      on_failure = "stop"
+
+    [[flow.doi-hinh.step]]
+      id = "tho-claude"
+      type = "agent"
+      needs = ["ke-hoach"]
+      profile = "claude:tns"
+      prompt = """Làm PHẦN THỨ NHẤT trong kế hoạch dưới đây. Chỉ làm phần 1.
+
+{{steps.ke-hoach.output}}"""
+      timeout_sec = 1800
+      on_failure = "continue"
+
+    [[flow.doi-hinh.step]]
+      id = "tho-anti"
+      type = "agent"
+      needs = ["ke-hoach"]
+      profile = "antigravity:may"
+      prompt = """Làm PHẦN THỨ HAI trong kế hoạch dưới đây. Chỉ làm phần 2.
+
+{{steps.ke-hoach.output}}"""
+      timeout_sec = 1800
+      on_failure = "continue"
+
+    [[flow.doi-hinh.step]]
+      id = "tong-hop"
+      type = "agent"
+      needs = ["tho-claude", "tho-anti"]
+      profile = "claude:phu"
+      prompt = """Gộp hai kết quả dưới thành một báo cáo ngắn, bỏ trùng lặp.
+
+--- phần 1 ---
+{{steps.tho-claude.output}}
+
+--- phần 2 ---
+{{steps.tho-anti.output}}"""
+      timeout_sec = 900
+
+# ---------------------------------------------------------------------------
+# Bản CHẠY ĐƯỢC NGAY HÔM NAY, không cần tài khoản Claude còn hạn mức.
+# Cùng hình dạng: điều phối -> hai thợ song song -> tổng hợp.
+  [flow.doi-hinh-khong-claude]
+    desc = "Cùng hình dạng nhưng dùng Antigravity + Codex — chạy được khi Claude hết hạn mức"
+    [flow.doi-hinh-khong-claude.vars]
+      viec = "Nói tên ngôn ngữ lập trình chính của repo này"
+
+    [[flow.doi-hinh-khong-claude.step]]
+      id = "ke-hoach"
+      type = "agent"
+      profile = "antigravity:may"
+      # Bật quyền cho bước NÀY: agent phải ĐỌC được repo mới trả lời nổi.
+      # Mặc định tắt — xem docs/DO-LUONG.md mục "headless không có quyền".
+      tu_duyet_quyen = true
+      prompt = "Chỉ ĐỌC, tuyệt đối không sửa/xoá gì. {{viec}} Trả lời đúng một dòng."
+      timeout_sec = 600
+
+    [[flow.doi-hinh-khong-claude.step]]
+      id = "tho-anti"
+      type = "agent"
+      needs = ["ke-hoach"]
+      profile = "antigravity:may"
+      prompt = "Nhắc lại đúng một từ đầu tiên của dòng này: {{steps.ke-hoach.output}}"
+      timeout_sec = 600
+      on_failure = "continue"
+
+    [[flow.doi-hinh-khong-claude.step]]
+      id = "bao"
+      type = "notify"
+      needs = ["tho-anti"]
+      message = "Đội hình đã chạy xong — xem log từng phiên trong dashboard."

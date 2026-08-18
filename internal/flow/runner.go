@@ -17,7 +17,7 @@ import (
 type AgentRunner interface {
 	// RunAgents bật n agent với prompt, ĐỢI xong, trả về kết quả gộp (để bước
 	// sau dùng qua {{steps.x.output}}) và lỗi nếu có.
-	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree bool) (string, error)
+	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree, tuDuyetQuyen bool) (string, error)
 }
 
 // Runner thực thi một flow.

@@ -190,3 +190,7 @@ func TestWorktreeRefusesOutsideGitRepo(t *testing.T) {
 		t.Fatalf("phải chết trước khi bật phiên nào, mà đã bật %d", len(list))
 	}
 }
+
+func (fakeAgent) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
+
+func (fakeAgent) ArgsThuMuc(string) []string { return nil }

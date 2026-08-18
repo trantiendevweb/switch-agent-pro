@@ -130,3 +130,7 @@ func (adapterMoiTruong) Identity(string) string               { return "" }
 func (adapterMoiTruong) HasToken(string) bool                 { return false }
 func (adapterMoiTruong) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
 func (adapterMoiTruong) Verify() []provider.Check             { return nil }
+
+func (adapterMoiTruong) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
+
+func (adapterMoiTruong) ArgsThuMuc(string) []string { return nil }

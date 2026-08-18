@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
@@ -11,20 +12,47 @@ import (
 )
 
 // fakeAgent đếm số lần được gọi — để khẳng định bước SAU approve không chạy.
+//
+// PHẢI có khoá: runner chạy các lượt foreach và các bước cùng đợt SONG SONG,
+// nên RunAgents bị gọi từ nhiều goroutine. Bản đầu không khoá và `append` đua
+// nhau làm MẤT phần tử: đo được 200 lượt thì vài lượt báo "3 mục thành 2",
+// mỗi lần mất một mục khác nhau (alpha+gamma, rồi gamma+beta) — cả ba lượt đều
+// đã chạy, chỉ là sổ ghi rơi mất một dòng. Đây là lỗi GIÀN TEST, không phải lỗi
+// sản phẩm, và là con flake làm CI đỏ ở tag v0.3.0 rồi xanh lại ở commit sau
+// với y nguyên mã nguồn.
 type fakeAgent struct {
+	mu      sync.Mutex
 	calls   int
 	prompts []string
 	fail    bool
 	output  string // kết quả giả agent trả về
+	quyen   []bool // cờ tự-duyệt-quyền của TỪNG lượt gọi
 }
 
-func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _ bool) (string, error) {
+func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _, tuDuyetQuyen bool) (string, error) {
+	f.mu.Lock()
 	f.calls += copies
 	f.prompts = append(f.prompts, prompt)
-	if f.fail {
+	f.quyen = append(f.quyen, tuDuyetQuyen)
+	fail, out := f.fail, f.output
+	f.mu.Unlock()
+	if fail {
 		return "", context.DeadlineExceeded
 	}
-	return f.output, nil
+	return out, nil
+}
+
+// soLanGoi và cacPrompt đọc có khoá — test cũng là một goroutine khác.
+func (f *fakeAgent) soLanGoi() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
+func (f *fakeAgent) cacPrompt() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.prompts...)
 }
 
 func newRunner(t *testing.T) (*Runner, *fakeAgent, *store.DB) {

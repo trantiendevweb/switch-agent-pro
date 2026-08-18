@@ -112,8 +112,18 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 			})
 		}
 
+		// Khai TƯỜNG MINH thư mục làm việc: ở git worktree thì `.git` là file con
+		// trỏ, có provider dò workspace hụt và trả "chưa có repository nào được
+		// mở" — mà bước vẫn tính là xong. Xem docs/DO-LUONG.md.
+		argsPhien := args
+		if workDir != "" {
+			if co := a.ArgsThuMuc(workDir); len(co) > 0 {
+				argsPhien = append(append([]string{}, co...), args...)
+			}
+		}
+
 		logPath := filepath.Join(dir, "fleet.log")
-		pid, err := profile.StartDetached(a, dir, args, logPath, workDir)
+		pid, err := profile.StartDetached(a, dir, argsPhien, logPath, workDir)
 		if err != nil {
 			bus.Failuref("phiên %d: %v", i+1, err)
 			if workDir != "" {

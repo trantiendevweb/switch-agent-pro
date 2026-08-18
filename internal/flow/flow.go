@@ -71,6 +71,8 @@ type Step struct {
 	Prompt   string `toml:"prompt,omitempty" json:"prompt,omitempty"`     // hỗ trợ {{bien}}
 	Copies   int    `toml:"copies,omitempty" json:"copies,omitempty"`     // số agent song song, mặc định 1
 	Worktree bool   `toml:"worktree,omitempty" json:"worktree,omitempty"` // mỗi agent một git worktree
+	// TuDuyetQuyen: cho agent tự duyệt mọi tool ở bước NÀY. Mặc định tắt.
+	TuDuyetQuyen bool `toml:"tu_duyet_quyen,omitempty" json:"tuDuyetQuyen,omitempty"`
 
 	// shell
 	Run []string `toml:"run,omitempty" json:"run,omitempty"` // argv — CỐ Ý không nhận chuỗi shell

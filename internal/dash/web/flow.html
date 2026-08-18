@@ -138,12 +138,29 @@
 
   <div id="left"></div>
 
+  <style>
+    #ketqua{position:absolute;right:12px;bottom:12px;width:380px;max-height:46%;overflow:auto;
+      background:rgba(20,22,28,.95);border:1px solid #2c3040;border-radius:8px;font-size:12px;z-index:6}
+    #ketqua-tieu{padding:6px 10px;border-bottom:1px solid #2c3040;font-weight:600;position:sticky;top:0;
+      background:rgba(20,22,28,.98)}
+    #ketqua-than{padding:6px 10px}
+    #ketqua .b{margin-bottom:8px}
+    #ketqua .b b{color:#9fd0ff}
+    #ketqua pre{margin:3px 0 0;white-space:pre-wrap;word-break:break-word;color:#cfd4e0;
+      background:#12141a;border-radius:5px;padding:5px 7px;max-height:150px;overflow:auto}
+    #ketqua .trong{color:#e0a04a}
+    #ketqua .mu{color:#8b93a7}
+  </style>
   <div id="mid">
     <div id="world">
       <svg id="edges"></svg>
     </div>
     <div id="empty"><div>Kéo một node từ cột trái vào đây<br><small>hoặc bấm vào node trong bảng</small></div></div>
     <div id="log"></div>
+    <!-- Kết quả THẬT của từng bước. Thiếu khung này thì bảng vẽ chỉ khoe đề bài
+         (prompt) mà giấu bài làm: lần chạy #8 hiện xanh đủ ba bước trong khi cả
+         hai agent chỉ trả về câu từ chối quyền. -->
+    <div id="ketqua" hidden><div id="ketqua-tieu">Kết quả từng bước</div><div id="ketqua-than"></div></div>
     <div id="zoom">
       <button class="btn" id="zin">+</button>
       <button class="btn" id="zout">−</button>
@@ -657,8 +674,25 @@ async function pollRun(){
     currentRun=mine[0].id;
     const det=await call('/api/run?id='+currentRun);
     liveStates={}; (det.steps||[]).forEach(s=>{ if(s.state!=='pending') liveStates[s.id]=s.state; });
+    veKetQua(det.steps||[]);
     render();
   }catch(_){}
+}
+// veKetQua bày output từng bước. Bước `done` mà rỗng thì nói thẳng là rỗng —
+// im lặng ở đây chính là cách lần chạy #8 trông như đã thành công.
+function veKetQua(steps){
+  const box=$('#ketqua'), than=$('#ketqua-than');
+  const co=steps.filter(s=>s.state && s.state!=='pending');
+  if(!co.length){ box.hidden=true; return; }
+  box.hidden=false;
+  than.innerHTML=co.map(s=>{
+    let t;
+    if(s.output) t='<pre>'+esc(s.output)+'</pre>';
+    else if(s.state==='done') t='<pre class="trong">(không có output — bước xong nhưng không trả về gì)</pre>';
+    else t='';
+    return '<div class="b"><b>'+esc(s.id)+'</b> <span class="mu">'+esc(s.state)+'</span>'+
+           (s.msg?' <span class="trong">'+esc(s.msg)+'</span>':'')+t+'</div>';
+  }).join('');
 }
 function logLine(e){
   const box=$('#log'); const d=document.createElement('div');

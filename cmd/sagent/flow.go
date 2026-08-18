@@ -31,7 +31,11 @@ func cmdFlow(args []string) {
 		}
 		flowRun(args[1], args[2:])
 	case "runs", "lich-su":
-		flowRuns()
+		if len(args) > 1 {
+			flowRunChiTiet(args[1])
+		} else {
+			flowRuns()
+		}
 	case "approve", "duyet":
 		flowDecide(args[1:], true)
 	case "reject", "tu-choi":

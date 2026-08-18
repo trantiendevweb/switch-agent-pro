@@ -1214,3 +1214,233 @@ vẫn dẫm. Ghi thêm lần nữa cho thấm: **trên PowerShell 5.1, muốn UT
 
 - **Máy/VM Linux** để chạy các ô Linux ở trên. Không có thì phần Linux của
   Pha 0/1 phải hoãn, và nhãn Linux giữ nguyên `experimental`.
+
+## 18/08 — Flow báo `completed` trong khi KHÔNG agent nào làm được việc
+
+Đo trên lần chạy #8 (`doi-hinh-khong-claude`). Flow kết thúc `completed`, cả ba
+bước `done`. Nhìn kỹ output từng bước thì:
+
+```
+ke-hoach [antigravity:may] done
+  │ jetski: no output produced — a tool required the "command" permission that
+  │ headless mode cannot prompt for, so it was auto-denied. …
+tho-anti [antigravity:may] done
+  │ jetski
+```
+
+Bước `ke-hoach` không trả lời gì; nó trả về CÂU TỪ CHỐI QUYỀN. Bước sau được
+lệnh "nhắc lại từ đầu tiên" nên lặp lại `jetski` — đó chỉ là tên phiên agent
+đứng đầu câu lỗi. Cả hai vẫn `done`, cả flow vẫn `completed`.
+
+Ba lỗi tách bạch, đừng gộp:
+
+1. **Không có cách nào đọc kết quả từng bước.** `FlowRunDetail` nằm trong lõi từ
+   lâu nhưng KHÔNG mặt nào gọi — cả CLI lẫn web. `flow runs 8` bỏ qua tham số và
+   in lại danh sách. Chạy flow xong thì không biết agent đã trả về gì. Đã thêm
+   `sagent flow runs <số>`.
+
+2. **Thoát mã 0 bị coi là bằng chứng đã làm việc.** `agentBridge.RunAgents` trả
+   thẳng `readLogs(logs), nil`, không nhìn output. Báo thành công khi chẳng có gì
+   xảy ra hỏng nặng hơn báo lỗi: người dùng tin vào một kết quả không tồn tại.
+   Đã thêm `khongCoKetQua()` — output rỗng, hoặc mang chữ ký bị chặn quyền
+   (`no output produced`, `auto-denied`, `headless mode cannot prompt`), thì bước
+   THẤT BẠI. Phản chứng: gỡ lá chắn → 2 test đỏ đúng chỗ, test "kết quả thật đi
+   lọt" vẫn xanh (nó không phụ thuộc lá chắn).
+
+3. **Chẩn đoán sai của chính tôi, ghi lại để không lặp.** Thấy dòng
+   `Failed to poll ListExperiments: You are not logged into Antigravity` trong
+   log là tôi kết luận ngay fleet làm hỏng đăng nhập. Đo lại: chạy `agy -p` với
+   `USERPROFILE` trỏ đúng thư mục clone → trả `OK`; với thư mục tạm rỗng → cũng
+   `OK`. Dòng kia là lỗi telemetry nền lúc khởi động, không phải đường chạy
+   chính. Một dòng ERROR trong log KHÔNG phải nguyên nhân chỉ vì nó ở gần.
+
+### Gốc rễ còn lại: headless không có quyền dùng tool
+
+Đo trực tiếp, cwd = repo thật:
+
+```
+agy -p "Ngôn ngữ lập trình chính của repo trong thư mục này là gì?"
+→ no output produced — a tool required the "command" permission …
+```
+
+`agy` CÓ lấy cwd làm workspace (nó đã định gọi tool để đọc repo). Nhưng headless
+thì không hỏi được người, nên tự từ chối. Hệ quả: agent trong flow chỉ trả lời
+được từ chữ có sẵn trong prompt, KHÔNG đọc nổi một file nào. Lần chạy #9 trả
+"Hiện chưa có repository/workspace nào được mở" là cùng gốc rễ này.
+
+Nghĩa là workflow hiện chạy đúng về mặt điều phối (đúng thứ tự, đúng profile,
+song song thật) nhưng thợ chưa có tay. Mở tay ra là một quyết định AN NINH, có
+hai đường và tôi không tự chọn:
+
+- `permissions.allow` trong settings.json của từng hồ sơ — hẹp, kiểm soát được.
+- `--dangerously-skip-permissions` — agent tự duyệt MỌI tool, kể cả xoá file và
+  chạy lệnh tuỳ ý, trong worktree của repo thật.
+
+## 18/08 — Con flake làm CI đỏ ở tag v0.3.0: đua trong GIÀN TEST, không phải sản phẩm
+
+`TestForEachChayTungMuc` đỏ khi chạy cả bộ, xanh 8/8 khi chạy riêng. Chạy lặp
+200 lượt thì đỏ vài lượt, và mỗi lần MẤT MỘT MỤC KHÁC NHAU:
+
+```
+3 mục phải thành 3 lượt, được 2: [Xử lý alpha (số 1) Xử lý gamma (số 3)]
+3 mục phải thành 3 lượt, được 2: [Xử lý gamma (số 3) Xử lý beta (số 2)]
+```
+
+Cả ba lượt đều đã chạy — sổ ghi rơi mất một dòng. `fakeAgent.RunAgents` sửa
+`calls` và `prompts` không khoá, trong khi runner gọi nó từ nhiều goroutine
+(foreach và các bước cùng đợt chạy song song). `append` đua nhau thì mất phần tử.
+
+Đã thêm `sync.Mutex`. Sau khi sửa: 200/200 xanh. `-race` không dùng được trên
+máy này (thiếu gcc, CGO tắt) nên phải chứng minh bằng lặp — đủ vì thất bại tái
+hiện được và dấu hiệu đặc trưng.
+
+Đây là lý do CI đỏ ở tag v0.3.0 rồi xanh lại ở commit sau với Y NGUYÊN mã nguồn.
+Giả thuyết cũ (`KillTree` hết giờ, đã nới 2s→10s) không phải nguyên nhân.
+
+## 18/08 — Go biến mất khỏi máy
+
+`go` không còn trong PATH, không ở thư mục chuẩn nào, tìm toàn ổ C: không ra.
+Nhưng `AppData\Local\go-build` và `go\pkg\mod` còn nguyên → Go TỪNG có rồi bị gỡ.
+Không có toolchain thì không build được gì.
+
+Đã cài lại đúng bản `go.mod` ghim (1.25.13), vào `LOCALAPPDATA\Programs\Go`,
+không cần quyền admin. Lấy SHA256 từ `go.dev/dl/?mode=json` rồi đối chiếu TRƯỚC
+khi giải nén (`54a6bbff…d1fc`, khớp). Đã thêm vào PATH người dùng.
+
+## 18/08 — Cú pháp allow-list của Antigravity: đo được gì, và chỗ tôi kết luận sai
+
+Mục tiêu: tìm allow-list HẸP để làm mặc định, thay vì phải bật cờ tự-duyệt-quyền.
+
+**Ký tự đại diện là MỘT sao, không phải hai.** Đo bằng cách đổi từng biến thể và
+xem câu lỗi có đổi không:
+
+| Luật thử | Kết quả |
+|---|---|
+| `command(**)` | vẫn bị chặn |
+| `command(git*)` | vẫn bị chặn (chặn cả git) |
+| `command(git status)`, `command(dir)` | vẫn bị chặn |
+| `command(cmd:*)` | vẫn bị chặn |
+| `command` (trần, không ngoặc) | vẫn bị chặn |
+| `run_command(**)` | vẫn bị chặn |
+| **`command(*)`** | **QUA** — agent chạy được lệnh |
+| **`read_file(*)`** | **QUA** — 3 lượt, không lượt nào bị chặn `read_file` |
+
+**Chỗ tôi kết luận sai, ghi lại vì nó là cái bẫy suy luận.** Trước đó tôi khẳng
+định `read_file(**)` "có tác dụng thật", căn cứ: đặt `read(**)` thì lỗi gọi tên
+`read_file`, đổi thành `read_file(**)` thì lỗi nhảy sang `command`. Suy ra sai.
+Agent CHỌN tool khác nhau giữa các lượt, nên tên quyền trong câu lỗi đổi vì lý do
+khác. Đo lại bằng cách chạy lặp thì `read_file(**)` vẫn bị chặn. **Một lượt chạy
+không phân biệt được "luật có tác dụng" với "agent tình cờ đi đường khác" — phải
+lặp.**
+
+**Không có nấc trung gian cho `command`.** Chỉ `command(*)` là qua, tức CHO PHÉP
+MỌI LỆNH. Sáu biến thể hẹp hơn đều bị chặn. Về sức phá hoại, `command(*)` ngang
+với `--dangerously-skip-permissions`.
+
+**Và allow-list chỉ-đọc KHÔNG đủ để agent làm việc.** Cho `read_file(*)`,
+`list_directory(*)`, `glob(*)`, `grep(*)`, `search_file_content(*)` mà bỏ
+`command`: agy vẫn với sang tool `command` ngay cả khi chỉ cần đọc `go.mod`, nên
+bước đứng chết. Thêm `trustedWorkspaces` trỏ đúng repo cũng không đổi (2 lượt).
+
+Kết luận cho antigravity: **không tồn tại mặc định hẹp mà vẫn dùng được.** Hai
+đường duy nhất đều là toàn quyền. Nên sự an toàn KHÔNG đến từ allow-list mà đến
+từ chỗ khác:
+
+1. Cờ `tu_duyet_quyen` mặc định TẮT, khai theo TỪNG BƯỚC (2 test: mặc định tắt,
+   và không lây sang bước sau).
+2. Mỗi agent chạy trong git worktree riêng (`sagent/may-1`), không phải cây làm
+   việc chính. Đã kiểm sau lần chạy #10: repo chính không file nào bị đụng.
+
+Chưa đo: allow-list của Claude Code (`allowedTools`) — nhiều khả năng hẹp được
+thật, nhưng `claude:tns` chưa đăng nhập nên chưa đo được. Đừng chép kết luận của
+antigravity sang Claude.
+
+Phụ: moi nhị phân `agy.exe` (183 MB, bundle) lấy được khuôn sinh câu lỗi
+`%s required the %s %s that headless mode cannot prompt for, so %s auto-denied`
+— nên `command` là TÊN QUYỀN, khác tên tool `run_command`. Cùng chỗ đó có dòng
+`user has workspace validation enabled but has no active workspaces`, đúng bằng
+triệu chứng lần chạy #9.
+
+## 18/08 — Rào quyền của năm provider: đo `--help`, và ba trạng thái khác nhau
+
+| Provider | Cờ mở toàn quyền | Nấc trung gian | Đo tới đâu |
+|---|---|---|---|
+| claude | `--dangerously-skip-permissions` | chưa đo (`allowedTools`?) | `--help` |
+| antigravity | `--dangerously-skip-permissions` | **không có** (7 biến thể allow-list đều chặn) | `--help` + chạy thật #10/#11 |
+| codex | `--dangerously-bypass-approvals-and-sandbox` | **CÓ** — xem dưới | `--help` |
+| grok | *không có rào nào* | không có | `--help` |
+| cursor | chưa đo | chưa đo | máy không cài `cursor-agent` |
+
+**Codex có đúng cái nấc mà Antigravity không có:**
+
+```
+-s, --sandbox <read-only | workspace-write | danger-full-access>
+-a, --ask-for-approval <untrusted | on-request | never>
+```
+
+`--sandbox workspace-write --ask-for-approval never` là mặc định hẹp đúng nghĩa:
+agent làm việc thật trong workspace, không hỏi, không ra ngoài. **Chưa xác nhận
+được hành vi**: `codex exec` trả `You've hit your usage limit … try again at
+Aug 20th`. Nên CHƯA sửa `HeadlessArgs` của codex — khai theo `--help` là đo giao
+diện, không phải đo hành vi.
+
+**Grok không có rào nào cả.** `grok --help` không có approval/sandbox/permission,
+chỉ có `--max-tool-rounds` (mặc định 400). Nó chạy tool tự do theo thiết kế.
+
+Chuyện này làm lộ một lỗi trong thiết kế cũ của tôi: `ArgsTuDuyetQuyen()` trả
+`nil` để nghĩa là "chưa đo", nên Grok bị xếp chung nhóm với Cursor. Sai — hai
+tình huống ngược nhau hoàn toàn. Đã tách thành `(args, daDo bool)`, ba trạng thái:
+
+- `(cờ, true)` — có rào, đây là cách mở.
+- `(nil, true)` — **đã đo, KHÔNG có rào**. Cờ thừa. Phải **cảnh báo**, kể cả khi
+  bước không bật cờ: người dùng dễ tưởng "không bật = agent bị hạn chế".
+- `(nil, false)` — **chưa đo**. Phải **báo lỗi**, không được lặng lẽ chạy không
+  quyền rồi báo xong.
+
+Quyết định này tách khỏi `RunAgents` thành hàm thuần `argsChoBuoc` để test được —
+chôn trong đó thì phải bật phiên thật mới chạy tới, tức không ai kiểm được. 4 test,
+trong đó cái quan trọng nhất: **bước không xin quyền thì dòng lệnh không được
+chứa cờ nguy hiểm**.
+
+Bẫy đã dính lại: `codex`/`grok` trên máy này là `.ps1` (npm shim), gọi qua
+`cmd /c` thì `--help` trả về RỖNG mà không báo lỗi — y hệt bẫy `wmic` hôm trước.
+Phải gọi thẳng qua PowerShell. Đo qua sai lớp vỏ thì được số 0 chứ không được sự thật.
+
+## 18/08 — Agent chạy trong git worktree thì dò workspace HỤT (chập chờn)
+
+Sau khi bật cờ quyền, lần chạy #10 và #11 trả đúng "Go (Golang)" nhưng #12 lại
+trả "Hiện tại không có repository nào được mở trong workspace" — cùng flow, cùng
+cờ, cùng máy. Không đoán; tách từng biến:
+
+1. **Cờ có rơi mất khi refactor không?** Viết test nạp `tu_duyet_quyen = true` từ
+   TOML → nạp đúng. (Test này đáng giữ: sai một chữ ở thẻ `toml:"..."` thì
+   BurntSushi bỏ qua IM LẶNG, cờ về false, agent chạy không quyền, flow vẫn báo
+   xong — đúng kiểu hỏng lặng lẽ của lần chạy #8.)
+2. **Cờ có tác dụng không?** Chạy tay `agy --dangerously-skip-permissions` với
+   cwd = thư mục repo: **3/3 đúng**.
+3. **Khác nhau ở đâu?** Flow chạy trong git worktree. Chạy tay với cwd =
+   worktree: **1/3 đúng**, hai lượt kia trả "chưa có repository nào được mở".
+
+Nguyên nhân: ở git worktree, `.git` là **FILE con trỏ 78 byte**, không phải thư
+mục. Antigravity dò workspace theo kiểu vấp phải chỗ này.
+
+Cách sửa (đo, không suy): `agy --help` có `--add-dir  Add a directory to the
+workspace`. Thêm nó, cwd = worktree: **4/4 đúng**.
+
+Đã thêm `ArgsThuMuc(dir)` vào adapter, fleet gọi khi phiên có worktree. Đo cờ
+tương ứng của từng provider trên `--help` thật:
+
+| Provider | Cờ | Đo tới đâu |
+|---|---|---|
+| antigravity | `--add-dir <dir>` | `--help` + chạy thật 4/4 |
+| claude | `--add-dir <directories...>` | `--help` |
+| codex | `-C, --cd <DIR>` | `--help` (chưa chạy thật, hết hạn mức tới 20/08) |
+| grok | `-d, --directory <dir>` | `--help` |
+| cursor | chưa đo | máy không cài `cursor-agent` |
+
+Kiểm chứng qua flow thật: **3/3 đúng** (#13, #14, #15). Trước bản vá là 2/4.
+
+Bài học lặp lại lần thứ ba trong ngày: **lỗi chập chờn thì một lượt xanh không
+chứng minh được gì.** Cả ba lỗi hôm nay đều thế — con flake CI (8/8 xanh khi
+chạy riêng), luật allow-list (một lượt làm tôi kết luận ngược), và cái này
+(#10, #11 xanh liền hai lượt trong khi lỗi vẫn còn nguyên).

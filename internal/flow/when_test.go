@@ -122,7 +122,7 @@ type slowAgent struct {
 	maxSeen int
 }
 
-func (s *slowAgent) RunAgents(_ context.Context, _, prompt string, copies int, _ bool) (string, error) {
+func (s *slowAgent) RunAgents(_ context.Context, _, prompt string, copies int, _, _ bool) (string, error) {
 	s.mu.Lock()
 	s.now++
 	if s.now > s.maxSeen {

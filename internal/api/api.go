@@ -729,7 +729,7 @@ type agentBridge struct {
 	fallback Addr
 }
 
-func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree bool) (string, error) {
+func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree, tuDuyetQuyen bool) (string, error) {
 	addr := b.fallback
 	if profileStr != "" {
 		addr = ParseAddr(profileStr)
@@ -741,9 +741,16 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	if err != nil {
 		return "", err
 	}
+	args, canhBao, err := argsChoBuoc(ad, prompt, tuDuyetQuyen)
+	if err != nil {
+		return "", err
+	}
+	if canhBao != "" {
+		b.a.bus.Warnf("%s", canhBao)
+	}
 	res, err := b.a.FleetStart(FleetRequest{
 		Addr: addr, Copies: copies, Worktree: worktree,
-		Args: ad.HeadlessArgs(prompt), // mỗi provider một kiểu, hỏi adapter
+		Args: args,
 	})
 	if err != nil {
 		return "", err
@@ -757,7 +764,76 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	if err := b.a.waitSessions(ctx, res.IDs); err != nil {
 		return "", err
 	}
-	return readLogs(logs), nil
+	out := readLogs(logs)
+	if ly := khongCoKetQua(out); ly != "" {
+		return out, fmt.Errorf("%s (profile %s)", ly, addr)
+	}
+	return out, nil
+}
+
+// argsChoBuoc ghép đối số chạy agent cho một bước, và trả thêm lời cảnh báo nếu
+// có chuyện người dùng cần biết.
+//
+// Tách khỏi RunAgents để TEST ĐƯỢC: phần còn lại của RunAgents phải bật phiên
+// thật mới chạy tới đây, nên nếu chôn ở trong thì không ai kiểm được ba nhánh
+// dưới — mà đúng ba nhánh đó mới là chỗ quyết định agent có toàn quyền hay không.
+func argsChoBuoc(ad provider.Adapter, prompt string, tuDuyetQuyen bool) (args []string, canhBao string, err error) {
+	args = ad.HeadlessArgs(prompt) // mỗi provider một kiểu, hỏi adapter
+	co, daDo := ad.ArgsTuDuyetQuyen()
+
+	// Không xin quyền: cảnh báo nếu provider vốn KHÔNG có rào nào, vì người dùng
+	// dễ tưởng "không bật cờ = agent bị hạn chế". Với Grok thì không.
+	if !tuDuyetQuyen {
+		if daDo && len(co) == 0 {
+			canhBao = fmt.Sprintf("%s KHÔNG có rào quyền nào: agent chạy tool tự do dù bước không bật `tu_duyet_quyen`", ad.Name())
+		}
+		return args, canhBao, nil
+	}
+
+	if !daDo {
+		return nil, "", fmt.Errorf("bước xin `tu_duyet_quyen` nhưng CHƯA ĐO cờ đó cho %s — không khai bừa; bỏ cờ hoặc dùng provider khác", ad.Name())
+	}
+	if len(co) == 0 {
+		// Đã đo, và provider không có rào: cờ là thừa, không phải lỗi.
+		return args, fmt.Sprintf("%s không có rào quyền nên `tu_duyet_quyen` là thừa — agent vốn đã chạy tool tự do", ad.Name()), nil
+	}
+	return append(co, args...), "", nil
+}
+
+// khongCoKetQua nhận ra agent CHẠY XONG MÀ KHÔNG LÀM ĐƯỢC GÌ. Trả về lý do,
+// hoặc "" nếu kết quả dùng được.
+//
+// Đo tại lần chạy #8 (18/08, flow doi-hinh-khong-claude): cả hai bước
+// antigravity thoát mã 0, runner đánh dấu `done`, flow báo `completed` — nhưng
+// log chỉ chứa câu TỪ CHỐI QUYỀN, và bước sau nuốt luôn câu đó làm dữ liệu rồi
+// "hoàn thành" trên rác. Báo thành công khi chẳng có gì xảy ra là hỏng nặng hơn
+// báo lỗi: người dùng tin vào một kết quả không tồn tại.
+//
+// Nên: mã thoát 0 KHÔNG phải bằng chứng đã làm việc — phải nhìn vào output.
+func khongCoKetQua(out string) string {
+	t := strings.TrimSpace(out)
+	if t == "" {
+		return "agent chạy xong nhưng không in ra gì — coi như thất bại, không phải thành công"
+	}
+	l := strings.ToLower(t)
+	// Chữ ký headless bị chặn quyền: agent không hỏi được nên tự từ chối.
+	if strings.Contains(l, "no output produced") ||
+		strings.Contains(l, "auto-denied") ||
+		strings.Contains(l, "headless mode cannot prompt") {
+		return "agent bị chặn quyền trong chế độ headless nên không làm gì: " + motDong(t)
+	}
+	return ""
+}
+
+// motDong rút gọn output thành một dòng để nhét vào thông báo lỗi.
+func motDong(s string) string {
+	if i := strings.IndexByte(s, 0x0A); i >= 0 {
+		s = s[:i]
+	}
+	if len(s) > 200 {
+		s = s[:200] + "…"
+	}
+	return s
 }
 
 // sessionLogs lấy đường dẫn log của các phiên vừa bật.

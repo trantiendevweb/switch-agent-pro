@@ -136,3 +136,9 @@ func (c cursor) Verify() []Check {
 // Token là file Cursor\auth.json trong thư mục APPDATA — đã đo: chép file đó
 // sang APPDATA giả là danh tính đi theo, hồ sơ mới thì "Not logged in".
 func (cursor) TachDuocTaiKhoan() bool { return true }
+
+// ArgsTuDuyetQuyen: CHƯA ĐO: máy này không cài cursor-agent nên không chạy `--help` được
+func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
+
+// ArgsThuMuc: CHƯA ĐO: máy này không cài cursor-agent
+func (cursor) ArgsThuMuc(dir string) []string { return nil }

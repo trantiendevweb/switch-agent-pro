@@ -209,3 +209,12 @@ func (c codex) Verify() []Check {
 
 // Token là file trong thư mục config, tách bằng CODEX_HOME — đã đo.
 func (codex) TachDuocTaiKhoan() bool { return true }
+
+// ArgsTuDuyetQuyen: đo `codex --help`. Codex CÓ nấc trung gian mà provider khác không có:
+// `--sandbox read-only|workspace-write|danger-full-access` và
+// `--ask-for-approval untrusted|on-request|never`. CHƯA chạy thật được để xác
+// nhận hành vi (hết hạn mức tới 20/08) — xem docs/DO-LUONG.md
+func (codex) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dangerously-bypass-approvals-and-sandbox"}, true }
+
+// ArgsThuMuc: đo `codex --help`: "-C, --cd <DIR>". CHƯA chạy thật (hết hạn mức tới 20/08)
+func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }

@@ -26,6 +26,11 @@ type stepDTO struct {
 	Msg     string   `json:"msg,omitempty"`
 	Attempt int      `json:"attempt,omitempty"`
 	Detail  string   `json:"detail,omitempty"` // prompt / lệnh / lời nhắn, đã rút gọn
+	// Output là thứ agent THỰC SỰ trả về. Thiếu nó thì mặt web chỉ khoe đề bài
+	// mà giấu bài làm: lần chạy #8 hiện "completed" đủ ba bước trong khi cả hai
+	// agent chỉ trả về câu từ chối quyền. Không đọc được kết quả thì không cách
+	// nào biết flow chạy thật hay chạy suông.
+	Output string `json:"output,omitempty"`
 }
 
 type flowDTO struct {
@@ -84,6 +89,7 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 		d := stepDTO{ID: st.ID, Type: st.Type, Needs: st.Needs, State: "pending"}
 		if got, ok := steps[st.ID]; ok {
 			d.State, d.Msg, d.Attempt = got.State, got.Msg, got.Attempt
+			d.Output = got.Output
 		}
 		switch st.Type {
 		case flow.TypeAgent, flow.TypeReview:

@@ -177,3 +177,11 @@ func (g grok) Verify() []Check {
 	out = append(out, mc)
 	return out
 }
+
+// ArgsTuDuyetQuyen: đo `grok --help`: KHÔNG có approval/sandbox/permission nào. Grok chạy tool
+// tự do theo thiết kế, nên cờ là thừa — nhưng đó là vì nó KHÔNG có rào, chứ
+// không phải vì chưa đo. Chỉ có `--max-tool-rounds` giới hạn số vòng.
+func (grok) ArgsTuDuyetQuyen() ([]string, bool) { return nil, true }
+
+// ArgsThuMuc: đo `grok --help`: "-d, --directory <dir>  set working directory"
+func (grok) ArgsThuMuc(dir string) []string { return []string{"-d", dir} }

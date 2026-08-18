@@ -138,3 +138,9 @@ var claudeSharedKeys = []string{
 
 // Token là file trong thư mục config, tách bằng CLAUDE_CONFIG_DIR — đã đo.
 func (claude) TachDuocTaiKhoan() bool { return true }
+
+// ArgsTuDuyetQuyen: đo `claude --help`: "--dangerously-skip-permissions  Bypass all permission checks."
+func (claude) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dangerously-skip-permissions"}, true }
+
+// ArgsThuMuc: đo `claude --help`: "--add-dir <directories...>  Additional directories to allow tool"
+func (claude) ArgsThuMuc(dir string) []string { return []string{"--add-dir", dir} }

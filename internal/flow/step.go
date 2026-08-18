@@ -280,7 +280,7 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (string
 			r.Bus.Warnf("copies=%d vượt trần %d của dự án — hạ xuống", n, r.MaxParallel)
 			n = r.MaxParallel
 		}
-		return r.Agent.RunAgents(ctx, s.Profile, Expand(s.Prompt, vars), n, s.Worktree)
+		return r.Agent.RunAgents(ctx, s.Profile, Expand(s.Prompt, vars), n, s.Worktree, s.TuDuyetQuyen)
 
 	case TypeShell, TypeTest, TypeLint:
 		argv := s.Run

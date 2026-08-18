@@ -119,3 +119,10 @@ func (a antigravity) Verify() []Check {
 // LOCALAPPDATA) vẫn dùng đúng danh tính đã đăng nhập, vì token đọc từ Windows
 // Credential Manager theo khoá cố định `gemini:antigravity`.
 func (antigravity) TachDuocTaiKhoan() bool { return false }
+
+// ArgsTuDuyetQuyen: đo `agy --help` + chạy thật (lần chạy #10, #11): agent đọc được repo, trả đúng "Go"
+func (antigravity) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--dangerously-skip-permissions"}, true }
+
+// ArgsThuMuc: đo `agy --help`: "--add-dir  Add a directory to the workspace". Chạy thật ở
+// worktree: không có cờ 1/3 đúng, có cờ 4/4 đúng.
+func (antigravity) ArgsThuMuc(dir string) []string { return []string{"--add-dir", dir} }

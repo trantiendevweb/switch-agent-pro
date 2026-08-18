@@ -180,3 +180,7 @@ func (adapterLong) Identity(string) string           { return "" }
 func (adapterLong) HasToken(string) bool             { return false }
 func (adapterLong) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
 func (adapterLong) Verify() []provider.Check         { return nil }
+
+func (adapterLong) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
+
+func (adapterLong) ArgsThuMuc(string) []string { return nil }

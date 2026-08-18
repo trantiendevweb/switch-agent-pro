@@ -68,3 +68,7 @@ func TestRemoveDoesNotTouchBase(t *testing.T) {
 		t.Fatalf("DỮ LIỆU GỐC BỊ MẤT qua link — bait.txt không còn: %v", err)
 	}
 }
+
+func (fakeAdapter) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
+
+func (fakeAdapter) ArgsThuMuc(string) []string { return nil }

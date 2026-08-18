@@ -30,6 +30,32 @@ type Adapter interface {
 	// rò vào code dùng chung, và `fleet codex:*` sẽ chạy sai mà không ai biết.
 	HeadlessArgs(prompt string) []string
 
+	// ArgsTuDuyetQuyen trả về cờ để agent TỰ DUYỆT MỌI TOOL ở chế độ headless,
+	// kèm daDo = đã đo được cách làm của provider này hay chưa.
+	//
+	// Ba trạng thái KHÁC NHAU, đừng gộp:
+	//   (cờ, true)  — có rào, và đây là cách mở.
+	//   (nil, true)  — ĐÃ ĐO và provider KHÔNG có rào nào; cờ là thừa. Grok thuộc
+	//                  nhóm này: `grok --help` không có approval/sandbox, nó chạy
+	//                  tool tự do theo thiết kế. Đây là chuyện AN NINH cần nói ra,
+	//                  không phải chuyện "không cần làm gì".
+	//   (nil, false) — CHƯA ĐO. Người gọi phải báo lỗi, không được lặng lẽ chạy
+	//                  tiếp: người dùng bật cờ là có chủ ý, nuốt mất ý đó rồi báo
+	//                  thành công là dối.
+	//
+	// Nguy hiểm thật: agent duyệt cả xoá file và chạy lệnh tuỳ ý trong worktree
+	// của repo thật. Mặc định TẮT, chỉ bật theo từng bước trong flows.toml.
+	ArgsTuDuyetQuyen() (args []string, daDo bool)
+
+	// ArgsThuMuc là đối số khai TƯỜNG MINH thư mục làm việc cho phiên headless.
+	//
+	// Cần vì fleet chạy mỗi agent trong một git worktree, mà ở worktree thì `.git`
+	// là FILE con trỏ chứ không phải thư mục — Antigravity dò workspace hụt. Đo:
+	// cùng lệnh cùng cờ, chạy ở thư mục repo đúng 3/3, chạy ở worktree chỉ 1/3
+	// (hai lượt kia trả "chưa có repository nào được mở"). Thêm `--add-dir` thì
+	// 4/4 đúng. Trả nil = provider không cần / chưa đo.
+	ArgsThuMuc(dir string) []string
+
 	// PrivateFiles là các file KHÔNG dùng chung (token + danh tính).
 	PrivateFiles() []string
 
