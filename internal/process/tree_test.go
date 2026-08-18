@@ -22,6 +22,12 @@ func lenhChoLongNhau() []string {
 	return []string{"sh", "-c", "sh -c 'sleep 20'"}
 }
 
+// doiTat chờ tới khi mọi pid chết, tối đa `trong`.
+//
+// Hạn phải RỘNG: test này đo HÀNH VI (có dọn sạch cây tiến trình không), không đo
+// tốc độ. Hạn hẹp làm test đỏ trên máy tải nặng — và một test đỏ vì máy chậm thì
+// không phân biệt được với test đỏ vì code sai, nên nó phá luôn giá trị của cả
+// bộ test. Vòng lặp thoát ngay khi xong nên chờ rộng không làm test chậm đi.
 func doiTat(t *testing.T, pids []int, trong time.Duration) []int {
 	t.Helper()
 	han := time.Now().Add(trong)
@@ -80,7 +86,7 @@ func TestKillTreeDonSachCayConSong(t *testing.T) {
 	if IsAlive(pid) {
 		t.Fatal("tiến trình cha vẫn sống sau KillTree")
 	}
-	if con := doiTat(t, hauDue, 3*time.Second); len(con) > 0 {
+	if con := doiTat(t, hauDue, 15*time.Second); len(con) > 0 {
 		t.Fatalf("còn %d hậu duệ sống: %v", len(con), con)
 	}
 	_ = cmd.Wait()
@@ -119,7 +125,7 @@ func TestKillTreeDonDuocMoCoi(t *testing.T) {
 	if err := KillTree(pid); err != nil {
 		t.Fatalf("KillTree(pid đã chết) = %v — phải dọn được mồ côi chứ không báo lỗi", err)
 	}
-	if con := doiTat(t, moCoi, 3*time.Second); len(con) > 0 {
+	if con := doiTat(t, moCoi, 15*time.Second); len(con) > 0 {
 		t.Fatalf("MỒ CÔI SỐNG SÓT: %v — chúng vẫn tiêu hạn mức", con)
 	}
 }

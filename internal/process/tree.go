@@ -74,7 +74,14 @@ func KillTree(pid int) error {
 
 	// Cho hệ điều hành một nhịp để thật sự thu dọn rồi mới kết luận. Không có
 	// chỗ chờ này thì hàm sẽ báo "còn sống" cho những tiến trình đang chết dở.
-	if !doiChet(pid, 2*time.Second) {
+	// 10 giây, không phải 2. Hạn này sinh ra để KHÔNG TREO MÃI, không phải để ép
+	// tốc độ: một tiến trình đang bị giết có thể mất vài giây để hệ điều hành thu
+	// dọn khi máy đang tải nặng (runner CI, máy đang build). Đặt 2 giây thì
+	// "máy chậm" biến thành "báo lỗi không dừng được" — một cảnh báo sai, và cảnh
+	// báo sai thì người dùng học cách bỏ qua.
+	//
+	// Chờ lâu hơn không hại: vòng lặp thoát NGAY khi tiến trình chết.
+	if !doiChet(pid, 10*time.Second) {
 		return fmt.Errorf("PID %d vẫn chạy sau khi dừng (%v)", pid, killErr)
 	}
 	var conLai []int
