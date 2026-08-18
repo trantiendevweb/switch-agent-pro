@@ -1,5 +1,7 @@
 package provider
 
+import "fmt"
+
 // KetQua là kết quả một lượt chạy agent, ĐỌC TỪ DỮ LIỆU CÓ CẤU TRÚC chứ không
 // đoán từ chữ tiếng Anh trong output.
 //
@@ -20,13 +22,17 @@ type KetQua struct {
 	// sự kiện. Đây mới là thứ nên đưa cho bước sau, không phải cả bản ghi NDJSON.
 	TraLoi string
 
-	CoLoi     bool   // is_error
-	Loai      string // subtype: success | error_max_turns | error_during_execution…
-	DungViCo  string // stop_reason: end_turn | max_tokens | …
-	KetCuc    string // terminal_reason: completed | …
-	LoiAPI    string // api_error_status, rỗng nếu không có
-	SoLuotTu  int    // num_turns
-	TuChoiSo  int    // len(permission_denials) — số tool bị từ chối quyền
+	CoLoi    bool   // is_error
+	Loai     string // subtype: success | error_max_turns | error_during_execution…
+	DungViCo string // stop_reason: end_turn | max_tokens | …
+	KetCuc   string // terminal_reason: completed | …
+	LoiAPI   string // api_error_status, rỗng nếu không có
+	SoLuotTu int    // num_turns
+	TuChoiSo int    // số tool bị TỪ CHỐI QUYỀN (Claude: len(permission_denials))
+	// ToolHong: số bước tool KẾT THÚC LỖI. Tách khỏi TuChoiSo vì không phải
+	// provider nào cũng phân biệt được: Antigravity chỉ báo `state:"ERROR"` trên
+	// step_update, không nói lỗi vì bị chặn quyền hay vì lệnh sai.
+	ToolHong  int
 	ChiPhiUSD float64
 	TokenVao  int
 	TokenRa   int
@@ -50,6 +56,9 @@ func (k KetQua) Hong() string {
 		return "agent bị từ chối quyền cho mọi tool và không trả lời được gì"
 	}
 	if k.TraLoi == "" {
+		if k.ToolHong > 0 {
+			return fmt.Sprintf("agent không trả lời gì, %d bước tool kết thúc lỗi", k.ToolHong)
+		}
 		return "agent chạy xong nhưng không trả lời gì"
 	}
 	return ""

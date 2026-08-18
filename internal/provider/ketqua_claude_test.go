@@ -3,7 +3,9 @@ package provider
 import "testing"
 
 // Nguyen van dong cuoi do duoc ngay 18/08 tu:
-//   claude -p "..." --output-format stream-json --verbose
+//
+//	claude -p "..." --output-format stream-json --verbose
+//
 // Da cat bot cac truong khong dung toi, GIU NGUYEN ten va kieu cua nhung truong
 // ma la chan dua vao.
 const ketQuaThatXong = `{"is_error":false,"duration_api_ms":4890,"num_turns":1,"stop_reason":"end_turn","session_id":"957255a6","total_cost_usd":0.08446,"usage":{"input_tokens":2,"output_tokens":4},"permission_denials":[],"terminal_reason":"completed","subtype":"success","api_error_status":null,"result":"OK","type":"result"}`

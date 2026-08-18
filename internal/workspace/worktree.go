@@ -50,8 +50,10 @@ func Add(repoRoot, name string) (string, error) {
 	if _, err := os.Stat(dir); err == nil {
 		_ = Remove(repoRoot, dir)
 	}
-	branch := "sagent/" + name
+	branch := nhanhTrong(repoRoot, "sagent/"+name)
 	// -B: có nhánh cũ thì ghi đè, không thì tạo mới — chạy lại fleet không kẹt.
+	// An toàn được là NHỜ nhanhTrong() ở trên đã đảm bảo nhánh này không giữ
+	// công việc nào chưa trộn.
 	if _, err := run(repoRoot, "worktree", "add", "-B", branch, dir); err != nil {
 		return "", fmt.Errorf("tạo worktree thất bại: %w", err)
 	}
@@ -119,4 +121,35 @@ func run(dir string, args ...string) (string, error) {
 	c.Dir = dir
 	out, err := c.Output()
 	return strings.TrimSpace(string(out)), err
+}
+
+// nhanhTrong trả về một tên nhánh KHÔNG GIỮ CÔNG VIỆC CHƯA TRỘN.
+//
+// Có vì một lỗi mất dữ liệu thật, đo ngày 18/08: `worktree add -B` ĐẶT LẠI nhánh,
+// nên mỗi lượt fleet mới xoá sạch commit của lượt trước trên cùng tài khoản.
+// Lần chạy #21, agent claude:tns commit 99 dòng (có 87 dòng test) lên
+// `sagent/tns-1`; lượt fleet sau đó cùng tài khoản làm commit đó thành MỒ CÔI —
+// còn trong kho nhưng không thuộc nhánh nào, và `git log main..sagent/tns-1`
+// hiện trống trơn như chưa ai làm gì.
+//
+// Cách sửa: nếu nhánh cũ còn commit chưa có ở nhánh nền thì ĐỔI TÊN nhánh mới
+// (thêm hậu tố), giữ nguyên việc cũ. Thà có vài nhánh thừa còn hơn mất việc —
+// nhánh thừa thì dọn được, việc mất thì không.
+func nhanhTrong(repoRoot, goc string) string {
+	nen, err := NhanhMacDinh(repoRoot)
+	if err != nil {
+		nen = "main"
+	}
+	ten := goc
+	for i := 2; i < 100; i++ {
+		if _, err := run(repoRoot, "rev-parse", "--verify", "--quiet", "refs/heads/"+ten); err != nil {
+			return ten // chưa có nhánh này
+		}
+		out, err := run(repoRoot, "rev-list", "--count", nen+".."+ten)
+		if err != nil || strings.TrimSpace(out) == "0" {
+			return ten // có nhưng rỗng so với nền -> ghi đè được
+		}
+		ten = fmt.Sprintf("%s-%d", goc, i)
+	}
+	return ten
 }

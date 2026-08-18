@@ -1795,3 +1795,56 @@ ghi không có dòng result" → phải nói thẳng KHÔNG ĐỌC ĐƯỢC, kh�
 **Bẫy đã dính khi kiểm:** `sagent fleet <tk> -- -p "..."` truyền đối số TAY nên
 bỏ qua `HeadlessArgs` — đo bằng đường đó thì thấy log chữ trơn và tưởng bản vá
 hỏng. Chỉ đường flow mới gọi `HeadlessArgs`. Phải đo đúng đường mà tính năng đi qua.
+
+## 18/08 — Lượt fleet sau XOÁ SẠCH công việc của lượt trước
+
+Lỗi mất dữ liệu nghiêm trọng nhất tìm được, và nó đã nổ thật.
+
+`workspace.Add` dùng `git worktree add -B <nhánh>`. Cờ `-B` **đặt lại** nhánh về
+HEAD hiện tại. Nên mỗi lượt fleet mới trên cùng một tài khoản xoá sạch commit của
+lượt trước.
+
+Bằng chứng: lần chạy #21, agent `claude:tns` sửa `internal/fleet/fleet.go` và
+viết 87 dòng test, commit `161e79e` lên `sagent/tns-1`. Các lượt fleet sau đó cùng
+tài khoản làm commit ấy thành **mồ côi** — còn nguyên trong kho nhưng không thuộc
+nhánh nào. `git log main..sagent/tns-1` hiện TRỐNG TRƠN, y như chưa ai làm gì.
+
+Điều làm nó nguy hiểm: **không có dấu hiệu nào cả.** Không lỗi, không cảnh báo.
+Người dùng mở nhánh ra xem, thấy trống, và kết luận agent lười.
+
+Đã cứu: `git branch cuu/tns-1-161e79e 161e79e` — 99 dòng, có test.
+
+Sửa gốc bằng `nhanhTrong()`: trước khi tạo worktree, kiểm nhánh cũ có commit nào
+chưa có ở nhánh nền không. Có thì dùng tên mới (`sagent/tns-1-2`), giữ nguyên việc
+cũ. Rỗng thì cứ ghi đè như trước, khỏi đẻ nhánh thừa.
+
+Thà vài nhánh thừa còn hơn mất việc — nhánh thừa dọn được, việc mất thì không.
+
+Hai test dựng repo git thật. Phản chứng: trả lại `-B` cũ thì đỏ đúng câu
+"VIỆC CỦA LƯỢT TRƯỚC BỊ XOÁ: nhánh sagent/tns-1 giờ có 0 commit, muốn 1".
+
+**Vì sao mãi không ai thấy:** đúng cái tính năng "bằng chứng git" thêm sáng nay
+mới làm nó lộ ra. Trước đó không mặt nào đọc số commit của nhánh, nên việc bị xoá
+cũng không ai biết. Một lá chắn tìm ra lỗi mà nó không được viết để tìm.
+
+## 18/08 — Antigravity: đọc được kết quả có cấu trúc, và một cái bẫy
+
+`agy --output-format stream-json` dùng lược đồ KHÁC HẲN Claude:
+
+```
+{"event":"result","result":{"status":"SUCCESS","response":"OK\n","num_turns":1,"usage":{…}}}
+{"event":"step_update","step_update":{"state":"ERROR","step_type":"tool","tool_name":"run_command"}}
+```
+
+**Bẫy đo được: bị chặn quyền thì `status` VẪN LÀ `"SUCCESS"`**, chỉ `response`
+rỗng. Tin vào `status` là kết luận ngược hoàn toàn. Dấu hiệu thật: response rỗng,
+cộng số `step_update` có `state:"ERROR"`.
+
+Nên thêm `KetQua.ToolHong` tách khỏi `TuChoiSo`: Antigravity chỉ báo tool lỗi,
+không nói lỗi vì bị chặn quyền hay vì lệnh sai. Đếm thì được, suy nguyên nhân thì
+không — nên không suy.
+
+Đây cũng là lý do việc đọc kết quả phải nằm trong ADAPTER, không phải một hàm
+chung: hai provider, hai lược đồ, và một cái nói dối bằng trường `status`.
+
+Nghiệm thu lần chạy #27: output bước là câu trả lời sạch, không còn NDJSON.

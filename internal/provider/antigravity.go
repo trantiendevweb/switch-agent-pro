@@ -49,7 +49,10 @@ func (antigravity) Command() (string, error) {
 // Đã đo: `agy -p "<prompt>"` chạy không tương tác và in kết quả ra stdout.
 // Có thêm `--output-format json` trả về cả thống kê token, nhưng lõi hiện chỉ
 // cần văn bản nên giữ mặc định.
-func (antigravity) HeadlessArgs(prompt string) []string { return []string{"-p", prompt} }
+// HeadlessArgs bật NDJSON có cấu trúc, cùng lý do như Claude.
+func (antigravity) HeadlessArgs(prompt string) []string {
+	return []string{"--output-format", "stream-json", "-p", prompt}
+}
 
 // Không có file riêng nào để chép: token nằm ở Credential Manager. Trả rỗng là
 // mô tả ĐÚNG sự thật, chứ không phải thiếu sót.
@@ -131,5 +134,4 @@ func (antigravity) ArgsThuMuc(dir string) []string { return []string{"--add-dir"
 
 func (antigravity) ArgsHoSo(string) []string { return nil }
 
-// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
-func (antigravity) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
+func (antigravity) DocKetQua(raw string) (KetQua, bool) { return docKetQuaAntigravity(raw) }
