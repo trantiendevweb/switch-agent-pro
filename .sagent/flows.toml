@@ -234,6 +234,10 @@ Yêu cầu bắt buộc:
       prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm. Việc
 của bạn là TÌM LỖI, không phải khen. CHỈ ĐỌC — tuyệt đối không sửa, không commit.
 
+MÁY NÀY LÀ WINDOWS, shell là cmd.exe. KHÔNG có `ls`, `cat`, `pwd`, `grep`.
+Dùng `dir`, `type`, `cd`, `findstr` — hoặc tốt nhất là chỉ dùng `git`, vì git
+chạy y hệt nhau trên mọi hệ. Một lệnh trượt hai lần thì ĐỔI CÁCH, đừng gọi lại.
+
 Đọc thay đổi của cả hai bằng git:
     git log --oneline main..sagent/tns-1
     git diff main...sagent/tns-1

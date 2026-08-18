@@ -1537,3 +1537,22 @@ nói "xong" nhưng một bước nhánh rỗng. Nên kiểm nhánh, đừng tin 
 `OAuth session expired`. `HasToken` chỉ kiểm **file token có tồn tại**, không
 kiểm nó còn dùng được. Kế hoạch gốc mục 1.6 đòi "trung thực về năng lực" —
 chỗ này đang vi phạm. Chưa sửa: cần một phép kiểm nhẹ, không tốn hạn mức.
+
+### Vá xong hai chỗ làm hỏng #21
+
+**Grok quẩn vòng.** Hai việc, không phải một:
+1. `HeadlessArgs` hạ trần `--max-tool-rounds` từ 400 xuống 60. Không sửa được
+   tính cố chấp, nhưng làm nó gãy sớm thay vì đốt hết hạn mức rồi mới gãy.
+2. Prompt nói thẳng máy là Windows/cmd.exe, không có `ls`/`cat`/`pwd`/`grep`;
+   ưu tiên `git` vì git chạy y hệt trên mọi hệ; một lệnh trượt hai lần thì đổi
+   cách. Đây mới là chỗ chữa gốc.
+
+Đo lại (lần chạy #22): Grok chạy CẢ HAI lệnh git trong MỘT vòng và trả lời đúng
+khuôn hai dòng. Trước đó là 399 vòng `ls -la` vô ích.
+
+**claude:phu hỏng xác thực.** Chủ dự án đăng nhập lại; chạy thật qua fleet trả
+`OK`. Bản sao hồ sơ nhận token mới, không cần dựng lại clone.
+
+Còn nợ: kiểu hỏng thứ ba (agent dừng giữa việc, nhánh rỗng, vẫn `done`) chưa bắt
+được bằng chuỗi. Bằng chứng đúng cho bước code là `git log main..sagent/<tk>-1`
+có commit hay không — phải kiểm nhánh, không tin lời agent kể.

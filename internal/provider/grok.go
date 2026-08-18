@@ -63,7 +63,16 @@ func (grok) Command() (string, error) {
 //
 // Thà để người dùng truyền tường minh: `sagent goc grok -m grok-4.5 -p "..."`.
 // Verify() nói thẳng điều này để không ai phải tự mò.
-func (grok) HeadlessArgs(prompt string) []string { return []string{"-p", prompt} }
+// HeadlessArgs hạ trần vòng gọi tool xuống 60 (mặc định của grok là 400).
+//
+// Đo tại lần chạy #21: tool `bash` của Grok chạy qua cmd.exe nên mọi lệnh Unix
+// đều trượt, mà nó KHÔNG thích nghi — gọi đúng `ls -la` 399 lần liên tiếp rồi
+// mới bị trần chặn, và bước vẫn được đánh dấu xong. Trần thấp không sửa được
+// việc nó cố chấp, nhưng làm nó GÃY SỚM thay vì đốt hết hạn mức rồi mới gãy.
+// 60 vòng vẫn thừa cho một bước soi diff.
+func (grok) HeadlessArgs(prompt string) []string {
+	return []string{"--max-tool-rounds", "60", "-p", prompt}
+}
 
 // user-settings.json chứa CẢ apiKey lẫn baseURL — tức toàn bộ danh tính. Đây là
 // file phải chép riêng cho từng hồ sơ, không bao giờ nối link dùng chung.
