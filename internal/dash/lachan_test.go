@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 )
 
 // Năm test dưới đây sinh ra từ một lượt soát code bằng codex, và mỗi cáo buộc
@@ -120,5 +122,74 @@ func TestLogoutKhongBiCheoTrang(t *testing.T) {
 	s.ServeHTTP(w2, r2)
 	if w2.Code == http.StatusUnauthorized {
 		t.Fatal("trang lạ điều hướng tới /logout đã xoá được phiên của người dùng")
+	}
+}
+
+// Mọi action trong hợp đồng phải có đường vào từ MẶT WEB — trừ những cái đã ghi
+// rõ là không thể.
+//
+// Vì sao cần test này: `session.sweep` và `db.admin` nằm trong api.Actions từ lúc
+// viết CLI, nhưng dashboard KHÔNG có endpoint nào cho chúng suốt nhiều ngày. Test
+// ngang quyền cũ chỉ canh chiều CLI↔hợp đồng, nên nó xanh trong khi luật "mọi mặt
+// ngang quyền" đang bị vi phạm ngay trong repo có test canh nó.
+//
+// Danh sách miễn trừ phải GHI LÝ DO, không được là một cái tên trần.
+func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
+	// action -> đường dẫn HTTP phục vụ nó
+	duong := map[string]string{
+		"session.list":  "/api/state",
+		"session.stop":  "/api/stop",
+		"session.sweep": "/api/quet",
+		"db.admin":      "/api/db",
+		"fleet.start":   "/api/fleet",
+		"profile.run":   "/api/run",
+		"flow.list":     "/api/flows",
+		"flow.show":     "/api/flow/def",
+		"flow.run":      "/api/flow/run",
+		"flow.approve":  "/api/flow/decide",
+		"flow.save":     "/api/flow/save",
+		"flow.delete":   "/api/flow/delete",
+		"flow.runs":     "/api/state",
+		"flow.validate": "/api/flow/def",
+		"config.show":   "/api/state",
+	}
+	// Miễn trừ CÓ LÝ DO — không phải danh sách để nhét cho qua test.
+	mienTru := map[string]string{
+		"dash.serve":      "mặt web không tự khởi động chính nó được",
+		"config.version":  "hiện trong /api/state, chưa tách endpoint riêng",
+		"profile.list":    "hiện trong /api/state",
+		"profile.create":  "tạo hồ sơ dẫn tới ĐĂNG NHẬP — phải làm ở terminal, xem docs/DO-LUONG.md",
+		"profile.remove":  "xoá thư mục thật; cố ý không cho bấm nhầm từ trình duyệt",
+		"profile.sync":    "chạm token của mọi hồ sơ; giữ ở terminal",
+		"profile.verify":  "spawn CLI của provider; giữ ở terminal",
+		"clones.create":   "đi kèm fleet.start",
+		"clones.clean":    "xoá thư mục thật; giữ ở terminal",
+		"config.init":     "ghi file vào thư mục dự án; giữ ở terminal",
+	}
+
+	s := newTestServer(t)
+	ck := dangNhap(t, s, "127.0.0.1:4600")
+	for _, act := range api.Actions {
+		p, ok := duong[act]
+		if !ok {
+			if ly, mien := mienTru[act]; mien {
+				if ly == "" {
+					t.Errorf("%s miễn trừ mà không ghi lý do", act)
+				}
+				continue
+			}
+			t.Errorf("action %q không có đường vào từ web và cũng không nằm trong danh sách miễn trừ "+
+				"— hoặc thêm endpoint, hoặc ghi rõ vì sao không thể", act)
+			continue
+		}
+		// Đường dẫn phải TỒN TẠI THẬT (không 404).
+		r := httptest.NewRequest("GET", p, nil)
+		r.Host = "127.0.0.1:4600"
+		r.AddCookie(ck)
+		w := httptest.NewRecorder()
+		s.ServeHTTP(w, r)
+		if w.Code == http.StatusNotFound {
+			t.Errorf("action %q khai đường %s nhưng server trả 404", act, p)
+		}
 	}
 }

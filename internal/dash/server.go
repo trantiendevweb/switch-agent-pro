@@ -60,6 +60,8 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/events", s.guard(s.handleEvents))
 	m.HandleFunc("/api/fleet", s.guard(s.handleFleet))
 	m.HandleFunc("/api/stop", s.guard(s.handleStop))
+	m.HandleFunc("/api/quet", s.guard(s.handleQuet))
+	m.HandleFunc("/api/db", s.guard(s.handleDB))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
@@ -570,6 +572,73 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			fl.Flush()
 		}
 	}
+}
+
+// handleQuet — action "session.sweep".
+//
+// Hai action `session.sweep` và `db.admin` đã nằm trong api.Actions từ lúc viết
+// CLI, nhưng mặt web thì chưa có — tức luật "mọi mặt ngang quyền" (MASTER-PLAN
+// mục 2c) đang bị vi phạm ngay trong repo có test canh nó. Test chỉ canh chiều
+// CLI↔hợp đồng, không canh chiều dashboard.
+//
+// GIẾT phải là POST và phải xin tường minh. Windows dùng lại PID nên danh sách
+// mồ côi có thể lẫn tiến trình vô can — mặc định chỉ liệt kê, y như CLI.
+func (s *Server) handleQuet(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Giet bool `json:"giet"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	if req.Giet && r.Method != http.MethodPost {
+		writeErr(w, errors.New("dừng tiến trình phải dùng POST"))
+		return
+	}
+	res, err := s.api.SessionSweep(req.Giet)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	// DTO liệt kê tường minh từng trường — không ném thẳng struct nội bộ ra ngoài.
+	type procDTO struct {
+		PID    int    `json:"pid"`
+		Ten    string `json:"ten"`
+		BatDau string `json:"bat_dau"`
+	}
+	type mucDTO struct {
+		SessionID int64     `json:"session_id"`
+		Addr      string    `json:"addr"`
+		PIDCu     int       `json:"pid_cu"`
+		Procs     []procDTO `json:"procs"`
+	}
+	out := make([]mucDTO, 0, len(res))
+	for _, m := range res {
+		ps := make([]procDTO, 0, len(m.Procs))
+		for _, p := range m.Procs {
+			ps = append(ps, procDTO{PID: p.PID, Ten: p.Ten, BatDau: p.BatDau.Format("15:04:05 02/01")})
+		}
+		out = append(out, mucDTO{SessionID: m.Session.ID, Addr: m.Session.Addr(),
+			PIDCu: m.Session.PID, Procs: ps})
+	}
+	writeJSON(w, map[string]any{"muc": out, "da_giet": req.Giet})
+}
+
+// handleDB — action "db.admin", CHỈ phần đọc.
+//
+// `db backup` và `db restore` CỐ Ý không có ở đây: restore ghi đè chính file mà
+// server đang mở, và backup thì nên đi cùng chỗ quyết định giữ bản sao ở đâu.
+// Xem ghi chú ở api.Actions — mặt web trả lời được "đang ở đâu", còn "đổi cái gì"
+// thì phải đứng ngoài mà làm.
+func (s *Server) handleDB(w http.ResponseWriter, r *http.Request) {
+	v, latest, path, err := s.api.DBInfo()
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{
+		"duong_dan":   path,
+		"schema":      v,
+		"schema_moi":  latest,
+		"can_nang_cap": v < latest,
+	})
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {

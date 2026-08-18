@@ -425,6 +425,19 @@ func (a *API) SessionStop(id int64) (int, error) {
 	return n, nil
 }
 
+// DBInfo — phần ĐỌC của action "db.admin": schema hiện tại, schema mà bản binary
+// này biết, và đường dẫn file.
+//
+// Chỉ đọc. `backup`/`restore` cố ý không có ở tầng này cho mặt web dùng: restore
+// ghi đè chính file mà server đang mở.
+func (a *API) DBInfo() (hienTai, moiNhat int, duongDan string, err error) {
+	v, err := a.db.SchemaVersion()
+	if err != nil {
+		return 0, 0, store.Path(), err
+	}
+	return v, store.LatestSchema(), store.Path(), nil
+}
+
 // MoCoi là một tiến trình còn sống của phiên đã chết.
 type MoCoi struct {
 	Session store.Session
