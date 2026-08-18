@@ -446,3 +446,200 @@ Trả về nguyên văn phần markdown để dán vào tài liệu, không lờ
       profile = "claude:tns"
       timeout_sec = 600
       prompt = "Ngon ngu lap trinh chinh cua repo nay la gi? Tra loi dung mot tu."
+
+# ---------------------------------------------------------------------------
+# ĐÊM: một lượt vừa code vừa debug, ba provider phân vai THEO SỐ ĐO.
+#
+# Phân vai không theo cảm giác "AI nào mạnh" mà theo bằng chứng trong
+# docs/DO-LUONG.md và internal/provider/:
+#
+#   claude:tns      DocKetQua ✓ (claude.go:64) — đọc được kết quả CÓ CẤU TRÚC,
+#                   biết chi phí/token thật. Rào quyền tường minh
+#                   (--dangerously-skip-permissions). → VIỆC GO NẶNG.
+#   antigravity:may DocKetQua ✓ (antigravity.go:137). Nhưng lịch sử: lần #8 trả
+#                   câu từ chối quyền mà vẫn `done`, bước hoc-agentdeck TIMEOUT
+#                   0 chữ 0 commit. → VIỆC BOUNDED, hỏng thì rẻ: tài liệu.
+#   grok:api        DocKetQua trả FALSE (grok.go:219) — hỏng chỉ bắt được bằng
+#                   dò chuỗi. KHÔNG có rào quyền nào (grok.go:190), chỉ hạ được
+#                   trần vòng tool xuống 60. Lần #21 gọi `ls -la` 399 lần vì
+#                   bash của nó đi qua cmd.exe mà nó không thích nghi.
+#                   → CHỈ ĐỌC/SOI. Không giao việc ghi.
+#
+# MÁY CHẤM QUYẾT ĐỊNH, không phải lời agent. Bước shell chạy `go test -C <đường
+# dẫn worktree>` vì exec.CommandContext ở step.go:316 KHÔNG đặt cmd.Dir — không
+# có -C thì nó chấm repo chính chứ không chấm cây mà thợ vừa sửa, và cả cổng
+# kiểm thành vô nghĩa.
+  [flow.dem]
+    desc = "Một lượt đêm: Claude code Go + Antigravity viết tài liệu song song, máy chấm phán, hai vòng debug, Grok soi"
+    [flow.dem.vars]
+      viec_go = "mô tả việc Go, truyền bằng --var"
+      viec_doc = "mô tả việc tài liệu, truyền bằng --var"
+      # Dùng dấu / chứ không phải \: TOML đọc \U là escape unicode và file không
+      # parse nổi. Go nhận dấu / trên Windows bình thường.
+      wt_tns = "C:/Users/Administrator/.ai-accounts/.worktrees/switch-agent-pro-b2d22420/tns-1"
+
+    [[flow.dem.step]]
+      id = "code-go"
+      type = "agent"
+      profile = "claude:tns"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 2400
+      on_failure = "continue"
+      prompt = """Bạn làm việc trong một git worktree riêng, nhánh sagent/tns-1.
+MÁY NÀY LÀ WINDOWS, shell là cmd.exe: KHÔNG có ls/cat/grep. Dùng dir/type/findstr,
+hoặc tốt nhất là chỉ dùng `git` và `go` vì chúng chạy giống nhau mọi nền.
+
+VIỆC: {{viec_go}}
+
+Luật bắt buộc, không có ngoại lệ:
+1. Đọc code hiện có TRƯỚC khi viết. Bám khuôn sẵn có, đừng phát minh phong cách mới.
+2. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra — không chứng minh
+   được điều đó thì đừng bảo là xong.
+3. Chạy `go build ./...` và `go test ./...`, phải XANH.
+4. XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn tiếng Việt>"
+   KHÔNG commit thì người soi ở worktree khác không thấy gì, và coi như bạn chưa làm.
+5. Trả lời đúng khuôn:
+   NHANH: <git branch --show-current>
+   COMMIT: <git rev-parse --short HEAD>
+   DA LAM: <gạch đầu dòng>
+   CHUA LAM: <nói THẲNG chỗ chưa xong, đừng giấu>"""
+
+    [[flow.dem.step]]
+      id = "code-doc"
+      type = "agent"
+      profile = "antigravity:may"
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 1800
+      on_failure = "continue"
+      prompt = """Bạn làm việc trong một git worktree riêng, nhánh sagent/may-1.
+MÁY NÀY LÀ WINDOWS, shell là cmd.exe: KHÔNG có ls/cat/grep. Dùng `git` là an toàn nhất.
+
+VIỆC: {{viec_doc}}
+
+CHỈ sửa file .md. TUYỆT ĐỐI không đụng file .go — có người khác đang sửa code
+song song với bạn, đụng vào là hỏng việc cả hai.
+
+Luật:
+1. Viết cho người KHÔNG RÀNH KỸ THUẬT. Không thuật ngữ chưa giải thích.
+2. Mọi lệnh bạn viết ra phải chạy được trên Windows PowerShell, đã kiểm.
+3. XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn>"
+4. Trả lời đúng khuôn:
+   NHANH: <git branch --show-current>
+   COMMIT: <git rev-parse --short HEAD>
+   FILE: <file đã tạo/sửa>
+   CHUA LAM: <nói thẳng>"""
+
+    [[flow.dem.step]]
+      id = "kiem-1"
+      type = "shell"
+      needs = ["code-go"]
+      run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
+      timeout_sec = 900
+      on_failure = "continue"
+
+    [[flow.dem.step]]
+      id = "sua-1"
+      type = "agent"
+      needs = ["kiem-1"]
+      when = "steps.kiem-1.state == failed"
+      profile = "claude:tns"
+      # CỐ Ý KHÔNG worktree = true. nhanhTrong() (workspace/worktree.go:144-152)
+      # thấy sagent/tns-1 đã có commit vượt main thì cấp nhánh sagent/tns-1-2 —
+      # tức một cây MỚI TINH từ main, KHÔNG có code đang đỏ. Bước sửa sẽ vá nhầm
+      # cây. Nên ghim thẳng vào đường dẫn worktree cũ bằng git -C / go -C.
+      tu_duyet_quyen = true
+      timeout_sec = 1500
+      on_failure = "continue"
+      prompt = """Test ĐỎ. Bạn phải sửa TRONG ĐÚNG thư mục này, không phải thư mục
+hiện tại:
+
+    {{wt_tns}}
+
+Mọi lệnh đều phải trỏ vào đó: `go test -C {{wt_tns}} ./...`,
+`git -C {{wt_tns}} add -A`, `git -C {{wt_tns}} commit -m "..."`.
+TUYỆT ĐỐI không sửa file ở thư mục hiện tại — đó là repo chính, sửa vào đấy là hỏng.
+
+Output THẬT của máy chấm:
+
+{{steps.kiem-1.output}}
+
+Sửa cho xanh, chạy lại `go test -C {{wt_tns}} ./...` để tự kiểm, rồi commit.
+Không sửa được thì NÓI THẲNG và nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
+
+    [[flow.dem.step]]
+      id = "kiem-2"
+      type = "shell"
+      needs = ["sua-1"]
+      when = "steps.kiem-1.state == failed"
+      run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
+      timeout_sec = 900
+      on_failure = "continue"
+
+    [[flow.dem.step]]
+      id = "sua-2"
+      type = "agent"
+      needs = ["kiem-2"]
+      when = "steps.kiem-2.state == failed"
+      profile = "claude:tns"
+      # Cùng lý do như sua-1: ghim đường dẫn, không xin worktree mới.
+      tu_duyet_quyen = true
+      timeout_sec = 1500
+      on_failure = "continue"
+      prompt = """Vẫn ĐỎ sau vòng sửa thứ nhất. Sửa TRONG ĐÚNG thư mục:
+
+    {{wt_tns}}
+
+Dùng `go test -C {{wt_tns}} ./...` và `git -C {{wt_tns}} ...`. Không đụng thư mục hiện tại.
+
+Output máy chấm:
+
+{{steps.kiem-2.output}}
+
+Đây là vòng CUỐI. Sửa được thì sửa rồi commit. Không sửa được thì commit phần
+đang có và ghi rõ là CHUA XANH kèm lý do — báo sai còn tệ hơn báo hỏng."""
+
+    [[flow.dem.step]]
+      id = "kiem-cuoi"
+      type = "shell"
+      needs = ["sua-2"]
+      run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
+      timeout_sec = 900
+      on_failure = "continue"
+
+    [[flow.dem.step]]
+      id = "soi"
+      type = "agent"
+      profile = "grok:api"
+      needs = ["kiem-cuoi", "code-doc"]
+      timeout_sec = 900
+      on_failure = "continue"
+      prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm.
+CHỈ ĐỌC — không sửa, không commit, không tạo file.
+
+MÁY NÀY LÀ WINDOWS, shell là cmd.exe. KHÔNG có ls/cat/grep/pwd. Chỉ dùng `git`.
+Một lệnh trượt HAI lần thì ĐỔI CÁCH, đừng gọi lại lần thứ ba.
+
+Đọc bằng đúng bốn lệnh này:
+    git log --oneline main..sagent/tns-1
+    git diff main...sagent/tns-1
+    git log --oneline main..sagent/may-1
+    git diff main...sagent/may-1
+
+Nhánh nào không có commit nào thì NÓI THẲNG người đó chưa làm gì.
+
+Máy chấm nói gì:
+{{steps.kiem-cuoi.output}}
+
+Trả lời đúng khuôn, mỗi mục một dòng:
+TNS: NEN TRON / CAN SUA THEM / VUT — kèm lý do một câu
+MAY: NEN TRON / CAN SUA THEM / VUT — kèm lý do một câu
+LOI: <lỗi cụ thể tìm được, hoặc "khong thay">
+GIAM CHAN: <hai nhánh có sửa cùng file không>"""
+
+    [[flow.dem.step]]
+      id = "bao"
+      type = "notify"
+      needs = ["soi"]
+      message = "Lượt đêm xong — xem `sagent flow runs <#>` để đọc kết quả và chi phí từng bước."
