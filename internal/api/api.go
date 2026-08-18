@@ -225,14 +225,26 @@ func (a *API) ProfileRun(addr Addr, args []string) error {
 	}
 	dir, ok := profile.ResolveDir(addr.Provider, addr.Account)
 	if !ok {
+		// "goc" là cái người ta gõ theo thói quen khi muốn tài khoản gốc — chỉ
+		// đúng đường thay vì rủ họ tạo một hồ sơ TÊN LÀ "goc".
+		if addr.Account == "goc" {
+			return fmt.Errorf("không có %s. Chạy tài khoản gốc của %s: sagent goc %s",
+				addr, addr.Provider, addr.Provider)
+		}
 		return fmt.Errorf("không có %s. Tạo: sagent them %s", addr, addr)
 	}
 	return profile.Run(ad, dir, args)
 }
 
-// RunRoot chạy bằng tài khoản gốc: XOÁ biến môi trường thay vì trỏ vào ~/.claude.
-func (a *API) RunRoot(args []string) error {
-	ad, err := adapterOf("claude")
+// RunRoot chạy TÀI KHOẢN GỐC của một provider — tức tài khoản mà chính CLI đó
+// dùng khi không có `sagent`.
+//
+// providerName rỗng = "claude", giữ nguyên cách gõ cũ `sagent goc`.
+func (a *API) RunRoot(providerName string, args []string) error {
+	if providerName == "" {
+		providerName = "claude"
+	}
+	ad, err := adapterOf(providerName)
 	if err != nil {
 		return err
 	}

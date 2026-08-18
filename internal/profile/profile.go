@@ -252,11 +252,20 @@ func Run(a provider.Adapter, dir string, args []string) error {
 	}
 	c := exec.Command(cmdPath, args...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
-	env := filterEnv(os.Environ(), a.EnvVar())
-	if dir != "" {
-		env = append(env, a.EnvVar()+"="+dir)
+
+	if dir == "" {
+		// TÀI KHOẢN GỐC: giữ NGUYÊN môi trường, không đụng gì.
+		//
+		// Bản trước xoá biến của adapter kể cả khi chạy gốc. Với
+		// CLAUDE_CONFIG_DIR/CODEX_HOME thì vô hại (xoá đi là CLI tự về mặc định),
+		// nhưng biến của Cursor là APPDATA còn của Antigravity là USERPROFILE —
+		// xoá hai cái đó không phải là "chạy tài khoản gốc", mà là ĐƯA CHO CLI
+		// một môi trường Windows hỏng. Kế thừa mới là đúng nghĩa "gốc".
+		c.Env = os.Environ()
+		return c.Run()
 	}
-	c.Env = env
+
+	c.Env = append(filterEnv(os.Environ(), a.EnvVar()), a.EnvVar()+"="+dir)
 	return c.Run()
 }
 

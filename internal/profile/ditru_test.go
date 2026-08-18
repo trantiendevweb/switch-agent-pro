@@ -3,8 +3,10 @@ package profile
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
@@ -71,3 +73,60 @@ func TestThemTrungTenVoiHoSoV1ThiTuChoi(t *testing.T) {
 		t.Fatalf("token v1 bị động: %v", err)
 	}
 }
+
+// Chạy TÀI KHOẢN GỐC không được đụng vào môi trường.
+//
+// Bản trước xoá biến của adapter kể cả khi chạy gốc. Với CLAUDE_CONFIG_DIR /
+// CODEX_HOME thì vô hại — xoá đi là CLI tự về mặc định. Nhưng biến của Cursor là
+// APPDATA và của Antigravity là USERPROFILE: xoá hai cái đó không phải "chạy tài
+// khoản gốc" mà là đưa cho CLI một môi trường Windows HỎNG.
+//
+// Test dựng một adapter giả có EnvVar = APPDATA, chạy một chương trình in ra giá
+// trị biến đó, rồi khẳng định nó KHÔNG rỗng.
+func TestChayGocKhongDuocXoaBienHeDieuHanh(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("chỉ có nghĩa trên Windows")
+	}
+	moc := os.Getenv("APPDATA")
+	if moc == "" {
+		t.Skip("máy này không có APPDATA để đo")
+	}
+
+	out := filepath.Join(t.TempDir(), "ra.txt")
+	a := adapterMoiTruong{}
+	// cmd /c echo %APPDATA% > file
+	err := Run(a, "", []string{"/c", "echo %APPDATA%> " + out})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(string(b))
+	if got == "" || got == "%APPDATA%" {
+		t.Fatalf("APPDATA bị xoá khi chạy tài khoản gốc (đọc được %q) — "+
+			"CLI sẽ chạy trong một môi trường Windows hỏng", got)
+	}
+	if got != moc {
+		t.Errorf("APPDATA = %q, muốn giữ nguyên %q", got, moc)
+	}
+}
+
+// adapterMoiTruong: EnvVar là một biến của HỆ ĐIỀU HÀNH, giống cursor/antigravity.
+type adapterMoiTruong struct{}
+
+func (adapterMoiTruong) Name() string                         { return "moitruong" }
+func (adapterMoiTruong) EnvVar() string                       { return "APPDATA" }
+func (adapterMoiTruong) Command() (string, error)             { return "cmd.exe", nil }
+func (adapterMoiTruong) Version() (string, error)             { return "0", nil }
+func (adapterMoiTruong) TachDuocTaiKhoan() bool               { return true }
+func (adapterMoiTruong) HeadlessArgs(p string) []string       { return []string{"/c", p} }
+func (adapterMoiTruong) PrivateFiles() []string               { return []string{"x.json"} }
+func (adapterMoiTruong) SharedKeys() []string                 { return nil }
+func (adapterMoiTruong) BaseDir() string                      { return os.TempDir() }
+func (adapterMoiTruong) IdentitySource() string               { return "" }
+func (adapterMoiTruong) Identity(string) string               { return "" }
+func (adapterMoiTruong) HasToken(string) bool                 { return false }
+func (adapterMoiTruong) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
+func (adapterMoiTruong) Verify() []provider.Check             { return nil }

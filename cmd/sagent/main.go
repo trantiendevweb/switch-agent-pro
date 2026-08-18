@@ -25,6 +25,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/console"
 	"github.com/trantiendevweb/switch-agent-pro/internal/dash"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
+	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
 // command là một lệnh CLI, gắn với đúng một hành động trong api.Actions.
@@ -241,10 +242,21 @@ func cmdRun(addr string, args []string) {
 	}
 }
 
+// cmdRunRoot: `sagent goc [provider] [đối số...]`
+//
+// Không có provider = claude, giữ nguyên cách gõ cũ. Nhận tên provider ở đối số
+// ĐẦU TIÊN chứ không dùng dạng địa chỉ `codex:goc`, vì "goc" hoàn toàn có thể là
+// tên một hồ sơ thật — hai nghĩa chồng lên nhau thì sớm muộn cũng chạy nhầm.
 func cmdRunRoot(args []string) {
+	prov := ""
+	if len(args) > 0 {
+		if _, ok := provider.Get(args[0]); ok {
+			prov, args = args[0], args[1:]
+		}
+	}
 	a, done := open()
 	defer done()
-	if err := a.RunRoot(args); err != nil {
+	if err := a.RunRoot(prov, args); err != nil {
 		console.KhoiPhuc()
 		os.Exit(1)
 	}
