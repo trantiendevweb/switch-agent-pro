@@ -81,6 +81,9 @@ var Actions = []string{
 	"flow.run",
 	"flow.runs",
 	"flow.approve",
+	// Huỷ một lượt chạy dở dang. Không có nó thì lượt bị cắt ngang (máy sập,
+	// Ctrl-C) nằm lại `running` vĩnh viễn — xem Runner.Huy.
+	"flow.cancel",
 	"flow.save",
 	"flow.delete",
 }
@@ -1173,6 +1176,14 @@ func (a *API) FlowResume(ctx context.Context, runID int64, defaultProfile Addr) 
 		return flow.Result{}, err
 	}
 	return a.runner(defaultProfile).Resume(ctx, runID, f)
+}
+
+// FlowCancel — action "flow.cancel". Đánh dấu một lần chạy dở dang là ĐÃ HUỶ.
+//
+// KHÔNG giết tiến trình nào: sổ trạng thái và tiến trình là hai chuyện. Dừng
+// tiến trình là việc của `sagent stop`.
+func (a *API) FlowCancel(runID int64, by string) error {
+	return a.runner(Addr{}).Huy(runID, by)
 }
 
 // FlowRunDetail trả về lần chạy + trạng thái từng bước + định nghĩa flow.

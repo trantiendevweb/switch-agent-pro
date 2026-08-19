@@ -181,6 +181,28 @@ func (s *Server) handleFlowDecide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"decided": "approved"})
 }
 
+// POST /api/flow/cancel — đánh dấu một lượt chạy dở dang là ĐÃ HUỶ.
+//
+// Có mặt ở web chứ không chỉ ở terminal, vì đây đúng là chỗ người ta phát hiện
+// ra vấn đề: bảng lịch sử hiện một lượt "đang chạy" từ đêm qua. Bắt họ mở
+// terminal để dọn thứ họ vừa nhìn thấy là làm ngược luật ngang quyền.
+//
+// KHÔNG giết tiến trình nào — xem flow.Runner.Huy.
+func (s *Server) handleFlowCancel(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := s.api.FlowCancel(req.ID, s.who()); err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, map[string]string{"cancelled": "ok"})
+}
+
 // GET /api/flow/def?name=x — định nghĩa đầy đủ của một flow, để bảng vẽ dựng lại.
 func (s *Server) handleFlowDef(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")

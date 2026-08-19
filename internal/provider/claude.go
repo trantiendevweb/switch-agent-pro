@@ -111,6 +111,18 @@ func (c claude) Verify() []Check {
 
 // TokenExpiry đọc claudeAiOauth.expiresAt (mili-giây từ epoch).
 // Đã đo 2026-08-17: cửa sổ khoảng 7,5 giờ.
+// Đo 2026-08-19 19:30, CLI 2.1.229: một lần đăng nhập mới ghi ra
+// `expiresAt: 0` kèm `refreshTokenExpiresAt: 1789617873859` (17/09/2026).
+// Bản cũ chỉ đọc expiresAt, gặp 0 thì trả "không đọc được hạn" — và
+// Profile.HetHan mặc định false, nên `sagent ds` in "sẵn sàng" VÔ ĐIỀU KIỆN
+// cho một tài khoản mà nó không hề biết còn sống hay không.
+//
+// Đúng cái lỗ commit 0bcb903 đã bịt, hở lại vì provider đổi HÌNH DẠNG DỮ LIỆU
+// chứ không đổi câu chữ. docs/DO-LUONG.md đã cảnh báo đúng cơ chế này.
+//
+// Vì sao refreshTokenExpiresAt là mốc đúng: còn refresh token sống thì CLI tự
+// đổi được access token mới. Câu hỏi người dùng cần trả lời là "tài khoản này
+// còn dùng được không", chứ không phải "access token hiện tại còn mấy phút".
 func (claude) TokenExpiry(dir string) (time.Time, bool) {
 	data, err := os.ReadFile(filepath.Join(dir, ".credentials.json"))
 	if err != nil {
@@ -118,13 +130,22 @@ func (claude) TokenExpiry(dir string) (time.Time, bool) {
 	}
 	var f struct {
 		ClaudeAiOauth struct {
-			ExpiresAt int64 `json:"expiresAt"`
+			ExpiresAt        int64 `json:"expiresAt"`
+			RefreshExpiresAt int64 `json:"refreshTokenExpiresAt"`
 		} `json:"claudeAiOauth"`
 	}
-	if json.Unmarshal(data, &f) != nil || f.ClaudeAiOauth.ExpiresAt == 0 {
+	if json.Unmarshal(data, &f) != nil {
 		return time.Time{}, false
 	}
-	return time.UnixMilli(f.ClaudeAiOauth.ExpiresAt), true
+	if ms := f.ClaudeAiOauth.ExpiresAt; ms != 0 {
+		return time.UnixMilli(ms), true
+	}
+	if ms := f.ClaudeAiOauth.RefreshExpiresAt; ms != 0 {
+		return time.UnixMilli(ms), true
+	}
+	// Không trường nào đọc được: nói THẬT là không biết. Bên gọi (Profile.HetHan)
+	// sẽ để trống thay vì đoán — thà không biết còn hơn đoán sai theo hướng lạc quan.
+	return time.Time{}, false
 }
 
 func (claude) SharedKeys() []string { return claudeSharedKeys }

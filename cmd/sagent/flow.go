@@ -40,13 +40,18 @@ func cmdFlow(args []string) {
 		flowDecide(args[1:], true)
 	case "reject", "tu-choi":
 		flowDecide(args[1:], false)
+	case "huy", "cancel":
+		if len(args) < 2 {
+			fail(fmt.Errorf("thiếu số lần chạy. Ví dụ: sagent flow huy 30"))
+		}
+		flowHuy(args[1])
 	case "resume", "tiep":
 		if len(args) < 2 {
 			fail(fmt.Errorf("thiếu số lần chạy. Ví dụ: sagent flow resume 3"))
 		}
 		flowResume(args[1])
 	default:
-		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | approve | reject | resume", sub))
+		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | approve | reject | resume | huy", sub))
 	}
 }
 

@@ -147,6 +147,7 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"flow.show":     "/api/flow/def",
 		"flow.run":      "/api/flow/run",
 		"flow.approve":  "/api/flow/decide",
+		"flow.cancel":   "/api/flow/cancel",
 		"flow.save":     "/api/flow/save",
 		"flow.delete":   "/api/flow/delete",
 		"flow.runs":     "/api/state",
@@ -156,16 +157,16 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 	}
 	// Miễn trừ CÓ LÝ DO — không phải danh sách để nhét cho qua test.
 	mienTru := map[string]string{
-		"dash.serve":      "mặt web không tự khởi động chính nó được",
-		"config.version":  "hiện trong /api/state, chưa tách endpoint riêng",
-		"profile.list":    "hiện trong /api/state",
-		"profile.create":  "tạo hồ sơ dẫn tới ĐĂNG NHẬP — phải làm ở terminal, xem docs/DO-LUONG.md",
-		"profile.remove":  "xoá thư mục thật; cố ý không cho bấm nhầm từ trình duyệt",
-		"profile.sync":    "chạm token của mọi hồ sơ; giữ ở terminal",
-		"profile.verify":  "spawn CLI của provider; giữ ở terminal",
-		"clones.create":   "đi kèm fleet.start",
-		"clones.clean":    "xoá thư mục thật; giữ ở terminal",
-		"config.init":     "ghi file vào thư mục dự án; giữ ở terminal",
+		"dash.serve":     "mặt web không tự khởi động chính nó được",
+		"config.version": "hiện trong /api/state, chưa tách endpoint riêng",
+		"profile.list":   "hiện trong /api/state",
+		"profile.create": "tạo hồ sơ dẫn tới ĐĂNG NHẬP — phải làm ở terminal, xem docs/DO-LUONG.md",
+		"profile.remove": "xoá thư mục thật; cố ý không cho bấm nhầm từ trình duyệt",
+		"profile.sync":   "chạm token của mọi hồ sơ; giữ ở terminal",
+		"profile.verify": "spawn CLI của provider; giữ ở terminal",
+		"clones.create":  "đi kèm fleet.start",
+		"clones.clean":   "xoá thư mục thật; giữ ở terminal",
+		"config.init":    "ghi file vào thư mục dự án; giữ ở terminal",
 	}
 
 	s := newTestServer(t)

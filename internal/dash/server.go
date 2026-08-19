@@ -68,6 +68,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
 	m.HandleFunc("/api/flow/run", s.guard(s.handleFlowRun))
 	m.HandleFunc("/api/flow/decide", s.guard(s.handleFlowDecide))
+	m.HandleFunc("/api/flow/cancel", s.guard(s.handleFlowCancel))
 	m.HandleFunc("/api/flow/save", s.guard(s.handleFlowSave))
 	m.HandleFunc("/api/flow/delete", s.guard(s.handleFlowDelete))
 	m.HandleFunc("/api/flow/def", s.guard(s.handleFlowDef))
@@ -682,9 +683,9 @@ func (s *Server) handleDB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{
-		"duong_dan":   path,
-		"schema":      v,
-		"schema_moi":  latest,
+		"duong_dan":    path,
+		"schema":       v,
+		"schema_moi":   latest,
 		"can_nang_cap": v < latest,
 	})
 }

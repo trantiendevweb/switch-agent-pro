@@ -76,6 +76,7 @@ func init() {
 		"__fsave": {"flow.save", "luu flow vao flows.toml", nil},
 		"__fdel":  {"flow.delete", "xoa flow khoi flows.toml", nil},
 		"__fapp":  {"flow.approve", "duyệt/từ chối bước đang chờ", nil},
+		"__fhuy":  {"flow.cancel", "huỷ một lượt chạy dở dang", nil},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},
 	}

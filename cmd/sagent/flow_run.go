@@ -236,3 +236,19 @@ func flowRunChiTiet(arg string) {
 			tongChiPhi, tongVao, tongRa)
 	}
 }
+
+// flowHuy đánh dấu một lượt chạy dở dang là đã huỷ. Không giết tiến trình nào —
+// nhắc người dùng kiểm `sagent status` để họ biết mình mới làm cái nào.
+func flowHuy(idStr string) {
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		fail(fmt.Errorf("số lần chạy phải là số, được %q", idStr))
+	}
+	a, done := open()
+	defer done()
+	if err := a.FlowCancel(id, whoAmI()); err != nil {
+		fail(err)
+	}
+	fmt.Printf("  ✓ đã đánh dấu lượt chạy #%d là ĐÃ HUỶ.\n", id)
+	fmt.Println("    Tiến trình thì KHÔNG bị đụng — kiểm bằng `sagent status`, dừng bằng `sagent stop all`.")
+}
