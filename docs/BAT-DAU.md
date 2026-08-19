@@ -94,3 +94,6 @@ Dưới đây là các trường hợp thường gặp nhất và cách xử lý
 | Cài đặt / cập nhật báo: `sagent.exe đang chạy và không đổi tên được` | Có một tiến trình hoặc trang quản lý cũ đang chạy nền nên Windows khoá file. | Gõ lệnh: `sagent stop all` để dừng toàn bộ phiên đang chạy, sau đó chạy lại lệnh cài đặt. |
 | Dùng Grok bị báo lỗi `503 No available channel` | Công cụ Grok yêu cầu chỉ định rõ tên mô hình AI muốn dùng. | Thêm `-m <tên-model>` vào câu lệnh, ví dụ: `sagent goc grok -m grok-4.5 -p "việc cần làm"`. |
 | Dùng Antigravity không tạo được nhiều tài khoản | Phần mềm Antigravity lưu thông tin đăng nhập trong phần quản lý mật khẩu chung của Windows. | Mỗi máy tính hiện chỉ dùng được **1 tài khoản Antigravity** tại một thời điểm (đây là giới hạn của chính Antigravity, không phải lỗi của `sagent`). |
+
+> 📌 **Gặp sự cố khác?** Xem ngay [**Sổ tay gỡ rối & khắc phục sự cố (docs/KHAC-PHUC-SU-CO.md)**](KHAC-PHUC-SU-CO.md) để xử lý các sự cố trong quá trình chạy quy trình, hết hạn token, kẹt tiến trình hoặc lỗi dữ liệu.
+
