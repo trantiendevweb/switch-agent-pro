@@ -310,6 +310,7 @@ chặn về mặt dữ liệu.
 | File | Nội dung |
 |---|---|
 | [`docs/BAT-DAU.md`](docs/BAT-DAU.md) | **5 phút đầu tiên** — hướng dẫn bắt đầu nhanh cho người không rành kỹ thuật |
+| [`docs/KHAC-PHUC-SU-CO.md`](docs/KHAC-PHUC-SU-CO.md) | **Sổ tay gỡ rối & khắc phục sự cố** — hướng dẫn xử lý các sự cố thực tế cho người vận hành |
 | [`docs/MASTER-PLAN.md`](docs/MASTER-PLAN.md) | **Lộ trình chính** — kiến trúc, 8 pha, DoD |
 | [`docs/THIET-KE.md`](docs/THIET-KE.md) | Vì sao thiết kế như vậy |
 | [`docs/DO-LUONG.md`](docs/DO-LUONG.md) | Báo cáo đo — cái gì đã chứng minh, cái gì chưa |
