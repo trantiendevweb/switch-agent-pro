@@ -2044,3 +2044,12 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
 - **Con số / Bằng chứng**: File thực thi `sagent.exe` có dung lượng thực tế là **12.3 MB** (làm tròn 12 MB). Con số 11 MB ghi trong tài liệu trước đó xuất phát từ thời điểm sản phẩm còn ít tính năng.
 - **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `2922dd3`). Cập nhật lại số đo thực tế trong `README.md` và `docs/BAT-DAU.md`.
 
+## 19/08 — Phát hiện agent CHẠY QUẨN, không chỉ giới hạn thiệt hại
+
+- **Đo lúc nào**: Số đo gốc là lần chạy #21 (18/08), xem mục "flow báo `completed`, thật ra 3/5 bước hỏng" ở trên. Phần phát hiện làm tối 19/08.
+- **Đo bằng cách nào**: Bước `soi` chạy bằng `grok:api` gọi đúng `ls -la` **399 lần liên tiếp** rồi mới bị trần `--max-tool-rounds` chặn — tool `bash` của Grok chạy qua `cmd.exe` nên lệnh Unix trượt, mà nó không đổi cách. Bước vẫn được đánh dấu `done`.
+- **Con số / Bằng chứng**: Việc đã làm sau #21 là hạ trần vòng tool xuống 60. Trần chỉ giới hạn THIỆT HẠI, nó không phát hiện được gì: 60 vòng `ls -la` vẫn là 60 vòng vô ích và bước vẫn báo xong. Nay `KetQua` đếm chuỗi lời gọi tool **giống hệt nhau liên tiếp** dài nhất, đọc từ khối `tool_use` (tên tool + tham số) trong bản ghi stream-json — không dò chữ. Vượt 10 thì `Hong()` nói thẳng: *agent lặp lại lệnh "ls -la" 399 lần liên tiếp — nghi chạy quẩn, KHÔNG phải lỗi code*.
+- **Ngưỡng 10 được bao nhiêu bằng chứng**: Chỉ được MỘT MẶT. 399 ≫ 10 nên chắc chắn không bỏ sót ca thật. Mặt kia — có bắt oan lượt chạy bình thường không — **chưa đo được**: chưa đếm chuỗi lặp dài nhất trên một bản ghi lượt-chạy-bình-thường nào. Phòng bắt oan bằng thiết kế chứ không bằng số đo: đếm chuỗi LIÊN TIẾP (chạy `git status` nhiều lần trong một bước là bình thường, nhưng giữa chúng có tool khác nên chuỗi bị ngắt) và chữ ký gồm CẢ THAM SỐ (`Read` 30 file khác nhau là đang làm việc, `Read` đúng một file 30 lần mới là quẩn).
+- **Chưa làm được**: (1) Ca quẩn XEN KẼ (A,B,A,B,…) không bắt được — chưa gặp bản ghi nào như vậy, mở rộng bây giờ là đoán. (2) Trớ trêu: provider gây ra ca #21 là Grok thì **chưa đọc được kết quả có cấu trúc**, nên với nó trần 60 vòng vẫn là thứ duy nhất cứu. (3) Antigravity phát `step_update` chỉ mang `tool_name`, KHÔNG mang tham số, nên cố tình không kết luận — `Quan()` trả về "không biết", khác hẳn "không quẩn".
+- **Đã sửa hay chưa**: **ĐÃ SỬA** phần phát hiện cho Claude. Nghiệm thu bằng `internal/provider/quan_test.go` (quẩn thật 399 vòng, lặp bình thường không bị bắt, thiếu dữ liệu thì nói không biết); mỗi test đã chứng minh đỏ khi gỡ đúng phần logic nó canh.
+

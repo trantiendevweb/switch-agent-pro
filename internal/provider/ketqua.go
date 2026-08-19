@@ -42,6 +42,16 @@ type KetQua struct {
 
 	// HanMucDenLai: mốc thời gian (unix) hạn mức được cấp lại, 0 nếu không rõ.
 	HanMucDenLai int64
+
+	// Ba trường dưới đây phục vụ phát hiện CHẠY QUẨN — xem quan.go.
+	//
+	// LenhLap là lời gọi tool bị lặp liên tiếp nhiều nhất trong lượt, SoLanLap là
+	// độ dài chuỗi lặp đó. DemDuocTool nói bản ghi có mang lời gọi tool KÈM THAM
+	// SỐ hay không: thiếu nó thì SoLanLap=0 KHÔNG có nghĩa "không quẩn", mà là
+	// "không biết" — hai thứ đó không được nhập làm một.
+	LenhLap     string
+	SoLanLap    int
+	DemDuocTool bool
 }
 
 // Hong trả về lý do nếu lượt chạy này KHÔNG thành công, hoặc "" nếu ổn.
@@ -49,10 +59,21 @@ type KetQua struct {
 // Đây là bản thay thế cho việc dò chuỗi: mọi kết luận đều đọc từ trường có tên,
 // nên provider đổi câu chữ cũng không ảnh hưởng.
 func (k KetQua) Hong() string {
+	if k.CoLoi && k.LoiAPI != "" {
+		return "agent báo lỗi (" + k.Loai + "): " + k.LoiAPI
+	}
+	// Chạy quẩn xét TRƯỚC mọi kết luận còn lại (trừ lỗi API, thứ luôn cụ thể hơn)
+	// vì nó GIẢI THÍCH được những kết luận kia. Lượt quẩn thường kết thúc bằng
+	// `error_max_turns` hoặc không trả lời gì; nói "hết vòng tool" thì đúng mà vô
+	// dụng, nói "lặp `ls -la` 399 lần" thì người đọc biết ngay phải sửa gì.
+	//
+	// Cũng vì thế nó phải xét cả khi lượt chạy trông như THÀNH CÔNG: ca đo được ở
+	// lần chạy #21 quẩn 399 vòng mà bước vẫn `done`. Quẩn xong vẫn nặn ra được
+	// một câu trả lời là ca nguy hiểm nhất, không phải ca vô hại.
+	if ly, biet := k.Quan(); biet && ly != "" {
+		return ly
+	}
 	if k.CoLoi {
-		if k.LoiAPI != "" {
-			return "agent báo lỗi (" + k.Loai + "): " + k.LoiAPI
-		}
 		return "agent báo lỗi: " + k.lyDo()
 	}
 	if k.TuChoiSo > 0 && k.TraLoi == "" {
