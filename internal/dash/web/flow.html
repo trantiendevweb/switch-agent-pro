@@ -112,6 +112,16 @@
     #right.open{transform:none}
     #log{display:none}
   }
+
+  /* Nút có transition, và bảng phải bên phải TRƯỢT vào khi mở trên màn hình
+     nhỏ. Máy nào bật "giảm chuyển động" thì phải tắt hết: với người bị rối loạn
+     tiền đình, chuyển động không phải trang trí mà là thứ gây chóng mặt thật.
+     Bảng vẫn mở ra bình thường, chỉ là hiện ngay chứ không trượt. */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{
+      animation-duration:.01ms !important;animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;scroll-behavior:auto !important}
+  }
 </style>
 </head>
 <body>

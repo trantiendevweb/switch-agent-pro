@@ -68,6 +68,7 @@ func init() {
 		"db":      {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
 		"api":     {"api.call", "gọi thẳng AI API (đường thứ hai)", cmdAPI},
 		"version": {"config.version", "phiên bản của binary này", func(a []string) { cmdVersion() }},
+		"tele":    {"tele.notify", "báo Telegram khi lượt chạy có sự cố", cmdTele},
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},
@@ -661,6 +662,14 @@ func cmdHelp() {
     sagent flow approve <#> <bước>   duyệt để chạy tiếp
     sagent flow reject  <#> <bước>   từ chối, huỷ lần chạy
     sagent flow resume  <#>     chạy tiếp sau khi máy khởi động lại
+
+  Báo tin ra ngoài:
+
+    sagent tele                 xem đã bật báo Telegram chưa
+    sagent tele --set-token <token> --chat <chat id>
+                                lưu bot + nơi nhận vào ~/.ai-accounts/telegram.json
+                                (NGOÀI repo). Chưa đặt thì máy im lặng.
+    sagent tele --thu           gửi một tin thử để biết đường báo tin đã thông
 
   Dashboard:
 

@@ -63,6 +63,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/quet", s.guard(s.handleQuet))
 	m.HandleFunc("/api/db", s.guard(s.handleDB))
 	m.HandleFunc("/api/ai", s.guard(s.handleAI))
+	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
@@ -622,6 +623,34 @@ func (s *Server) handleQuet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"muc": out, "da_giet": req.Giet})
 }
 
+// handleTele — action "tele.notify" nhìn từ mặt web.
+//
+// GET trả trạng thái, POST gửi tin thử. Cố ý KHÔNG cho đặt token từ trình duyệt:
+// token bot là bí mật, mà dash có chế độ phơi ra mạng (`--host 0.0.0.0`) — một
+// secret gõ vào ô input sẽ nằm lại trong autofill, lịch sử và ảnh chụp màn hình.
+// Đặt token là việc của terminal, đúng như tạo hồ sơ và đặt API key.
+//
+// Nhưng trạng thái và nút "gửi thử" thì phải có ở đây: người dùng cần biết đường
+// báo tin còn thông TRƯỚC khi giao cho máy chạy flow qua đêm.
+func (s *Server) handleTele(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		if err := s.api.TeleThu(r.Context()); err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"da_gui": true})
+		return
+	}
+	da, chatID, duongDan := s.api.TeleTrangThai()
+	// Không có trường nào cho token — DTO liệt kê tường minh chính là lá chắn.
+	writeJSON(w, map[string]any{
+		"da_cau_hinh": da,
+		"chat_id":     chatID,
+		"duong_dan":   duongDan,
+		"bao_khi":     []string{"bước hỏng", "lượt chạy hỏng", "lượt chạy chờ duyệt", "lượt chạy xong"},
+	})
+}
+
 // handleAI — action "api.call": gọi thẳng AI API.
 //
 // GET liệt kê route (không bao giờ trả key_id ra ngoài đã đủ, nhưng vẫn không trả
@@ -681,9 +710,9 @@ func (s *Server) handleDB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{
-		"duong_dan":   path,
-		"schema":      v,
-		"schema_moi":  latest,
+		"duong_dan":    path,
+		"schema":       v,
+		"schema_moi":   latest,
 		"can_nang_cap": v < latest,
 	})
 }

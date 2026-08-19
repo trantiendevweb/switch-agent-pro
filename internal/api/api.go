@@ -30,6 +30,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
+	"github.com/trantiendevweb/switch-agent-pro/internal/tele"
 	"github.com/trantiendevweb/switch-agent-pro/internal/workspace"
 )
 
@@ -82,6 +83,9 @@ var Actions = []string{
 	"flow.approve",
 	"flow.save",
 	"flow.delete",
+	// Báo tin ra ngoài. Bốn mặt điều khiển đều phải MỞ RA mới thấy chuyện gì
+	// xảy ra; đây là mặt duy nhất tự tìm tới người dùng khi lượt chạy có sự cố.
+	"tele.notify",
 }
 
 // API gom mọi thứ một mặt cần. Tạo bằng New, nhớ Close.
@@ -89,6 +93,10 @@ type API struct {
 	db  *store.DB
 	bus *events.Bus
 	cfg config.Config
+
+	// dungBao gỡ bộ báo Telegram khỏi bus. Luôn khác nil (chưa cấu hình thì là
+	// hàm rỗng), nhờ vậy Close không phải nhớ kiểm.
+	dungBao func()
 }
 
 // New mở store và nạp cấu hình cho thư mục làm việc dir.
@@ -101,10 +109,24 @@ func New(dir string) (*API, error) {
 	if err != nil {
 		return nil, fmt.Errorf("không mở được sổ trạng thái (%s): %w", store.Path(), err)
 	}
-	return &API{db: db, bus: events.NewBus(), cfg: cfg}, nil
+	a := &API{db: db, bus: events.NewBus(), cfg: cfg}
+	// Cắm bộ báo Telegram vào ĐÚNG luồng event mà bốn mặt kia đang nghe, ngay
+	// tại hợp đồng — không phải trong CLI. Nếu gắn ở CLI thì flow chạy từ
+	// dashboard sẽ hỏng trong im lặng, mà đó mới là lúc người dùng không ngồi
+	// nhìn màn hình. Chưa cấu hình thì tele.Nghe không đăng ký gì cả.
+	a.dungBao = tele.Nghe(a.bus)
+	return a, nil
 }
 
-func (a *API) Close() error { a.bus.Close(); return a.db.Close() }
+func (a *API) Close() error {
+	if a.dungBao != nil {
+		// Gỡ TRƯỚC khi đóng bus: để tin cuối cùng (thường là tin báo hỏng) kịp
+		// bay đi trước khi tiến trình thoát.
+		a.dungBao()
+	}
+	a.bus.Close()
+	return a.db.Close()
+}
 
 // Events là luồng sự thật để mọi mặt bám vào.
 func (a *API) Events() *events.Bus { return a.bus }
@@ -828,10 +850,17 @@ func (a *API) waitSessions(ctx context.Context, ids []int64) error {
 }
 
 func (a *API) runner(defaultProfile Addr) *flow.Runner {
+	// Tài khoản mặc định đi kèm để event báo hỏng nói được "chạy bằng tài khoản
+	// nào" — bước không khai `profile` thì đây là câu trả lời duy nhất đúng.
+	mac := ""
+	if defaultProfile.Account != "" {
+		mac = defaultProfile.String()
+	}
 	return &flow.Runner{
 		DB: a.db, Bus: a.bus,
-		Agent:       agentBridge{a: a, fallback: defaultProfile},
-		MaxParallel: a.cfg.Policy.MaxParallelSessions,
+		Agent:          agentBridge{a: a, fallback: defaultProfile},
+		DefaultProfile: mac,
+		MaxParallel:    a.cfg.Policy.MaxParallelSessions,
 		// Node `test`/`lint` lấy lệnh từ .sagent/project.toml, khỏi lặp lại
 		// trong từng flow.
 		Commands: map[string][]string{
@@ -918,6 +947,35 @@ func (a *API) FlowApprove(ctx context.Context, runID int64, stepID, by string, o
 	}
 	return a.FlowResume(ctx, runID, defaultProfile)
 }
+
+// ---------------------------- báo tin ----------------------------
+
+// TeleTrangThai — phần ĐỌC của action "tele.notify".
+//
+// Cố ý không có đường nào trả token ra: token đi tới trình duyệt là token nằm
+// lại trong lịch sử, cache và ảnh chụp màn hình. Mặt nào cũng chỉ cần biết
+// "đã cấu hình chưa, nhắn vào đâu, file nằm ở đâu".
+func (a *API) TeleTrangThai() (daCauHinh bool, chatID, duongDan string) {
+	b := tele.Mo()
+	return b.DaCauHinh(), b.ChatID(), tele.ConfigPath()
+}
+
+// TeleDat — phần GHI của action "tele.notify": lưu token bot + chat id.
+//
+// Ghi ra ~/.ai-accounts/telegram.json chứ KHÔNG vào repo. Đổi cấu hình chỉ có
+// hiệu lực từ lần mở API sau, vì bộ nghe bus được cắm lúc New — nói rõ ở CLI
+// thay vì để người dùng ngồi đoán tại sao chưa thấy tin.
+func (a *API) TeleDat(token, chatID string) error {
+	if err := tele.Save(tele.Config{Token: token, ChatID: chatID}); err != nil {
+		return err
+	}
+	a.bus.Infof("đã lưu cấu hình Telegram vào %s", tele.ConfigPath())
+	return nil
+}
+
+// TeleThu — gửi một tin thử, để biết đường báo tin thông TRƯỚC khi trông cậy
+// vào nó lúc nửa đêm.
+func (a *API) TeleThu(ctx context.Context) error { return tele.Mo().Thu(ctx) }
 
 // ---------------------------- lặt vặt ----------------------------
 
