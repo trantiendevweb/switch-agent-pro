@@ -10,3 +10,7 @@
 
 # tools/sync-docs.sh chạy bằng Git Bash trên Windows, vẫn cần LF.
 *.sh text eol=lf
+
+# Asset vendor (three.js + font woff2) phải giữ NGUYÊN BYTE: chúng được nhúng
+# thẳng vào binary, và git tự đổi LF→CRLF trên Windows sẽ sửa nội dung file.
+internal/dash/web/vendor/** binary
