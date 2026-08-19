@@ -129,6 +129,16 @@ function mauToken(ten){
 // Trạng thái — CÙNG bộ token mà 2D dùng cho pill/chấm (vendor/token.css):
 // --run --done --error --pending --idle. Trước đây 3D có bộ riêng, nên một
 // bước "xong" ở bảng 2D là xanh lá còn ở 3D là xanh dương.
+// Bản CHUỖI của mauToken: canvas 2D nhận chuỗi CSS, không nhận số như WebGL.
+// Tách riêng chứ không viết cứng #070810 hai chỗ trong mascotTex — token.css đổi
+// nền mà mặt robot giữ màu cũ thì lệch ngầm, đúng thứ design system sinh ra để
+// chặn (xem designsystem_test.go).
+function mauChuoi(ten, duPhong){
+  const v = (CSS_ROOT.getPropertyValue(ten) || '').trim();
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v) ? v : duPhong;
+}
+const NEN = mauChuoi('--void', '#070810');
+
 const MAU_TT = {running:mauToken('--run'), done:mauToken('--done'),
                 failed:mauToken('--error'), pending:mauToken('--pending'),
                 '':mauToken('--idle')};
@@ -282,9 +292,9 @@ function mascotTex(key,tint){
   const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
   const g=x.createRadialGradient(128,150,8,128,150,132);g.addColorStop(0,bh+'55');g.addColorStop(1,bh+'00');x.fillStyle=g;x.fillRect(0,0,256,256);
   x.strokeStyle=bh;x.lineWidth=8;x.beginPath();x.moveTo(128,74);x.lineTo(128,52);x.stroke();x.fillStyle=bh;x.beginPath();x.arc(128,48,7,0,7);x.fill();
-  x.fillStyle='#070810';rr(x,64,74,128,106,30);x.fill();x.strokeStyle=bh;x.lineWidth=6;x.stroke();
+  x.fillStyle=NEN;rr(x,64,74,128,106,30);x.fill();x.strokeStyle=bh;x.lineWidth=6;x.stroke();
   x.fillStyle=bh;x.beginPath();x.arc(104,150,13,0,7);x.arc(152,150,13,0,7);x.fill();
-  x.fillStyle='#070810';x.beginPath();x.arc(108,150,5,0,7);x.arc(156,150,5,0,7);x.fill();
+  x.fillStyle=NEN;x.beginPath();x.arc(108,150,5,0,7);x.arc(156,150,5,0,7);x.fill();
   x.strokeStyle=bh;x.lineWidth=5;x.beginPath();x.arc(128,166,13,.15*Math.PI,.85*Math.PI);x.stroke();
   const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;
 }
