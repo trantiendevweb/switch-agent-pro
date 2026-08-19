@@ -77,9 +77,25 @@ func (claude) IdentitySource() string {
 	return filepath.Join(paths.Home(), ".claude", ".claude.json")
 }
 
+// HasToken: file tồn tại là CHƯA ĐỦ.
+//
+// Đo 19/08 19:30 — một lần đăng nhập DỞ DANG vẫn để lại .credentials.json đầy
+// đủ trường (accessToken, refreshToken, scopes, subscriptionType "max"), chỉ
+// khác đúng một chỗ: `expiresAt: 0`. Hỏi thẳng CLI trên đúng hồ sơ đó:
+//
+//	claude auth status  ->  {"loggedIn": false, "authMethod": "none"}
+//
+// Trong khi tài khoản gốc đang chạy được có expiresAt = 1787156212029 (một mốc
+// thật). Nói cách khác `expiresAt: 0` KHÔNG phải "không ghi hạn", nó là dấu vết
+// của một token không dùng được.
+//
+// Bản trước chỉ kiểm file có tồn tại, nên `sagent ds` in "sẵn sàng" và cổng
+// kiểm tài khoản cho lượt chạy #31 đi qua — rồi bước code-go chết ngay với
+// "OAuth session expired and could not be refreshed". Đúng cái bệnh mà
+// Profile.HetHan sinh ra để chữa, chỉ là lọt qua bằng một cửa khác.
 func (claude) HasToken(dir string) bool {
-	_, err := os.Stat(filepath.Join(dir, ".credentials.json"))
-	return err == nil
+	ms, err := hanTokenClaude(dir)
+	return err == nil && ms != 0
 }
 
 func (claude) Identity(dir string) string {
@@ -111,41 +127,29 @@ func (c claude) Verify() []Check {
 
 // TokenExpiry đọc claudeAiOauth.expiresAt (mili-giây từ epoch).
 // Đã đo 2026-08-17: cửa sổ khoảng 7,5 giờ.
-// Đo 2026-08-19 19:30, CLI 2.1.229: một lần đăng nhập mới ghi ra
-// `expiresAt: 0` kèm `refreshTokenExpiresAt: 1789617873859` (17/09/2026).
-// Bản cũ chỉ đọc expiresAt, gặp 0 thì trả "không đọc được hạn" — và
-// Profile.HetHan mặc định false, nên `sagent ds` in "sẵn sàng" VÔ ĐIỀU KIỆN
-// cho một tài khoản mà nó không hề biết còn sống hay không.
-//
-// Đúng cái lỗ commit 0bcb903 đã bịt, hở lại vì provider đổi HÌNH DẠNG DỮ LIỆU
-// chứ không đổi câu chữ. docs/DO-LUONG.md đã cảnh báo đúng cơ chế này.
-//
-// Vì sao refreshTokenExpiresAt là mốc đúng: còn refresh token sống thì CLI tự
-// đổi được access token mới. Câu hỏi người dùng cần trả lời là "tài khoản này
-// còn dùng được không", chứ không phải "access token hiện tại còn mấy phút".
 func (claude) TokenExpiry(dir string) (time.Time, bool) {
+	ms, err := hanTokenClaude(dir)
+	if err != nil || ms == 0 {
+		return time.Time{}, false
+	}
+	return time.UnixMilli(ms), true
+}
+
+// hanTokenClaude đọc claudeAiOauth.expiresAt (mili-giây). 0 = không có mốc.
+func hanTokenClaude(dir string) (int64, error) {
 	data, err := os.ReadFile(filepath.Join(dir, ".credentials.json"))
 	if err != nil {
-		return time.Time{}, false
+		return 0, err
 	}
 	var f struct {
 		ClaudeAiOauth struct {
-			ExpiresAt        int64 `json:"expiresAt"`
-			RefreshExpiresAt int64 `json:"refreshTokenExpiresAt"`
+			ExpiresAt int64 `json:"expiresAt"`
 		} `json:"claudeAiOauth"`
 	}
-	if json.Unmarshal(data, &f) != nil {
-		return time.Time{}, false
+	if err := json.Unmarshal(data, &f); err != nil {
+		return 0, err
 	}
-	if ms := f.ClaudeAiOauth.ExpiresAt; ms != 0 {
-		return time.UnixMilli(ms), true
-	}
-	if ms := f.ClaudeAiOauth.RefreshExpiresAt; ms != 0 {
-		return time.UnixMilli(ms), true
-	}
-	// Không trường nào đọc được: nói THẬT là không biết. Bên gọi (Profile.HetHan)
-	// sẽ để trống thay vì đoán — thà không biết còn hơn đoán sai theo hướng lạc quan.
-	return time.Time{}, false
+	return f.ClaudeAiOauth.ExpiresAt, nil
 }
 
 func (claude) SharedKeys() []string { return claudeSharedKeys }

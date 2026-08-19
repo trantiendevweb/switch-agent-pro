@@ -16,74 +16,75 @@ func ghiCred(t *testing.T, noiDung string) string {
 	return dir
 }
 
-// CA DA NO THAT — do 2026-08-19 19:30, CLI 2.1.229.
+// CA DA NO THAT — do 19/08 19:30, sau mot lan dang nhap DO DANG.
 //
-// Mot lan dang nhap MOI ghi ra `expiresAt: 0` kem `refreshTokenExpiresAt`.
-// Ban cu chi doc expiresAt, gap 0 thi tra "khong doc duoc han" -> Profile.HetHan
-// mac dinh false -> `sagent ds` in "san sang" VO DIEU KIEN cho mot tai khoan ma
-// no khong he biet con song hay khong. Va cong kiem tai khoan cua `flow run`
-// cung mu theo, vi no dua tren dung truong do.
+// File .credentials.json duoc ghi ra DAY DU TRUONG: accessToken, refreshToken,
+// scopes, subscriptionType "max", refreshTokenExpiresAt cua thang sau. Chi khac
+// dung mot cho: `expiresAt: 0`. Hoi thang CLI tren dung ho so do:
 //
-// Day la nguyen van hinh dang do duoc (token da thay bang chu gia).
-const credHinhDangMoi = `{"claudeAiOauth":{
+//	claude auth status  ->  {"loggedIn": false, "authMethod": "none"}
+//
+// Ban cu chi kiem FILE CO TON TAI nen bao "san sang", cong kiem tai khoan cho
+// luot chay #31 di qua, roi buoc code-go chet ngay voi "OAuth session expired
+// and could not be refreshed".
+const credDangNhapDoDang = `{"claudeAiOauth":{
   "accessToken":"gia-lap","refreshToken":"gia-lap",
   "expiresAt":0,
   "refreshTokenExpiresAt":1789617873859,
   "scopes":"user:inference user:profile",
   "subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}`
 
-func TestDocDuocHanKhiExpiresAtLaSo0(t *testing.T) {
-	dir := ghiCred(t, credHinhDangMoi)
+func TestDangNhapDoDangKhongDuocTinhLaCoToken(t *testing.T) {
+	dir := ghiCred(t, credDangNhapDoDang)
 
-	exp, ok := claude{}.TokenExpiry(dir)
+	if (claude{}).HasToken(dir) {
+		t.Fatal("expiresAt=0 la token khong dung duoc — khong duoc tinh la da dang nhap")
+	}
+}
+
+// Doi chung: tai khoan gocDANG CHAY DUOC luon co expiresAt khac 0.
+func TestTokenThatThiCoExpiresAtKhac0(t *testing.T) {
+	con := time.Now().Add(3 * time.Hour).UnixMilli()
+	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":`+itoa64(con)+`,"refreshTokenExpiresAt":1789617873859}}`)
+
+	if !(claude{}).HasToken(dir) {
+		t.Fatal("token that ma bao la khong co")
+	}
+	exp, ok := (claude{}).TokenExpiry(dir)
 	if !ok {
-		t.Fatal("expiresAt=0 nhung co refreshTokenExpiresAt — phai doc duoc han, khong duoc bo cuoc")
+		t.Fatal("khong doc duoc han cua token that")
 	}
-	muon := time.UnixMilli(1789617873859)
-	if !exp.Equal(muon) {
-		t.Fatalf("han sai: duoc %s, muon %s", exp, muon)
-	}
-	// 17/09/2026 la tuong lai so voi luc do -> tai khoan con dung duoc.
 	if time.Now().After(exp) {
-		t.Fatalf("moc %s bi coi la da qua — kiem lai don vi mili-giay", exp)
+		t.Fatalf("han %s bi coi la da qua — kiem lai don vi mili-giay", exp)
 	}
 }
 
-// Hinh dang CU (expiresAt that) phai giu nguyen hanh vi, va phai duoc UU TIEN:
-// no la han cua access token, sat hon refresh token.
-func TestExpiresAtThatVanDuocUuTien(t *testing.T) {
-	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":1755000000000,"refreshTokenExpiresAt":1789617873859}}`)
-
-	exp, ok := claude{}.TokenExpiry(dir)
-	if !ok {
-		t.Fatal("expiresAt that ma khong doc duoc")
-	}
-	if !exp.Equal(time.UnixMilli(1755000000000)) {
-		t.Fatalf("phai uu tien expiresAt, duoc %s", exp)
-	}
-}
-
-// Khong truong nao doc duoc thi phai noi THAT la khong biet. Doan bua theo huong
-// lac quan ("chac con han") chinh la loi ma commit 0bcb903 da sua mot lan roi.
-func TestKhongTruongNaoThiNoiKhongBiet(t *testing.T) {
-	dir := ghiCred(t, `{"claudeAiOauth":{"accessToken":"gia-lap"}}`)
-
-	if _, ok := (claude{}).TokenExpiry(dir); ok {
-		t.Fatal("khong co truong han nao ma van bao doc duoc")
-	}
-}
-
-// Token da het han that (hinh dang moi) phai bi bat.
-func TestRefreshTokenHetHanThiBiBat(t *testing.T) {
+// Token het han that thi van phai doc duoc han (de con noi "het han luc may
+// gio"), va van tinh la CO token — day la chuyen khac han "chua dang nhap".
+func TestTokenHetHanVanDocDuocMoc(t *testing.T) {
 	qua := time.Now().Add(-48 * time.Hour).UnixMilli()
-	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":0,"refreshTokenExpiresAt":`+itoa64(qua)+`}}`)
+	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":`+itoa64(qua)+`}}`)
 
-	exp, ok := claude{}.TokenExpiry(dir)
+	if !(claude{}).HasToken(dir) {
+		t.Fatal("token het han van la CO token, khac han chua dang nhap")
+	}
+	exp, ok := (claude{}).TokenExpiry(dir)
 	if !ok {
-		t.Fatal("phai doc duoc han")
+		t.Fatal("phai doc duoc moc het han")
 	}
 	if !time.Now().After(exp) {
-		t.Fatalf("refresh token da qua han ma khong bi bat: %s", exp)
+		t.Fatalf("token da qua han ma khong bi bat: %s", exp)
+	}
+}
+
+// Khong co file thi khong co token — va khong duoc hoang bao loi.
+func TestKhongCoFileThiKhongCoToken(t *testing.T) {
+	dir := t.TempDir()
+	if (claude{}).HasToken(dir) {
+		t.Fatal("khong co file ma bao co token")
+	}
+	if _, ok := (claude{}).TokenExpiry(dir); ok {
+		t.Fatal("khong co file ma bao doc duoc han")
 	}
 }
 
