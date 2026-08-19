@@ -16,7 +16,7 @@ Bạn chỉ cần một máy tính chạy Windows 10 hoặc Windows 11. Không c
 iex (irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/install/get.ps1)
 ```
 
-Chờ vài giây để chương trình tự động tải file chạy `sagent.exe` (khoảng 11 MB) và thiết lập sẵn sàng trên máy tính của bạn.
+Chờ vài giây để chương trình tự động tải file chạy `sagent.exe` (khoảng 12 MB) và thiết lập sẵn sàng trên máy tính của bạn.
 
 ---
 

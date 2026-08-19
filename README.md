@@ -3,7 +3,7 @@
 > ⚡ **Mới bắt đầu?** Xem ngay [**Hướng dẫn 5 phút đầu tiên (docs/BAT-DAU.md)**](docs/BAT-DAU.md) — dành riêng cho người không rành kỹ thuật (cách cài đặt 1 dòng, vượt cảnh báo Windows và 3 bước dùng ngay).
 
 **Local-first control plane điều phối nhiều coding agent và nhiều AI API.**
-Một file `.exe` **11 MB**, không phụ thuộc gì, chạy native trên **Windows**,
+Một file `.exe` **12 MB**, không phụ thuộc gì, chạy native trên **Windows**,
 có dashboard quan sát realtime.
 
 ```
@@ -60,7 +60,7 @@ iex (irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/
 > giấy phép, nên mở mã nguồn không gỡ được cảnh báo này. Thay vào đó mỗi bản phát hành có
 > `SHA256SUMS.txt`: trình cài **tự đối chiếu băm**, và bạn kiểm lại tay được bất cứ lúc nào.
 
-Nó tải một file `.exe` (~11 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
+Nó tải một file `.exe` (~12 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
 `%USERPROFILE%\bin` rồi thêm vào PATH của người dùng. Chỉ cần Windows 10 trở lên —
 PowerShell 5.1 có sẵn là đủ. Có bản `amd64` và `arm64`, trình cài tự chọn.
 
