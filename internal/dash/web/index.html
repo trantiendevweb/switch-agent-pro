@@ -4,27 +4,31 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Switch-Agent-Pro — Dashboard</title>
+<!-- Màu và font khai MỘT chỗ: vendor/token.css. Trang không được tự khai lại
+     --run/--pending/--done/--idle/--error — có test giữ (designsystem_test.go). -->
+<link rel="stylesheet" href="vendor/token.css" />
 <style>
   :root{
-    --bg:#0F172A;--primary:#1E293B;--muted:#272F42;--fg:#F8FAFC;--sub:#94A3B8;
-    --border:#475569;--run:#22C55E;--warn:#F59E0B;--limit:#EF4444;--api:#4285F4;
-    --panel:rgba(30,41,59,.55);--ease:cubic-bezier(0.16,1,0.3,1);
     --safe-b:env(safe-area-inset-bottom,0px);
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);
-    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;
+  body{margin:0;background:var(--void);color:var(--hi);
+    font-family:var(--font-body);line-height:1.5;
     -webkit-font-smoothing:antialiased}
-  a{color:#7dd3fc}
-  code{font-family:ui-monospace,Consolas,monospace;font-size:.9em}
+  a{color:var(--link)}
+  /* Dữ liệu máy đi mono, kể cả khi nằm lọt giữa câu văn. */
+  code{font-family:var(--font-mono);font-size:.9em}
   .wrap{max-width:1100px;margin:0 auto;padding:16px 16px calc(24px + var(--safe-b))}
   header{display:flex;align-items:center;gap:12px;padding:6px 0 16px}
-  header .b{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px}
-  #conn{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub)}
-  #conn .d{width:9px;height:9px;border-radius:50%;background:var(--limit)}
+  header .b{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;
+    font-family:var(--font-display)}
+  #conn{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mid)}
+  /* Chấm nối là TRẠNG THÁI, nên được phép có màu. */
+  #conn .d{width:9px;height:9px;border-radius:50%;background:var(--error)}
   #conn.on .d{background:var(--run)}
-  h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin:22px 0 10px}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mid);
+    margin:22px 0 10px;font-family:var(--font-display)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
   /* Motion 6/10 (Standard) theo design system: thẻ nhẹ nhàng trồi lên khi tải.
      So le nhẹ để mắt đi từ trên xuống, KHÔNG dùng back.out vì đây là bảng dữ
      liệu dày (design system cấm: overshoot đọc như cẩu thả trên UI thông tin). */
@@ -32,46 +36,59 @@
   .grid > div{animation:vaosan .34s var(--ease) both}
   .grid > div:nth-child(2){animation-delay:.06s}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
-  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid rgba(71,85,105,.35)}
-  th{color:var(--sub);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;white-space:nowrap}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line)}
+  th{color:var(--lo);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;white-space:nowrap}
   tr:last-child td{border-bottom:0}
-  td.num{font-variant-numeric:tabular-nums}
+  /* Dữ liệu máy: PID, số phiên, provider:account, nơi làm việc — tất cả mono. */
+  td.num,td.may{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
-  .pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
-  .ok{color:var(--run);background:rgba(34,197,94,.13)}
-  .off{color:var(--sub);background:rgba(148,163,184,.12)}
-  .btn{cursor:pointer;background:transparent;color:var(--fg);border:1px solid var(--border);
+  .pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;font-family:var(--font-mono)}
+  .ok{color:var(--run);background:rgba(47,224,160,.13)}
+  /* .warn có được dùng thật (pill "hết hạn — đăng nhập lại") nhưng trước đây
+     không ai khai, nên nó rơi về nền trong suốt — trông y hệt .off. */
+  .pill.warn{color:var(--pending);background:rgba(246,178,61,.13)}
+  .off{color:var(--mid);background:rgba(255,255,255,.06)}
+  /* Nút là KHUNG: đơn sắc. Hover đổi độ sáng viền, không đổi sang màu trạng thái. */
+  .btn{cursor:pointer;background:transparent;color:var(--hi);border:1px solid var(--line-2);
     border-radius:7px;padding:6px 11px;font:inherit;font-size:12px;font-weight:600;transition:all .15s var(--ease)}
-  .btn:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
-  .btn.danger:hover{border-color:var(--limit);background:rgba(239,68,68,.12);color:#fca5a5}
+  .btn:hover{border-color:var(--hi);background:rgba(255,255,255,.06)}
+  /* Hành động phá huỷ vẫn được đỏ: đó là cảnh báo trạng thái, không phải trang trí. */
+  .btn.danger:hover{border-color:var(--error);background:rgba(255,93,121,.12);color:var(--error)}
   .btn:disabled{opacity:.4;cursor:default}
-  .empty{padding:16px;color:var(--sub);font-size:13px}
+  .btn:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+  .empty{padding:16px;color:var(--mid);font-size:13px}
   .grid{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start}
   @media(max-width:820px){.grid{grid-template-columns:1fr}}
   /* fleet form */
   form{padding:14px;display:grid;gap:10px}
-  label{font-size:12px;color:var(--sub);display:block;margin-bottom:4px}
-  select,input[type=text],input[type=number]{width:100%;background:#0f172a;color:var(--fg);
-    border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  label{font-size:12px;color:var(--mid);display:block;margin-bottom:4px}
+  select,input[type=text],input[type=number]{width:100%;background:var(--void);color:var(--hi);
+    border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  /* Ô chọn tài khoản chứa provider:account — dữ liệu máy, nên mono. */
+  select#f-addr{font-family:var(--font-mono)}
+  select:focus-visible,input:focus-visible{outline:2px solid var(--core);outline-offset:1px}
   .row{display:flex;gap:10px}.row>div{flex:1}
-  .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg)}
-  .go{background:var(--run);color:#06240f;border:0;font-weight:700;padding:9px;border-radius:8px;cursor:pointer;font-size:13px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--hi)}
+  .go{background:var(--run);color:var(--void);border:0;font-weight:700;padding:9px;border-radius:8px;cursor:pointer;font-size:13px}
   .go:hover{opacity:.92}
-  .warnbox{font-size:12px;color:var(--warn);background:rgba(245,158,11,.08);
-    border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:8px 10px;line-height:1.45}
-  /* event log */
-  #log{padding:10px 13px;max-height:340px;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:12px}
-  #log .e{padding:3px 0;border-bottom:1px solid rgba(71,85,105,.25);white-space:pre-wrap;word-break:break-word}
-  #log .t{color:var(--sub);margin-right:8px}
-  .e.warning{color:var(--warn)} .e.failure{color:var(--limit)} .e.session\.started{color:var(--run)}
-  .banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:#fecaca;
+  .warnbox{font-size:12px;color:var(--pending);background:rgba(246,178,61,.08);
+    border:1px solid rgba(246,178,61,.35);border-radius:8px;padding:8px 10px;line-height:1.45}
+  /* Ba ô này in ra toàn dữ liệu máy: đường dẫn state.db, danh sách PID mồ côi,
+     và số token/giây của lần gọi API. Sans-serif thì cột số không thẳng hàng. */
+  #dbinfo,#quetout,#ai-out{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+  /* event log — log là dữ liệu máy, cả khối đi mono */
+  #log{padding:10px 13px;max-height:340px;overflow:auto;font-family:var(--font-mono);font-size:12px}
+  #log .e{padding:3px 0;border-bottom:1px solid var(--line);white-space:pre-wrap;word-break:break-word}
+  #log .t{color:var(--lo);margin-right:8px}
+  .e.warning{color:var(--pending)} .e.failure{color:var(--error)} .e.session\.started{color:var(--run)}
+  .banner{background:rgba(255,93,121,.1);border:1px solid rgba(255,93,121,.4);color:var(--error);
     border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;display:none}
   /* báo tin: trạng thái vẽ bằng CHẤM CSS, không dùng ký tự/emoji làm icon */
   .tele{padding:14px;font-size:13px}
   .tele .hang{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-  .tele .d{width:9px;height:9px;border-radius:50%;background:var(--sub);flex:none}
+  .tele .d{width:9px;height:9px;border-radius:50%;background:var(--idle);flex:none}
   .tele.on .d{background:var(--run)}
-  .tele .phu{color:var(--sub);font-size:12px;line-height:1.5}
+  .tele .phu{color:var(--mid);font-size:12px;line-height:1.5}
 
   /* Có transition ở .btn/.go — máy nào bật "giảm chuyển động" thì phải tắt hết.
      Chuyển động không phải trang trí với người bị rối loạn tiền đình. */
@@ -86,12 +103,12 @@
 <div class="wrap">
   <header>
     <div class="b">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
       Switch-Agent-Pro
     </div>
     <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
     <nav style="display:flex;gap:8px">
-      <a class="btn" href="./" style="text-decoration:none;border-color:var(--run);background:rgba(34,197,94,.14);color:var(--run)">2D</a>
+      <a class="btn" href="./" style="text-decoration:none;border-color:var(--hi);background:rgba(255,255,255,.09)">2D</a>
       <a class="btn" id="to3d" href="3d.html" style="text-decoration:none">3D</a>
       <a class="btn" id="toflow" href="flow.html" style="text-decoration:none">Workflow</a>
       <a class="btn" href="/docs/" style="text-decoration:none">Plan</a>
@@ -106,25 +123,25 @@
        khác nhau chỗ nào, cái nào tiêu hạn mức thuê bao, cái nào tiêu tiền. -->
   <details id="huongdan" class="card" style="margin-bottom:16px" open>
     <summary style="cursor:pointer;font-weight:700;font-size:15px">Bắt đầu từ đâu — đọc 30 giây</summary>
-    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:var(--sub)">
-      <b style="color:var(--fg)">1. Bạn có ba cách giao việc, khác nhau về TIỀN:</b>
+    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:var(--mid)">
+      <b style="color:var(--hi)">1. Bạn có ba cách giao việc, khác nhau về TIỀN:</b>
       <table style="margin:8px 0 12px;width:100%">
-        <tr><td style="width:150px"><b style="color:var(--fg)">Bật hạm đội</b></td>
+        <tr><td style="width:150px"><b style="color:var(--hi)">Bật hạm đội</b></td>
             <td>Bật N phiên agent song song trên MỘT tài khoản. Tiêu <b>hạn mức thuê bao</b>. Dùng khi muốn nhiều agent cùng cày một việc.</td></tr>
-        <tr><td><b style="color:var(--fg)">Chạy workflow</b></td>
+        <tr><td><b style="color:var(--hi)">Chạy workflow</b></td>
             <td>Chạy một quy trình nhiều bước, mỗi bước một tài khoản khác nhau. Đây là cách dùng chính: một agent chia việc, vài agent làm, một agent soi.</td></tr>
-        <tr><td><b style="color:var(--fg)">Hỏi thẳng AI API</b></td>
+        <tr><td><b style="color:var(--hi)">Hỏi thẳng AI API</b></td>
             <td>Gọi thẳng model qua API key. Tiêu <b>tiền theo token</b>, không đụng hạn mức thuê bao. Hợp với việc ngắn.</td></tr>
       </table>
-      <b style="color:var(--fg)">2. Mỗi agent chạy trong git worktree riêng</b> — nhánh <code>sagent/&lt;tài khoản&gt;-1</code>.
+      <b style="color:var(--hi)">2. Mỗi agent chạy trong git worktree riêng</b> — nhánh <code>sagent/&lt;tài khoản&gt;-1</code>.
       Chúng không đụng thư mục làm việc chính của bạn. Xong việc thì xem
       <code>git log main..sagent/&lt;tài khoản&gt;-1</code> rồi tự quyết có trộn hay không.
       <br><br>
-      <b style="color:var(--fg)">3. Muốn xem ai đang làm gì</b> — mở tab <b>3D</b>: mỗi tài khoản một robot,
+      <b style="color:var(--hi)">3. Muốn xem ai đang làm gì</b> — mở tab <b>3D</b>: mỗi tài khoản một robot,
       đang làm việc thì gõ tay, đang chuyển kết quả cho bước sau thì vung tay về phía người nhận.
       Tab <b>Workflow</b> để sửa quy trình bằng cách kéo thả.
       <br><br>
-      <span style="color:var(--warn)">Cột "chưa đăng nhập" của antigravity là ĐÚNG và không sửa được:
+      <span style="color:var(--pending)">Cột "chưa đăng nhập" của antigravity là ĐÚNG và không sửa được:
       nó giữ token trong Windows Credential Manager nên không đọc ra danh tính. Nó vẫn chạy bình thường.</span>
     </div>
   </details>
@@ -379,9 +396,9 @@ function render(state){
   // sessions
   const tb=$('sessions'); tb.innerHTML='';
   (state.sessions||[]).forEach(s=>{
-    const where = s.worktree ? ('<code>'+s.worktree.split(/[\\/]/).slice(-2).join('/')+'</code>') : '<span style="color:var(--sub)">thư mục hiện tại</span>';
+    const where = s.worktree ? ('<code>'+s.worktree.split(/[\\/]/).slice(-2).join('/')+'</code>') : '<span style="color:var(--mid)">thư mục hiện tại</span>';
     const tr=document.createElement('tr');
-    tr.innerHTML = `<td class="num">#${s.id}</td><td>${s.addr}</td><td class="num">${s.pid}</td><td>${where}</td>`+
+    tr.innerHTML = `<td class="num">#${s.id}</td><td class="may">${s.addr}</td><td class="num">${s.pid}</td><td class="may">${where}</td>`+
       `<td style="text-align:right"><button class="btn danger" data-stop="${s.id}">Dừng</button></td>`;
     tb.appendChild(tr);
   });
@@ -400,7 +417,7 @@ function render(state){
               : '<span class="pill off">chưa đăng nhập</span>';
     const act = p.active ? '<span class="dot" style="background:var(--run)"></span>' : '';
     const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${act}</td><td>${p.provider}</td><td>${p.account}</td><td style="color:var(--sub)">${p.identity||'—'}</td><td>${tok}</td>`;
+    tr.innerHTML = `<td>${act}</td><td class="may">${p.provider}</td><td class="may">${p.account}</td><td class="may" style="color:var(--mid)">${p.identity||'—'}</td><td>${tok}</td>`;
     pb.appendChild(tr);
   });
   // fleet dropdown

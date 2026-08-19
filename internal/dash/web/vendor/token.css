@@ -1,0 +1,82 @@
+/* token.css — MỘT bộ token cho MỌI mặt của dashboard: 2D lẫn 3D.
+ *
+ * Vì sao một file chung: trước đây bốn trang mỗi trang tự khai một bảng màu.
+ * Đo ngày 19/08: index/flow/hoi-thoai dùng bộ #0F172A/#22C55E/#F59E0B/#EF4444,
+ * còn 3d.html dùng bộ thứ tư — nên chuyển từ 2D sang 3D là mắt phải làm quen
+ * lại từ đầu, và sửa màu ở một chỗ thì ba chỗ kia lệch đi mà không ai biết.
+ * Nay chỉ có ở ĐÂY mới được khai màu; trang chỉ được dùng.
+ *
+ * File nằm trong web/vendor/ vì thư mục đó server đã mở công khai (server.go)
+ * — giống ba file font bên cạnh: đây là asset tĩnh, không có bí mật nào trong đó.
+ *
+ * LUẬT MÀU (design system, mục "Nguyên tắc màu"):
+ *   Màu CHỈ dành cho trạng thái agent. Khung — topbar, panel, lưới, nút, form —
+ *   giữ đơn sắc: --line/--line-2 cho viền, --hi/--mid/--lo cho chữ.
+ *   Rải màu ra khung là anti-pattern số 1: khi mọi thứ đều nổi thì không gì nổi,
+ *   và người vận hành mất đúng cái họ cần — nhìn phát biết agent đang làm gì.
+ */
+
+/* Font nằm sẵn trong binary (web/vendor) — offline tuyệt đối, không gọi Google
+   Fonts. Asset ngoài là asset có thể biến mất, đúng bài học màn 3D trắng trơn.
+   Đường dẫn tương đối với CHÍNH file này, tức vendor/<tên> khi trình duyệt lấy. */
+@font-face{font-family:"Space Grotesk";src:url("space-grotesk-variable.woff2") format("woff2");
+  font-weight:300 700;font-style:normal;font-display:swap}
+@font-face{font-family:Inter;src:url("inter-variable.woff2") format("woff2");
+  font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("jetbrains-mono-variable.woff2") format("woff2");
+  font-weight:100 800;font-style:normal;font-display:swap}
+
+:root{
+  /* nền: sâu → nổi */
+  --void:#070810;
+  --panel:#0C0E17;
+  --panel-2:#11141F;
+
+  /* hairline — viền mảnh, không phải màu */
+  --line:rgba(255,255,255,.06);
+  --line-2:rgba(255,255,255,.12);
+
+  /* chữ: chính / phụ / nhãn */
+  --hi:#EAECF4;
+  --mid:#969DB0;
+  --lo:#565D71;
+
+  /* TRẠNG THÁI — chỗ duy nhất được phép có màu.
+     Dùng chung cho pill 2D và orb 3D, nên hai mặt đọc như một sản phẩm. */
+  --run:#2FE0A0;
+  --pending:#F6B23D;
+  --done:#6E8CFF;
+  --idle:#5A6273;
+  --error:#FF5D79;
+
+  /* core điều phối / đường nối giữa các agent */
+  --core:#8FB2FF;
+  --link:#39D9E0;
+
+  /* Sắc HÃNG — DANH TÍNH, không phải trạng thái. Chỉ được dùng ở đúng một chỗ
+     mỗi mặt (huy hiệu hãng ở 2D, da robot ở 3D), không bao giờ trên khung.
+     Trước đây hai mặt bất đồng: hội thoại vẽ claude tím #8B5CF6, còn 3D vẽ
+     claude cam #D97757 — cùng một tài khoản, hai màu, tuỳ tab đang mở. */
+  --prov-claude:#D97757;
+  --prov-codex:#10A37F;
+  --prov-cursor:#8B5CF6;
+  --prov-gemini:#4285F4;
+  --prov-antigravity:#4285F4;
+  --prov-grok:#C7CBD6;
+  --prov-may:#5A6273;
+
+  /* Ba vai chữ. Display có cá tính nên dùng tiết chế; mono cho MỌI dữ liệu máy. */
+  --font-display:"Space Grotesk",Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-body:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+
+/* Ba lớp vai chữ — dán lớp là đúng vai, khỏi mỗi trang tự chế font-family. */
+.t-display{font-family:var(--font-display);letter-spacing:-.01em}
+.t-body{font-family:var(--font-body)}
+/* Dữ liệu máy: provider:account, token, chi phí, PID, thời gian, log.
+   Sans-serif cho số liệu là anti-pattern — cột số không thẳng hàng thì mắt
+   không so sánh được. tabular-nums giữ mọi chữ số cùng bề ngang. */
+.t-mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
