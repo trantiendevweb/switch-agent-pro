@@ -29,7 +29,7 @@ type fakeAgent struct {
 	quyen   []bool // cờ tự-duyệt-quyền của TỪNG lượt gọi
 }
 
-func (f *fakeAgent) RunAgents(_ context.Context, _ string, prompt string, copies int, _, tuDuyetQuyen bool) (KetQuaAgent, error) {
+func (f *fakeAgent) RunAgents(_ context.Context, _ string, _ string, prompt string, copies int, _, tuDuyetQuyen bool) (KetQuaAgent, error) {
 	f.mu.Lock()
 	f.calls += copies
 	f.prompts = append(f.prompts, prompt)

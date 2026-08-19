@@ -30,6 +30,15 @@ type Adapter interface {
 	// rò vào code dùng chung, và `fleet codex:*` sẽ chạy sai mà không ai biết.
 	HeadlessArgs(prompt string) []string
 
+	// ModelArgs trả đối số để CHỌN MODEL, hoặc nil nếu provider này chưa đo được
+	// cách chọn từ dòng lệnh.
+	//
+	// Tách khỏi HeadlessArgs theo đúng nguyên tắc "capability thay vì suy đoán"
+	// (MASTER-PLAN mục 3): nil nghĩa là CHƯA BIẾT, không phải "không có model".
+	// Bên gọi thấy nil thì cảnh báo rồi chạy model mặc định, chứ không im lặng
+	// bỏ qua lựa chọn của người dùng — im lặng thì họ tưởng đã tiết kiệm được.
+	ModelArgs(model string) []string
+
 	// ArgsTuDuyetQuyen trả về cờ để agent TỰ DUYỆT MỌI TOOL ở chế độ headless,
 	// kèm daDo = đã đo được cách làm của provider này hay chưa.
 	//

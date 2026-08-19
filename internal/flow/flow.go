@@ -67,7 +67,14 @@ type Step struct {
 	Needs []string `toml:"needs,omitempty" json:"needs"` // các bước phải xong trước
 
 	// agent / review
-	Profile  string `toml:"profile,omitempty" json:"profile,omitempty"`   // "claude:phu"; rỗng = mặc định lúc chạy
+	Profile string `toml:"profile,omitempty" json:"profile,omitempty"` // "claude:phu"; rỗng = mặc định lúc chạy
+	// Model chọn model cho RIÊNG bước này, ví dụ "sonnet" cho việc nhẹ và "opus"
+	// cho việc nặng. Rỗng = để provider dùng mặc định của nó.
+	//
+	// VÌ SAO CÓ, có số đo: lượt chạy #34 tốn 9,40 USD, trong đó riêng bước
+	// `code-go` là 8,18 USD — vì mọi bước đều chạy model mạnh nhất, kể cả bước
+	// chỉ viết tài liệu hay gộp báo cáo.
+	Model    string `toml:"model,omitempty" json:"model,omitempty"`
 	Prompt   string `toml:"prompt,omitempty" json:"prompt,omitempty"`     // hỗ trợ {{bien}}
 	Copies   int    `toml:"copies,omitempty" json:"copies,omitempty"`     // số agent song song, mặc định 1
 	Worktree bool   `toml:"worktree,omitempty" json:"worktree,omitempty"` // mỗi agent một git worktree

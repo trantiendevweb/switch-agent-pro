@@ -38,9 +38,9 @@ type Route struct {
 // Usage là phần đếm token. Nhà cung cấp nào cũng trả, và đây là thứ cho biết
 // một lời gọi tốn bao nhiêu.
 type Usage struct {
-	Vao   int `json:"prompt_tokens"`
-	Ra    int `json:"completion_tokens"`
-	Tong  int `json:"total_tokens"`
+	Vao  int `json:"prompt_tokens"`
+	Ra   int `json:"completion_tokens"`
+	Tong int `json:"total_tokens"`
 }
 
 // KetQua là kết quả một lời gọi.

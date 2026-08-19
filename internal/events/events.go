@@ -138,8 +138,8 @@ func (b *Bus) Close() {
 
 // Tiện dụng ------------------------------------------------------------
 
-func (b *Bus) Infof(format string, args ...any)   { b.emit(Info, format, args...) }
-func (b *Bus) Warnf(format string, args ...any)   { b.emit(Warning, format, args...) }
+func (b *Bus) Infof(format string, args ...any)    { b.emit(Info, format, args...) }
+func (b *Bus) Warnf(format string, args ...any)    { b.emit(Warning, format, args...) }
 func (b *Bus) Failuref(format string, args ...any) { b.emit(Failure, format, args...) }
 
 func (b *Bus) emit(t Type, format string, args ...any) {

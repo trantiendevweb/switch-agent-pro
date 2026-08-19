@@ -19,7 +19,7 @@ type AgentRunner interface {
 	// Kết quả mang cả output (cho {{steps.x.output}}) lẫn chi phí đo được — chi
 	// phí phải đi CÙNG output vì cả hai sinh ra trong cùng một lượt chạy; tách
 	// ra hai đường thì bước nào tính tiền bước nấy sẽ lệch.
-	RunAgents(ctx context.Context, profile, prompt string, copies int, worktree, tuDuyetQuyen bool) (KetQuaAgent, error)
+	RunAgents(ctx context.Context, profile, model, prompt string, copies int, worktree, tuDuyetQuyen bool) (KetQuaAgent, error)
 }
 
 // KetQuaAgent là những gì một lượt chạy agent trả về cho bộ thực thi flow.

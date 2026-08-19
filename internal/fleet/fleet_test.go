@@ -27,20 +27,21 @@ func TestHelperProcess(t *testing.T) {
 // fakeAgent trỏ Command() vào chính test binary.
 type fakeAgent struct{ base string }
 
-func (fakeAgent) Name() string             { return "fake" }
-func (fakeAgent) Version() (string, error) { return "fake 0.0.0", nil }
-func (fakeAgent) TachDuocTaiKhoan() bool { return true }
-func (fakeAgent) EnvVar() string           { return "FAKE_CONFIG_DIR" }
-func (fakeAgent) Command() (string, error) { return os.Executable() }
-func (fakeAgent) HeadlessArgs(p string) []string { return []string{"-p", p} }
-func (fakeAgent) PrivateFiles() []string   { return []string{".credentials.json", ".claude.json"} }
-func (fakeAgent) SharedKeys() []string     { return []string{"projects"} }
-func (f fakeAgent) BaseDir() string        { return f.base }
-func (fakeAgent) IdentitySource() string   { return "" }
-func (fakeAgent) Identity(string) string   { return "" }
-func (fakeAgent) HasToken(string) bool     { return true }
+func (fakeAgent) Name() string                         { return "fake" }
+func (fakeAgent) Version() (string, error)             { return "fake 0.0.0", nil }
+func (fakeAgent) TachDuocTaiKhoan() bool               { return true }
+func (fakeAgent) EnvVar() string                       { return "FAKE_CONFIG_DIR" }
+func (fakeAgent) Command() (string, error)             { return os.Executable() }
+func (fakeAgent) HeadlessArgs(p string) []string       { return []string{"-p", p} }
+func (fakeAgent) ModelArgs(string) []string            { return nil }
+func (fakeAgent) PrivateFiles() []string               { return []string{".credentials.json", ".claude.json"} }
+func (fakeAgent) SharedKeys() []string                 { return []string{"projects"} }
+func (f fakeAgent) BaseDir() string                    { return f.base }
+func (fakeAgent) IdentitySource() string               { return "" }
+func (fakeAgent) Identity(string) string               { return "" }
+func (fakeAgent) HasToken(string) bool                 { return true }
 func (fakeAgent) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
-func (fakeAgent) Verify() []provider.Check { return nil }
+func (fakeAgent) Verify() []provider.Check             { return nil }
 
 // setup dựng HOME giả + hồ sơ gốc có token + một store tạm.
 func setup(t *testing.T) (*store.DB, *events.Bus, fakeAgent) {
@@ -199,6 +200,7 @@ func (fakeAgent) ArgsThuMuc(string) []string { return nil }
 func (fakeAgent) ArgsHoSo(string) []string { return nil }
 
 func (fakeAgent) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }
+
 // khoTokenChung là adapter giả cho lớp provider giữ token ở kho dùng chung toàn
 // máy (Antigravity: Windows Credential Manager). Dấu hiệu ĐO ĐƯỢC của lớp này
 // là `PrivateFiles()` rỗng — không có file nào để chép sang bản clone.

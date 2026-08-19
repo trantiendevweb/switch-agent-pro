@@ -56,7 +56,7 @@ type Config struct {
 	AI struct {
 		DefaultRoute   string   `toml:"default_route"`
 		FallbackRoutes []string `toml:"fallback_routes"`
-		Routes       []struct {
+		Routes         []struct {
 			Ten     string `toml:"ten"`
 			BaseURL string `toml:"base_url"`
 			Model   string `toml:"model"`

@@ -70,7 +70,6 @@ func TestNoiVeDangNhapKhongBiBatNham(t *testing.T) {
 	}
 }
 
-
 // Ca BAO DONG GIA do duoc o lan chay #23: buoc `hoc-acp` clone xong hai repo va
 // viet bao cao that, nhung GIUA DUONG co mot lan bi chan quyen. La chan ban dau
 // soi ca ban ghi nen giet oan ca buoc.
@@ -99,7 +98,6 @@ func TestKetThucBangBiChanQuyenVanBiBat(t *testing.T) {
 		t.Fatal("agent ket thuc bang cau tu choi quyen ma van tinh la xong")
 	}
 }
-
 
 // Chu ky thu tu, do tai lan chay #24: buoc hoc Agent Deck (antigravity:may) tuong
 // thuat y dinh ba dong roi ket thuc bang "Error: timeout waiting for response".

@@ -774,7 +774,7 @@ type agentBridge struct {
 	fallback Addr
 }
 
-func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, copies int, worktree, tuDuyetQuyen bool) (flow.KetQuaAgent, error) {
+func (b agentBridge) RunAgents(ctx context.Context, profileStr, model, prompt string, copies int, worktree, tuDuyetQuyen bool) (flow.KetQuaAgent, error) {
 	addr := b.fallback
 	if profileStr != "" {
 		addr = ParseAddr(profileStr)
@@ -786,7 +786,7 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, prompt string, c
 	if err != nil {
 		return flow.KetQuaAgent{}, err
 	}
-	args, canhBao, err := argsChoBuoc(ad, prompt, tuDuyetQuyen)
+	args, canhBao, err := argsChoBuoc(ad, model, prompt, tuDuyetQuyen)
 	if err != nil {
 		return flow.KetQuaAgent{}, err
 	}
@@ -868,8 +868,19 @@ func (a *API) bangChungWorktree(dirs []string) string {
 // Tách khỏi RunAgents để TEST ĐƯỢC: phần còn lại của RunAgents phải bật phiên
 // thật mới chạy tới đây, nên nếu chôn ở trong thì không ai kiểm được ba nhánh
 // dưới — mà đúng ba nhánh đó mới là chỗ quyết định agent có toàn quyền hay không.
-func argsChoBuoc(ad provider.Adapter, prompt string, tuDuyetQuyen bool) (args []string, canhBao string, err error) {
+func argsChoBuoc(ad provider.Adapter, model, prompt string, tuDuyetQuyen bool) (args []string, canhBao string, err error) {
 	args = ad.HeadlessArgs(prompt) // mỗi provider một kiểu, hỏi adapter
+
+	// Chọn model cho riêng bước này. Provider chưa đo được cách chọn thì NÓI
+	// THẲNG rồi chạy mặc định — im lặng bỏ qua thì người dùng tưởng mình vừa
+	// tiết kiệm được, mà thật ra vẫn đốt model đắt nhất.
+	if model != "" {
+		if ma := ad.ModelArgs(model); len(ma) > 0 {
+			args = append(ma, args...)
+		} else {
+			canhBao = fmt.Sprintf("%s CHƯA ĐO cách chọn model từ dòng lệnh — bỏ qua `model = %q`, bước này chạy model mặc định", ad.Name(), model)
+		}
+	}
 	co, daDo := ad.ArgsTuDuyetQuyen()
 
 	// Không xin quyền: cảnh báo nếu provider vốn KHÔNG có rào nào, vì người dùng

@@ -61,6 +61,14 @@ func (claude) HeadlessArgs(prompt string) []string {
 	return []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
 }
 
+// ModelArgs: đã đo `claude --model <tên>` (bản 2.1.229). Tên nhận cả bí danh
+// ngắn (sonnet, opus, haiku) lẫn id đầy đủ.
+//
+// VÌ SAO ĐÁNG CÓ, có số đo: lượt chạy #34 bước `code-go` tốn 8,18 USD vì mọi
+// bước đều chạy model mạnh nhất. Việc viết tài liệu hay việc gộp báo cáo không
+// cần tới đó.
+func (claude) ModelArgs(model string) []string { return []string{"--model", model} }
+
 func (claude) DocKetQua(raw string) (KetQua, bool) { return docKetQuaClaude(raw) }
 
 func (claude) PrivateFiles() []string { return []string{".credentials.json", ".claude.json"} }

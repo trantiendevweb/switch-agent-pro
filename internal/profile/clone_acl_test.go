@@ -2,11 +2,11 @@ package profile
 
 import (
 	"os"
-	"time"
 	"os/exec"
-	"runtime"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
 	"github.com/trantiendevweb/switch-agent-pro/internal/link"
@@ -166,20 +166,20 @@ func TestTokenKhaiDuongDanLongVanLaRiengTu(t *testing.T) {
 // adapterLong khai token bằng đường dẫn lồng, y như adapter cursor thật.
 type adapterLong struct{ base string }
 
-func (adapterLong) Name() string                     { return "long" }
-func (adapterLong) EnvVar() string                   { return "APPDATA" }
-func (adapterLong) Command() (string, error)         { return "", nil }
-func (adapterLong) Version() (string, error)         { return "long 0.0.0", nil }
-func (adapterLong) TachDuocTaiKhoan() bool           { return true }
-func (adapterLong) HeadlessArgs(p string) []string   { return []string{"-p", p} }
-func (adapterLong) PrivateFiles() []string           { return []string{filepath.Join("Cursor", "auth.json")} }
-func (adapterLong) SharedKeys() []string             { return nil }
-func (a adapterLong) BaseDir() string                { return a.base }
-func (adapterLong) IdentitySource() string           { return "" }
-func (adapterLong) Identity(string) string           { return "" }
-func (adapterLong) HasToken(string) bool             { return false }
+func (adapterLong) Name() string                         { return "long" }
+func (adapterLong) EnvVar() string                       { return "APPDATA" }
+func (adapterLong) Command() (string, error)             { return "", nil }
+func (adapterLong) Version() (string, error)             { return "long 0.0.0", nil }
+func (adapterLong) TachDuocTaiKhoan() bool               { return true }
+func (adapterLong) HeadlessArgs(p string) []string       { return []string{"-p", p} }
+func (adapterLong) PrivateFiles() []string               { return []string{filepath.Join("Cursor", "auth.json")} }
+func (adapterLong) SharedKeys() []string                 { return nil }
+func (a adapterLong) BaseDir() string                    { return a.base }
+func (adapterLong) IdentitySource() string               { return "" }
+func (adapterLong) Identity(string) string               { return "" }
+func (adapterLong) HasToken(string) bool                 { return false }
 func (adapterLong) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
-func (adapterLong) Verify() []provider.Check         { return nil }
+func (adapterLong) Verify() []provider.Check             { return nil }
 
 func (adapterLong) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
 
@@ -188,3 +188,5 @@ func (adapterLong) ArgsThuMuc(string) []string { return nil }
 func (adapterLong) ArgsHoSo(string) []string { return nil }
 
 func (adapterLong) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }
+
+func (adapterLong) ModelArgs(string) []string { return nil }

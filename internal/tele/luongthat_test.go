@@ -25,7 +25,7 @@ import (
 // agentGia đóng vai bộ chạy agent, hỏng hay không là do test quyết.
 type agentGia struct{ hong bool }
 
-func (a agentGia) RunAgents(_ context.Context, _ string, _ string, _ int, _, _ bool) (flow.KetQuaAgent, error) {
+func (a agentGia) RunAgents(_ context.Context, _ string, _ string, _ string, _ int, _, _ bool) (flow.KetQuaAgent, error) {
 	if a.hong {
 		return flow.KetQuaAgent{}, errors.New("phiên chết sau 3 giây")
 	}

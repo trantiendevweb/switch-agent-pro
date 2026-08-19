@@ -27,6 +27,11 @@ type BuocKho struct {
 	// định của lượt chạy. Bước không dùng agent thì RỖNG: đoán bừa một cái tên
 	// tài khoản còn tệ hơn không nói.
 	TaiKhoan string `json:"taiKhoan,omitempty"`
+	// Model phải hiện ở đây: cả lý do sinh ra `--kho` là xem TRƯỚC khi tiêu tiền,
+	// mà model chính là thứ quyết định tiêu bao nhiêu. Không hiện thì người dùng
+	// khai `model = "sonnet"` để tiết kiệm rồi vẫn phải chạy thật mới biết nó có
+	// vào hay không — đúng kiểu "làm rồi mà không kiểm được".
+	Model    string `json:"model,omitempty"`
 	SoAgent  int    `json:"soAgent,omitempty"`
 	Worktree bool   `json:"worktree,omitempty"`
 	// TuDuyetQuyen phải hiện ở đây: đọc kế hoạch đúng là lúc người ta quyết định
@@ -165,6 +170,7 @@ func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int) B
 	}
 	switch s.Type {
 	case flow.TypeAgent, flow.TypeReview:
+		b.Model = s.Model
 		b.TaiKhoan = s.Profile
 		if b.TaiKhoan == "" && mac.Account != "" {
 			b.TaiKhoan = mac.String()

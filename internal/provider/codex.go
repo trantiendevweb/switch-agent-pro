@@ -224,4 +224,9 @@ func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
 func (codex) ArgsHoSo(string) []string { return nil }
 
 // DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
+// ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
+// nil = chua biet, KHONG phai "khong co model" — ben goi se canh bao thay vi
+// im lang bo qua lua chon cua nguoi dung.
+func (codex) ModelArgs(string) []string { return nil }
+
 func (codex) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }

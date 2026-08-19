@@ -115,6 +115,11 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 				// lúc chạy thật, và đây là chỗ duy nhất báo được trước.
 				dong += "  (chưa biết tài khoản — thiếu `profile` và --profile)"
 			}
+			// Model đứng ngay sau tài khoản: đọc kế hoạch chạy khan là lúc người
+			// ta cân "bước này có đáng model đắt không", nên hai thứ phải nằm cạnh.
+			if b.Model != "" {
+				dong += " · model " + b.Model
+			}
 			if b.SoAgent > 0 {
 				dong += fmt.Sprintf(" · %d agent", b.SoAgent)
 			}

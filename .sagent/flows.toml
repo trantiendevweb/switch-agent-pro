@@ -670,6 +670,8 @@ GIAM CHAN: <hai nhánh có sửa cùng file không>"""
       id = "ke-hoach"
       type = "agent"
       profile = "claude:phu"
+      # Chia việc: đọc nhiều, quyết định ít. Sonnet đủ.
+      model = "sonnet"
       tu_duyet_quyen = true
       timeout_sec = 1200
       on_failure = "stop"
@@ -690,6 +692,9 @@ PHAN 2: <mô tả> | file: <danh sách>"""
       id = "code-go"
       type = "agent"
       profile = "claude:tns"
+      # Việc NẶNG NHẤT của cả lượt — giữ model mạnh. Lượt #34 bước này tốn
+      # 8,18 USD; cắt ở đây thì cắt luôn chất lượng code, không đáng.
+      model = "opus"
       needs = ["ke-hoach"]
       worktree = true
       tu_duyet_quyen = true
@@ -744,6 +749,9 @@ Trả lời: NHANH, COMMIT, FILE, CHUA LAM."""
       id = "sua"
       type = "agent"
       profile = "claude:tns"
+      # Sửa cho xanh: đã có output máy chấm chỉ thẳng chỗ hỏng, không phải
+      # nghĩ từ đầu.
+      model = "sonnet"
       needs = ["kiem-1"]
       when = "steps.kiem-1.state == failed"
       tu_duyet_quyen = true
@@ -809,6 +817,8 @@ GIAM CHAN: <hai nhánh có sửa cùng file không>"""
       id = "gop"
       type = "agent"
       profile = "claude:phu"
+      # Gộp: chạy git đếm commit rồi đối chiếu. Việc máy móc, không cần model mạnh.
+      model = "sonnet"
       needs = ["soi"]
       tu_duyet_quyen = true
       timeout_sec = 1500

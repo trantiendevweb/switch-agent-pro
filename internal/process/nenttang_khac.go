@@ -18,9 +18,9 @@ import "time"
 // phép đo trong docs/DO-LUONG.md đều là một phép đo Windows. Giữ nhánh Linux mà
 // KHÔNG có máy Linux để chạy thì đó không phải hỗ trợ, đó là lời hứa suông —
 // đúng thứ tài liệu kia lập ra để chống.
-func IsAlive(int) bool          { return sagentChiHoTroWindows_xemREADME() }
-func Kill(int) error            { sagentChiHoTroWindows_xemREADME(); return nil }
-func parentMap() map[int]int    { sagentChiHoTroWindows_xemREADME(); return nil }
+func IsAlive(int) bool       { return sagentChiHoTroWindows_xemREADME() }
+func Kill(int) error         { sagentChiHoTroWindows_xemREADME(); return nil }
+func parentMap() map[int]int { sagentChiHoTroWindows_xemREADME(); return nil }
 
 func StartTime(int) (time.Time, bool) { sagentChiHoTroWindows_xemREADME(); return time.Time{}, false }
 

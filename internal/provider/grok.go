@@ -218,4 +218,9 @@ func (grok) ArgsHoSo(dir string) []string {
 // DocKetQua doc ban ghi NDJSON cua Grok — xem ketqua_grok.go de biet vi sao
 // day la viec gap: la chan chong chay quan sinh ra vi Grok, ma truoc do khong
 // bao gio chay duoc cho Grok.
+// ModelArgs: grok BẮT BUỘC có `-m` — CLI bỏ qua defaultModel trong chính file
+// cấu hình của nó và dùng grok-code-fast-1 dựng sẵn; endpoint nào không bán
+// model đó sẽ trả 503 No available channel (đã đo, xem README).
+func (grok) ModelArgs(model string) []string { return []string{"-m", model} }
+
 func (grok) DocKetQua(raw string) (KetQua, bool) { return docKetQuaGrok(raw) }

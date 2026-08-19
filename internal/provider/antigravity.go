@@ -134,4 +134,9 @@ func (antigravity) ArgsThuMuc(dir string) []string { return []string{"--add-dir"
 
 func (antigravity) ArgsHoSo(string) []string { return nil }
 
+// ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
+// nil = chua biet, KHONG phai "khong co model" — ben goi se canh bao thay vi
+// im lang bo qua lua chon cua nguoi dung.
+func (antigravity) ModelArgs(string) []string { return nil }
+
 func (antigravity) DocKetQua(raw string) (KetQua, bool) { return docKetQuaAntigravity(raw) }
