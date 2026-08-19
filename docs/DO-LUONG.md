@@ -1983,25 +1983,52 @@ nguyên văn sang cho agent.
   nhận nhãn ngữ cảnh của mô hình ngôn ngữ lớn (Grok). Hiện hệ thống chưa có cơ chế kiểm
   chéo tự động giữa phán quyết văn bản của agent soi với dữ liệu commit thực tế từ git.
 
-## 19/08 — Token hình dạng mới (expiresAt = 0) làm bảng trạng thái báo "sẵn sàng" vô điều kiện
+## 19/08 — `expiresAt = 0` là ĐĂNG NHẬP DỞ DANG, không phải "hình dạng mới"
 
-- **Đo lúc nào**: Chiều 19/08/2026 lúc 19:30, khi đăng nhập lại `claude:tns` bằng Claude CLI 2.1.229.
-- **Đo bằng cách nào**: Đọc trực tiếp cấu trúc file `.credentials.json` sinh ra sau khi đăng nhập.
-- **Con số / Bằng chứng**: File credentials của Claude CLI 2.1.229 sinh ra định dạng mới:
-  `expiresAt: 0` và có thêm trường `refreshTokenExpiresAt: 1789617873859` (mốc ngày 17/09/2026).
-  Hàm `TokenExpiry` cũ chỉ đọc `expiresAt`, khi thấy giá trị `0` thì trả về `false` ("không đọc được hạn").
-  Vì không đọc được hạn, cờ `HetHan` mặc định là `false`, khiến `sagent ds` và giao diện web
-  in chữ "sẵn sàng" **VÔ ĐIỀU KIỆN** cho tài khoản dù không biết chắc token còn sống hay không.
-  Nguy hiểm hơn, cổng kiểm tài khoản của `flow run` (vừa làm sáng 19/08) cũng bị mù theo vì dựa
-  trên đúng trường dữ liệu này.
-- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `4fa396f`). Sửa hàm `TokenExpiry` trong `internal/provider/claude.go`:
-  1. Ưu tiên đọc `expiresAt` (nếu khác 0).
-  2. Nếu `expiresAt == 0`, lùi về đọc `refreshTokenExpiresAt`.
-  3. Chỉ khi cả hai trường đều không có mới báo "không biết" (để bên gọi không đoán mò theo hướng lạc quan).
-  - Lý do: Còn refresh token sống thì CLI tự động làm mới access token được khi chạy. Đó mới là
-    mốc trả lời cho câu hỏi "tài khoản này còn dùng được không".
-  - Nghiệm thu: Test `TestDocDuocHanKhiExpiresAtLaSo0` và `TestExpiresAtThatVanDuocUuTien`
-    trong `internal/provider/token_hinhdang_test.go`.
+Mục này đã bị ghi SAI một lần trong chính ngày hôm nay, và bản ghi sai đó nằm
+trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
+
+- **Đo lúc nào**: 19/08/2026, hai lần — 19:30 (kết luận sai) và 20:05 (đo lại).
+- **Đo bằng cách nào**:
+  - Vòng 1: đọc `.credentials.json` của `claude:tns` sau khi đăng nhập. **Một mẫu duy nhất.**
+  - Vòng 2: hỏi thẳng CLI `claude auth status` trên đúng hồ sơ đó, VÀ đối chiếu với
+    một tài khoản đang chạy được (`~/.claude`).
+- **Con số / Bằng chứng**:
+
+  | Hồ sơ | `expiresAt` | `claude auth status` |
+  |---|---|---|
+  | `claude:tns` lúc 19:30 (đăng nhập hỏng) | `0` | `{"loggedIn": false, "authMethod": "none"}` |
+  | `~/.claude` (đang chạy được) | `1787156212029` | đăng nhập bình thường |
+  | `claude:tns` lúc 20:08 (đăng nhập lại, thành công) | `1787173725663` → 20/08 04:08 | `{"loggedIn": true, ...}` |
+
+  File của lần đăng nhập hỏng vẫn ĐẦY ĐỦ TRƯỜNG — `accessToken`, `refreshToken`,
+  `scopes`, `subscriptionType: "max"`, `refreshTokenExpiresAt` của tháng sau. Chỉ
+  khác đúng một chỗ là `expiresAt: 0`. Nhìn qua tưởng lành.
+
+- **Kết luận sai ở vòng 1**: thấy `expiresAt: 0` kèm `refreshTokenExpiresAt`, suy ra
+  "Claude CLI đổi hình dạng dữ liệu", rồi cho `TokenExpiry` lùi về đọc
+  `refreshTokenExpiresAt`. Suy từ một mẫu, không đối chiếu với tài khoản nào đang
+  chạy được. Bản vá đó làm cổng kiểm tài khoản DỄ DÃI HƠN bản chưa vá.
+
+- **Giá phải trả**: lượt chạy #31 (19:56) đi lọt qua cổng kiểm rồi bước `code-go`
+  chết ngay với `Failed to authenticate: OAuth session expired and could not be
+  refreshed`. Mất một nhánh việc của cả lượt.
+
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `714730c`).
+  1. `TokenExpiry` trở lại chỉ đọc `expiresAt`.
+  2. `HasToken` thôi kiểm "file có tồn tại" mà đòi `expiresAt != 0` — file có mà
+     token chết thì không phải "sẵn sàng".
+  - Nghiệm thu: `TestDangNhapDoDangKhongDuocTinhLaCoToken` và
+    `TestTokenThatThiCoExpiresAtKhac0` trong `internal/provider/token_hinhdang_test.go`.
+    Gỡ bản vá ra thì test đỏ.
+  - Kiểm trên máy thật: `sagent ds` chuyển từ "sẵn sàng" (sai) sang "chưa đăng nhập"
+    (đúng), khớp với điều CLI tự nói.
+
+- **Bài học, và là bài học đắt nhất trong ngày**: một câu chuyện MẠCH LẠC không phải
+  là một SỐ ĐO. Vòng 1 nghe hợp lý đến mức đủ sức thuyết phục để viết hẳn một đoạn
+  bình luận dài trong mã nguồn giải thích nó. Thứ lật lại được chỉ là một câu hỏi rẻ
+  tiền: "tài khoản đang chạy được thì trường này bằng bao nhiêu?" — chưa hỏi câu đó
+  thì chưa gọi là đã đo.
 
 ## 19/08 — Huỷ lượt chạy bị cắt ngang: không để flow treo "đang chạy" vĩnh viễn
 
