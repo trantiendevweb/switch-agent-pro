@@ -9,6 +9,7 @@ import (
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
+	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
 // Các endpoint cho workflow board (mặt thứ 3 trong bốn mặt điều khiển).
@@ -179,6 +180,78 @@ func (s *Server) handleFlowDecide(w http.ResponseWriter, r *http.Request) {
 		_, _ = s.api.FlowResume(context.Background(), req.ID, api.Addr{})
 	}()
 	writeJSON(w, map[string]string{"decided": "approved"})
+}
+
+// GET /api/flow/detail?id=N — một lượt chạy: trạng thái, CÂU HỎI và CÂU TRẢ LỜI
+// của từng bước, kèm sơ đồ phụ thuộc.
+//
+// Vì sao cần: `sagent flow runs <N>` ở terminal đọc được hết những thứ này từ
+// lâu, mặt web thì không. Luật ngang quyền (MASTER-PLAN mục 2c) nói một tính
+// năng chưa xong nếu chưa làm ở cả bốn mặt — và test ngang quyền không bắt được
+// vì `flow.runs` khai đường là /api/state, một endpoint KHÔNG hề trả runs.
+// Đường dẫn tồn tại nên test xanh, còn dữ liệu thì không có.
+func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if err != nil {
+		writeErr(w, fmt.Errorf("thiếu hoặc sai tham số id"))
+		return
+	}
+	run, steps, def, err := s.api.FlowRunDetail(id)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+
+	// Trả về theo THỨ TỰ ĐỊNH NGHĨA để mặt web dựng được mạch trên xuống dưới
+	// mà không phải tự sắp xếp lại đồ thị.
+	type buocDTO struct {
+		ID        string   `json:"id"`
+		Type      string   `json:"type"`
+		Profile   string   `json:"profile"`
+		Needs     []string `json:"needs"`
+		State     string   `json:"state"`
+		Msg       string   `json:"msg"`
+		Prompt    string   `json:"prompt"`
+		Output    string   `json:"output"`
+		Attempt   int      `json:"attempt"`
+		CostUSD   float64  `json:"costUsd"`
+		TokensIn  int      `json:"tokensIn"`
+		TokensOut int      `json:"tokensOut"`
+	}
+	ds := make([]buocDTO, 0, len(def.Steps))
+	daCo := map[string]bool{}
+	them := func(id, typ, prof string, needs []string, st store.StepRun) {
+		daCo[id] = true
+		if needs == nil {
+			needs = []string{}
+		}
+		ds = append(ds, buocDTO{
+			ID: id, Type: typ, Profile: prof, Needs: needs,
+			State: st.State, Msg: st.Msg, Prompt: st.Prompt, Output: st.Output,
+			Attempt: st.Attempt, CostUSD: st.CostUSD,
+			TokensIn: st.TokensIn, TokensOut: st.TokensOut,
+		})
+	}
+	for i := range def.Steps {
+		d := def.Steps[i]
+		them(d.ID, d.Type, d.Profile, d.Needs, steps[d.ID])
+	}
+	// Bước có trong sổ nhưng flows.toml đã bỏ (flow sửa sau khi chạy) vẫn phải
+	// hiện — giấu đi thì người đọc tưởng lượt chạy ít bước hơn thực tế.
+	for id, st := range steps {
+		if !daCo[id] {
+			them(id, "", "", nil, st)
+		}
+	}
+
+	writeJSON(w, map[string]any{
+		"id":      run.ID,
+		"flow":    run.Flow,
+		"state":   run.State,
+		"dir":     run.Dir,
+		"started": run.Started.Unix(),
+		"steps":   ds,
+	})
 }
 
 // POST /api/flow/cancel — đánh dấu một lượt chạy dở dang là ĐÃ HUỶ.

@@ -156,6 +156,17 @@ var migrations = []string{
 	`ALTER TABLE flow_steps ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0;
 	 ALTER TABLE flow_steps ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0;
 	 ALTER TABLE flow_steps ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0;`,
+
+	// v6 — CÂU HỎI đã gửi cho agent, sau khi thay hết biến.
+	//
+	// Trước đây chỉ lưu câu trả lời. Nhìn lại một lượt chạy thì thấy agent nói
+	// gì mà không thấy nó ĐƯỢC HỎI GÌ — mà phần lớn lỗi của lượt #29 nằm đúng ở
+	// câu hỏi: placeholder chưa thay lọt nguyên văn vào prompt, và không ai nhìn
+	// ra cho tới khi đọc bản ghi NDJSON thô.
+	//
+	// Lưu prompt ĐÃ THAY BIẾN (không phải mẫu trong flows.toml) vì đó mới là thứ
+	// agent thật sự nhận.
+	`ALTER TABLE flow_steps ADD COLUMN prompt TEXT;`,
 }
 
 // MaxStepOutput là trần kích thước kết quả lưu cho mỗi bước.
@@ -202,6 +213,9 @@ type StepRun struct {
 	CostUSD   float64
 	TokensIn  int
 	TokensOut int
+	// Prompt là câu hỏi ĐÃ THAY BIẾN gửi cho agent. Rỗng với bước không hỏi ai
+	// (shell/notify lưu lệnh hoặc lời nhắn).
+	Prompt string
 }
 
 // CreateRun mở một lần chạy mới.
@@ -292,6 +306,19 @@ func (d *DB) SetStepOutput(runID int64, stepID, output string) error {
 	return err
 }
 
+// SetStepPrompt lưu CÂU HỎI đã gửi cho agent (đã thay hết biến).
+//
+// Cắt theo cùng trần với output: prompt của bước gộp có thể nhét cả kết quả
+// nhiều bước trước vào, dài không kém câu trả lời.
+func (d *DB) SetStepPrompt(runID int64, stepID, prompt string) error {
+	if len(prompt) > MaxStepOutput {
+		prompt = "…(đã cắt bớt phần đầu)…\n" + prompt[len(prompt)-MaxStepOutput:]
+	}
+	_, err := d.db.Exec(`UPDATE flow_steps SET prompt=? WHERE run_id=? AND step_id=?`,
+		prompt, runID, stepID)
+	return err
+}
+
 // SetStepCost ghi chi phí và token của một bước. Tách khỏi SetStepOutput vì
 // output đến từ bản ghi còn chi phí đến từ dòng result có cấu trúc — hai nguồn,
 // và không phải provider nào cũng cho được chi phí (chỉ ghi khi > 0).
@@ -306,7 +333,8 @@ func (d *DB) SetStepCost(runID int64, stepID string, costUSD float64, tokIn, tok
 func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 	rows, err := d.db.Query(
 		`SELECT run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,''),
-		        COALESCE(cost_usd,0),COALESCE(tokens_in,0),COALESCE(tokens_out,0)
+		        COALESCE(cost_usd,0),COALESCE(tokens_in,0),COALESCE(tokens_out,0),
+		        COALESCE(prompt,'')
 		   FROM flow_steps WHERE run_id=?`, runID)
 	if err != nil {
 		return nil, err
@@ -316,7 +344,7 @@ func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
 	for rows.Next() {
 		var s StepRun
 		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output,
-			&s.CostUSD, &s.TokensIn, &s.TokensOut); err != nil {
+			&s.CostUSD, &s.TokensIn, &s.TokensOut, &s.Prompt); err != nil {
 			return nil, err
 		}
 		out[s.StepID] = s

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Switch-Agent-Pro — Hội thoại</title>
+<style>
+:root{
+  --bg:#0F172A;--panel:#141d31;--muted:#272F42;--fg:#F8FAFC;--sub:#94A3B8;--border:#334155;
+  --run:#22C55E;--warn:#F59E0B;--limit:#EF4444;--api:#4285F4;--purple:#8B5CF6;
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
+a{color:inherit}
+
+/* ---------- khung ---------- */
+header{display:flex;align-items:center;gap:14px;padding:12px 18px;
+  border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;z-index:5}
+header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px}
+header nav{display:flex;gap:4px;margin-left:auto}
+header nav a{padding:6px 11px;border-radius:7px;color:var(--sub);text-decoration:none;font-size:13px}
+header nav a:hover{background:var(--muted);color:var(--fg)}
+header nav a[aria-current]{background:var(--muted);color:var(--fg)}
+
+main{display:grid;grid-template-columns:248px 1fr;height:calc(100vh - 53px)}
+aside{border-right:1px solid var(--border);overflow-y:auto;background:var(--panel)}
+#thread{overflow-y:auto;padding:20px 22px 90px}
+
+/* ---------- danh sách lượt chạy ---------- */
+.aside-title{padding:12px 14px 8px;font-size:11px;letter-spacing:.9px;
+  text-transform:uppercase;color:var(--sub);font-weight:650}
+.run{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;
+  border-left:2px solid transparent}
+.run:hover{background:var(--muted)}
+.run[aria-selected="true"]{background:var(--muted);border-left-color:var(--api)}
+.run-id{font-variant-numeric:tabular-nums;color:var(--sub);font-size:12px;min-width:30px}
+.run-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Chấm trạng thái bằng CSS — design system cấm dùng emoji làm icon. */
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--sub)}
+.dot.running{background:var(--api)}
+.dot.completed,.dot.done{background:var(--run)}
+.dot.failed{background:var(--limit)}
+.dot.cancelled{background:var(--sub)}
+.dot.waiting_approval{background:var(--warn)}
+.dot.skipped{background:var(--muted);border:1px solid var(--border)}
+
+/* Nhịp thở cho thứ ĐANG chạy — mắt cần bắt được ngay cái nào còn sống. */
+.dot.running{animation:tho 1.6s var(--ease) infinite}
+@keyframes tho{0%,100%{opacity:1}50%{opacity:.32}}
+
+/* ---------- đầu luồng ---------- */
+#head{margin-bottom:18px}
+#head h2{margin:0 0 4px;font-size:19px;font-weight:650}
+#meta{color:var(--sub);font-size:13px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+#meta b{color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- một lượt nói ---------- */
+.msg{margin:0 0 14px;border:1px solid var(--border);border-radius:11px;
+  background:var(--panel);overflow:hidden}
+.msg.running{border-color:var(--api)}
+.msg.failed{border-color:var(--limit)}
+
+.msg-top{display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.who{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.badge{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+  font-size:11px;font-weight:700;color:#0B1120;flex:none}
+.step-id{color:var(--sub);font-weight:500;font-size:12px}
+.msg-meta{margin-left:auto;display:flex;gap:12px;align-items:center;
+  color:var(--sub);font-size:12px;font-variant-numeric:tabular-nums}
+
+.turn{padding:11px 14px;border-top:1px solid var(--border)}
+.turn:first-of-type{border-top:0}
+.turn-label{font-size:11px;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--sub);font-weight:650;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12.5px/1.6 ui-monospace,
+  "Cascadia Code",Consolas,monospace;color:#DBE3F0}
+.turn.hoi pre{color:var(--sub)}
+.fold{max-height:132px;overflow:hidden;position:relative}
+.fold::after{content:"";position:absolute;inset:auto 0 0;height:46px;
+  background:linear-gradient(transparent,var(--panel))}
+button.more{margin-top:7px;background:var(--muted);border:1px solid var(--border);
+  color:var(--sub);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:12px}
+button.more:hover{color:var(--fg)}
+
+.err{color:#FCA5A5;font-size:12.5px;padding:9px 14px;background:rgba(239,68,68,.08);
+  border-top:1px solid var(--border)}
+.tra-loi-ai{color:var(--sub);font-size:12px;padding:7px 14px;border-top:1px solid var(--border)}
+.tra-loi-ai b{color:#CBD5E1;font-weight:600}
+
+.empty{color:var(--sub);padding:60px 20px;text-align:center}
+#live{position:fixed;right:18px;bottom:16px;display:flex;align-items:center;gap:8px;
+  background:var(--panel);border:1px solid var(--border);border-radius:20px;
+  padding:7px 14px;font-size:12px;color:var(--sub)}
+
+/* Design system: mọi chuyển động phải tôn trọng lựa chọn của người dùng. */
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important;transition:none !important}
+  .dot.running{opacity:1}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Hội thoại giữa các agent</h1>
+  <nav>
+    <a href="/index.html">Bảng điều khiển</a>
+    <a href="/flow.html">Luồng</a>
+    <a href="/hoi-thoai.html" aria-current="page">Hội thoại</a>
+    <a href="/3d.html">3D</a>
+  </nav>
+</header>
+
+<main>
+  <aside>
+    <div class="aside-title">Lượt chạy</div>
+    <div id="runs"></div>
+  </aside>
+  <section id="thread">
+    <div class="empty">Chọn một lượt chạy ở cột trái.</div>
+  </section>
+</main>
+
+<div id="live"><span class="dot" id="live-dot"></span><span id="live-text">đang nối…</span></div>
+
+<script>
+"use strict";
+
+// Màu theo HÃNG, không theo bước: mắt nhớ màu nhanh hơn nhớ tên.
+const MAU = {claude:"#8B5CF6", antigravity:"#4285F4", grok:"#F59E0B",
+             codex:"#22C55E", cursor:"#EC4899", may:"#64748B"};
+
+const NHAN = {running:"đang chạy", done:"xong", completed:"xong", failed:"hỏng",
+              skipped:"bỏ qua", cancelled:"đã huỷ", waiting_approval:"chờ duyệt", "":"chưa chạy"};
+
+let runHienTai = null;
+let dangMo = new Set();   // bước nào người dùng đã bấm "xem đủ"
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+async function api(p){
+  const r = await fetch(p, {headers:{"Accept":"application/json"}});
+  if (!r.ok) throw new Error(p + " -> " + r.status);
+  return r.json();
+}
+
+function hang(profile){
+  if (!profile) return "may";
+  const i = profile.indexOf(":");
+  return i < 0 ? profile : profile.slice(0, i);
+}
+
+function tenNguoiNoi(b){
+  if (b.profile) return b.profile;
+  if (b.type === "notify") return "hệ thống";
+  return "máy chấm";
+}
+
+// ---------------------------------------------------------------- cột trái
+async function napDanhSach(){
+  let st;
+  try { st = await api("/api/state"); }
+  catch (e) { $("#runs").innerHTML = '<div class="empty">không đọc được</div>'; return; }
+
+  const runs = st.runs || [];
+  if (!runs.length){ $("#runs").innerHTML = '<div class="empty">chưa có lượt nào</div>'; return; }
+
+  $("#runs").innerHTML = runs.map(r => `
+    <div class="run" role="option" data-id="${r.id}"
+         aria-selected="${r.id === runHienTai}">
+      <span class="dot ${esc(r.state)}"></span>
+      <span class="run-id">#${r.id}</span>
+      <span class="run-name">${esc(r.flow)}</span>
+    </div>`).join("");
+
+  for (const el of document.querySelectorAll(".run")){
+    el.onclick = () => moLuot(Number(el.dataset.id));
+  }
+  // Lần đầu vào: mở lượt đang chạy, không có thì lượt mới nhất.
+  if (runHienTai == null){
+    const dangChay = runs.find(r => r.state === "running");
+    moLuot((dangChay || runs[0]).id);
+  }
+}
+
+// ---------------------------------------------------------------- luồng chat
+async function moLuot(id){
+  runHienTai = id;
+  for (const el of document.querySelectorAll(".run"))
+    el.setAttribute("aria-selected", String(Number(el.dataset.id) === id));
+  await veLuot();
+}
+
+async function veLuot(){
+  if (runHienTai == null) return;
+  let d;
+  try { d = await api("/api/flow/detail?id=" + runHienTai); }
+  catch (e) { $("#thread").innerHTML = '<div class="empty">không đọc được lượt này</div>'; return; }
+
+  let tien = 0, tin = 0, tout = 0;
+  for (const b of d.steps){ tien += b.costUsd||0; tin += b.tokensIn||0; tout += b.tokensOut||0; }
+
+  const dau = `
+    <div id="head">
+      <h2>#${d.id} · ${esc(d.flow)}</h2>
+      <div id="meta">
+        <span><span class="dot ${esc(d.state)}"></span> ${esc(NHAN[d.state] || d.state)}</span>
+        <span>bắt đầu <b>${new Date(d.started*1000).toLocaleString("vi-VN")}</b></span>
+        <span>token <b>${tin.toLocaleString("vi-VN")}</b> vào / <b>${tout.toLocaleString("vi-VN")}</b> ra</span>
+        ${tien > 0 ? `<span>chi phí <b>${tien.toFixed(4)} USD</b></span>` : ""}
+      </div>
+    </div>`;
+
+  $("#thread").innerHTML = dau + d.steps.map(veMot).join("") ;
+
+  for (const el of document.querySelectorAll("button.more")){
+    el.onclick = () => {
+      const k = el.dataset.k;
+      dangMo.has(k) ? dangMo.delete(k) : dangMo.add(k);
+      veLuot();
+    };
+  }
+}
+
+function veKhoi(nhan, chu, khoa, lop){
+  if (!chu) return "";
+  const mo = dangMo.has(khoa);
+  const dai = chu.length > 420 || chu.split("\n").length > 7;
+  return `
+    <div class="turn ${lop}">
+      <div class="turn-label">${nhan}</div>
+      <div class="${dai && !mo ? "fold" : ""}"><pre>${esc(chu)}</pre></div>
+      ${dai ? `<button class="more" data-k="${esc(khoa)}">${mo ? "thu gọn" : "xem đủ"}</button>` : ""}
+    </div>`;
+}
+
+function veMot(b){
+  const h = hang(b.profile);
+  const mau = MAU[h] || MAU.may;
+  const ten = tenNguoiNoi(b);
+  const chuCai = (h === "may" ? "M" : h[0]).toUpperCase();
+
+  const meta = [];
+  if (b.attempt > 1) meta.push(`lần thử ${b.attempt}`);
+  if (b.tokensIn || b.tokensOut) meta.push(`${b.tokensIn}&#8594;${b.tokensOut} tok`);
+  if (b.costUsd > 0) meta.push(`${b.costUsd.toFixed(4)} USD`);
+  meta.push(NHAN[b.state] || b.state || "chưa chạy");
+
+  const nguon = (b.needs && b.needs.length)
+    ? `<div class="tra-loi-ai">nối tiếp <b>${b.needs.map(esc).join("</b>, <b>")}</b></div>` : "";
+
+  return `
+    <article class="msg ${esc(b.state)}">
+      <div class="msg-top">
+        <span class="badge" style="background:${mau}">${esc(chuCai)}</span>
+        <span class="who">${esc(ten)} <span class="step-id">${esc(b.id)}</span></span>
+        <span class="msg-meta"><span class="dot ${esc(b.state)}"></span>${meta.join(" · ")}</span>
+      </div>
+      ${nguon}
+      ${veKhoi("được giao", b.prompt, b.id + ":hoi", "hoi")}
+      ${veKhoi("trả lời", b.output, b.id + ":dap", "dap")}
+      ${b.msg && b.state === "failed" ? `<div class="err">${esc(b.msg)}</div>` : ""}
+    </article>`;
+}
+
+// ---------------------------------------------------------------- realtime
+function noiSuKien(){
+  const es = new EventSource("/api/events");
+  let hen = null;
+
+  es.onopen = () => {
+    $("#live-dot").className = "dot running";
+    $("#live-text").textContent = "đang theo dõi";
+  };
+  es.onerror = () => {
+    $("#live-dot").className = "dot failed";
+    $("#live-text").textContent = "mất kết nối — thử lại…";
+  };
+  es.onmessage = ev => {
+    let e; try { e = JSON.parse(ev.data); } catch { return; }
+    const t = e.type || "";
+    if (!t.startsWith("flow.") && t !== "failure") return;
+
+    // Gộp nhiều sự kiện dồn dập thành một lần vẽ: lượt chạy song song có thể
+    // bắn vài sự kiện trong cùng một khoảnh khắc.
+    clearTimeout(hen);
+    hen = setTimeout(() => {
+      const cuaLuotNay = !e.detail || !e.detail.run || Number(e.detail.run) === runHienTai;
+      if (cuaLuotNay) veLuot();
+      napDanhSach();
+    }, 250);
+  };
+}
+
+napDanhSach();
+noiSuKien();
+setInterval(napDanhSach, 15000);   // lưới an toàn nếu lỡ mất sự kiện
+</script>
+</body>
+</html>

@@ -68,6 +68,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
 	m.HandleFunc("/api/flow/run", s.guard(s.handleFlowRun))
 	m.HandleFunc("/api/flow/decide", s.guard(s.handleFlowDecide))
+	m.HandleFunc("/api/flow/detail", s.guard(s.handleFlowDetail))
 	m.HandleFunc("/api/flow/cancel", s.guard(s.handleFlowCancel))
 	m.HandleFunc("/api/flow/save", s.guard(s.handleFlowSave))
 	m.HandleFunc("/api/flow/delete", s.guard(s.handleFlowDelete))
@@ -530,10 +531,23 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	for _, s := range sessions {
 		ss = append(ss, sessionDTO{s.ID, s.Addr(), s.PID, s.Worktree, s.Log, s.Started.Unix()})
 	}
+	// runs: `flow.runs` khai đường vào từ web CHÍNH LÀ endpoint này, nên thiếu
+	// nó thì mặt web không có cách nào biết lượt chạy nào đang chạy — mà test
+	// ngang quyền vẫn xanh vì đường dẫn có tồn tại.
+	runs, err := s.api.FlowRuns(20)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	rs := make([]runDTO, 0, len(runs))
+	for _, r := range runs {
+		rs = append(rs, runDTO{r.ID, r.Flow, r.State, r.Started.Unix()})
+	}
 	writeJSON(w, map[string]any{
 		"apiVersion": api.Version,
 		"profiles":   ps,
 		"sessions":   ss,
+		"runs":       rs,
 		"now":        time.Now().Unix(),
 	})
 }

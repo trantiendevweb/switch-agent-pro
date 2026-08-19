@@ -151,6 +151,7 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"flow.save":     "/api/flow/save",
 		"flow.delete":   "/api/flow/delete",
 		"flow.runs":     "/api/state",
+		"flow.detail":   "/api/flow/detail",
 		"flow.validate": "/api/flow/def",
 		"config.show":   "/api/state",
 		"api.call":      "/api/ai",

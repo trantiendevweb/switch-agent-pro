@@ -233,8 +233,17 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	var lastErr error
 	for attempt := 1; attempt <= tries; attempt++ {
 		_ = r.DB.SetStep(runID, s.ID, store.StepRunning, "", attempt)
+		// Lưu CÂU HỎI trước khi chạy, không phải sau: bước có thể treo hoặc bị
+		// cắt ngang, mà lúc đó câu hỏi lại là thứ cần nhất để hiểu vì sao.
+		_ = r.DB.SetStepPrompt(runID, s.ID, cauHoi(s, env))
 		r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID, SessionID: runID,
-			Msg: fmt.Sprintf("chạy [%s] lần %d/%d", s.Type, attempt, tries)})
+			Msg: fmt.Sprintf("chạy [%s] lần %d/%d", s.Type, attempt, tries),
+			// Mặt web cần biết ĐÚNG Ô NÀO vừa đổi để cập nhật, thay vì nạp lại
+			// cả lượt chạy mỗi lần có một dòng sự kiện.
+			Detail: map[string]string{
+				"run": fmt.Sprint(runID), "step": s.ID,
+				"state": store.StepRunning, "profile": s.Profile, "type": s.Type,
+			}})
 
 		stepCtx := ctx
 		var cancel context.CancelFunc
@@ -255,7 +264,11 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 				_ = r.DB.SetStepCost(runID, s.ID, kq.ChiPhiUSD, kq.TokenVao, kq.TokenRa)
 			}
 			r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
-				SessionID: runID, Msg: "xong"})
+				SessionID: runID, Msg: "xong",
+				Detail: map[string]string{
+					"run": fmt.Sprint(runID), "step": s.ID,
+					"state": store.StepDone, "profile": s.Profile, "type": s.Type,
+				}})
 			return store.StepDone, "", kq.Output
 		}
 		lastErr = err
@@ -272,7 +285,12 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	}
 	emsg := lastErr.Error()
 	_ = r.DB.SetStep(runID, s.ID, store.StepFailed, emsg, tries)
-	r.Bus.Failuref("%s.%s: %s", f.Name, s.ID, emsg)
+	r.Bus.Publish(events.Event{Type: events.Failure, Addr: f.Name + "." + s.ID, SessionID: runID,
+		Msg: f.Name + "." + s.ID + ": " + emsg,
+		Detail: map[string]string{
+			"run": fmt.Sprint(runID), "step": s.ID,
+			"state": store.StepFailed, "profile": s.Profile, "type": s.Type,
+		}})
 	return store.StepFailed, emsg, ""
 }
 
@@ -354,4 +372,32 @@ func lastLine(s string) string {
 		return ""
 	}
 	return lines[len(lines)-1]
+}
+
+// cauHoi dựng lại ĐÚNG thứ bước này gửi đi, sau khi đã thay hết biến.
+//
+// Không dùng lại s.Prompt thô trong flows.toml: cái người ta cần đọc lại là thứ
+// agent THẬT SỰ nhận. Lượt chạy #29 cho thấy khoảng cách giữa hai thứ đó có thể
+// là cả một lỗi — mẫu ghi `{{steps.kiem-cuoi.output}}`, thứ gửi đi cũng đúng
+// chuỗi đó vì bước kia không để lại kết quả.
+//
+// Bước không hỏi ai (shell/notify) vẫn lưu, vì trong dòng hội thoại chúng là
+// tiếng nói của MÁY — "tôi chạy lệnh này" — và bỏ đi thì mạch đứt quãng.
+func cauHoi(s Step, vars map[string]string) string {
+	switch s.Type {
+	case TypeAgent, TypeReview:
+		return ExpandChay(s.Prompt, vars)
+	case TypeNotify:
+		return ExpandChay(s.Message, vars)
+	case TypeShell, TypeTest, TypeLint:
+		if len(s.Run) == 0 {
+			return ""
+		}
+		args := make([]string, len(s.Run))
+		for i, a := range s.Run {
+			args[i] = Expand(a, vars)
+		}
+		return strings.Join(args, " ")
+	}
+	return ""
 }
