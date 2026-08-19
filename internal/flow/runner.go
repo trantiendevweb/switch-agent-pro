@@ -42,6 +42,14 @@ type Runner struct {
 	// Commands là các lệnh khai trong .sagent/project.toml (test, lint, build…),
 	// để node `test`/`lint` không phải lặp lại lệnh trong từng flow.
 	Commands map[string][]string
+
+	// DefaultProfile là tài khoản dùng cho bước agent không khai `profile`.
+	//
+	// Bộ thực thi KHÔNG dùng nó để chạy (việc đó là của AgentRunner) — nó chỉ để
+	// event báo hỏng nói được "tài khoản nào". Tin báo "bước x hỏng" mà không
+	// kèm tài khoản thì người đọc vẫn phải mở máy lên tra, tức là tin đó chưa
+	// làm xong việc của nó.
+	DefaultProfile string
 }
 
 // Result tóm tắt một lần chạy.
@@ -148,10 +156,21 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		}
 
 		if len(work) > 0 {
-			if failed := r.runWave(ctx, runID, f, work, vars, st); failed != "" {
+			if failed, ly := r.runWave(ctx, runID, f, work, vars, st); failed != "" {
 				_ = r.DB.SetRunState(runID, store.RunFailed)
+				msg := fmt.Sprintf("dừng ở bước %s", failed)
+				if ly != "" {
+					msg += ": " + ly
+				}
 				r.Bus.Publish(events.Event{Type: events.FlowFailed, Addr: f.Name, SessionID: runID,
-					Msg: fmt.Sprintf("dừng ở bước %s", failed)})
+					Msg: msg,
+					// Có cấu trúc chứ không chỉ một câu chữ: mặt nào muốn mở đúng
+					// bước hỏng (workflow board) hay nhắn đúng tên bước (Telegram)
+					// đều phải tự tách chuỗi nếu thiếu chỗ này — và tách chuỗi thì
+					// sớm muộn cũng sai.
+					Detail: map[string]string{
+						"flow": f.Name, "run": fmt.Sprint(runID), "step": failed, "ly_do": ly,
+					}})
 				return Result{RunID: runID, State: store.RunFailed}, nil
 			}
 			continue // xong đợt, tính lại xem bước nào sẵn sàng
@@ -164,14 +183,17 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		_ = r.DB.SetRunState(runID, store.RunWaiting)
 		r.Bus.Publish(events.Event{
 			Type: events.FlowWaiting, Addr: f.Name + "." + s.ID, SessionID: runID,
-			Msg:    "chờ duyệt: " + s.Message,
-			Detail: map[string]string{"run": fmt.Sprint(runID), "step": s.ID},
+			Msg: "chờ duyệt: " + s.Message,
+			Detail: map[string]string{
+				"flow": f.Name, "run": fmt.Sprint(runID), "step": s.ID, "ly_do": s.Message,
+			},
 		})
 		return Result{RunID: runID, State: store.RunWaiting, Waiting: s.ID}, nil
 	}
 
 	_ = r.DB.SetRunState(runID, store.RunDone)
 	r.Bus.Publish(events.Event{Type: events.FlowDone, Addr: f.Name, SessionID: runID,
-		Msg: fmt.Sprintf("xong #%d", runID)})
+		Msg:    fmt.Sprintf("xong #%d", runID),
+		Detail: map[string]string{"flow": f.Name, "run": fmt.Sprint(runID)}})
 	return Result{RunID: runID, State: store.RunDone}, nil
 }

@@ -22,3 +22,6 @@ __pycache__/
 # tạo ở THƯ MỤC LÀM VIỆC — kiểm rồi, bản này không chứa key, nhưng cấu hình của
 # provider là chỗ key hay nằm nên chặn từ đầu chứ đừng đợi lần sau.
 .grok/
+
+# Worktree tạm của workflow — không thuộc repo.
+.claude/worktrees/

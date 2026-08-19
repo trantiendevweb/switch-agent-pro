@@ -34,7 +34,7 @@ import (
 
 const tlsHanDung = 825 * 24 * time.Hour // 825 ngày: giới hạn các trình duyệt chấp nhận
 
-func tlsDir() string  { return filepath.Join(paths.AccountsRoot(), "dash-tls") }
+func tlsDir() string   { return filepath.Join(paths.AccountsRoot(), "dash-tls") }
 func certPath() string { return filepath.Join(tlsDir(), "cert.pem") }
 func keyPath() string  { return filepath.Join(tlsDir(), "key.pem") }
 

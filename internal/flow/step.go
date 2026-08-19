@@ -13,8 +13,11 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
+// runWave trả về ID bước làm cả đợt dừng và LÝ DO, tách làm hai chứ không dán
+// thành một chuỗi: mặt nào muốn nhắc đúng tên bước (báo Telegram, workflow
+// board) thì phải có tên bước sạch, không lẫn với câu mô tả lỗi.
 func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
-	vars map[string]string, st *runState) string {
+	vars map[string]string, st *runState) (buoc, ly string) {
 
 	limit := r.MaxParallel
 	if limit < 1 {
@@ -23,7 +26,7 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 	sem := make(chan struct{}, limit)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	stopAt := ""
+	stopAt, stopLy := "", ""
 
 	// Một bước hỏng với on_failure=stop thì HUỶ luôn các bước cùng đợt: chúng
 	// sắp bị bỏ đi anyway, để chạy tiếp chỉ tốn hạn mức.
@@ -49,10 +52,10 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				if err != nil {
 					_ = r.DB.SetStep(runID, s.ID, store.StepFailed, "điều kiện sai: "+err.Error(), 0)
 					st.set(s.ID, store.StepFailed, "")
-					r.Bus.Failuref("%s.%s điều kiện sai: %v", f.Name, s.ID, err)
+					r.baoBuocHong(runID, f, s, "điều kiện sai: "+err.Error())
 					mu.Lock()
 					if stopAt == "" && s.OnFailure != OnFailContinue {
-						stopAt = s.ID
+						stopAt, stopLy = s.ID, "điều kiện sai: "+err.Error()
 					}
 					mu.Unlock()
 					return
@@ -72,10 +75,10 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				if err != nil {
 					_ = r.DB.SetStep(runID, s.ID, store.StepFailed, err.Error(), 0)
 					st.set(s.ID, store.StepFailed, "")
-					r.Bus.Failuref("%s.%s: %v", f.Name, s.ID, err)
+					r.baoBuocHong(runID, f, s, err.Error())
 					mu.Lock()
 					if stopAt == "" && s.OnFailure != OnFailContinue {
-						stopAt = s.ID
+						stopAt, stopLy = s.ID, err.Error()
 					}
 					mu.Unlock()
 					return
@@ -92,7 +95,7 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				if state == store.StepFailed && s.OnFailure != OnFailContinue && s.OnFailure != OnFailFallback {
 					mu.Lock()
 					if stopAt == "" {
-						stopAt = s.ID + ": " + msg
+						stopAt, stopLy = s.ID, msg
 					}
 					mu.Unlock()
 					cancelWave()
@@ -112,7 +115,7 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				default:
 					mu.Lock()
 					if stopAt == "" {
-						stopAt = s.ID + ": " + msg
+						stopAt, stopLy = s.ID, msg
 					}
 					mu.Unlock()
 					cancelWave() // dừng các bước cùng đợt, khỏi tốn thêm
@@ -121,7 +124,56 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 		}()
 	}
 	wg.Wait()
-	return stopAt
+	return stopAt, stopLy
+}
+
+// baoBuocHong phát event "bước hỏng" ĐỦ THÔNG TIN để mặt khác dùng lại được.
+//
+// CÓ BẮN CẢ KHI on_failure = continue, và đó là CỐ Ý — không phải sót.
+// Hàm này chạy trong runStep, tức TRƯỚC chỗ runWave xét OnFailure. Một bước hỏng
+// mà lượt chạy vẫn đi tiếp thì người ở xa CÀNG cần biết: lượt sẽ kết thúc
+// "completed" và không còn dấu vết nào nổi lên. Đo tại lần chạy #31 — `code-go`
+// hỏng vì hết hạn đăng nhập, lượt vẫn `completed`, và nếu chỉ báo lúc cả lượt
+// hỏng thì tin nhắn đó không bao giờ được gửi.
+//
+// Đổi lại là ồn: flow `dem` có bốn bước khai `continue`, xấu nhất là bốn tin cho
+// một lượt. Chấp nhận, vì mất một tin báo hỏng đắt hơn nhận thừa một tin.
+//
+// Bus.Failuref chỉ đẻ ra một dòng chữ — đủ cho terminal, vì người đang nhìn
+// terminal đã biết mình vừa chạy lượt nào. Người nhận tin Telegram lúc 2 giờ
+// sáng thì không: họ cần số lượt chạy, tên bước và tài khoản mới mở đúng chỗ mà
+// xem. Msg giữ NGUYÊN dạng cũ nên phần in ra màn hình không đổi.
+func (r *Runner) baoBuocHong(runID int64, f Flow, s Step, ly string) {
+	r.Bus.Publish(events.Event{
+		Type:      events.Failure,
+		Addr:      f.Name + "." + s.ID,
+		SessionID: runID,
+		Msg:       fmt.Sprintf("%s.%s: %s", f.Name, s.ID, ly),
+		Detail: map[string]string{
+			"flow":    f.Name,
+			"run":     fmt.Sprint(runID),
+			"step":    s.ID,
+			"ly_do":   ly,
+			"profile": r.taiKhoan(s),
+			// Hai khoa duoi cho man hoi thoai: no can biet DUNG O NAO vua doi
+			// trang thai de ve lai, thay vi nap lai ca luot chay.
+			"state": store.StepFailed,
+			"type":  s.Type,
+		},
+	})
+}
+
+// taiKhoan là tài khoản bước sẽ chạy bằng: khai trong bước, hoặc mặc định của
+// lượt chạy. Bước không dùng agent thì trả rỗng — nói bừa một cái tên tài khoản
+// còn tệ hơn không nói (nguyên tắc #6: chưa biết thì đừng đoán).
+func (r *Runner) taiKhoan(s Step) string {
+	if s.Type != TypeAgent && s.Type != TypeReview {
+		return ""
+	}
+	if s.Profile != "" {
+		return s.Profile
+	}
+	return r.DefaultProfile
 }
 
 // runForEach chạy một bước lặp trên danh sách, các lượt SONG SONG theo trần.
@@ -192,7 +244,7 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 		if combined != "" {
 			_ = r.DB.SetStepOutput(runID, s.ID, combined)
 		}
-		r.Bus.Failuref("%s.%s: %s", f.Name, s.ID, firstErr)
+		r.baoBuocHong(runID, f, s, firstErr)
 		return store.StepFailed, firstErr, combined
 	}
 	_ = r.DB.SetStep(runID, s.ID, store.StepDone, fmt.Sprintf("xong %d mục", len(items)), 1)
@@ -285,12 +337,7 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	}
 	emsg := lastErr.Error()
 	_ = r.DB.SetStep(runID, s.ID, store.StepFailed, emsg, tries)
-	r.Bus.Publish(events.Event{Type: events.Failure, Addr: f.Name + "." + s.ID, SessionID: runID,
-		Msg: f.Name + "." + s.ID + ": " + emsg,
-		Detail: map[string]string{
-			"run": fmt.Sprint(runID), "step": s.ID,
-			"state": store.StepFailed, "profile": s.Profile, "type": s.Type,
-		}})
+	r.baoBuocHong(runID, f, s, emsg)
 	return store.StepFailed, emsg, ""
 }
 

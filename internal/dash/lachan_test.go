@@ -155,6 +155,7 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"flow.validate": "/api/flow/def",
 		"config.show":   "/api/state",
 		"api.call":      "/api/ai",
+		"tele.notify":   "/api/tele",
 	}
 	// Miễn trừ CÓ LÝ DO — không phải danh sách để nhét cho qua test.
 	mienTru := map[string]string{

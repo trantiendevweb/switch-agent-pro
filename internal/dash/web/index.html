@@ -66,11 +66,19 @@
   .e.warning{color:var(--warn)} .e.failure{color:var(--limit)} .e.session\.started{color:var(--run)}
   .banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:#fecaca;
     border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;display:none}
-  /* Design system: chuyển động phải tôn trọng lựa chọn của người dùng.
-     Ai bật "giảm chuyển động" ở hệ điều hành thường là vì chóng mặt thật. */
+  /* báo tin: trạng thái vẽ bằng CHẤM CSS, không dùng ký tự/emoji làm icon */
+  .tele{padding:14px;font-size:13px}
+  .tele .hang{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .tele .d{width:9px;height:9px;border-radius:50%;background:var(--sub);flex:none}
+  .tele.on .d{background:var(--run)}
+  .tele .phu{color:var(--sub);font-size:12px;line-height:1.5}
+
+  /* Có transition ở .btn/.go — máy nào bật "giảm chuyển động" thì phải tắt hết.
+     Chuyển động không phải trang trí với người bị rối loạn tiền đình. */
   @media (prefers-reduced-motion: reduce){
-    *{animation-duration:.001ms !important;animation-iteration-count:1 !important;
-      transition-duration:.001ms !important;scroll-behavior:auto !important}
+    *,*::before,*::after{
+      animation-duration:.01ms !important;animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;scroll-behavior:auto !important}
   }
 </style>
 </head>
@@ -189,6 +197,18 @@
         <div id="ai-out" class="empty">Chưa hỏi gì.</div>
       </div>
 
+      <h2>Báo tin Telegram</h2>
+      <div class="card">
+        <div id="tele" class="tele">
+          <div class="hang"><span class="d"></span><span id="tele-tt">đang đọc…</span></div>
+          <div id="tele-phu" class="phu"></div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="tele-thu" disabled>Gửi tin thử</button>
+          </div>
+          <div id="tele-ket" class="phu" style="margin-top:8px"></div>
+        </div>
+      </div>
+
       <h2>Máy &amp; dọn dẹp</h2>
       <div class="card">
         <div id="dbinfo" class="empty">đang đọc…</div>
@@ -264,6 +284,38 @@ async function napRoute(){
   }catch(e){ /* chưa cấu hình thì im, không bắn lỗi đỏ vào mặt người dùng */ }
 }
 
+// Báo tin Telegram: mặt web CHỈ xem trạng thái và gửi thử.
+//
+// Đặt token là việc của terminal — dash có chế độ phơi ra mạng, mà một secret gõ
+// vào ô input thì nằm lại trong autofill và ảnh chụp màn hình. Server cũng không
+// có trường nào trả token về, nên trang này không thể lỡ tay hiện nó ra.
+async function napTele(){
+  try{
+    const d = await api('/api/tele');
+    const box = $('tele');
+    if(d.da_cau_hinh){
+      box.classList.add('on');
+      $('tele-tt').textContent = 'Đang bật — nhắn tới ' + d.chat_id;
+      $('tele-phu').textContent = 'Nhắn khi: ' + (d.bao_khi||[]).join(' · ');
+      $('tele-thu').disabled = false;
+    }else{
+      box.classList.remove('on');
+      $('tele-tt').textContent = 'Chưa cấu hình — máy im lặng, lượt chạy không bị ảnh hưởng';
+      $('tele-phu').textContent = 'Bật ở terminal: sagent tele --set-token <token> --chat <chat id>  ·  lưu tại ' + d.duong_dan;
+      $('tele-thu').disabled = true;
+    }
+  }catch(e){ $('tele-tt').textContent = 'không đọc được: ' + e.message; }
+}
+
+$('tele-thu').onclick = async () => {
+  const out = $('tele-ket');
+  out.textContent = 'đang gửi…';
+  try{
+    await api('/api/tele', {method:'POST', body:'{}'});
+    out.textContent = 'Đã gửi. Không thấy gì trong Telegram thì kiểm lại chat id.';
+  }catch(e){ out.textContent = 'lỗi: ' + e.message; }
+};
+
 async function napDB(){
   try{
     const d = await api('/api/db');
@@ -290,7 +342,7 @@ async function quet(giet){
     }
     dong.push(d.da_giet ? '→ đã dừng ' + moCoiCo + ' tiến trình.'
                         : '→ thấy ' + moCoiCo + ' tiến trình. Windows dùng lại PID nên xem kỹ tên và giờ trước khi dừng.');
-    out.textContent = dong.join(String.fromCharCode(10));
+    out.textContent = dong.join('\n');
     out.style.whiteSpace = 'pre';
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 }
@@ -305,8 +357,7 @@ $('aiform').onsubmit = async ev => {
     const d = await api('/api/ai', {method:'POST', body: JSON.stringify({
       route: $('ai-route').value, prompt: $('ai-prompt').value })});
     out.style.whiteSpace = 'pre-wrap';
-    const xd = String.fromCharCode(10, 10) + '— ';
-    out.textContent = d.noi_dung + xd + d.model + ' · vào ' + d.usage.vao +
+    out.textContent = d.noi_dung + '\n\n— ' + d.model + ' · vào ' + d.usage.vao +
       ', ra ' + d.usage.ra + ', tổng ' + d.usage.tong + ' token · ' + d.giay.toFixed(1) + 's';
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
@@ -415,16 +466,19 @@ function connect(){
     logEvent(e);
     // trạng thái đổi thì đọc lại ảnh chụp đầy đủ (không dựng UI chỉ từ event)
     if(['session.started','session.stopped','clones.cleaned','worktree.removed'].includes(e.type)) refresh();
-// Hai cái này đọc một lần lúc mở: route và schema hiếm khi đổi giữa chừng, nên
-// nhét vào vòng poll 5 giây chỉ tốn request. Quét mồ côi thì CỐ Ý không tự chạy —
-// nó đọc bảng tiến trình cả máy, phải do người dùng bấm.
-napFlow(); napRoute();
-napDB();
   };
 }
 
 refresh();
 connect();
+// Ba cái này đọc ĐÚNG MỘT LẦN lúc mở trang: route, schema và trạng thái báo tin
+// hiếm khi đổi giữa chừng. (Trước đây chúng nằm nhầm trong onmessage của SSE,
+// nghĩa là mỗi event lại bắn thêm ba request — ngược hẳn ý của chính dòng chú
+// thích đứng cạnh.) Quét mồ côi thì CỐ Ý không tự chạy: nó đọc bảng tiến trình
+// cả máy, phải do người dùng bấm.
+napRoute();
+napDB();
+napTele();
 setInterval(refresh, 5000); // đồng hồ "đang chạy bao lâu" + phòng khi lỡ event
 </script>
 </body>
