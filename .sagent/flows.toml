@@ -643,3 +643,205 @@ GIAM CHAN: <hai nhánh có sửa cùng file không>"""
       type = "notify"
       needs = ["soi"]
       message = "Lượt đêm xong — xem `sagent flow runs <#>` để đọc kết quả và chi phí từng bước."
+
+# ---------------------------------------------------------------------------
+# ĐỘI 4 — dùng HẾT bốn tài khoản đang có trên máy, phân vai theo SỐ ĐO ngày 19/08.
+#
+#   claude:phu       ĐIỀU PHỐI + GỘP. Việc đọc nhiều rồi ra quyết định.
+#                    Vừa đăng nhập lại 19/08 22:1x, DocKetQua ✓.
+#   claude:tns       CODE GO + SỬA. Việc nặng nhất, cần đọc được chi phí/token thật.
+#   antigravity:may  TÀI LIỆU (.md). Việc ĐÓNG KHUNG, hỏng thì rẻ — nó từng
+#                    timeout trả 0 chữ 0 commit (lần chạy #23).
+#   grok:api         SOI, CHỈ ĐỌC. KHÔNG có rào quyền nào (grok.go), nên không
+#                    giao việc ghi. Và nó PHÁN NGƯỢC NHÃN 2/2 lượt (#29, #31):
+#                    lập luận đúng, nhãn sai. Vì vậy bước GỘP phải tự chạy git
+#                    kiểm lại lời nó, xem chú thích ở bước `gop`.
+#
+# VÌ SAO tns làm cả code lẫn sửa mà không chia cho phu: bước sửa phải vá ĐÚNG
+# cây đang đỏ. Giao cho tài khoản khác thì nó được cấp worktree khác, tức vá
+# nhầm một cây sạch — bẫy đã ghi ở flow `dem`.
+  [flow.doi-4]
+    desc = "Đội 4 tài khoản: phu điều phối, tns code Go, may viết tài liệu, grok soi, phu gộp và kiểm lại lời grok bằng git"
+    [flow.doi-4.vars]
+      viec = "mô tả việc cần làm, truyền bằng --var"
+      wt_tns = "C:/Users/Administrator/.ai-accounts/.worktrees/switch-agent-pro-b2d22420/tns-1"
+
+    [[flow.doi-4.step]]
+      id = "ke-hoach"
+      type = "agent"
+      profile = "claude:phu"
+      tu_duyet_quyen = true
+      timeout_sec = 1200
+      on_failure = "stop"
+      prompt = """Bạn là người điều phối. KHÔNG viết code ở bước này.
+
+VIỆC CẦN LÀM: {{viec}}
+
+Đọc repo trước. Rồi chia thành ĐÚNG HAI phần:
+- PHẦN 1 là việc Go (sửa mã nguồn, có test).
+- PHẦN 2 là việc TÀI LIỆU (chỉ file .md).
+Hai phần KHÔNG được đụng cùng một file — hai người sẽ làm song song.
+
+Trả lời đúng khuôn, mỗi phần một dòng:
+PHAN 1: <mô tả> | file: <danh sách>
+PHAN 2: <mô tả> | file: <danh sách>"""
+
+    [[flow.doi-4.step]]
+      id = "code-go"
+      type = "agent"
+      profile = "claude:tns"
+      needs = ["ke-hoach"]
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 2400
+      on_failure = "continue"
+      prompt = """Làm PHẦN 1 (việc Go) trong kế hoạch dưới. CHỈ phần 1.
+
+{{steps.ke-hoach.output}}
+
+MÁY NÀY LÀ WINDOWS, shell là cmd.exe: không có ls/cat/grep. Dùng git và go.
+
+Bắt buộc:
+1. Đọc mã hiện có TRƯỚC khi viết. Bám khuôn sẵn có.
+2. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra — nói rõ bạn đã
+   chứng minh điều đó bằng cách nào.
+3. go build ./... và go test ./... phải XANH.
+4. XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn tiếng Việt>"
+   Không commit thì người soi ở worktree khác không thấy gì, coi như chưa làm.
+5. Trả lời: NHANH, COMMIT, DA LAM, CHUA LAM (nói thẳng chỗ chưa xong)."""
+
+    [[flow.doi-4.step]]
+      id = "code-doc"
+      type = "agent"
+      profile = "antigravity:may"
+      needs = ["ke-hoach"]
+      worktree = true
+      tu_duyet_quyen = true
+      timeout_sec = 1800
+      on_failure = "continue"
+      prompt = """Làm PHẦN 2 (tài liệu) trong kế hoạch dưới. CHỈ phần 2.
+
+{{steps.ke-hoach.output}}
+
+CHỈ sửa file .md. TUYỆT ĐỐI không đụng file .go — có người khác đang sửa mã
+song song với bạn.
+
+Viết cho người KHÔNG rành kỹ thuật. Mọi lệnh phải chạy được trên Windows
+PowerShell. Thứ nào bạn không kiểm được thì ghi thẳng là chưa kiểm, đừng đoán.
+
+XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn>"
+Trả lời: NHANH, COMMIT, FILE, CHUA LAM."""
+
+    [[flow.doi-4.step]]
+      id = "kiem-1"
+      type = "shell"
+      needs = ["code-go"]
+      run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
+      timeout_sec = 900
+      on_failure = "continue"
+
+    [[flow.doi-4.step]]
+      id = "sua"
+      type = "agent"
+      profile = "claude:tns"
+      needs = ["kiem-1"]
+      when = "steps.kiem-1.state == failed"
+      tu_duyet_quyen = true
+      timeout_sec = 1800
+      on_failure = "continue"
+      prompt = """Test ĐỎ. Sửa TRONG ĐÚNG thư mục này, không phải thư mục hiện tại:
+
+    {{wt_tns}}
+
+Mọi lệnh phải trỏ vào đó: go test -C {{wt_tns}} ./... và git -C {{wt_tns}} ...
+TUYỆT ĐỐI không sửa file ở thư mục hiện tại — đó là repo chính.
+
+CỐ Ý không cấp worktree mới cho bước này: xin mới thì được một cây sạch từ main,
+tức là vá nhầm cây KHÔNG có code đang đỏ.
+
+Output thật của máy chấm:
+
+{{steps.kiem-1.output}}
+
+Sửa cho xanh, chạy lại để tự kiểm, rồi commit. Không sửa được thì NÓI THẲNG và
+nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
+
+    [[flow.doi-4.step]]
+      id = "kiem-2"
+      type = "shell"
+      needs = ["sua"]
+      run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
+      timeout_sec = 900
+      on_failure = "continue"
+
+    [[flow.doi-4.step]]
+      id = "soi"
+      type = "agent"
+      profile = "grok:api"
+      needs = ["kiem-2", "code-doc"]
+      timeout_sec = 900
+      on_failure = "continue"
+      prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm.
+CHỈ ĐỌC — không sửa, không commit, không tạo file.
+
+MÁY NÀY LÀ WINDOWS, shell là cmd.exe. KHÔNG có ls/cat/grep/pwd. Chỉ dùng git.
+Một lệnh trượt HAI lần thì ĐỔI CÁCH, đừng gọi lại lần thứ ba.
+
+Đọc bằng đúng bốn lệnh:
+    git log --oneline main..sagent/tns-1
+    git diff main...sagent/tns-1
+    git log --oneline main..sagent/may-1
+    git diff main...sagent/may-1
+
+Nhánh nào KHÔNG có commit nào thì phán VUT và nói thẳng người đó chưa làm gì.
+Đừng phán NEN TRON cho một nhánh rỗng — không có gì để trộn cả.
+
+Máy chấm nói gì:
+{{steps.kiem-2.output}}
+
+Trả lời đúng khuôn, mỗi mục một dòng:
+TNS: NEN TRON / CAN SUA THEM / VUT — lý do một câu
+MAY: NEN TRON / CAN SUA THEM / VUT — lý do một câu
+LOI: <lỗi cụ thể tìm được, hoặc "khong thay">
+GIAM CHAN: <hai nhánh có sửa cùng file không>"""
+
+    [[flow.doi-4.step]]
+      id = "gop"
+      type = "agent"
+      profile = "claude:phu"
+      needs = ["soi"]
+      tu_duyet_quyen = true
+      timeout_sec = 1500
+      on_failure = "continue"
+      prompt = """Gộp thành một báo cáo ngắn cho chủ dự án.
+
+VIỆC ĐẦU TIÊN, LÀM TRƯỚC KHI ĐỌC BẤT CỨ THỨ GÌ BÊN DƯỚI — tự chạy git và ghi số:
+
+    git rev-list --count main..sagent/tns-1
+    git rev-list --count main..sagent/may-1
+    git log --oneline main..sagent/tns-1
+    git log --oneline main..sagent/may-1
+
+VÌ SAO BẮT BUỘC: người soi đã PHÁN NGƯỢC NHÃN ở cả hai lượt gần nhất (#29 và
+#31) — nói một nhánh KHÔNG có commit nào là "NEN TRON". Lập luận nó viết ra thì
+đúng, chỉ cái nhãn là sai. Nếu bạn chép lại nhãn của nó, sai số đi thẳng tới
+người đọc.
+
+Lời người soi:
+{{steps.soi.output}}
+
+Kết quả máy chấm:
+{{steps.kiem-2.output}}
+
+Báo cáo phải trả lời đúng bốn câu:
+1. Nhánh nào có bao nhiêu commit THẬT (số bạn vừa tự đếm, không phải lời ai kể).
+2. Lời người soi có KHỚP với số đó không? Lệch thì nói thẳng là nó mâu thuẫn với
+   git, và tin git.
+3. Nhánh nào trộn được ngay, lệnh git cụ thể là gì.
+4. Việc gì CHƯA ai làm."""
+
+    [[flow.doi-4.step]]
+      id = "bao"
+      type = "notify"
+      needs = ["gop"]
+      message = "Đội 4 chạy xong — xem `sagent flow runs <#>` hoặc tab Hội thoại."
