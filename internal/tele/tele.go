@@ -233,3 +233,102 @@ func (b *Bao) Nghe(bus *events.Bus) func() {
 		}
 	}
 }
+
+// DoChatID hỏi Telegram xem AI vừa nhắn cho bot, rồi trả về chat id của họ.
+//
+// VÌ SAO CÓ HÀM NÀY: bước khó nhất khi bật báo tin không phải tạo bot, mà là lấy
+// chat id — tài liệu chính thức bảo người dùng mở
+// `https://api.telegram.org/bot<token>/getUpdates` rồi TỰ BỚI JSON tìm
+// `"chat":{"id":...}`. Chủ dự án gặp đúng chỗ đó và nói thẳng: "khó sử dụng vậy".
+// Máy làm được việc bới JSON thì đừng bắt người làm.
+//
+// Trả về danh sách vì bot có thể đã được nhiều người nhắn. Rỗng nghĩa là CHƯA AI
+// NHẮN — không phải lỗi, chỉ là chưa tới lượt: Telegram không cho bot nhắn trước.
+// ChoChatID chờ tới khi có người nhắn cho bot, rồi trả về nơi nhận.
+//
+// VÌ SAO PHẢI CHỜ chứ không hỏi một phát: getUpdates chỉ trả về thứ Telegram
+// ĐANG GIỮ. Đo 19/08 trên máy này — chủ dự án bấm Start trong Telegram, ảnh
+// chụp thấy tin đã gửi (hai dấu tích), nhưng getUpdates trả 0 bản ghi và
+// getWebhookInfo báo pending_update_count = 0. Hỏi một phát rồi bỏ cuộc thì
+// người dùng phải tự đoán xem mình làm sai bước nào.
+//
+// Long-polling: mỗi vòng nhờ Telegram GIỮ kết nối tới 25 giây, nên nhắn lúc nào
+// là bắt được gần như tức thì, mà không phải hỏi dồn dập.
+func ChoChatID(ctx context.Context, token string, hanCho time.Duration) ([]NguoiNhan, error) {
+	het := time.Now().Add(hanCho)
+	for {
+		ai, err := DoChatID(ctx, token)
+		if err != nil || len(ai) > 0 {
+			return ai, err
+		}
+		if time.Now().After(het) {
+			return nil, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(1500 * time.Millisecond):
+		}
+	}
+}
+
+func DoChatID(ctx context.Context, token string) ([]NguoiNhan, error) {
+	// timeout=20: nhờ Telegram giữ kết nối chờ tin mới, thay vì trả rỗng ngay.
+	u := "https://api.telegram.org/bot" + token + "/getUpdates?timeout=20"
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("không gọi được Telegram: %w", err)
+	}
+	defer res.Body.Close()
+
+	var r struct {
+		OK     bool   `json:"ok"`
+		MoTa   string `json:"description"`
+		Result []struct {
+			Message struct {
+				Chat struct {
+					ID    int64  `json:"id"`
+					Type  string `json:"type"`
+					Title string `json:"title"`
+					First string `json:"first_name"`
+					User  string `json:"username"`
+				} `json:"chat"`
+			} `json:"message"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		return nil, fmt.Errorf("Telegram trả về thứ không đọc được: %w", err)
+	}
+	if !r.OK {
+		// Sai token thì Telegram nói rõ; đưa NGUYÊN VĂN cho người dùng, đừng
+		// dịch lại thành "có lỗi xảy ra".
+		return nil, fmt.Errorf("Telegram từ chối: %s", r.MoTa)
+	}
+
+	thay := map[int64]bool{}
+	var out []NguoiNhan
+	for _, u := range r.Result {
+		c := u.Message.Chat
+		if c.ID == 0 || thay[c.ID] {
+			continue
+		}
+		thay[c.ID] = true
+		ten := c.Title
+		if ten == "" {
+			ten = strings.TrimSpace(c.First + " @" + c.User)
+		}
+		out = append(out, NguoiNhan{ID: fmt.Sprint(c.ID), Ten: strings.TrimSpace(ten), Loai: c.Type})
+	}
+	return out, nil
+}
+
+// NguoiNhan là một nơi bot có thể nhắn tới.
+type NguoiNhan struct {
+	ID   string
+	Ten  string
+	Loai string // private | group | supergroup | channel
+}

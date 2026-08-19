@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/tele"
 )
@@ -25,6 +26,39 @@ func cmdTele(args []string) {
 	defer done()
 
 	if token != "" {
+		// Chưa nói chat id thì TỰ DÒ. Bước bới JSON trong getUpdates là chỗ khó
+		// nhất của cả việc bật báo tin, mà máy làm được thì đừng bắt người làm.
+		if chat == "" {
+			fmt.Println()
+			fmt.Println("  Mở Telegram, vào bot vừa tạo, bấm Start hoặc nhắn một câu bất kỳ.")
+			fmt.Println("  Đang chờ (tối đa 2 phút)…")
+
+			ctx, huy := context.WithTimeout(context.Background(), 2*time.Minute)
+			ai, err := tele.ChoChatID(ctx, token, 2*time.Minute)
+			huy()
+			if err != nil {
+				fail(err)
+			}
+			switch len(ai) {
+			case 0:
+				fail(fmt.Errorf("chờ 2 phút vẫn không thấy tin nào.\n" +
+					"    Kiểm: đúng bot vừa lấy token chưa (tên bot in ở @BotFather),\n" +
+					"    và tin đã gửi đi thật chưa (Telegram không cho bot nhắn trước)"))
+			case 1:
+				chat = ai[0].ID
+				fmt.Printf("\n  Tự dò được nơi nhận: %s (%s)\n", ai[0].Ten, ai[0].ID)
+			default:
+				// Nhiều nơi đã nhắn: KHÔNG tự chọn hộ. Chọn nhầm thì tin báo sự
+				// cố của bạn bay sang người khác.
+				fmt.Println()
+				fmt.Println("  Nhiều nơi đã nhắn cho bot. Chọn một rồi chạy lại kèm --chat <id>:")
+				for _, n := range ai {
+					fmt.Printf("    %-16s %s (%s)\n", n.ID, n.Ten, n.Loai)
+				}
+				fmt.Println()
+				return
+			}
+		}
 		if err := a.TeleDat(token, chat); err != nil {
 			fail(err)
 		}
@@ -59,8 +93,8 @@ func cmdTele(args []string) {
 		fmt.Println("  Bật lên:")
 		fmt.Println("    1. Nhắn @BotFather trên Telegram, gõ /newbot, lấy token.")
 		fmt.Println("    2. Nhắn cho bot vừa tạo một câu bất kỳ.")
-		fmt.Println("    3. sagent tele --set-token <token> --chat <chat id>")
-		fmt.Printf("  Chat id lấy ở: https://api.telegram.org/bot<token>/getUpdates\n")
+		fmt.Println("    3. sagent tele --set-token <token>")
+		fmt.Println("       Chat id TỰ DÒ, không phải đi tìm trong JSON.")
 	} else {
 		fmt.Println("  Trạng thái: ĐÃ CẤU HÌNH")
 		fmt.Printf("  Nhắn tới:   %s\n", chatID)
