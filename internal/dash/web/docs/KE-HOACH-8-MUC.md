@@ -31,6 +31,7 @@ chỗ này im lặng nói ổn hay ồn ào báo không biết?"
 | — | `flow huy` — huỷ lượt chạy bị cắt ngang | `4fa396f` |
 | — | Sửa `expiresAt=0`, `HasToken` nói thật | `714730c` |
 | — | Chặn placeholder chưa thay lọt vào prompt | `c67a1ff` |
+| — | Chạy khan (`flow run --kho`, `POST /api/flow/kho`) | — |
 
 Nền tảng dùng lại cho mọi mục sau: `FlowRunDetail()` trong `internal/api/api.go`,
 endpoint `/api/flow/detail`, cột `prompt` (schema v6), bus sự kiện `internal/events`.
@@ -134,7 +135,6 @@ Chỉ chạy sau khi đợt A xong, vì trước đó không có báo Telegram v
 | Việc | Vì sao |
 |---|---|
 | Trộn `f7206fd` (`docs/KHAC-PHUC-SU-CO.md`, 148 dòng) | Antigravity làm ở lượt #33, chưa rà |
-| Thêm `--kho` (chạy khan) cho `flow run` | Tôi đã bấm nhầm chạy thật **3 lần** hôm nay (#30, #32, #33) |
 | Siết tường lửa cổng 8788 về đúng IP của chủ dự án | Máy đang bị dò ~2.400 lần/giờ |
 | Dọn `sagent/may-1-2`, `sagent/may-1-luot29` | Nhánh rác từ các lượt hỏng |
 
