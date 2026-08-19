@@ -132,6 +132,61 @@
   a{color:#7dd3fc}
   .rv{opacity:0;transform:translateY(16px);transition:opacity .55s var(--ease),transform .55s var(--ease)}
   .rv.in{opacity:1;transform:none}
+
+  /* ---------- sơ đồ một lượt chạy ---------- */
+  /* Vẽ bằng CSS thuần, KHÔNG kéo thư viện vẽ đồ thị: trang này đọc từ điện thoại,
+     có khi mạng yếu, và sơ đồ chỉ có 9 nút thì một thư viện 200 KB là đắt vô lý. */
+  .flow{display:grid;gap:0;margin-top:16px}
+  .lane{display:grid;gap:11px;grid-template-columns:1fr 1fr}
+  .lane.one{grid-template-columns:1fr}
+  @media(max-width:640px){.lane{grid-template-columns:1fr}}
+  .nd{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--panel)}
+  .nd .hd{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .nd .av{width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;
+    font-size:11px;font-weight:800;color:#0B1120}
+  .nd .id{font-weight:700;font-size:14px}
+  .nd .wh{margin-left:auto;font-size:11px;color:var(--sub);font-weight:600;white-space:nowrap}
+  .nd .ds{color:var(--sub);font-size:13px;margin:0}
+  .nd.claude{border-color:rgba(139,92,246,.5)}
+  .nd.anti{border-color:rgba(66,133,244,.5)}
+  .nd.grok{border-color:rgba(245,158,11,.5)}
+  .nd.may{border-color:rgba(100,116,139,.6);background:rgba(30,41,59,.35)}
+  .nd.dk{border-style:dashed}
+  /* Mũi tên nối: thuần CSS, không dùng ký tự làm icon (design system cấm). */
+  .arw{display:grid;place-items:center;height:26px;position:relative}
+  .arw::before{content:"";width:2px;height:100%;background:var(--border)}
+  .arw::after{content:"";position:absolute;bottom:2px;width:7px;height:7px;
+    border-right:2px solid var(--border);border-bottom:2px solid var(--border);transform:rotate(45deg)}
+  .arw span{position:absolute;background:var(--bg);padding:0 9px;font-size:11.5px;
+    color:var(--sub);font-weight:600}
+  .note{margin-top:12px;font-size:13px;color:var(--sub);border:1px dashed rgba(71,85,105,.7);
+    border-radius:11px;padding:11px 14px}
+  .note b{color:var(--fg)}
+
+  /* ---------- bảng 8 mục ---------- */
+  .muc{display:grid;gap:9px}
+  .m{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:11px;
+    background:rgba(30,41,59,.4);border:1px solid rgba(71,85,105,.45)}
+  .m .n{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;
+    font-weight:700;font-size:12px}
+  .m .n.xong{background:rgba(34,197,94,.16);color:var(--run)}
+  .m .n.chay{background:rgba(245,158,11,.16);color:var(--warn)}
+  .m .n.cho{background:rgba(148,163,184,.13);color:var(--sub)}
+  .m b{display:block;font-size:14.5px}
+  .m span{color:var(--sub);font-size:13.5px}
+
+
+  /* ---------- dấu trạng thái vẽ bằng CSS ----------
+     Design system cấm emoji/ky tu lam icon: chung doi hinh theo he dieu hanh va
+     phong chu, khong chinh duoc net, khong doi mau theo trang thai. Tick duoi day
+     ve bang hai duong vien nen luon sac net va thua mau tu currentColor. */
+  .tick::before{content:"";display:inline-block;width:11px;height:6px;
+    border-left:2px solid currentColor;border-bottom:2px solid currentColor;
+    transform:rotate(-45deg);margin-right:8px;vertical-align:3px}
+  .box::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;
+    border:1.5px solid rgba(148,163,184,.55);margin-right:8px;vertical-align:0}
+  li.tick{color:var(--run)} li.tick > *{color:var(--sub)}
+  li.box{color:var(--sub)}
   @media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
 </style>
 </head>
@@ -144,15 +199,17 @@
       Switch-Agent-Pro
     </div>
     <div class="sp">
+      <a href="#mot-luot">Cách chạy</a>
+      <a href="#tam-muc">8 mục</a>
       <a href="master-plan.html">Master Plan</a>
-      <a href="/">Dashboard ↗</a>
+      <a href="/">Dashboard</a>
     </div>
   </nav>
 
   <header class="hero">
     <span class="tag">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-      Bước 0 xong · Pha 1 đang chạy
+      Flow DAG chạy được · đang làm 8 mục để dám chạy qua đêm
     </span>
     <h1>Control plane<br>cho <span class="g">đội AI của bạn</span></h1>
     <p class="lead">Điều phối nhiều <b>coding agent</b> và nhiều <b>AI API</b> từ một chỗ. Local-first, một binary, chạy native trên Windows &amp; Linux — có dashboard 3D quan sát realtime.</p>
@@ -300,9 +357,9 @@
       <div class="it now rv"><div class="ph"><small>Pha 0</small> · Đo giả định <span class="st now">đang chạy</span></div>
         <div class="de">Chứng minh cơ chế cả hai đường trước khi khoá interface.</div>
         <ul class="steps">
-          <li>✅ Windows/Claude: junction không cần admin · token là file · xoá an toàn</li>
-          <li>⬜ Linux: token ở file hay keyring <span style="color:var(--warn)">(rủi ro #1)</span></li>
-          <li>⬜ Codex / Gemini CLI / Cursor · ⬜ 6 API provider · ⬜ threat model</li>
+          <li class="tick">Windows/Claude: junction không cần admin · token là file · xoá an toàn</li>
+          <li class="box">Linux: token ở file hay keyring <span style="color:var(--warn)">(rủi ro #1)</span></li>
+          <li class="box">Codex / Gemini CLI / Cursor · 6 API provider · threat model</li>
         </ul>
         <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Mỗi kết luận có command + OS + output đã redaction; chưa đo = <code>unknown</code>.</div>
       </div>
@@ -310,9 +367,9 @@
       <div class="it now rv"><div class="ph"><small>Pha 1</small> · Domain + SQLite + 2 lát cắt <span class="st now">một phần</span></div>
         <div class="de">Lõi có domain rõ, storage an toàn, một lát cắt subscription + một lát cắt API.</div>
         <ul class="steps">
-          <li>✅ Đổi/chạy tài khoản Claude trên Windows · bỏ Python · xoá an toàn có test</li>
-          <li>⬜ <code>internal/domain</code> + <code>internal/store</code> (SQLite là nguồn sự thật)</li>
-          <li>⬜ Claude thành Harness Adapter + conformance · ⬜ lát cắt API đầu tiên</li>
+          <li class="tick">Đổi/chạy tài khoản Claude trên Windows · bỏ Python · xoá an toàn có test</li>
+          <li class="box"><code>internal/domain</code> + <code>internal/store</code> (SQLite là nguồn sự thật)</li>
+          <li class="box">Claude thành Harness Adapter + conformance · lát cắt API đầu tiên</li>
         </ul>
         <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>CI Win+Linux xanh · đổi profile không đăng nhập lại · fault injection không tạo DB dở.</div>
       </div>
@@ -320,10 +377,10 @@
       <div class="it now rv"><div class="ph"><small>Pha 2</small> · Chạy song song <span class="st now">một phần</span></div>
         <div class="de">Kiến trúc <b>đường gọn</b>: một binary, <b>không daemon</b>; SQLite giữ state (PID chỉ là thuộc tính runtime).</div>
         <ul class="steps">
-          <li>✅ <code>fleet</code> bật N phiên nền · <code>status</code> · <code>stop</code> · <code>clean</code></li>
-          <li>✅ <code>clone</code>: mỗi phiên một config dir riêng → không đua ghi <code>.claude.json</code></li>
-          <li>✅ Cảnh báo thẳng: tiêu hạn mức gấp N · concurrent refresh <b>chưa đo</b></li>
-          <li>⬜ Git worktree cho từng phiên · <code>.sagent/project.toml</code></li>
+          <li class="tick"><code>fleet</code> bật N phiên nền · <code>status</code> · <code>stop</code> · <code>clean</code></li>
+          <li class="tick"><code>clone</code>: mỗi phiên một config dir riêng → không đua ghi <code>.claude.json</code></li>
+          <li class="tick">Cảnh báo thẳng: tiêu hạn mức gấp N · concurrent refresh <b>chưa đo</b></li>
+          <li class="box">Git worktree cho từng phiên · <code>.sagent/project.toml</code></li>
         </ul>
         <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Đã đo trên Windows: spawn nền, tự dọn phiên chết, stop giết cả cây con, xoá clone không xuyên junction.</div>
       </div>
@@ -363,6 +420,119 @@
     </div>
   </section>
 
+  <!-- MỘT LƯỢT CHẠY -->
+  <section id="mot-luot">
+    <p class="eyebrow">Cách nó hoạt động</p>
+    <h2>Một lượt chạy diễn ra thế nào</h2>
+    <p class="sub">Đây là flow <code>dem</code> đang dùng thật. Ba hãng AI khác nhau phân vai
+      <b>theo số đo</b>, không theo cảm giác "AI nào mạnh" — và <b>máy chấm quyết định</b>, không phải lời agent.</p>
+
+    <div class="flow rv">
+      <div class="lane">
+        <div class="nd claude">
+          <div class="hd"><span class="av" style="background:#8B5CF6">C</span>
+            <span class="id">code-go</span><span class="wh">claude:tns</span></div>
+          <p class="ds">Viết code Go, có test. Chọn Claude vì nó đọc được kết quả <b>có cấu trúc</b> — biết chi phí, token, và lý do hỏng thật.</p>
+        </div>
+        <div class="nd anti">
+          <div class="hd"><span class="av" style="background:#4285F4">A</span>
+            <span class="id">code-doc</span><span class="wh">antigravity:may</span></div>
+          <p class="ds">Viết tài liệu, chỉ sửa file <code>.md</code>. Việc đóng khung, hỏng thì rẻ — vì nó từng timeout 0 chữ 0 commit.</p>
+        </div>
+      </div>
+
+      <div class="arw"><span>hai thợ chạy SONG SONG, mỗi người một git worktree riêng</span></div>
+
+      <div class="lane one">
+        <div class="nd may">
+          <div class="hd"><span class="av" style="background:#64748B">M</span>
+            <span class="id">kiem-1</span><span class="wh">máy chấm</span></div>
+          <p class="ds"><code>go test</code> chạy trên đúng cây mà thợ vừa sửa. Đây là <b>cổng</b>: từ đây trở đi mọi quyết định dựa vào kết quả test, không dựa vào lời agent kể.</p>
+        </div>
+      </div>
+
+      <div class="arw"><span>chỉ khi ĐỎ</span></div>
+
+      <div class="lane one">
+        <div class="nd claude dk">
+          <div class="hd"><span class="av" style="background:#8B5CF6">C</span>
+            <span class="id">sua-1 → kiem-2 → sua-2 → kiem-cuoi</span></div>
+          <p class="ds">Hai vòng sửa, mỗi vòng máy chấm lại. Bước sửa <b>cố ý không xin worktree mới</b> — xin mới thì được cây sạch từ main, tức là vá nhầm cây không có code đang đỏ.</p>
+        </div>
+      </div>
+
+      <div class="arw"><span>xanh hay vẫn đỏ đều đi tiếp</span></div>
+
+      <div class="lane one">
+        <div class="nd grok">
+          <div class="hd"><span class="av" style="background:#F59E0B">G</span>
+            <span class="id">soi</span><span class="wh">grok:api</span></div>
+          <p class="ds">Người soi <b>khác hãng</b> với hai thợ, chỉ đọc bằng <code>git diff</code>. Giao việc chỉ-đọc vì Grok không có rào quyền nào — không khai cờ thì nó vẫn toàn quyền.</p>
+        </div>
+      </div>
+
+      <div class="arw"></div>
+
+      <div class="lane one">
+        <div class="nd may">
+          <div class="hd"><span class="av" style="background:#64748B">M</span>
+            <span class="id">bao</span><span class="wh">thông báo</span></div>
+          <p class="ds">Kết thúc lượt. Xem lại toàn bộ hội thoại ở tab <a href="/hoi-thoai.html">Hội thoại</a>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="note rv"><b>Đo được 19/08, và chưa sửa:</b> ở hai lượt liên tiếp, người soi
+      <b>phán ngược nhãn</b> — nói nhánh không có commit nào là "nên trộn". Phần lập luận nó viết
+      lại đúng. Vì vậy đợt A đang làm bản tóm tắt có <b>bằng chứng máy tự đọc từ git</b>, để khi
+      lời agent mâu thuẫn với git thì tin git.</div>
+  </section>
+
+  <!-- 8 MỤC -->
+  <section id="tam-muc">
+    <p class="eyebrow">Đang làm</p>
+    <h2>Tám mục để dám chạy qua đêm</h2>
+    <p class="sub">Ngày 19/08 máy tự khởi động lại lúc 01:47 và cắt ngang một lượt chạy —
+      <b>tới 15:16 mới có người biết</b>. Tám mục dưới đây sinh ra từ đó. Chi tiết đầy đủ ở
+      <a href="ke-hoach.html">Kế hoạch 8 mục</a>.</p>
+
+    <div class="muc rv">
+      <div class="m"><span class="n xong">1</span><div><b>Hội thoại realtime giữa các agent</b>
+        <span>Xem được ai được giao gì và trả lời gì, cập nhật ngay khi đang chạy. <b style="color:var(--run)">Xong</b> — tab Hội thoại.</span></div></div>
+      <div class="m"><span class="n xong">2</span><div><b>Giao diện dễ theo dõi</b>
+        <span>Màu theo hãng, khối dài tự gập, trạng thái bằng chấm màu. <b style="color:var(--run)">Xong bản đầu</b> — chờ dùng thật rồi tinh chỉnh.</span></div></div>
+      <div class="m"><span class="n chay">3</span><div><b>Một AI quản lý báo cáo việc các AI khác</b>
+        <span>Chọn bản "quản lý" thay vì "can thiệp trực tiếp": agent headless <b>không có kênh nhận lệnh giữa chừng</b>, làm thật thì phải đổi cách chạy agent chứ không phải thêm một nút bấm.</span></div></div>
+      <div class="m"><span class="n cho">4</span><div><b>Mặt 3D: robot, phòng, vai trò, bong bóng thoại</b>
+        <span>Robot và three.js đã có sẵn. Chờ khảo sát dự án mã nguồn mở xong mới làm, khỏi tự phát minh lại.</span></div></div>
+      <div class="m"><span class="n cho">5</span><div><b>Mặt 2D: setting đầy đủ + AI tự dựng flow</b>
+        <span>Bảng vẽ đã thật (kéo nối, undo/redo, bắt chu trình). Thiếu trang setting và AI sinh flow từ câu tiếng Việt — <b>bắt buộc cho xem trước và sửa</b>, không tự lưu đè.</span></div></div>
+      <div class="m"><span class="n chay">6</span><div><b>Luật chống agent chạy quẩn</b>
+        <span>Số đo: một agent gọi <code>ls -la</code> <b>399 lần</b> trong một lượt. Đọc từ dữ liệu có cấu trúc, không dò chuỗi.</span></div></div>
+      <div class="m"><span class="n chay">7</span><div><b>Báo Telegram khi có sự cố</b>
+        <span>Xếp làm đầu tiên vì đây là thứ khiến người ta <b>dám</b> để máy chạy đêm.</span></div></div>
+      <div class="m"><span class="n chay">8</span><div><b>Học dự án mã nguồn mở trước khi tự build</b>
+        <span>Ba agent đang tra GitHub cho phần 3D và phần chống loop.</span></div></div>
+    </div>
+
+    <p class="sub" style="margin:22px 0 8px">Bốn đợt, xếp theo <b>thứ tự phụ thuộc</b> chứ không theo thứ tự dễ làm:</p>
+    <div class="tl">
+      <div class="it now rv"><div class="ph"><small>Đợt A</small> · Lõi tin cậy <span class="st now">đang chạy</span></div>
+        <div class="de">Telegram · AI quản lý · chống loop. Ba việc song song, mỗi việc một worktree, có người soi kiểm bằng <code>git</code>.</div>
+        <div class="dod"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>Test phải ĐỎ khi gỡ phần sửa ra · mỗi action đủ ba mặt: API, CLI, web.</div>
+      </div>
+      <div class="it rv"><div class="ph"><small>Đợt B</small> · Mặt 2D <span class="st next">chờ</span></div>
+        <div class="de">Trang setting, AI dựng flow, xem trước prompt sau khi thay biến.</div>
+      </div>
+      <div class="it rv"><div class="ph"><small>Đợt C</small> · Mặt 3D + context riêng <span class="st next">chờ</span></div>
+        <div class="de">Bong bóng thoại, phòng, vai trò thành <b>dữ liệu thật</b> thay vì suy từ cạnh <code>needs</code>. Mỗi agent một kho context, muốn đọc của nhau phải xin.</div>
+      </div>
+      <div class="it rv"><div class="ph"><small>Đợt D</small> · Chạy đêm thật và đo <span class="st next">chờ</span></div>
+        <div class="de">Chỉ chạy sau đợt A — trước đó không có báo động và không có luật chống loop.</div>
+      </div>
+    </div>
+  </section>
+
   <!-- TRẠNG THÁI -->
   <section>
     <p class="eyebrow">Thực tế</p>
@@ -372,14 +542,20 @@
       <table>
         <thead><tr><th>Hạng mục</th><th>Windows</th><th>Linux</th></tr></thead>
         <tbody>
-          <tr><td>Đổi/chạy tài khoản Claude, không đăng nhập lại</td><td class="ok-i">✓ chạy thật</td><td class="no-i">chưa đo</td></tr>
-          <tr><td>Junction/symlink phần dùng chung, không cần admin</td><td class="ok-i">✓ 17 mục</td><td class="no-i">chưa đo</td></tr>
-          <tr><td>Xoá an toàn (không đụng dữ liệu gốc)</td><td class="ok-i">✓ test + thật</td><td class="no-i">chưa đo</td></tr>
-          <tr><td>Bỏ phụ thuộc Python (khoá JSON trùng hoa/thường)</td><td class="ok-i">✓ có test</td><td class="ok-i">✓ CI</td></tr>
-          <tr><td>Di trú tài khoản từ v1</td><td class="ok-i">✓</td><td class="no-i">—</td></tr>
-          <tr><td><b>Chạy N phiên song song</b> (fleet · status · stop · clean)</td><td class="ok-i">✓ chạy thật</td><td class="no-i">chưa đo</td></tr>
-          <tr><td>Lưu trạng thái SQLite, tự dọn phiên chết</td><td class="ok-i">✓</td><td class="no-i">chưa đo</td></tr>
-          <tr><td>Git worktree · flow DAG · đường API · dashboard dữ liệu thật</td><td class="no-i">chưa làm</td><td class="no-i">chưa làm</td></tr>
+          <tr><td>Đổi/chạy tài khoản Claude, không đăng nhập lại</td><td class="ok-i"><span class="tick"></span>chạy thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Junction/symlink phần dùng chung, không cần admin</td><td class="ok-i"><span class="tick"></span>17 mục</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Xoá an toàn (không đụng dữ liệu gốc)</td><td class="ok-i"><span class="tick"></span>test + thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Bỏ phụ thuộc Python (khoá JSON trùng hoa/thường)</td><td class="ok-i"><span class="tick"></span>có test</td><td class="ok-i"><span class="tick"></span>CI</td></tr>
+          <tr><td>Di trú tài khoản từ v1</td><td class="ok-i"><span class="tick"></span></td><td class="no-i">—</td></tr>
+          <tr><td><b>Chạy N phiên song song</b> (fleet · status · stop · clean)</td><td class="ok-i"><span class="tick"></span>chạy thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Lưu trạng thái SQLite, tự dọn phiên chết</td><td class="ok-i"><span class="tick"></span></td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Git worktree cho từng phiên</td><td class="ok-i"><span class="tick"></span>chạy thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td><b>Flow DAG</b> — chạy song song, cổng test, retry, approval, resume sau khi máy sập</td><td class="ok-i"><span class="tick"></span>33 lượt chạy</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Đọc kết quả agent từ <b>dữ liệu có cấu trúc</b> (chi phí, token, lý do hỏng)</td><td class="ok-i"><span class="tick"></span>claude · antigravity</td><td class="no-i">grok: chưa được</td></tr>
+          <tr><td>Dashboard dữ liệu thật · hội thoại giữa agent, realtime</td><td class="ok-i"><span class="tick"></span>chạy thật</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Cổng kiểm tài khoản trước khi chạy flow (chặn lượt chết sẵn)</td><td class="ok-i"><span class="tick"></span>có test</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Đường API (route, streaming, usage/cost, fallback)</td><td class="no-i">chưa đo</td><td class="no-i">chưa đo</td></tr>
+          <tr><td>Báo Telegram · luật chống loop · AI quản lý</td><td class="no-i">đang làm</td><td class="no-i">đang làm</td></tr>
         </tbody>
       </table>
     </div>
@@ -393,6 +569,9 @@
       <div class="risk"><b>Chưa có máy/VM Linux:</b> không đo được token Linux nằm ở file hay keyring — nếu là keyring thì nguyên lý "tách thư mục = tách tài khoản" gãy trên Linux. Nhãn Linux giữ <code>experimental</code>.</div>
       <div class="risk"><b>Chưa có API key để đo:</b> toàn bộ đường API (route, streaming, usage/cost, fallback) chưa verify được. Cần key local-only, output redaction.</div>
       <div class="risk"><b>Hạn mức khi chạy song song:</b> N phiên trên một tài khoản tiêu hạn mức gấp N — công cụ cảnh báo rõ, không giấu. Dùng nhiều tài khoản để vượt hạn mức có thể đi ngược ToS; bạn tự cân.</div>
+      <div class="risk"><b>Người soi phán ngược nhãn — 2/2 lượt:</b> Grok nói nhánh "nên trộn" trong khi nhánh đó không có commit nào, dù chính nó vừa chạy <code>git log</code> ra kết quả đúng. Lập luận đúng, nhãn sai. Đang vá bằng cách bắt máy tự đọc git rồi đối chiếu; nhưng việc giao vai người soi cho Grok vẫn đáng xét lại.</div>
+      <div class="risk"><b>Máy đang bị dò mật khẩu ~2.400 lần/giờ:</b> Security log 20 MB quay vòng hết trong ~8 giờ, nên sự cố ban đêm mất log trước khi kịp đọc. Rạng sáng 19/08 <code>lsass.exe</code> chết kéo theo máy khởi động lại — <b>chưa chứng minh được</b> có phải do luồng này không, vì không có crash dump.</div>
+      <div class="risk"><b>Token Claude hết hạn ~8 tiếng một lần:</b> lượt chạy đêm dài sẽ vượt mốc đó. Hành vi khi nhiều bản clone cùng làm mới token <b>chưa đo</b>.</div>
     </div>
   </section>
 

@@ -1,6 +1,7 @@
 package dash
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,17 +68,38 @@ func TestTonTrongReducedMotion(t *testing.T) {
 	}
 }
 
+// mienTru: trang duoc tha, kem LY DO. Danh sach nay chi duoc ngan lai, khong dai ra.
+//
+// Vi sao co no: ban dau test chi quet web/*.html o tang tren, bo qua ca thu muc
+// web/docs/. Do 19/08: rieng hai trang trong docs/ co 82 cho dung emoji lam icon,
+// va vi khong bi quet nen chung con lay lan sang trang moi. Nay quet DE QUY.
+//
+// master-plan.html la trang sinh ra tu MASTER-PLAN.md, chua co khau sinh lai tu
+// dong nen don tay se lech voi ban .md. Tha tam, va ghi ro la no NO CHU khong
+// phai la khong sao.
+var mienTru = map[string]string{
+	"master-plan.html": "trang sinh tu MASTER-PLAN.md, chua co khau sinh lai — don tay se lech voi ban .md",
+}
+
 func fileWeb(t *testing.T) []string {
 	t.Helper()
-	ents, err := os.ReadDir("web")
+	var out []string
+	err := filepath.WalkDir("web", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".html") {
+			return nil
+		}
+		if ly, tha := mienTru[d.Name()]; tha {
+			t.Logf("bo qua %s — %s", d.Name(), ly)
+			return nil
+		}
+		out = append(out, p)
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	var out []string
-	for _, e := range ents {
-		if strings.HasSuffix(e.Name(), ".html") {
-			out = append(out, filepath.Join("web", e.Name()))
-		}
 	}
 	if len(out) == 0 {
 		t.Fatal("khong thay file web nao — test nay se xanh gia")
