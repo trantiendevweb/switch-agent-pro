@@ -283,6 +283,7 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 		tries = 1
 	}
 	var lastErr error
+	var kqCuoi KetQuaAgent // giữ kết quả lần thử cuối, kể cả khi nó hỏng
 	for attempt := 1; attempt <= tries; attempt++ {
 		_ = r.DB.SetStep(runID, s.ID, store.StepRunning, "", attempt)
 		// Lưu CÂU HỎI trước khi chạy, không phải sau: bước có thể treo hoặc bị
@@ -306,6 +307,7 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 		if cancel != nil {
 			cancel()
 		}
+		kqCuoi = kq
 
 		if err == nil {
 			_ = r.DB.SetStep(runID, s.ID, store.StepDone, "", attempt)
@@ -337,6 +339,13 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	}
 	emsg := lastErr.Error()
 	_ = r.DB.SetStep(runID, s.ID, store.StepFailed, emsg, tries)
+	// GIỮ output kể cả khi hỏng. Trước đây SetStepOutput chỉ nằm ở nhánh thành
+	// công, nên đúng lúc cần đọc agent nói gì nhất thì không còn gì để đọc — đo
+	// tại lượt #35: bước `code-doc` hỏng, tôi phải đi đào fleet.log mới biết
+	// antigravity trả status ERROR. Bằng chứng phải còn lại ở chỗ người ta tìm.
+	if kqCuoi.Output != "" {
+		_ = r.DB.SetStepOutput(runID, s.ID, kqCuoi.Output)
+	}
 	r.baoBuocHong(runID, f, s, emsg)
 	return store.StepFailed, emsg, ""
 }

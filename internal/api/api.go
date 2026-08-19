@@ -819,7 +819,24 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, model, prompt st
 	// trúc dữ liệu, không phải chữ trong văn bản").
 	if k, ok := ad.DocKetQua(out); ok {
 		if ly := k.Hong(); ly != "" {
-			return flow.KetQuaAgent{Output: out}, fmt.Errorf("%s (profile %s)", ly, addr)
+			// PHIÊN HỎNG NHƯNG ĐÃ COMMIT là chuyện KHÁC HẲN chưa làm gì.
+			//
+			// Đo tại lượt chạy #35, bước `code-doc`: antigravity commit xong việc
+			// rồi CLI mới crash lúc thoát, trả status ERROR. Bước bị đánh dấu
+			// hỏng, Telegram bắn tin báo hỏng, output bị vứt — trong khi git có
+			// commit 1426ac6 đúng việc được giao. Người đọc dễ chạy lại một việc
+			// đã xong, hoặc tệ hơn là vứt nó đi.
+			//
+			// Git là thứ ĐO ĐƯỢC, status của CLI chỉ là lời kể về phiên. Có commit
+			// thì hạ xuống CẢNH BÁO và đi tiếp, nhưng nói thẳng phiên đã hỏng để
+			// không ai tưởng mọi thứ êm.
+			if bc := b.a.bangChungWorktree(wts); bc != "" && coCommit(wts, b.a) {
+				b.a.bus.Warnf("%s: phiên hỏng (%s) NHƯNG đã commit xong việc — tin git, đi tiếp", addr, ly)
+				out += "\n\n--- lưu ý ---\nPhiên agent kết thúc lỗi: " + ly +
+					"\nNhưng worktree CÓ commit, nên việc coi như đã làm. Đọc kỹ diff trước khi trộn."
+			} else {
+				return flow.KetQuaAgent{Output: out}, fmt.Errorf("%s (profile %s)", ly, addr)
+			}
 		}
 		// Câu trả lời thật, đã tách khỏi đống sự kiện NDJSON. Bước sau nhận cái
 		// này chứ không phải cả bản ghi.
@@ -843,10 +860,22 @@ func (b agentBridge) RunAgents(ctx context.Context, profileStr, model, prompt st
 }
 
 // bangChungWorktree đọc trạng thái git của các worktree vừa dùng.
-func (a *API) bangChungWorktree(dirs []string) string {
-	if len(dirs) == 0 {
-		return ""
+// coCommit trả true nếu ÍT NHẤT một worktree của bước có commit đi trước nhánh
+// gốc. Đây là câu hỏi "agent có làm gì không", trả lời bằng git chứ không bằng
+// lời agent hay mã thoát của CLI.
+func coCommit(dirs []string, a *API) bool {
+	goc := a.nhanhGoc()
+	for _, d := range dirs {
+		if bc := workspace.Xem(d, goc); !bc.KhongRo && bc.Commit > 0 {
+			return true
+		}
 	}
+	return false
+}
+
+// nhanhGoc là nhánh nền để so — tách ra vì cả bangChungWorktree lẫn coCommit
+// đều cần, và đọc hai lần thì hai chỗ có thể lệch nhau.
+func (a *API) nhanhGoc() string {
 	goc := "main"
 	if wd, err := os.Getwd(); err == nil {
 		if root, ok := workspace.RepoRoot(wd); ok {
@@ -855,6 +884,14 @@ func (a *API) bangChungWorktree(dirs []string) string {
 			}
 		}
 	}
+	return goc
+}
+
+func (a *API) bangChungWorktree(dirs []string) string {
+	if len(dirs) == 0 {
+		return ""
+	}
+	goc := a.nhanhGoc()
 	var dong []string
 	for _, d := range dirs {
 		dong = append(dong, workspace.Xem(d, goc).MotDong())

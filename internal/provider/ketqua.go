@@ -106,7 +106,7 @@ func (k KetQua) Hong() string {
 // Bỏ qua mọi giá trị tự nhận là "success": đặt sau chữ "báo lỗi" thì nó vô
 // nghĩa, mà nói vô nghĩa còn tệ hơn nói thẳng là không biết.
 func (k KetQua) lyDo() string {
-	if t := dongDau(k.TraLoi); t != "" {
+	if t := dongDau(k.TraLoi); t != "" && dangNhuLyDo(t) {
 		return t
 	}
 	for _, v := range []string{k.KetCuc, k.DungViCo, k.Loai} {
@@ -129,4 +129,34 @@ func dongDau(s string) string {
 		return string(r[:tran]) + "…"
 	}
 	return s
+}
+
+// dangNhuLyDo lọc những dòng đầu KHÔNG dùng làm lý do hỏng được.
+//
+// Đo tại lượt chạy #35: bước `code-doc` hỏng, thông báo hiện ra là
+//
+//	agent báo lỗi: ### NHANH
+//
+// vì câu trả lời của agent mở đầu bằng một tiêu đề markdown. Người đọc không
+// suy ra được gì, mà lại tưởng đó là lý do thật nên thôi không đào tiếp.
+//
+// Nguyên tắc: thà nói "không nói lý do" rồi để người ta đi đọc output, còn hơn
+// dán một mẩu văn bản vô nghĩa vào chỗ đáng lẽ là chẩn đoán.
+func dangNhuLyDo(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	// Tiêu đề markdown, gạch ngang phân cách, mở khối mã, bảng — đều là ĐỊNH DẠNG
+	// của một câu trả lời dài, không phải câu giải thích.
+	for _, dau := range []string{"#", "---", "===", "```", "|", "*", ">"} {
+		if strings.HasPrefix(s, dau) {
+			return false
+		}
+	}
+	// Một dòng quá ngắn (kiểu "NHANH", "OK") không mang chẩn đoán nào.
+	if len([]rune(s)) < 12 {
+		return false
+	}
+	return true
 }
