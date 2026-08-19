@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -29,21 +30,154 @@ func varFlags(args []string) (map[string]string, []string) {
 	return vars, out
 }
 
-func flowRun(name string, args []string) {
+// yChay là những gì người dùng gõ sau `sagent flow run <tên>`.
+type yChay struct {
+	vars   map[string]string
+	prof   string
+	cuChay bool // biết tài khoản hỏng mà vẫn muốn chạy — xem API.KiemTaiKhoanFlow
+	kho    bool // chỉ hỏi "chạy thì sẽ ra sao", không chạy — xem API.FlowChayKho
+}
+
+// docCoChay rút các cờ. Tách ra khỏi flowRun để TEST ĐƯỢC: flowRun tự mở sổ và
+// tự thoát tiến trình khi lỗi, nên không test thẳng được, mà cờ --kho lại đúng
+// là thứ quyết định lượt chạy CÓ XẢY RA THẬT hay không.
+func docCoChay(args []string) yChay {
 	vars, args := varFlags(args)
 	prof, args := strFlag(args, "--profile", "")
-	// --cu-chay: biết tài khoản hỏng mà vẫn muốn chạy. Xem API.KiemTaiKhoanFlow.
-	cuChay, _ := boolFlag(args, "--cu-chay")
+	cuChay, args := boolFlag(args, "--cu-chay")
+	kho, _ := boolFlag(args, "--kho")
+	return yChay{vars: vars, prof: prof, cuChay: cuChay, kho: kho}
+}
+
+func flowRun(name string, args []string) {
+	y := docCoChay(args)
+	if y.kho {
+		flowChayKho(name, y.vars, y.prof)
+		return
+	}
 
 	a, done := open()
 	defer done()
 	wd, _ := os.Getwd()
-	res, err := a.FlowRunCuChay(context.Background(), wd, name, vars, api.ParseAddr(prof), cuChay)
+	res, err := a.FlowRunCuChay(context.Background(), wd, name, y.vars, api.ParseAddr(y.prof), y.cuChay)
 	if err != nil {
 		fail(err)
 	}
 	done()
 	reportRun(res)
+}
+
+// flowChayKho in KẾ HOẠCH của một lượt chạy rồi dừng — không bật agent nào,
+// không ghi dòng nào vào sổ.
+//
+// Vì sao đáng có: ba lượt chạy thật ngày 19/08 (#30, #32, #33) được bấm chỉ để
+// xem cổng kiểm tài khoản nói gì. Mỗi lượt đốt hạn mức thuê bao và để lại một
+// lượt rác phải huỷ tay. Câu trả lời vốn đã biết được trước khi chạy.
+func flowChayKho(name string, vars map[string]string, prof string) {
+	a, done := open()
+	defer done()
+	wd, _ := os.Getwd()
+	kh, err := a.FlowChayKho(wd, name, vars, api.ParseAddr(prof))
+	if err != nil {
+		fail(err)
+	}
+	done()
+
+	fmt.Printf("\n  CHẠY KHAN — %s", kh.Flow)
+	if kh.Desc != "" {
+		fmt.Printf(" · %s", kh.Desc)
+	}
+	fmt.Printf("\n  Thư mục: %s\n", kh.Dir)
+	if len(kh.Vars) > 0 {
+		fmt.Println()
+		fmt.Println("  Biến dùng cho lượt này:")
+		for _, k := range tenBienSapXep(kh.Vars) {
+			fmt.Printf("    %-12s %s\n", k, truncate(kh.Vars[k], 60))
+		}
+	}
+
+	for _, d := range kh.Dot {
+		fmt.Println()
+		switch {
+		case d.ChoDuyet:
+			fmt.Printf("  Đợt %d — RÀO DUYỆT (lượt chạy thật DỪNG ở đây tới khi có người duyệt)\n", d.So)
+		case len(d.Buoc) > 1:
+			fmt.Printf("  Đợt %d — %d bước chạy SONG SONG\n", d.So, len(d.Buoc))
+		default:
+			fmt.Printf("  Đợt %d\n", d.So)
+		}
+		for _, b := range d.Buoc {
+			dong := fmt.Sprintf("   · %-12s [%s]", b.ID, b.Type)
+			if b.TaiKhoan != "" {
+				dong += "  " + b.TaiKhoan
+			} else if b.Type == flow.TypeAgent || b.Type == flow.TypeReview {
+				// Nói thẳng là CHƯA BIẾT thay vì im lặng: bước này sẽ hỏng ngay
+				// lúc chạy thật, và đây là chỗ duy nhất báo được trước.
+				dong += "  (chưa biết tài khoản — thiếu `profile` và --profile)"
+			}
+			if b.SoAgent > 0 {
+				dong += fmt.Sprintf(" · %d agent", b.SoAgent)
+			}
+			if b.Worktree {
+				dong += " · worktree riêng"
+			}
+			if b.TuDuyetQuyen {
+				dong += " · ⚠ TỰ DUYỆT MỌI QUYỀN"
+			}
+			fmt.Println(dong)
+			if b.Lap != "" {
+				fmt.Printf("       lặp trên %s — mỗi mục thêm một lượt agent, dài bao nhiêu thì lúc chạy mới biết\n", b.Lap)
+			}
+			if b.Prompt != "" {
+				fmt.Printf("       %s\n", truncate(b.Prompt, 100))
+			}
+			if b.ConSot != "" {
+				fmt.Printf("       ✗ đang chờ kết quả bước %q, nhưng bước đó KHÔNG xong trước nó\n", b.ConSot)
+			}
+		}
+	}
+
+	fmt.Println()
+	if kh.CoLap {
+		fmt.Printf("  Tổng: TỪ %d phiên agent trở lên (có bước lặp)\n", kh.SoAgent)
+	} else {
+		fmt.Printf("  Tổng: %d phiên agent\n", kh.SoAgent)
+	}
+	for _, v := range kh.Van {
+		mark := "✗"
+		if v.Warn {
+			mark = "!"
+		}
+		if v.Buoc != "" {
+			fmt.Printf("  %s %s: %s\n", mark, v.Buoc, v.Msg)
+		} else {
+			fmt.Printf("  %s %s\n", mark, v.Msg)
+		}
+	}
+	for _, h := range kh.TaiKhoanHong {
+		fmt.Printf("  ✗ %s — %s (kéo theo bước: %s)\n", h.Addr, h.LyDo, strings.Join(h.Buoc, ", "))
+		fmt.Printf("      sửa: sagent %s\n", h.Addr)
+	}
+
+	fmt.Println()
+	fmt.Println("  Chưa có gì xảy ra: không phiên agent nào được bật, không dòng nào vào sổ.")
+	fmt.Printf("  Chạy thật: sagent flow run %s", kh.Flow)
+	if prof != "" {
+		fmt.Printf(" --profile %s", prof)
+	}
+	fmt.Println()
+	fmt.Println()
+}
+
+// tenBienSapXep để thứ tự in ra ổn định — map của Go trả về ngẫu nhiên, và một
+// bản kế hoạch mỗi lần in một khác thì không so được với lần trước.
+func tenBienSapXep(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func flowResume(idStr string) {

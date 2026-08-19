@@ -92,3 +92,21 @@ func TestCoCacFlag(t *testing.T) {
 		t.Fatalf("boolFlag sai: b=%v rest=%v", b, rest2)
 	}
 }
+
+// `--kho` phải sống sót qua mọi cờ khác đứng trước nó.
+//
+// Cờ này quyết định lượt chạy CÓ XẢY RA THẬT hay không, nên mất nó là mất tiền:
+// mỗi hàm rút cờ trả về phần args còn lại, quên nối vào hàm sau thì --kho không
+// bao giờ được thấy và `sagent flow run x --cu-chay --kho` chạy thật.
+func TestCoKhoSongSotQuaCacCoKhac(t *testing.T) {
+	y := docCoChay([]string{"--var", "a=b", "--profile", "claude:phu", "--cu-chay", "--kho"})
+	if !y.kho {
+		t.Fatal("--kho bị mất khi đứng sau các cờ khác — lượt chạy sẽ xảy ra THẬT")
+	}
+	if !y.cuChay || y.prof != "claude:phu" || y.vars["a"] != "b" {
+		t.Fatalf("các cờ khác bị hỏng theo: %+v", y)
+	}
+	if docCoChay([]string{"--profile", "claude:phu"}).kho {
+		t.Fatal("không gõ --kho mà vẫn hiểu là chạy khan")
+	}
+}

@@ -350,3 +350,32 @@ func join(ss []string) string {
 	}
 	return out
 }
+
+// POST /api/flow/kho — CHẠY KHAN: trả về kế hoạch của một lượt chạy mà không
+// chạy gì cả.
+//
+// Đây là endpoint DUY NHẤT trong nhóm flow không đẻ ra tác dụng phụ nào: không
+// goroutine nền, không lượt chạy trong sổ, không agent. Nhờ vậy nó trả lời được
+// NGAY trong request thay vì đẩy tiến độ qua luồng event như /api/flow/run —
+// không có tiến độ nào để đẩy.
+//
+// Nút "Chạy khan" trên bảng flow gọi đúng đường này. Người dùng bấm "Chay
+// workflow" để xem cổng kiểm nói gì là chuyện đã xảy ra thật ba lần trong ngày
+// 19/08 (#30, #32, #33), mỗi lần đốt hạn mức và đẻ một lượt rác.
+func (s *Server) handleFlowKho(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name    string            `json:"name"`
+		Profile string            `json:"profile"`
+		Vars    map[string]string `json:"vars"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	kh, err := s.api.FlowChayKho(s.workDir(), req.Name, req.Vars, api.ParseAddr(req.Profile))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, kh)
+}

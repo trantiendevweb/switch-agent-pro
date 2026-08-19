@@ -73,6 +73,7 @@ func init() {
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},
 		"__frun":  {"flow.run", "chạy một workflow", nil},
+		"__fkho":  {"flow.kho", "chạy khan: xem kế hoạch, không tốn hạn mức", nil},
 		"__fruns": {"flow.runs", "lịch sử chạy workflow", nil},
 		"__fsave": {"flow.save", "luu flow vao flows.toml", nil},
 		"__fdel":  {"flow.delete", "xoa flow khoi flows.toml", nil},
@@ -665,6 +666,11 @@ func cmdHelp() {
                                 chạy flow; dừng lại khi gặp bước cần duyệt.
                                 Tài khoản nào flow cần mà hết hạn/chưa đăng nhập
                                 thì DỪNG trước, --cu-chay để bỏ qua chốt đó
+    sagent flow run <tên> --kho CHẠY KHAN: in kế hoạch (đợt nào chạy song song,
+                                bước nào bằng tài khoản nào, prompt đã thay biến)
+                                rồi DỪNG. Không bật agent, không ghi vào sổ,
+                                không tốn hạn mức. Muốn xem cổng kiểm nói gì thì
+                                dùng cái này, đừng chạy thật.
     sagent flow runs            lịch sử các lần chạy
     sagent flow approve <#> <bước>   duyệt để chạy tiếp
     sagent flow reject  <#> <bước>   từ chối, huỷ lần chạy

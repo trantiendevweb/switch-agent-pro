@@ -146,6 +146,7 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"flow.list":     "/api/flows",
 		"flow.show":     "/api/flow/def",
 		"flow.run":      "/api/flow/run",
+		"flow.kho":      "/api/flow/kho",
 		"flow.approve":  "/api/flow/decide",
 		"flow.cancel":   "/api/flow/cancel",
 		"flow.save":     "/api/flow/save",

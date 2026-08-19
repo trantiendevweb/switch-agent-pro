@@ -80,6 +80,10 @@ var Actions = []string{
 	"flow.show",
 	"flow.validate",
 	"flow.run",
+	// Chạy KHAN: hỏi "bấm chạy thì chuyện gì xảy ra" mà không tốn một đồng nào.
+	// Ngày 19/08 có ba lượt chạy THẬT (#30, #32, #33) chỉ để xem cổng kiểm tài
+	// khoản nói gì — mỗi lượt đốt hạn mức và đẻ một lượt rác phải huỷ tay.
+	"flow.kho",
 	"flow.runs",
 	"flow.approve",
 	// Huỷ một lượt chạy dở dang. Không có nó thì lượt bị cắt ngang (máy sập,
@@ -1073,10 +1077,12 @@ func (a *API) runner(defaultProfile Addr) *flow.Runner {
 }
 
 // TaiKhoanHong: một tài khoản mà flow CẦN nhưng dùng không được.
+//
+// Có thẻ json vì chạy khan gửi nguyên khối này ra mặt web (xem FlowChayKho).
 type TaiKhoanHong struct {
-	Addr string   // "claude:tns"
-	LyDo string   // vì sao dùng không được
-	Buoc []string // các bước sẽ chết theo
+	Addr string   `json:"addr"` // "claude:tns"
+	LyDo string   `json:"lyDo"` // vì sao dùng không được
+	Buoc []string `json:"buoc"` // các bước sẽ chết theo
 }
 
 // KiemTaiKhoanFlow soi mọi tài khoản mà flow cần, TRƯỚC khi tiêu một đồng nào.
