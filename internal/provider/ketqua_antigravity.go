@@ -56,6 +56,21 @@ func docKetQuaAntigravity(raw string) (KetQua, bool) {
 		return KetQua{}, false
 	}
 
+	// KHÔNG xét chạy quẩn cho provider này, và đây là quyết định có lý do chứ
+	// không phải chỗ chưa làm xong (xem quan.go).
+	//
+	// Bản ghi đo được chỉ mang `tool_name`, KHÔNG mang tham số của lời gọi. Đếm
+	// theo mỗi tên tool thì một bước chạy `run_command` 15 lệnh KHÁC NHAU — tức
+	// đang làm việc tử tế — sẽ bị kết tội y hệt một bước lặp đúng một lệnh 15
+	// lần. Tên tool không phân biệt được hai ca đó, mà bắt oan một bước tốt thì
+	// còn tệ hơn bỏ sót: người dùng sẽ học cách bỏ qua cảnh báo.
+	//
+	// Thêm một cái bẫy nữa: `step_update` phát nhiều lần cho CÙNG một bước (mỗi
+	// lần đổi trạng thái), nên số dòng không phải số lời gọi.
+	//
+	// Nên DemDuocTool để nguyên false: KetQua.Quan() sẽ nói KHÔNG BIẾT. Khi nào
+	// đo được Antigravity phát tham số ở trường nào thì bóc ra và đếm như Claude.
+
 	// Đếm bước tool kết thúc lỗi. Antigravity không nói lỗi VÌ SAO, nên chỉ đếm
 	// chứ không suy diễn nguyên nhân.
 	for _, d := range dong {

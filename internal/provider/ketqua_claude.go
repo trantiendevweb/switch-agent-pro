@@ -52,6 +52,7 @@ func docKetQuaClaude(raw string) (KetQua, bool) {
 			k.LoiAPI = *r.APIErr
 		}
 		k.HanMucDenLai = hanMucClaude(dong)
+		k.LenhLap, k.SoLanLap, k.DemDuocTool = lapLaiClaude(dong)
 		return k, true
 	}
 	return KetQua{}, false
@@ -76,4 +77,46 @@ func hanMucClaude(dong []string) int64 {
 		}
 	}
 	return 0
+}
+
+// lapLaiClaude đếm chuỗi lời gọi tool giống hệt nhau LIÊN TIẾP dài nhất trong
+// bản ghi stream-json, để phát hiện agent chạy quẩn (xem quan.go).
+//
+// Đọc XUÔI, khác hai hàm trên: chúng tìm MỘT dòng nên đi ngược cho nhanh, còn
+// đây cần đúng THỨ TỰ các lời gọi — "liên tiếp" chỉ có nghĩa khi giữ thứ tự.
+//
+// Lời gọi tool nằm trong khối nội dung `{"type":"tool_use","name":…,"input":{…}}`
+// của dòng assistant. Hàm KHÔNG chặn theo `type` của dòng bao ngoài: nếu Claude
+// đổi vỏ mà vẫn giữ khối tool_use thì vẫn đếm được. Còn nếu chính khối tool_use
+// đổi tên trường thì hàm trả docDuoc=false, và KetQua.Quan() nói KHÔNG BIẾT thay
+// vì nói "không quẩn" — hỏng về phía im lặng, không hỏng về phía vu oan.
+func lapLaiClaude(dong []string) (lenh string, soLan int, docDuoc bool) {
+	var d demQuan
+	for _, l := range dong {
+		l = strings.TrimSpace(l)
+		// Lọc thô cho khỏi phân tích JSON từng dòng của một bản ghi dài: khối
+		// tool_use nào cũng phải mang đúng chuỗi này trong JSON.
+		if !strings.HasPrefix(l, "{") || !strings.Contains(l, `"tool_use"`) {
+			continue
+		}
+		var e struct {
+			Message struct {
+				Content []struct {
+					Type  string         `json:"type"`
+					Name  string         `json:"name"`
+					Input map[string]any `json:"input"`
+				} `json:"content"`
+			} `json:"message"`
+		}
+		if json.Unmarshal([]byte(l), &e) != nil {
+			continue
+		}
+		for _, c := range e.Message.Content {
+			if c.Type != "tool_use" {
+				continue
+			}
+			d.Them(chuKyTool(c.Name, c.Input))
+		}
+	}
+	return d.KetLuan()
 }
