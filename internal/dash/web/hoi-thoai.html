@@ -96,11 +96,61 @@ button.more:hover{color:var(--fg)}
   background:var(--panel);border:1px solid var(--border);border-radius:20px;
   padding:7px 14px;font-size:12px;color:var(--sub)}
 
+/* ---------- màn hẹp ----------
+   Chủ dự án điều khiển máy này từ điện thoại, nên mobile KHÔNG phải phần phụ.
+   Đo trên máy thật (ảnh chụp 23:23, màn ~390px): lưới 248px + 1fr giữ nguyên
+   nên cột danh sách nuốt hơn nửa bề ngang, phần hội thoại bị bóp còn một dải
+   hẹp, tên bước "ke-hoach" bị cắt thành "ke-hoa…", và thanh điều hướng vỡ ba
+   dòng. Nghĩa là thứ người ta mở điện thoại ra để xem lại là thứ khó đọc nhất.
+
+   Cách sửa: bỏ hai cột, danh sách lượt chạy thành DẢI CHIP CUỘN NGANG dính
+   trên đầu. Vẫn đổi lượt được bằng một chạm, mà không ăn chiều dọc — thứ quý
+   nhất trên màn dọc. */
+@media (max-width:720px){
+  header{padding:9px 13px;gap:10px}
+  header h1{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header nav{gap:2px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  header nav::-webkit-scrollbar{display:none}
+  header nav a{padding:6px 9px;font-size:12px;white-space:nowrap}
+
+  main{grid-template-columns:1fr;height:auto}
+  aside{border-right:0;border-bottom:1px solid var(--border);
+    position:sticky;top:47px;z-index:4;overflow:visible}
+  .aside-title{display:none}
+  #runs{display:flex;gap:7px;overflow-x:auto;padding:9px 13px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #runs::-webkit-scrollbar{display:none}
+  .run{flex:none;border:1px solid var(--border);border-radius:999px;
+    padding:6px 12px;border-left-width:1px}
+  .run[aria-selected="true"]{border-color:var(--api)}
+  .run-id{min-width:0}
+  .run-name{max-width:104px}
+
+  #thread{padding:15px 13px 78px}
+  #head h2{font-size:17px}
+  #meta{gap:5px 13px;font-size:12.5px}
+
+  /* Tên bước xuống dòng thay vì bị cắt cụt — nó là thứ để tra lại trong log. */
+  .msg-top{flex-wrap:wrap;gap:7px 9px;padding:10px 12px}
+  .who{flex-wrap:wrap;gap:5px 7px;min-width:0}
+  .msg-meta{margin-left:0;width:100%;gap:9px;font-size:11.5px}
+  .turn{padding:10px 12px}
+  pre{font-size:12px;line-height:1.55}
+  .fold{max-height:150px}
+
+  /* Chip trạng thái nhỏ lại và nhường chỗ, khỏi đè lên khối cuối. */
+  #live{right:11px;bottom:11px;padding:6px 11px;font-size:11.5px}
+}
+
 /* Design system: mọi chuyển động phải tôn trọng lựa chọn của người dùng. */
 @media (prefers-reduced-motion: reduce){
   *{animation:none !important;transition:none !important}
   .dot.running{opacity:1}
 }
+
+/* Thao tác được bằng bàn phím — sàn chất lượng của skill. */
+.run:focus-visible,button.more:focus-visible,header nav a:focus-visible{
+  outline:2px solid var(--api);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -170,16 +220,21 @@ async function napDanhSach(){
   const runs = st.runs || [];
   if (!runs.length){ $("#runs").innerHTML = '<div class="empty">chưa có lượt nào</div>'; return; }
 
+  // tabindex + role: đổi lượt chạy phải làm được bằng bàn phím, không chỉ bằng
+  // chuột — sàn chất lượng của skill dashboard.
   $("#runs").innerHTML = runs.map(r => `
-    <div class="run" role="option" data-id="${r.id}"
-         aria-selected="${r.id === runHienTai}">
+    <div class="run" role="option" tabindex="0" data-id="${r.id}"
+         aria-selected="${r.id === runHienTai}"
+         title="lượt #${r.id} · ${esc(r.flow)} · ${esc(NHAN[r.state] || r.state)}">
       <span class="dot ${esc(r.state)}"></span>
       <span class="run-id">#${r.id}</span>
       <span class="run-name">${esc(r.flow)}</span>
     </div>`).join("");
 
   for (const el of document.querySelectorAll(".run")){
-    el.onclick = () => moLuot(Number(el.dataset.id));
+    const mo = () => moLuot(Number(el.dataset.id));
+    el.onclick = mo;
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); mo(); } };
   }
   // Lần đầu vào: mở lượt đang chạy, không có thì lượt mới nhất.
   if (runHienTai == null){
@@ -191,8 +246,13 @@ async function napDanhSach(){
 // ---------------------------------------------------------------- luồng chat
 async function moLuot(id){
   runHienTai = id;
-  for (const el of document.querySelectorAll(".run"))
-    el.setAttribute("aria-selected", String(Number(el.dataset.id) === id));
+  for (const el of document.querySelectorAll(".run")){
+    const chon = Number(el.dataset.id) === id;
+    el.setAttribute("aria-selected", String(chon));
+    // Trên màn hẹp danh sách là dải cuộn ngang: chip vừa chọn có thể nằm ngoài
+    // khung nhìn, kéo nó vào để người dùng thấy mình vừa chọn cái nào.
+    if (chon && el.scrollIntoView) el.scrollIntoView({block:"nearest", inline:"center"});
+  }
   await veLuot();
 }
 
