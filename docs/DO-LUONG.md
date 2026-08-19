@@ -2053,3 +2053,17 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
 - **Chưa làm được**: (1) Ca quẩn XEN KẼ (A,B,A,B,…) không bắt được — chưa gặp bản ghi nào như vậy, mở rộng bây giờ là đoán. (2) Trớ trêu: provider gây ra ca #21 là Grok thì **chưa đọc được kết quả có cấu trúc**, nên với nó trần 60 vòng vẫn là thứ duy nhất cứu. (3) Antigravity phát `step_update` chỉ mang `tool_name`, KHÔNG mang tham số, nên cố tình không kết luận — `Quan()` trả về "không biết", khác hẳn "không quẩn".
 - **Đã sửa hay chưa**: **ĐÃ SỬA** phần phát hiện cho Claude. Nghiệm thu bằng `internal/provider/quan_test.go` (quẩn thật 399 vòng, lặp bình thường không bị bắt, thiếu dữ liệu thì nói không biết); mỗi test đã chứng minh đỏ khi gỡ đúng phần logic nó canh.
 
+## 19/08 — Chạy khan (`flow run --kho`): kiểm tra toàn bộ luồng mà không đốt hạn mức và không sinh lượt rác
+
+- **Đo lúc nào**: Tối 19/08/2026.
+- **Đo bằng cách nào**: Quan sát thực tế vận hành khi người dùng muốn kiểm tra trước cấu hình luồng hoặc xem cổng kiểm tra nói gì nhưng lại bấm nhầm lệnh chạy thật (`flow run`).
+- **Con số / Bằng chứng**:
+  - Trong ngày 19/08/2026, đã xảy ra **3 lượt chạy thật lỡ tay** (#30 lúc 19:37, #32, #33).
+  - Mỗi lượt chạy thật lỡ tay đều kích hoạt agent thật, tiêu tốn hạn mức tài khoản (token/quota) và sinh ra các lượt chạy dở dang/rác ở trạng thái `running` hoặc `failed` trong sổ trạng thái `state.db` buộc phải dùng lệnh `flow huy` để dọn.
+  - Cần một cơ chế chạy khan (dry-run) để kiểm tra toàn diện trước khi bấm chạy thật: kiểm tra cấu trúc DAG (`flow.Validate`), chạy qua cổng kiểm tra tài khoản (`KiemTaiKhoanFlow`), tính toán các đợt chạy song song (`flow.Dot`), và hiển thị trước prompt sau khi thay biến (`flow.Expand` / `BuocConSot` — chỉ rõ bước nào có placeholder chưa có kết quả từ bước trước) mà **tuyệt đối KHÔNG chạm vào cơ sở dữ liệu (`state.db`), không tạo git worktree, và không gọi agent thật**.
+- **Đã sửa hay chưa**: **ĐÃ SỬA**.
+  1. Thêm cờ `--kho` cho lệnh CLI: `sagent flow run <tên> --kho`.
+  2. Bổ sung action `flow.kho` vào hợp đồng API lõi `api.Actions`, route `POST /api/flow/kho` và nút "Chạy khan" trên bảng vẽ web (`flow.html`).
+  3. API và CLI trả về toàn bộ kế hoạch thực thi chi tiết: phân chia theo từng đợt chạy, bước nào chạy song song trong mỗi đợt, tài khoản AI được phân công cho từng bước, nội dung prompt sau khi điền biến hoặc cảnh báo placeholder chưa có dữ liệu từ bước trước.
+  - Nghiệm thu: Bộ test kiểm tra đảm bảo luật 3 mặt (CLI, API, Web UI) và khẳng định chạy khan không ghi bất kỳ bản ghi nào vào bảng `flow_runs`/`flow_steps` trong cơ sở dữ liệu, không tạo thư mục tạm và không tiêu tốn token của agent.
+

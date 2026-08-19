@@ -430,7 +430,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   test gọi `Resume` nhiều lần khi chưa duyệt và khẳng định bước sau KHÔNG chạy.
 - [x] **Resume**: trạng thái từng bước nằm ở SQLite (bảng `flow_runs`/`flow_steps`),
   bước đã `done` không chạy lại — chạy tiếp được sau khi máy khởi động lại.
-- [x] Lệnh: `flow run | runs | approve | reject | resume`.
+- [x] Lệnh: `flow run [--kho] | runs | approve | reject | resume | huy`.
 - [x] Đã chạy thật: shell → approve → shell; duyệt thì đi tiếp, từ chối thì huỷ.
 - [x] **Chạy song song nhiều bước**: vòng chạy theo ĐỢT — mỗi vòng tìm mọi bước
   đã sẵn sàng rồi chạy chúng cùng lúc, có trần lấy từ `policy.max_parallel_sessions`.

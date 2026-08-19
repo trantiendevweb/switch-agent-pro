@@ -105,7 +105,18 @@ sagent claude:tns
 2. Hoàn tất đăng nhập và bấm **Authorize** (Cho phép).
 3. Quay lại cửa sổ PowerShell cho đến khi thấy thông báo đăng nhập thành công.
 
-*(Mẹo: Nếu bạn biết rõ tài khoản hết hạn nhưng vẫn muốn chạy thử các bước không dùng tài khoản đó, bạn có thể thêm cờ `--cu-chay`: `sagent flow run dem --cu-chay`)*.
+- **Muốn xem cổng kiểm nói gì thì chạy khan, đừng chạy thật (`--kho`)**:
+  Nếu bạn chỉ muốn kiểm tra xem toàn bộ các tài khoản trong quy trình có sẵn sàng không, các bước phân bổ theo đợt song song ra sao và câu lệnh gửi cho agent trông như thế nào mà **không muốn tiêu tốn hạn mức AI, không gọi agent thật và không ghi lượt chạy rác vào cơ sở dữ liệu**, hãy thêm cờ `--kho`:
+  ```powershell
+  sagent flow run dem --kho
+  ```
+  *(Lệnh chạy khan sẽ kiểm tra cổng tài khoản, đối chiếu cấu trúc luồng, in toàn bộ kế hoạch thực thi từng đợt và cảnh báo ngay tài khoản nào hết hạn hoặc chưa đăng nhập mà không kích hoạt bất kỳ phiên AI nào).*
+
+- **Mẹo bỏ qua cổng kiểm tra để chạy tiếp (`--cu-chay`)**:
+  Nếu bạn biết rõ một tài khoản bị hết hạn nhưng vẫn muốn chạy thử các bước còn lại không dùng tới tài khoản đó, bạn có thể thêm cờ `--cu-chay`:
+  ```powershell
+  sagent flow run dem --cu-chay
+  ```
 
 ### ✅ Cách kiểm đã sửa xong
 Gõ lệnh kiểm tra danh sách tài khoản:
