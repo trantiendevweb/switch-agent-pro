@@ -137,6 +137,10 @@
       <button class="btn" id="redo" title="Lam lai (Ctrl+Shift+Z)" disabled></button>
     <button class="btn" id="tidy" title="Tự xếp theo thứ tự phụ thuộc">Tự xếp</button>
     <button class="btn" id="save">Lưu</button>
+      <!-- Chạy khan đứng TRƯỚC nút chạy thật, và cố ý không tô màu go: nút rẻ
+           tiền phải là nút dễ bấm nhầm hơn. Ngày 19/08 có ba lượt chạy thật
+           (#30, #32, #33) bấm chỉ để xem cổng kiểm nói gì. -->
+      <button class="btn" id="kho" title="Xem kế hoạch: đợt nào chạy song song, bước nào bằng tài khoản nào, prompt đã thay biến. Không bật agent, không ghi vào sổ.">Chạy khan</button>
       <button class="btn go" id="run"><span id="run-ic"></span> Chay workflow</button>
     <div class="sp"></div>
     <span id="conn" style="font-size:12px;color:var(--sub)">…</span>
@@ -163,6 +167,25 @@
     /* Nhan chi phi: mau tien (xanh --run) de doc luot thay ngay "ton bao nhieu". */
     #ketqua .tien{color:var(--run);font-variant-numeric:tabular-nums}
     #ketqua .b.tong{border-bottom:1px solid #2c3040;padding-bottom:6px;font-weight:600}
+    /* Kế hoạch chạy khan: cùng ngôn ngữ hình với #ketqua, đặt bên trái để không
+       che kết quả lượt chạy thật đang diễn ra. */
+    #kehoach{position:absolute;left:12px;top:12px;width:420px;max-height:72%;overflow:auto;
+      background:rgba(20,22,28,.97);border:1px solid #2c3040;border-radius:8px;font-size:12px;z-index:7}
+    #kehoach-tieu{display:flex;align-items:center;justify-content:space-between;gap:8px;
+      padding:6px 10px;border-bottom:1px solid #2c3040;font-weight:600;position:sticky;top:0;
+      background:rgba(20,22,28,.99)}
+    #kehoach-than{padding:8px 10px}
+    #kehoach .dot{margin-bottom:10px}
+    #kehoach .dot-tieu{color:#9fd0ff;font-weight:600;margin-bottom:3px}
+    #kehoach .dot-tieu .song{color:var(--warn)}
+    #kehoach .b{padding:3px 0 3px 8px;border-left:2px solid #2c3040;margin-bottom:4px}
+    #kehoach .mu{color:#8b93a7}
+    #kehoach .tk{color:var(--run)}
+    #kehoach pre{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;color:#cfd4e0;
+      background:#12141a;border-radius:5px;padding:4px 6px;max-height:96px;overflow:auto}
+    #kehoach .bao{color:#e0a04a}
+    #kehoach .do{color:#EF4444}
+    #kehoach .tong{border-top:1px solid #2c3040;padding-top:6px;margin-top:6px;font-weight:600}
     /* Cham trang thai thay cho ky tu la: doi mau duoc, chinh kich thuoc duoc,
        khong phu thuoc phong chu he thong. */
     .m{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
@@ -188,6 +211,13 @@
          (prompt) mà giấu bài làm: lần chạy #8 hiện xanh đủ ba bước trong khi cả
          hai agent chỉ trả về câu từ chối quyền. -->
     <div id="ketqua" hidden><div id="ketqua-tieu">Kết quả từng bước</div><div id="ketqua-than"></div></div>
+    <!-- Kế hoạch chạy khan. Khung RIÊNG, không dùng chung với #ketqua: khung kia
+         bị pollRun() vẽ lại mỗi 5 giây, kế hoạch nằm nhờ trong đó sẽ biến mất
+         trước khi người ta đọc xong. -->
+    <div id="kehoach" hidden>
+      <div id="kehoach-tieu"><span>Kế hoạch chạy khan</span><button class="btn" id="kehoach-dong">Đóng</button></div>
+      <div id="kehoach-than"></div>
+    </div>
     <div id="zoom">
       <button class="btn" id="zin">+</button>
       <button class="btn" id="zout">−</button>
@@ -738,6 +768,55 @@ $('#save').onclick=async()=>{
     dirty=false; toast('Đã lưu vào '+r.file); loadList();
   }catch(e){ toast(e.message,'err'); }
 };
+// Chạy khan: hỏi máy "bấm chạy thì chuyện gì xảy ra" mà không tốn gì.
+// Kế hoạch đọc từ flows.toml đã lưu, nên bảng vẽ còn thay đổi chưa lưu thì phải
+// nói ra — không thì người ta đọc kế hoạch của một bản khác với bản trên màn hình.
+$('#kho').onclick=async()=>{
+  if(!flowName){ toast('Chưa chọn workflow','err'); return; }
+  if(dirty){ toast('Lưu trước đã — kế hoạch đọc từ flows.toml, không phải từ bảng vẽ','err'); return; }
+  try{
+    const kh=await call('/api/flow/kho',{method:'POST',body:JSON.stringify({name:flowName})});
+    veKeHoach(kh);
+  }catch(e){ toast(e.message,'err'); }
+};
+$('#kehoach-dong').onclick=()=>{ $('#kehoach').hidden=true; };
+
+function veKeHoach(kh){
+  const dots=(kh.dot||[]).map(d=>{
+    let tieu;
+    if(d.choDuyet) tieu='Đợt '+d.so+' — RÀO DUYỆT <span class="bao">(lượt chạy thật dừng ở đây)</span>';
+    else if((d.buoc||[]).length>1) tieu='Đợt '+d.so+' — <span class="song">'+d.buoc.length+' bước chạy song song</span>';
+    else tieu='Đợt '+d.so;
+    const bs=(d.buoc||[]).map(b=>{
+      let head='<b>'+esc(b.id)+'</b> <span class="mu">'+esc(b.type)+'</span>';
+      if(b.taiKhoan) head+=' <span class="tk">'+esc(b.taiKhoan)+'</span>';
+      else if(b.type==='agent'||b.type==='review') head+=' <span class="bao">chưa biết tài khoản</span>';
+      if(b.soAgent) head+=' <span class="mu">· '+b.soAgent+' agent</span>';
+      if(b.worktree) head+=' <span class="mu">· worktree riêng</span>';
+      if(b.tuDuyetQuyen) head+=' <span class="do">· TỰ DUYỆT MỌI QUYỀN</span>';
+      let than='';
+      if(b.lap) than+='<div class="bao">lặp trên '+esc(b.lap)+' — số agent chỉ biết lúc chạy</div>';
+      if(b.prompt) than+='<pre>'+esc(b.prompt)+'</pre>';
+      if(b.conSot) than+='<div class="do">đang chờ kết quả bước "'+esc(b.conSot)+'" nhưng bước đó không xong trước nó</div>';
+      return '<div class="b">'+head+than+'</div>';
+    }).join('');
+    return '<div class="dot"><div class="dot-tieu">'+tieu+'</div>'+bs+'</div>';
+  }).join('');
+
+  let cuoi='<div class="tong">Tổng: '+(kh.coLap?'từ ':'')+(kh.soAgent||0)+' phiên agent'+(kh.coLap?' trở lên':'')+'</div>';
+  (kh.vanDe||[]).forEach(v=>{
+    cuoi+='<div class="'+(v.warn?'bao':'do')+'">'+(v.buoc?esc(v.buoc)+': ':'')+esc(v.msg)+'</div>';
+  });
+  (kh.taiKhoanHong||[]).forEach(h=>{
+    cuoi+='<div class="do">'+esc(h.addr)+' — '+esc(h.lyDo)+' (kéo theo: '+esc((h.buoc||[]).join(', '))+')</div>';
+  });
+  cuoi+='<div class="mu">Chưa có gì xảy ra: không phiên agent nào được bật, không dòng nào vào sổ.</div>';
+
+  $('#kehoach-than').innerHTML=dots+cuoi;
+  $('#kehoach').hidden=false;
+  toast('Chạy khan xong — chưa agent nào được bật');
+}
+
 $('#run').onclick=async()=>{
   if(dirty){ toast('Lưu trước khi chạy','err'); return; }
   if(!flowName){ toast('Chưa chọn workflow','err'); return; }
