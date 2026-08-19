@@ -442,6 +442,41 @@ func Expand(s string, vars map[string]string) string {
 	return s
 }
 
+// conSotOutput bắt các {{steps.<id>.output}} mà Expand KHÔNG thay được.
+var conSotOutput = regexp.MustCompile(`\{\{steps\.([^.{}]+)\.output\}\}`)
+
+// ExpandChay thay biến như Expand, rồi CHỐT các {{steps.<id>.output}} còn sót
+// lại bằng một câu nói thật thay vì để nguyên chữ sống.
+//
+// Vì sao cần: Expand chỉ thay những khoá CÓ trong map. Bước hỏng — hoặc chạy
+// xong mà không trả về gì — không để lại `steps.<id>.output` nào, nên
+// placeholder đi thẳng vào prompt dưới dạng văn bản.
+//
+// Đo tại lần chạy #29: bước `kiem-cuoi` hỏng, và người soi được gửi nguyên văn
+//
+//	Máy chấm nói gì:
+//	{{steps.kiem-cuoi.output}}
+//
+// Người soi không hề nhận được phán quyết của máy chấm, nhưng vẫn phán như thể
+// có. Cả lời hứa "máy chấm quyết định, không phải lời agent" bốc hơi trong im
+// lặng — đúng kiểu hỏng mà dự án này sợ nhất.
+//
+// Vì sao KHÔNG chốt thẳng trong Expand: `sagent flow show` dùng Expand để in
+// thử prompt lúc CHƯA chạy, khi đó chưa bước nào có kết quả là chuyện bình
+// thường. Chốt ở đó là nói dối theo chiều ngược lại.
+func ExpandChay(s string, vars map[string]string) string {
+	return conSotOutput.ReplaceAllString(Expand(s, vars), `(bước "$1" không để lại kết quả)`)
+}
+
+// BuocConSot trả về id bước đầu tiên còn placeholder chưa thay, hoặc "" nếu
+// không còn. Dùng cho chỗ KHÔNG được phép đoán bừa — xem bước shell trong do().
+func BuocConSot(s string, vars map[string]string) string {
+	if m := conSotOutput.FindStringSubmatch(Expand(s, vars)); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
 // WithOutputs trả về bản sao của vars, thêm khoá `steps.<id>.output` để bước sau
 // dùng được kết quả bước trước:
 //

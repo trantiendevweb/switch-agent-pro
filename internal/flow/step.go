@@ -291,7 +291,7 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 			r.Bus.Warnf("copies=%d vượt trần %d của dự án — hạ xuống", n, r.MaxParallel)
 			n = r.MaxParallel
 		}
-		return r.Agent.RunAgents(ctx, s.Profile, Expand(s.Prompt, vars), n, s.Worktree, s.TuDuyetQuyen)
+		return r.Agent.RunAgents(ctx, s.Profile, ExpandChay(s.Prompt, vars), n, s.Worktree, s.TuDuyetQuyen)
 
 	case TypeShell, TypeTest, TypeLint:
 		argv := s.Run
@@ -309,8 +309,17 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 		}
 		s.Run = argv
 		// argv, KHÔNG qua shell — flow là file người ta gửi cho nhau được.
+		//
+		// Bước shell KHÔNG được chốt placeholder như prompt: `go test -C
+		// (bước "x" không để lại kết quả)` là một đường dẫn bịa, chạy vào rồi
+		// hỏng bằng một thông báo chẳng liên quan gì tới nguyên nhân thật.
+		// Thiếu giá trị thì dừng ngay và nói rõ thiếu của bước nào.
 		args := make([]string, len(s.Run))
 		for i, a := range s.Run {
+			if id := BuocConSot(a, vars); id != "" {
+				return KetQuaAgent{}, fmt.Errorf(
+					"tham số %d cần kết quả của bước %q nhưng bước đó không để lại gì", i+1, id)
+			}
 			args[i] = Expand(a, vars)
 		}
 		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
@@ -325,7 +334,7 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 		return KetQuaAgent{Output: strings.TrimRight(string(raw), "\r\n")}, nil
 
 	case TypeNotify:
-		m := Expand(s.Message, vars)
+		m := ExpandChay(s.Message, vars)
 		r.Bus.Infof("%s", m)
 		return KetQuaAgent{Output: m}, nil
 

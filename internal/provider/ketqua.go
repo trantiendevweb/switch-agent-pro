@@ -1,6 +1,9 @@
 package provider
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // KetQua là kết quả một lượt chạy agent, ĐỌC TỪ DỮ LIỆU CÓ CẤU TRÚC chứ không
 // đoán từ chữ tiếng Anh trong output.
@@ -50,7 +53,7 @@ func (k KetQua) Hong() string {
 		if k.LoiAPI != "" {
 			return "agent báo lỗi (" + k.Loai + "): " + k.LoiAPI
 		}
-		return "agent báo lỗi: " + k.Loai
+		return "agent báo lỗi: " + k.lyDo()
 	}
 	if k.TuChoiSo > 0 && k.TraLoi == "" {
 		return "agent bị từ chối quyền cho mọi tool và không trả lời được gì"
@@ -62,4 +65,40 @@ func (k KetQua) Hong() string {
 		return "agent chạy xong nhưng không trả lời gì"
 	}
 	return ""
+}
+
+// lyDo tìm câu giải thích ĐÁNG ĐỌC nhất cho một lượt có CoLoi.
+//
+// Vì sao cần: `subtype` KHÔNG phải lúc nào cũng là lý do hỏng. Đo tại lần chạy
+// #29 bước `code-go`: Claude trả về is_error=true nhưng subtype vẫn là
+// "success", nên thông báo hoá ra "agent báo lỗi: success" — tự mâu thuẫn, và
+// người đọc không biết được gì. Lý do thật nằm trong trường `result`.
+//
+// Thứ tự ưu tiên: lời agent (result) → terminal_reason → stop_reason → subtype.
+// Bỏ qua mọi giá trị tự nhận là "success": đặt sau chữ "báo lỗi" thì nó vô
+// nghĩa, mà nói vô nghĩa còn tệ hơn nói thẳng là không biết.
+func (k KetQua) lyDo() string {
+	if t := dongDau(k.TraLoi); t != "" {
+		return t
+	}
+	for _, v := range []string{k.KetCuc, k.DungViCo, k.Loai} {
+		if v != "" && !strings.EqualFold(v, "success") {
+			return v
+		}
+	}
+	return "không nói lý do"
+}
+
+// dongDau lấy dòng đầu của s, cắt theo RUNE cho vừa một dòng thông báo (cắt
+// theo byte sẽ xé đôi ký tự tiếng Việt).
+func dongDau(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexAny(s, "\r\n"); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	const tran = 200
+	if r := []rune(s); len(r) > tran {
+		return string(r[:tran]) + "…"
+	}
+	return s
 }
