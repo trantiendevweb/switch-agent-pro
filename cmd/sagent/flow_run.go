@@ -31,12 +31,14 @@ func varFlags(args []string) (map[string]string, []string) {
 
 func flowRun(name string, args []string) {
 	vars, args := varFlags(args)
-	prof, _ := strFlag(args, "--profile", "")
+	prof, args := strFlag(args, "--profile", "")
+	// --cu-chay: biết tài khoản hỏng mà vẫn muốn chạy. Xem API.KiemTaiKhoanFlow.
+	cuChay, _ := boolFlag(args, "--cu-chay")
 
 	a, done := open()
 	defer done()
 	wd, _ := os.Getwd()
-	res, err := a.FlowRun(context.Background(), wd, name, vars, api.ParseAddr(prof))
+	res, err := a.FlowRunCuChay(context.Background(), wd, name, vars, api.ParseAddr(prof), cuChay)
 	if err != nil {
 		fail(err)
 	}

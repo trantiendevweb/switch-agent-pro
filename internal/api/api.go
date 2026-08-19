@@ -11,6 +11,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1039,8 +1040,101 @@ func (a *API) runner(defaultProfile Addr) *flow.Runner {
 	}
 }
 
+// TaiKhoanHong: một tài khoản mà flow CẦN nhưng dùng không được.
+type TaiKhoanHong struct {
+	Addr string   // "claude:tns"
+	LyDo string   // vì sao dùng không được
+	Buoc []string // các bước sẽ chết theo
+}
+
+// KiemTaiKhoanFlow soi mọi tài khoản mà flow cần, TRƯỚC khi tiêu một đồng nào.
+//
+// Vì sao cần: lượt chạy #29 (19/08 01:45) đốt 9 bước, trong đó 4 bước chết chắc
+// từ trước lúc bấm chạy — token claude:tns đã hết hạn lúc 18/08 23:44, tức 2
+// tiếng trước. Log để lại đầy bước đỏ ("agent báo lỗi", "không bật được phiên
+// nào", rồi máy chấm đỏ theo vì worktree chưa kịp tạo), trong khi nguyên nhân
+// thật gói gọn một dòng: chưa đăng nhập lại.
+//
+// `sagent ds` VỐN ĐÃ biết chuyện đó — Profile.HetHan có sẵn từ commit 0bcb903.
+// Chỉ là `flow run` không thèm hỏi trước khi chạy.
+func (a *API) KiemTaiKhoanFlow(f flow.Flow, defaultProfile Addr) ([]TaiKhoanHong, error) {
+	can := map[string][]string{} // addr -> các bước cần nó
+	var thuTu []string           // giữ thứ tự gặp, để thông báo đọc theo sơ đồ
+	for _, s := range f.Steps {
+		if s.Type != flow.TypeAgent && s.Type != flow.TypeReview {
+			continue
+		}
+		addr := s.Profile
+		if addr == "" {
+			// Bước không khai profile thì runner dùng --profile của lượt chạy.
+			// Không có cả hai thì để runner tự báo, đừng đoán hộ.
+			if defaultProfile.Account == "" {
+				continue
+			}
+			addr = defaultProfile.String()
+		}
+		if _, co := can[addr]; !co {
+			thuTu = append(thuTu, addr)
+		}
+		can[addr] = append(can[addr], s.ID)
+	}
+	if len(can) == 0 {
+		return nil, nil
+	}
+
+	list, err := a.ProfileList()
+	if err != nil {
+		return nil, err
+	}
+	co := make(map[string]Profile, len(list))
+	for _, p := range list {
+		co[p.Addr()] = p
+	}
+
+	var hong []TaiKhoanHong
+	for _, addr := range thuTu {
+		p, ok := co[addr]
+		switch {
+		case !ok:
+			hong = append(hong, TaiKhoanHong{addr, "không có hồ sơ nào trên máy này", can[addr]})
+		case p.HetHan:
+			hong = append(hong, TaiKhoanHong{addr,
+				"token hết hạn lúc " + p.HanToi.Format("02/01 15:04"), can[addr]})
+		case !p.HasToken:
+			hong = append(hong, TaiKhoanHong{addr, "chưa đăng nhập", can[addr]})
+		}
+	}
+	return hong, nil
+}
+
+// loiTaiKhoanHong dựng thông báo nói ĐỦ ba thứ: hỏng cái gì, kéo theo bước nào,
+// và sửa bằng lệnh nào. Thiếu thứ ba thì người đọc vẫn phải đi tra.
+func loiTaiKhoanHong(hong []TaiKhoanHong) error {
+	var b strings.Builder
+	b.WriteString("flow cần tài khoản đang dùng không được:")
+	for _, h := range hong {
+		fmt.Fprintf(&b, "\n\n  %s — %s\n    kéo theo bước: %s\n    sửa: sagent %s   (đăng nhập một lần rồi thoát)",
+			h.Addr, h.LyDo, strings.Join(h.Buoc, ", "), h.Addr)
+	}
+	b.WriteString("\n\n  Biết mà vẫn muốn chạy (các bước trên sẽ hỏng): thêm cờ --cu-chay")
+	return errors.New(b.String())
+}
+
 // FlowRun — action "flow.run". Chạy một flow; dừng lại nếu gặp bước chờ duyệt.
+//
+// Chặn sẵn khi tài khoản hỏng. Muốn bỏ qua thì dùng FlowRunCuChay.
 func (a *API) FlowRun(ctx context.Context, dir, name string, vars map[string]string, defaultProfile Addr) (flow.Result, error) {
+	return a.FlowRunCuChay(ctx, dir, name, vars, defaultProfile, false)
+}
+
+// FlowRunCuChay như FlowRun, nhưng cuChay=true thì chỉ CẢNH BÁO chứ không chặn.
+//
+// Vẫn cảnh báo thật to: người gõ `--cu-chay` là đã chấp nhận vài bước sẽ hỏng,
+// nhưng lúc đọc log lại vài tiếng sau thì họ quên mất — dòng cảnh báo nằm trong
+// log mới là thứ nối được bước đỏ với nguyên nhân.
+func (a *API) FlowRunCuChay(ctx context.Context, dir, name string, vars map[string]string,
+	defaultProfile Addr, cuChay bool) (flow.Result, error) {
+
 	f, _, err := a.FlowShow(dir, name)
 	if err != nil {
 		return flow.Result{}, err
@@ -1050,6 +1144,19 @@ func (a *API) FlowRun(ctx context.Context, dir, name string, vars map[string]str
 			if !p.Warn {
 				return flow.Result{}, fmt.Errorf("flow %q có lỗi: %s", name, p.Msg)
 			}
+		}
+	}
+	hong, err := a.KiemTaiKhoanFlow(f, defaultProfile)
+	if err != nil {
+		return flow.Result{}, err
+	}
+	if len(hong) > 0 {
+		if !cuChay {
+			return flow.Result{}, loiTaiKhoanHong(hong)
+		}
+		for _, h := range hong {
+			a.bus.Warnf("--cu-chay: %s %s — bước %s sẽ hỏng vì chuyện này, không phải vì code",
+				h.Addr, h.LyDo, strings.Join(h.Buoc, ", "))
 		}
 	}
 	return a.runner(defaultProfile).Start(ctx, f, dir, vars)

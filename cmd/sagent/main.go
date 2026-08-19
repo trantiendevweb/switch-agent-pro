@@ -659,8 +659,10 @@ func cmdHelp() {
     sagent flow                 liệt kê workflow (có 3 flow mẫu dựng sẵn)
     sagent flow show <tên>      xem các bước + thứ tự chạy
     sagent flow validate        kiểm tra mọi flow (thoát ≠ 0 nếu có lỗi — dùng trong CI)
-    sagent flow run <tên> [--profile claude:x] [--var k=v]
-                                chạy flow; dừng lại khi gặp bước cần duyệt
+    sagent flow run <tên> [--profile claude:x] [--var k=v] [--cu-chay]
+                                chạy flow; dừng lại khi gặp bước cần duyệt.
+                                Tài khoản nào flow cần mà hết hạn/chưa đăng nhập
+                                thì DỪNG trước, --cu-chay để bỏ qua chốt đó
     sagent flow runs            lịch sử các lần chạy
     sagent flow approve <#> <bước>   duyệt để chạy tiếp
     sagent flow reject  <#> <bước>   từ chối, huỷ lần chạy
