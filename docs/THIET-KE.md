@@ -311,6 +311,36 @@ Ba font chữ được vendor offline trong `internal/dash/web/vendor/` dưới 
   2. *Một nguồn sự thật (Single Source of Truth):* Toàn bộ token màu sắc, typography và `@font-face` nằm gọn trong `vendor/token.css`. Mọi trang (`index.html`, `flow.html`, `hoi-thoai.html`, `3d.html`) chỉ cần `<link>` vào là dùng được ngay.
   3. *Tương thích nhúng offline:* Không cần build tool hay preprocessor, phục vụ trực tiếp từ Go `embed` tĩnh.
 
+#### 5. Mặt 3D (Kiến trúc không gian & Ba quyết định cốt lõi)
+
+Không gian theo dõi 3D (`3d.html`) đóng vai trò là "phòng điều khiển trực quan" cho toàn bộ hạm đội agent. Người vận hành chỉ cần mở màn hình là nắm bắt được ngay trạng thái vận hành của từng phiên làm việc, dòng chảy dữ liệu giữa các agent và tiến độ thực thi theo thời gian thực.
+
+Để đảm bảo hiệu năng cao nhất, giao diện sắc nét và khả năng hoạt động độc lập 100% offline trong một binary duy nhất, kiến trúc 3D được xây dựng dựa trên ba quyết định thiết kế cốt lõi:
+
+- **Quyết định 1: Xếp agent trên một Ring (vòng tròn) quanh Core điều phối thay vì thả trôi tự do**
+  - *Vấn đề của bản cũ (Lỗi trực quan số 1):* Trong các bản phác thảo đầu tiên, các agent và quả cầu phiên (orb) được thả trôi lơ lửng ngẫu nhiên quanh không gian. Điều này tạo ra trải nghiệm thị giác rất rối rắm: mắt người dùng không thể xác định được trật tự trước - sau, không đếm nhanh được số lượng phiên đang chạy, và khi xoay góc nhìn camera thì các đối tượng che khuất lẫn nhau khiến việc theo dõi bị gián đoạn.
+  - *Giải pháp & Lợi ích:* Tất cả các agent được sắp xếp cách đều nhau trên **một vòng tròn cố định (Ring)** bao quanh khối đa diện lõi điều phối (`Core` icosahedron nằm ở trung tâm $y = 1.1$). Bố cục hình học tròn mang lại trật tự trực quan rõ ràng:
+    - *Quét nhanh trong một cái nhìn:* Mắt người vận hành chỉ cần quét một vòng cung là nhận diện được toàn bộ các agent, màu trạng thái chân đế (`--run` xanh ngọc, `--pending` vàng cam, `--done` xanh dịu, `--error` đỏ) và vai trò của từng thành viên.
+    - *Đường truyền dữ liệu mạch lạc:* Tia kết nối (beam) và các luồng hạt tín hiệu (particle) di chuyển giữa Core và các agent trên Ring hoặc giữa các bước phụ thuộc (`needs`) theo những đường cong xác định, không bị chồng chéo hay rối mắt.
+
+- **Quyết định 2: Quầng sáng phát quang bằng Glow Sprite Additive thay vì Post-Processing (Bloom / EffectComposer)**
+  - *Ràng buộc kiến trúc sống còn (Offline & Một file core duy nhất):*
+    - Switch-Agent-Pro tuân thủ tiêu chuẩn đóng gói nhúng tĩnh trong Go (`go:embed`), chạy hoàn toàn cục bộ (offline 100%) mà không phụ thuộc vào bất kỳ kết nối mạng hay CDN bên ngoài nào.
+    - Thư viện Three.js được nhúng duy nhất **một file lõi** (`three.min.js` r128). Các giải pháp hậu kỳ hình ảnh như `EffectComposer`, `UnrealBloomPass` hay `ShaderPass` là các addon mở rộng rời rạc. Sử dụng chúng sẽ kéo theo nhiều file JavaScript phụ thuộc, làm tăng độ phức tạp và tiềm ẩn nguy cơ "màn hình trắng trơn" khi chạy trên môi trường máy chủ nội bộ bị chặn Internet.
+    - Ngoài ra, kỹ thuật hậu kỳ Bloom (post-processing) yêu cầu GPU phải xử lý render nhiều lượt (multi-pass), gây nóng máy và tụt khung hình trên các thiết bị hoặc máy ảo không có card đồ hoạ rời.
+  - *Giải pháp & Lợi ích:* Sử dụng `THREE.Sprite` kết hợp với chế độ trộn màu cộng hưởng (`THREE.AdditiveBlending`) và ảnh quầng sáng (radial gradient) sinh trực tiếp trong bộ nhớ lúc khởi chạy. Kỹ thuật này tạo ra quầng sáng aura rực rỡ, mềm mại bao quanh các orb khi agent hoạt động mà hoàn toàn:
+    - *Chỉ dùng Three.js core:* Không cần thêm bất kỳ file addon nào, an toàn tuyệt đối khi phân phối offline.
+    - *Siêu nhẹ và mượt mà:* Chi phí dựng hình cực thấp, đảm bảo tốc độ khung hình 60 FPS ổn định trên mọi cấu hình máy tính.
+
+- **Quyết định 3: Nhãn thông tin (Label) bằng HTML Overlay chiếu World → Screen thay vì 3D Text**
+  - *Nhược điểm của 3D Text / Texture Canvas trong 3D:*
+    - Văn bản tạo bằng 3D mesh (`TextGeometry`) hoặc vẽ lên Canvas texture rồi dán lên mặt phẳng 3D (billboard) thường xuyên bị hiện tượng nhoè chữ, răng cưa vỡ hạt khi phóng to, thu nhỏ hoặc nhìn ở góc nghiêng.
+    - Dựng chữ 3D đòi hỏi phải tải thêm file font 3D vector JSON nặng nề, tốn bộ nhớ hình học, và không hỗ trợ các tính năng định dạng giao diện hiện đại (như đổ bóng viền chữ, căn chỉnh linh hoạt nhiều dòng).
+  - *Giải pháp & Lợi ích:* Nhãn thông tin được xây dựng bằng các thẻ `<div>` HTML phẳng nằm đè (overlay) phía trên canvas WebGL. Mỗi khung hình, toạ độ 3D của agent được chiếu thành toạ độ 2D trên màn hình thông qua hàm chiếu `vector.project(camera)`. Nhãn sẽ tự động ẩn đi nếu agent nằm khuất phía sau góc nhìn camera ($z \ge 1$).
+    - *Chữ sắc nét 100%:* Được render bằng bộ engine font chữ tự nhiên của trình duyệt, nét căng tuyệt đối trên mọi độ phân giải và màn hình mật độ điểm ảnh cao (Retina / 4K).
+    - *Đồng bộ Design Tokens:* Nhãn sử dụng chuẩn font kỹ thuật `JetBrains Mono` (`--font-mono`), cỡ chữ, màu tương phản (`--hi`, `--mid`) và màu trạng thái thừa hưởng trực tiếp từ file `vendor/token.css`, đồng nhất hoàn toàn với giao diện 2D.
+    - *Hiển thị chi tiết đa tầng:* Dễ dàng định dạng cấu trúc nhãn đa thông tin gồm: định danh tài khoản (`provider:account`), vai trò điều phối (`giao việc`, `chốt`, `nhận rồi giao`) và tên bước công việc đang thực thi.
+
 ---
 
 **Concept 3D — "phòng điều khiển đội agent":**
