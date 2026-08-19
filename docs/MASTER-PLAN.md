@@ -130,6 +130,14 @@ Bốn mặt × N tính năng là công thức phình bảo trì. Ba luật sau l
    luồng event** có schema/version. Cấm UI tự suy trạng thái bằng timer hay
    animation — trạng thái nào không có event thì không được hiển thị.
 
+### Ba bất biến giao diện (UI Invariants — bắt buộc tuân thủ)
+
+Nguồn từ mục "Ràng buộc" của dashboard (`.claude/skills/sagent-dashboard/SKILL.md`):
+
+1. **INV-UI-1 (Offline tuyệt đối lúc runtime):** KHÔNG load `three.js` từ CDN, KHÔNG load font từ Google Fonts, KHÔNG gọi API ngoài để render. Mọi asset phải **vendor** (tải về nhét vào bundle nhúng qua Go `embed`). *(Bài học thật: bản prototype để three.js ở cdnjs → màn 3D trắng trơn trong môi trường thật).*
+2. **INV-UI-2 (Vanilla, không Node build):** HTML/CSS/JS thuần. Không React/Vue/bundler. Toàn bộ assets giao diện nhúng trực tiếp qua Go `embed`.
+3. **INV-UI-3 (three.js chỉ MỘT file core):** KHÔNG dùng addon `OrbitControls`, `EffectComposer`, `UnrealBloomPass` — chúng kéo theo nhiều file, dễ vỡ khi nhúng. → Camera orbit **tự viết tay** (drag xoay azimuth/polar, wheel zoom `minDistance 6`/`maxDistance 40`, clamp polar ≤ `Math.PI*0.49`, giữ damping + autoRotate khi không reduce-motion); "bloom" (quầng sáng) làm bằng **additive glow sprite** (sprite radial-gradient chồng lớp), không post-processing.
+
 ### Mặt nào cũng bật/tắt được
 
 - Lõi chạy **không cần mặt nào cả** (headless, cho CI/script).
