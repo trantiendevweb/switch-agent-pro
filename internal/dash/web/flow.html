@@ -4,68 +4,72 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Switch-Agent-Pro — Workflow</title>
+<!-- Màu và font khai MỘT chỗ: vendor/token.css. Trang không được tự khai lại
+     --run/--pending/--done/--idle/--error — có test giữ (designsystem_test.go). -->
+<link rel="stylesheet" href="vendor/token.css" />
 <style>
-  :root{
-    --bg:#0F172A;--panel:#141d31;--muted:#272F42;--fg:#F8FAFC;--sub:#94A3B8;--border:#334155;
-    --run:#22C55E;--warn:#F59E0B;--limit:#EF4444;--api:#4285F4;--purple:#8B5CF6;
-    --ease:cubic-bezier(0.16,1,0.3,1);
-  }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
-    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--hi);
+    font-family:var(--font-body);font-size:14px;
     -webkit-font-smoothing:antialiased}
   button,input,select,textarea{font:inherit;color:inherit}
   /* khung */
   #app{display:grid;grid-template-columns:210px 1fr 300px;grid-template-rows:52px 1fr;height:100%}
   #top{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:0 14px;
-    background:rgba(15,23,42,.9);border-bottom:1px solid var(--border);z-index:5}
-  .brand{display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap}
+    background:rgba(12,14,23,.92);border-bottom:1px solid var(--line);z-index:5}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;
+    font-family:var(--font-display)}
   .sp{flex:1}
-  .btn{cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:8px;
-    padding:7px 12px;font-size:12.5px;font-weight:600;text-decoration:none;color:var(--fg);
+  .btn{cursor:pointer;background:transparent;border:1px solid var(--line-2);border-radius:8px;
+    padding:7px 12px;font-size:12.5px;font-weight:600;text-decoration:none;color:var(--hi);
     display:inline-flex;align-items:center;gap:6px;transition:all .15s var(--ease)}
-  .btn:hover{border-color:var(--run);background:rgba(34,197,94,.1)}
-  .btn.on{border-color:var(--run);background:rgba(34,197,94,.14);color:var(--run)}
-  .btn.go{background:var(--run);color:#06240f;border-color:var(--run);font-weight:700}
+  /* Nut la KHUNG: don sac. Hover doi do sang vien, khong nhay sang mau trang thai. */
+  .btn:hover{border-color:var(--hi);background:rgba(255,255,255,.06)}
+  .btn.on{border-color:var(--hi);background:rgba(255,255,255,.09);color:var(--hi)}
+  .btn.go{background:var(--hi);color:var(--void);border-color:var(--hi);font-weight:700}
   .btn.go:hover{opacity:.9}
-  .btn.danger{color:#fca5a5;border-color:rgba(239,68,68,.45)}
-  .btn.danger:hover{background:rgba(239,68,68,.12)}
-  select.pick{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12.5px}
+  /* Rieng hanh dong pha huy giu do: do la canh bao, khong phai trang tri. */
+  .btn.danger{color:var(--error);border-color:rgba(255,93,121,.45)}
+  .btn.danger:hover{background:rgba(255,93,121,.12)}
+  .btn:focus-visible,.pal:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+  select.pick{font-family:var(--font-mono);background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:7px 10px;font-size:12.5px}
   /* cột trái: bảng node */
-  #left{background:var(--panel);border-right:1px solid var(--border);overflow:auto;padding:12px}
+  #left{background:var(--panel);border-right:1px solid var(--line-2);overflow:auto;padding:12px}
   .lbl{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--sub);margin:14px 0 8px}
+    color:var(--mid);margin:14px 0 8px}
   .lbl:first-child{margin-top:0}
-  .pal{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--border);
+  .pal{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--line-2);
     border-radius:9px;background:rgba(255,255,255,.02);cursor:grab;margin-bottom:7px;font-size:13px}
-  .pal:hover{border-color:var(--run);background:rgba(34,197,94,.08)}
+  .pal:hover{border-color:var(--hi);background:rgba(255,255,255,.05)}
   .pal .ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none}
-  .pal small{display:block;color:var(--sub);font-size:11px;font-weight:400}
+  .pal small{display:block;color:var(--mid);font-size:11px;font-weight:400}
   /* canvas */
   #mid{position:relative;overflow:hidden;background:
-    radial-gradient(circle at 1px 1px, rgba(148,163,184,.16) 1px, transparent 0) 0 0/22px 22px, var(--bg)}
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.10) 1px, transparent 0) 0 0/22px 22px, var(--void)}
   #world{position:absolute;inset:0;transform-origin:0 0}
   #edges{position:absolute;inset:0;overflow:visible;pointer-events:none}
   #edges path{pointer-events:stroke;cursor:pointer}
-  .node{position:absolute;width:230px;background:var(--panel);border:1px solid var(--border);
+  .node{position:absolute;width:230px;background:var(--panel);border:1px solid var(--line-2);
     border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.45);user-select:none}
-  .node.sel{border-color:var(--run);box-shadow:0 0 0 2px rgba(34,197,94,.35),0 8px 20px rgba(0,0,0,.5)}
+  .node.sel{border-color:var(--core);box-shadow:0 0 0 2px rgba(143,178,255,.35),0 8px 20px rgba(0,0,0,.5)}
   .node .bar{height:4px;border-radius:12px 12px 0 0}
   .node .hd{display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:grab;font-weight:600;font-size:13px}
   .node .hd .ic{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;flex:none}
   .node .hd .ty{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.06em;
-    text-transform:uppercase;color:var(--sub)}
-  .node .bd{padding:0 11px 11px;font-size:12px;color:var(--sub);line-height:1.45;
+    text-transform:uppercase;color:var(--mid)}
+  .node .bd{padding:0 11px 11px;font-size:12px;color:var(--mid);line-height:1.45;
     max-height:74px;overflow:hidden;word-break:break-word;white-space:pre-wrap}
   .node .st{position:absolute;top:-9px;right:-9px;width:20px;height:20px;border-radius:50%;
-    display:none;place-items:center;font-size:11px;font-weight:700;border:2px solid var(--bg)}
-  .node.s-done .st{display:grid;background:var(--run);color:#06240f}
-  .node.s-running .st{display:grid;background:var(--api);color:#fff}
-  .node.s-waiting .st{display:grid;background:var(--warn);color:#3a2a00}
-  .node.s-failed .st{display:grid;background:var(--limit);color:#fff}
-  .port{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--bg);
-    border:2px solid var(--sub);top:50%;transform:translateY(-50%);cursor:crosshair;z-index:2}
-  .port:hover,.port.hot{border-color:var(--run);background:rgba(34,197,94,.35)}
+    display:none;place-items:center;font-size:11px;font-weight:700;border:2px solid var(--void)}
+  /* Huy hieu trang thai la cho DUY NHAT tren mot node duoc phep co mau —
+     don diem nhan vao mot cho, nhin phat biet buoc nao dang chay. */
+  .node.s-done .st{display:grid;background:var(--done);color:var(--void)}
+  .node.s-running .st{display:grid;background:var(--run);color:var(--void)}
+  .node.s-waiting .st{display:grid;background:var(--pending);color:var(--void)}
+  .node.s-failed .st{display:grid;background:var(--error);color:var(--void)}
+  .port{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--void);
+    border:2px solid var(--lo);top:50%;transform:translateY(-50%);cursor:crosshair;z-index:2}
+  .port:hover,.port.hot{border-color:var(--core);background:rgba(143,178,255,.35)}
   .port.in{left:-7px} .port.out{right:-7px}
   /* Vùng chạm rộng hơn phần nhìn thấy — CHỈ trên thiết bị cảm ứng.
      Trên desktop mà nới ra thì bấm giữa-trái node sẽ hoá thành kéo dây. */
@@ -76,39 +80,39 @@
       width:38px;height:38px;border-radius:50%}
   }
   .btn:disabled{opacity:.35;cursor:default}
-  .btn:disabled:hover{border-color:var(--border);background:transparent}
+  .btn:disabled:hover{border-color:var(--line-2);background:transparent}
   /* cột phải */
-  #right{background:var(--panel);border-left:1px solid var(--border);overflow:auto;padding:14px}
+  #right{background:var(--panel);border-left:1px solid var(--line-2);overflow:auto;padding:14px}
   .fld{margin-bottom:11px}
-  .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:4px}
-  .fld input,.fld textarea,.fld select{width:100%;background:var(--bg);border:1px solid var(--border);
+  .fld label{display:block;font-size:11px;color:var(--mid);margin-bottom:4px}
+  .fld input,.fld textarea,.fld select{width:100%;background:var(--void);border:1px solid var(--line-2);
     border-radius:8px;padding:8px 10px;font-size:13px}
   .fld textarea{min-height:92px;resize:vertical;line-height:1.5}
-  .fld input:focus,.fld textarea:focus,.fld select:focus{outline:none;border-color:var(--run)}
+  .fld input:focus,.fld textarea:focus,.fld select:focus{outline:none;border-color:var(--core)}
   .two{display:flex;gap:9px}.two>*{flex:1}
   .chk{display:flex;align-items:center;gap:8px;font-size:13px;margin:10px 0}
-  .hint{font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:6px}
-  .hint code{background:var(--muted);padding:1px 5px;border-radius:4px;font-size:.92em}
+  .hint{font-size:11.5px;color:var(--mid);line-height:1.5;margin-top:6px}
+  .hint code{background:var(--panel-2);padding:1px 5px;border-radius:4px;font-size:.92em}
   /* nhật ký + thông báo */
   #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:30;
     padding:10px 16px;border-radius:10px;font-size:13px;display:none;max-width:80vw}
-  #toast.ok{background:rgba(34,197,94,.16);border:1px solid rgba(34,197,94,.5);color:#bbf7d0}
-  #toast.err{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#fecaca}
+  #toast.ok{background:rgba(47,224,160,.16);border:1px solid rgba(47,224,160,.5);color:var(--run)}
+  #toast.err{background:rgba(255,93,121,.16);border:1px solid rgba(255,93,121,.5);color:var(--error)}
   #log{position:absolute;left:12px;bottom:12px;width:340px;max-height:150px;overflow:auto;
-    background:rgba(20,29,49,.92);border:1px solid var(--border);border-radius:10px;padding:8px 11px;
-    font-family:ui-monospace,Consolas,monospace;font-size:11.5px;backdrop-filter:blur(10px)}
-  #log div{padding:2px 0;border-bottom:1px solid rgba(51,65,85,.5)}
-  #log .t{color:var(--sub);margin-right:6px}
+    background:rgba(12,14,23,.92);border:1px solid var(--line);border-radius:10px;padding:8px 11px;
+    font-family:var(--font-mono);font-size:11.5px;backdrop-filter:blur(10px)}
+  #log div{padding:2px 0;border-bottom:1px solid var(--line)}
+  #log .t{color:var(--lo);margin-right:6px}
   #zoom{position:absolute;right:12px;bottom:12px;display:flex;gap:6px}
-  #zoom .btn{padding:6px 10px;background:rgba(20,29,49,.92)}
-  #empty{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:var(--sub);text-align:center}
+  #zoom .btn{padding:6px 10px;background:rgba(12,14,23,.92)}
+  #empty{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:var(--mid);text-align:center}
   @media(max-width:900px){
     #app{grid-template-columns:1fr;grid-template-rows:52px auto 1fr}
-    #left{display:flex;gap:7px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--border);padding:9px}
+    #left{display:flex;gap:7px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line-2);padding:9px}
     #left .lbl{display:none}
     .pal{margin:0;white-space:nowrap}.pal small{display:none}
     #right{position:fixed;right:0;top:0;bottom:0;width:290px;transform:translateX(100%);
-      transition:transform .3s var(--ease);z-index:20;border-left:1px solid var(--border)}
+      transition:transform .3s var(--ease);z-index:20;border-left:1px solid var(--line-2)}
     #right.open{transform:none}
     #log{display:none}
   }
@@ -128,7 +132,7 @@
 <div id="app">
   <div id="top">
     <div class="brand">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="#22C55E" stroke="none"/></svg>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
       Workflow
     </div>
     <select class="pick" id="pick"></select>
@@ -143,7 +147,7 @@
       <button class="btn" id="kho" title="Xem kế hoạch: đợt nào chạy song song, bước nào bằng tài khoản nào, prompt đã thay biến. Không bật agent, không ghi vào sổ.">Chạy khan</button>
       <button class="btn go" id="run"><span id="run-ic"></span> Chay workflow</button>
     <div class="sp"></div>
-    <span id="conn" style="font-size:12px;color:var(--sub)">…</span>
+    <span id="conn" style="font-size:12px;color:var(--mid)">…</span>
     <a class="btn" id="n2d" href="./">2D</a>
     <a class="btn" id="n3d" href="3d.html">3D</a>
     <a class="btn" href="/docs/">Plan</a>
@@ -154,52 +158,59 @@
 
   <style>
     #ketqua{position:absolute;right:12px;bottom:12px;width:380px;max-height:46%;overflow:auto;
-      background:rgba(20,22,28,.95);border:1px solid #2c3040;border-radius:8px;font-size:12px;z-index:6}
-    #ketqua-tieu{padding:6px 10px;border-bottom:1px solid #2c3040;font-weight:600;position:sticky;top:0;
-      background:rgba(20,22,28,.98)}
+      background:rgba(12,14,23,.95);border:1px solid var(--line-2);border-radius:8px;font-size:12px;z-index:6}
+    #ketqua-tieu{padding:6px 10px;border-bottom:1px solid var(--line);font-weight:600;position:sticky;top:0;
+      background:rgba(12,14,23,.98)}
     #ketqua-than{padding:6px 10px}
     #ketqua .b{margin-bottom:8px}
-    #ketqua .b b{color:#9fd0ff}
-    #ketqua pre{margin:3px 0 0;white-space:pre-wrap;word-break:break-word;color:#cfd4e0;
-      background:#12141a;border-radius:5px;padding:5px 7px;max-height:150px;overflow:auto}
-    #ketqua .trong{color:#e0a04a}
-    #ketqua .mu{color:#8b93a7}
-    /* Nhan chi phi: mau tien (xanh --run) de doc luot thay ngay "ton bao nhieu". */
-    #ketqua .tien{color:var(--run);font-variant-numeric:tabular-nums}
-    #ketqua .b.tong{border-bottom:1px solid #2c3040;padding-bottom:6px;font-weight:600}
+    /* Ten buoc la dinh danh may sinh — mono. */
+    #ketqua .b b{color:var(--hi);font-family:var(--font-mono)}
+    #ketqua pre{margin:3px 0 0;white-space:pre-wrap;word-break:break-word;color:var(--hi);
+      font-family:var(--font-mono);
+      background:var(--void);border-radius:5px;padding:5px 7px;max-height:150px;overflow:auto}
+    #ketqua .trong{color:var(--pending)}
+    #ketqua .mu{color:var(--mid)}
+    /* Chi phi la SO, khong phai trang thai — nen di mono chu khong di mau.
+       Truoc day no to xanh --run, tuc mat doc no nhu "dang chay". */
+    #ketqua .tien{color:var(--hi);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+    #ketqua .b.tong{border-bottom:1px solid var(--line);padding-bottom:6px;font-weight:600}
     /* Kế hoạch chạy khan: cùng ngôn ngữ hình với #ketqua, đặt bên trái để không
        che kết quả lượt chạy thật đang diễn ra. */
     #kehoach{position:absolute;left:12px;top:12px;width:420px;max-height:72%;overflow:auto;
-      background:rgba(20,22,28,.97);border:1px solid #2c3040;border-radius:8px;font-size:12px;z-index:7}
+      background:rgba(12,14,23,.97);border:1px solid var(--line-2);border-radius:8px;font-size:12px;z-index:7}
     #kehoach-tieu{display:flex;align-items:center;justify-content:space-between;gap:8px;
-      padding:6px 10px;border-bottom:1px solid #2c3040;font-weight:600;position:sticky;top:0;
-      background:rgba(20,22,28,.99)}
+      padding:6px 10px;border-bottom:1px solid var(--line);font-weight:600;position:sticky;top:0;
+      background:rgba(12,14,23,.99)}
     #kehoach-than{padding:8px 10px}
     #kehoach .dot{margin-bottom:10px}
-    #kehoach .dot-tieu{color:#9fd0ff;font-weight:600;margin-bottom:3px}
-    #kehoach .dot-tieu .song{color:var(--warn)}
-    #kehoach .b{padding:3px 0 3px 8px;border-left:2px solid #2c3040;margin-bottom:4px}
-    #kehoach .mu{color:#8b93a7}
-    #kehoach .tk{color:var(--run)}
-    #kehoach pre{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;color:#cfd4e0;
-      background:#12141a;border-radius:5px;padding:4px 6px;max-height:96px;overflow:auto}
-    #kehoach .bao{color:#e0a04a}
-    #kehoach .do{color:#EF4444}
-    #kehoach .tong{border-top:1px solid #2c3040;padding-top:6px;margin-top:6px;font-weight:600}
+    #kehoach .dot-tieu{color:var(--hi);font-weight:600;margin-bottom:3px}
+    #kehoach .dot-tieu .song{color:var(--pending)}
+    #kehoach .b{padding:3px 0 3px 8px;border-left:2px solid var(--line-2);margin-bottom:4px}
+    #kehoach .mu{color:var(--mid)}
+    /* Ten tai khoan provider:account — du lieu may, mono. */
+    #kehoach .tk{color:var(--hi);font-family:var(--font-mono)}
+    #kehoach pre{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;color:var(--hi);
+      font-family:var(--font-mono);
+      background:var(--void);border-radius:5px;padding:4px 6px;max-height:96px;overflow:auto}
+    #kehoach .bao{color:var(--pending)}
+    #kehoach .do{color:var(--error)}
+    #kehoach .tong{border-top:1px solid var(--line);padding-top:6px;margin-top:6px;font-weight:600}
     /* Cham trang thai thay cho ky tu la: doi mau duoc, chinh kich thuoc duoc,
        khong phu thuoc phong chu he thong. */
     .m{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
-    .m.ok{background:var(--run)} .m.run{background:var(--run);animation:tho 1.1s ease-in-out infinite}
-    .m.wait{background:var(--warn)} .m.bad{background:#EF4444} .m.skip{background:#64748B}
+    .m.ok{background:var(--done)} .m.run{background:var(--run);animation:tho 1.1s ease-in-out infinite}
+    .m.wait{background:var(--pending)} .m.bad{background:var(--error)} .m.skip{background:var(--idle)}
     @keyframes tho{0%,100%{opacity:.35}50%{opacity:1}}
     @media (prefers-reduced-motion: reduce){ .m.run{animation:none} }
-    .node .vt{padding:2px 10px 0;font-size:10.5px;color:#7fd1a6;letter-spacing:.2px}
+    /* Vai tro suy tu do thi — chu, khong phai trang thai. Giu don sac. */
+    .node .vt{padding:2px 10px 0;font-size:10.5px;color:var(--mid);letter-spacing:.2px}
     .node .ai{padding:3px 10px 0;display:flex;gap:5px;flex-wrap:wrap}
     .node .ai span{font-size:10px;padding:1px 6px;border-radius:4px;line-height:1.5}
-    .node .acc{background:#1d3a5c;color:#9fd0ff;font-weight:600}
-    .node .acc.chua{background:#4a2b2b;color:#f0a0a0;font-weight:400}
-    .node .quyen{background:#4a3a1a;color:#f0c060}
-    .node .wt{background:#26303f;color:#93a0b8}
+    /* provider:account — du lieu may, mono, va khung don sac. */
+    .node .acc{background:rgba(255,255,255,.07);color:var(--hi);font-weight:600;font-family:var(--font-mono)}
+    .node .acc.chua{background:rgba(255,93,121,.14);color:var(--error);font-weight:400;font-family:var(--font-body)}
+    .node .quyen{background:rgba(246,178,61,.14);color:var(--pending)}
+    .node .wt{background:rgba(255,255,255,.06);color:var(--mid)}
   </style>
   <div id="mid">
     <div id="world">
@@ -237,14 +248,19 @@ const $ = s => document.querySelector(s);
 $('#n2d').href='./'; $('#n3d').href='3d.html';
 
 // ---- loại node ----
+// Loai node KHONG to mau. Truoc day moi loai mot mau (#22C55E/#4285F4/#F59E0B/
+// #8B5CF6/#06B6D4) — bay mau tren khung, nen huy hieu trang thai o goc node phai
+// canh tranh voi chinh cai khung dang do no. Design system: mau chi cho trang
+// thai. Loai van phan biet duoc bang HINH icon + ten + nhan chu hoa ben phai.
+const MAU_LOAI = '#969DB0'; // = --mid
 const TYPES = {
-  agent:  {name:'Agent',   color:'#22C55E', desc:'Giao việc cho coding agent', icon:'M4 6h16M4 12h10M4 18h7'},
-  shell:  {name:'Lệnh',    color:'#4285F4', desc:'Chạy lệnh (argv)',           icon:'M4 17l6-5-6-5M12 19h8'},
-  approve:{name:'Duyệt',   color:'#F59E0B', desc:'Dừng chờ người quyết',       icon:'M9 12l2 2 4-4M12 3l9 4v6c0 4-4 7-9 8-5-1-9-4-9-8V7z'},
-  notify: {name:'Báo',     color:'#8B5CF6', desc:'Nhắn một dòng',              icon:'M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4'},
-  test:   {name:'Test',    color:'#06B6D4', desc:'Chạy commands.test',         icon:'M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3'},
-  lint:   {name:'Lint',    color:'#06B6D4', desc:'Chạy commands.lint',         icon:'M4 7h16M4 12h10M4 17h13M18 15l2 2 3-3'},
-  review: {name:'Review',  color:'#22C55E', desc:'Agent đọc kết quả trước đó', icon:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6'},
+  agent:  {name:'Agent',   color:MAU_LOAI, desc:'Giao việc cho coding agent', icon:'M4 6h16M4 12h10M4 18h7'},
+  shell:  {name:'Lệnh',    color:MAU_LOAI, desc:'Chạy lệnh (argv)',           icon:'M4 17l6-5-6-5M12 19h8'},
+  approve:{name:'Duyệt',   color:MAU_LOAI, desc:'Dừng chờ người quyết',       icon:'M9 12l2 2 4-4M12 3l9 4v6c0 4-4 7-9 8-5-1-9-4-9-8V7z'},
+  notify: {name:'Báo',     color:MAU_LOAI, desc:'Nhắn một dòng',              icon:'M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4'},
+  test:   {name:'Test',    color:MAU_LOAI, desc:'Chạy commands.test',         icon:'M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3'},
+  lint:   {name:'Lint',    color:MAU_LOAI, desc:'Chạy commands.lint',         icon:'M4 7h16M4 12h10M4 17h13M18 15l2 2 3-3'},
+  review: {name:'Review',  color:MAU_LOAI, desc:'Agent đọc kết quả trước đó', icon:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6'},
 };
 const STATE_MARK = {done:'<i class="m ok"></i>', running:'<i class="m run"></i>', waiting:'<i class="m wait"></i>', failed:'<i class="m bad"></i>', skipped:'<i class="m skip"></i>'};
 
@@ -416,7 +432,7 @@ const LOAI_AGENT = {agent:1, review:1};
 function vaiTro(n){
   const nhan = (n.needs||[]).length;
   const giao = nodes.filter(x=>(x.needs||[]).includes(n.id)).length;
-  const v = '#7fd1a6';
+  const v = 'currentColor'; // icon vai tro an theo mau chu cua .vt (--mid)
   if(!nhan && giao) return icon(IC.vua, v, 12)+' giao viec cho '+giao+' buoc';
   if(nhan && !giao) return icon(IC.dich, v, 12)+' nhan viec · buoc cuoi nhanh';
   if(nhan && giao)  return icon(IC.quaLai, v, 12)+' nhan viec roi giao tiep cho '+giao+' buoc';
@@ -427,7 +443,7 @@ function render(){
   // node
   world.querySelectorAll('.node').forEach(e=>e.remove());
   nodes.forEach(n=>{
-    const d = TYPES[n.type] || {name:n.type,color:'#94A3B8',icon:'M4 6h16'};
+    const d = TYPES[n.type] || {name:n.type,color:MAU_LOAI,icon:'M4 6h16'};
     const el=document.createElement('div');
     el.className='node'+(sel===n.id?' sel':'')+(liveStates[n.id]?' s-'+liveStates[n.id]:'');
     el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.dataset.id=n.id;
@@ -442,13 +458,13 @@ function render(){
       '<div class="bar" style="background:'+d.color+'"></div>'+
       '<div class="st">'+(STATE_MARK[liveStates[n.id]]||'')+'</div>'+
       '<div class="hd"><span class="ic" style="background:'+d.color+'22">'+icon(d.icon,d.color,13)+'</span>'+
-        esc(n.id)+(n.foreach?'<span class="ty" style="color:var(--warn)">⟳ lặp</span>':'')+
+        esc(n.id)+(n.foreach?'<span class="ty" style="color:var(--pending)">⟳ lặp</span>':'')+
         '<span class="ty">'+d.name+'</span></div>'+
       (nhan ? '<div class="vt">'+nhan+'</div>' : '')+
       (LOAI_AGENT[n.type] ? '<div class="ai">'+(n.profile
           ? '<span class="acc">'+esc(n.profile)+'</span>'
           : '<span class="acc chua">chưa gán tài khoản</span>')+
-        (n.tuDuyetQuyen?'<span class="quyen">'+icon(IC.canhBao,'#f0c060',10)+' toan quyen</span>':'')+
+        (n.tuDuyetQuyen?'<span class="quyen">'+icon(IC.canhBao,'currentColor',10)+' toan quyen</span>':'')+
         (n.worktree?'<span class="wt">worktree riêng</span>':'')+'</div>' : '')+
       '<div class="bd">'+esc(body||'—')+'</div>'+
       '<div class="port in" data-port="in"></div><div class="port out" data-port="out"></div>';
@@ -472,7 +488,7 @@ function drawEdges(){
     if(!a||!b) return;
     const dx=Math.max(40,Math.abs(b.x-a.x)*0.5);
     s+='<path d="M '+a.x+' '+a.y+' C '+(a.x+dx)+' '+a.y+', '+(b.x-dx)+' '+b.y+', '+b.x+' '+b.y+'" '+
-       'stroke="#475569" stroke-width="2" fill="none" data-from="'+esc(from)+'" data-to="'+esc(n.id)+'"/>';
+       'stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none" data-from="'+esc(from)+'" data-to="'+esc(n.id)+'"/>';
   }));
   edges.innerHTML = s + (tmpEdge||'');
 }
@@ -511,7 +527,7 @@ window.addEventListener('pointermove', e=>{
     const a=portPos(link.from, link.kind), p=toWorld(e.clientX,e.clientY);
     if(a){ const dx=Math.max(40,Math.abs(p.x-a.x)*0.5);
       tmpEdge='<path d="M '+a.x+' '+a.y+' C '+(a.x+dx)+' '+a.y+', '+(p.x-dx)+' '+p.y+', '+p.x+' '+p.y+
-              '" stroke="#22C55E" stroke-width="2" stroke-dasharray="5 4" fill="none"/>';
+              '" stroke="#8FB2FF" stroke-width="2" stroke-dasharray="5 4" fill="none"/>';
       drawEdges(); }
     document.querySelectorAll('.port').forEach(el=>el.classList.remove('hot'));
     const over=document.elementFromPoint(e.clientX,e.clientY);
@@ -603,7 +619,7 @@ function inspector(){
       '<div class="fld"><label>Biến mặc định (mỗi dòng: ten=giá trị)</label>'+
         '<textarea id="i-vars">'+esc(Object.entries(flowVars).map(([k,v])=>k+'='+v).join('\n'))+'</textarea></div>'+
       '<div class="hint">Dùng trong prompt bằng <code>{{ten}}</code>. Kết quả bước trước: <code>{{steps.&lt;id&gt;.output&gt;}}</code></div>'+
-      (builtin?'<div class="hint" style="color:var(--warn)">Đây là flow mẫu dựng sẵn. Lưu lại sẽ tạo bản của bạn đè lên nó.</div>':'')+
+      (builtin?'<div class="hint" style="color:var(--pending)">Đây là flow mẫu dựng sẵn. Lưu lại sẽ tạo bản của bạn đè lên nó.</div>':'')+
       (flowName && !builtin ? '<button class="btn danger" style="margin-top:14px;width:100%" id="i-del">Xoá workflow này</button>':'');
     const nm=$('#i-name'), ds=$('#i-desc'), vs=$('#i-vars');
     if(nm) nm.oninput=e=>{flowName=e.target.value.trim(); dirty=true;};
@@ -639,7 +655,7 @@ function inspector(){
         '<div class="hint">Ai làm bước này. Bỏ trống thì dùng --profile lúc chạy.</div></div>'+
         '<div class="fld"><label><input type="checkbox" id="p-quyen"'+(n.tuDuyetQuyen?' checked':'')+'> '+
         'Cho agent tự duyệt mọi quyền</label>'+
-        '<div class="hint" style="color:var(--warn)">'+icon(IC.canhBao,'#f0c060',10)+' Agent duoc xoa file va chay lenh tuy y. '+
+        '<div class="hint" style="color:var(--pending)">'+icon(IC.canhBao,'currentColor',10)+' Agent duoc xoa file va chay lenh tuy y. '+
         'Không bật thì nhiều agent không đọc nổi file nào ở chế độ headless. '+
         'Luôn chạy trong worktree riêng nên không đụng cây làm việc chính.</div></div>'+
       '<div class="hint">Dùng <code>{{steps.&lt;id&gt;.output}}</code> để nhận kết quả bước trước.</div>';
