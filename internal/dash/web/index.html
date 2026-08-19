@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Switch-Agent-Pro — Dashboard</title>
 <!-- Màu và font khai MỘT chỗ: vendor/token.css. Trang không được tự khai lại
-     --run/--pending/--done/--idle/--error — có test giữ (designsystem_test.go). -->
+     các biến trạng thái — có test giữ (designsystem_test.go). -->
 <link rel="stylesheet" href="vendor/token.css" />
 <style>
   :root{
@@ -18,7 +18,7 @@
   a{color:var(--link)}
   /* Dữ liệu máy đi mono, kể cả khi nằm lọt giữa câu văn. */
   code{font-family:var(--font-mono);font-size:.9em}
-  .wrap{max-width:1100px;margin:0 auto;padding:16px 16px calc(24px + var(--safe-b))}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 16px calc(24px + var(--safe-b))}
   header{display:flex;align-items:center;gap:12px;padding:6px 0 16px}
   header .b{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;
     font-family:var(--font-display)}
@@ -27,14 +27,15 @@
   #conn .d{width:9px;height:9px;border-radius:50%;background:var(--error)}
   #conn.on .d{background:var(--run)}
   h2{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mid);
-    margin:22px 0 10px;font-family:var(--font-display)}
+    margin:22px 0 10px;font-family:var(--font-display);display:flex;align-items:center;gap:8px}
+  h2 .dem{font-family:var(--font-mono);color:var(--lo);letter-spacing:0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
   /* Motion 6/10 (Standard) theo design system: thẻ nhẹ nhàng trồi lên khi tải.
      So le nhẹ để mắt đi từ trên xuống, KHÔNG dùng back.out vì đây là bảng dữ
      liệu dày (design system cấm: overshoot đọc như cẩu thả trên UI thông tin). */
   @keyframes vaosan{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  .grid > div{animation:vaosan .34s var(--ease) both}
-  .grid > div:nth-child(2){animation-delay:.06s}
+  .bento > div{animation:vaosan .34s var(--ease) both}
+  .bento > div:nth-child(2){animation-delay:.06s}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line)}
   th{color:var(--lo);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;white-space:nowrap}
@@ -57,8 +58,79 @@
   .btn:disabled{opacity:.4;cursor:default}
   .btn:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--core);outline-offset:2px}
   .empty{padding:16px;color:var(--mid);font-size:13px}
-  .grid{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start}
-  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+
+  /* ---------------------------------------------------------------- bento
+     Hạm đội chiếm chính · cột phải là Tổng quan + các ô điều khiển · Nhật ký
+     nằm dưới cùng, full-width.
+
+     Vì sao bỏ bảng phiên: bảng bắt mắt đọc theo HÀNG, mà cái người vận hành
+     cần là "liếc phát biết cả hạm đội đang thế nào" — tức đọc theo KHỐI. Bảng
+     5 cột với PID và đường dẫn dài cũng không xuống được điện thoại. */
+  .bento{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+  .duoi{margin-top:4px}
+  /* Dưới 720px: một cột. Card tự co nhờ auto-fill nên không cần luật riêng. */
+  @media(max-width:720px){.bento{grid-template-columns:1fr}}
+
+  /* ---- lưới card Hạm đội ---- */
+  .ham{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px}
+
+  /* ---- giải phẫu một card agent ----
+     rail (2px, quầng theo --c) · aura góc trên · hàng 1: glyph hãng +
+     provider:account + pill trạng thái · dòng việc · meta 3 ô · nút Dừng. */
+  .ag{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:12px 13px 11px 17px;animation:vaosan .3s var(--ease) both}
+  .ag .rail{position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c);
+    box-shadow:0 0 7px var(--c),0 0 16px var(--c)}
+  .ag .aura{position:absolute;right:-34px;top:-34px;width:112px;height:112px;border-radius:50%;
+    background:radial-gradient(circle,var(--c) 0%,transparent 68%);opacity:.15;pointer-events:none}
+  .ag .h1{display:flex;align-items:center;gap:8px;position:relative}
+  /* Glyph hãng mang sắc --prov-*: đó là DANH TÍNH, không phải trạng thái, nên
+     nó chỉ được xuất hiện ở đúng một chỗ này trên card. */
+  .ag .glyph{width:15px;height:15px;flex:none;color:var(--prov);display:block}
+  .ag .who{font-family:var(--font-mono);font-size:12.5px;color:var(--mid);min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ag .who b{color:var(--c);font-weight:600}
+  .ag .st{margin-left:auto;flex:none;display:flex;align-items:center;gap:5px;
+    font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--c);
+    background:rgba(255,255,255,.05);border-radius:999px;padding:2px 8px 2px 6px}
+  .ag .st i{width:6px;height:6px;border-radius:50%;background:var(--c);display:block;flex:none}
+  /* Nhịp thở CHỈ dành cho thứ đang sống. Chạy nhanh, chờ chậm — nhìn nhịp là
+     biết nó đang cày hay đang xếp hàng, khỏi phải đọc chữ. */
+  @keyframes nhiptho{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.78)}}
+  .ag.run .st i{animation:nhiptho 1.05s var(--ease) infinite}
+  .ag.pending .st i{animation:nhiptho 1.7s var(--ease) infinite}
+  .ag .viec{margin-top:9px;display:flex;gap:7px;align-items:baseline;font-size:12.5px}
+  .ag .verb{font-family:var(--font-mono);font-size:10px;letter-spacing:.07em;flex:none;
+    text-transform:uppercase;color:var(--lo)}
+  .ag .txt{color:var(--hi);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ag .meta{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .ag .meta .k{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--lo)}
+  .ag .meta .v{display:block;margin-top:2px;font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums;font-size:12px;color:var(--hi)}
+  /* Ô chưa đo được đi màu nhãn, không đi màu số: nó KHÔNG phải một con số. */
+  .ag .meta .v.trong{color:var(--lo);font-size:10.5px;letter-spacing:.02em}
+  /* Nút Dừng chỉ hiện khi rê chuột vào card đang sống — và khi tab tới nó bằng
+     bàn phím (focus-within), nếu không thì thao tác bàn phím sẽ bấm vào một nút
+     vô hình. */
+  .ag .dung{position:absolute;right:10px;bottom:10px;opacity:0;transform:translateY(3px);
+    pointer-events:none;transition:opacity .15s var(--ease),transform .15s var(--ease)}
+  .ag.song:hover .dung,.ag.song:focus-within .dung{opacity:1;transform:none;pointer-events:auto}
+
+  /* ---- Tổng quan: meter chạy bằng transition width ---- */
+  .tq{padding:13px 14px}
+  .tq .muc + .muc{margin-top:12px}
+  .tq .hang{display:flex;align-items:baseline;gap:8px}
+  .tq .nhan{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--lo)}
+  .tq .so{margin-left:auto;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+    font-size:14px;color:var(--hi)}
+  .tq .so.trong{font-size:11px;color:var(--lo)}
+  .meter{margin-top:6px;height:5px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+  .meter i{display:block;height:100%;width:0;border-radius:999px;background:var(--c);
+    transition:width .6s var(--ease)}
+  .tq .ghi{margin-top:13px;padding-top:11px;border-top:1px solid var(--line);
+    font-size:11.5px;line-height:1.55;color:var(--mid)}
+
   /* fleet form */
   form{padding:14px;display:grid;gap:10px}
   label{font-size:12px;color:var(--mid);display:block;margin-bottom:4px}
@@ -71,16 +143,29 @@
   .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--hi)}
   .go{background:var(--run);color:var(--void);border:0;font-weight:700;padding:9px;border-radius:8px;cursor:pointer;font-size:13px}
   .go:hover{opacity:.92}
+  .go:focus-visible{outline:2px solid var(--core);outline-offset:2px}
   .warnbox{font-size:12px;color:var(--pending);background:rgba(246,178,61,.08);
     border:1px solid rgba(246,178,61,.35);border-radius:8px;padding:8px 10px;line-height:1.45}
   /* Ba ô này in ra toàn dữ liệu máy: đường dẫn state.db, danh sách PID mồ côi,
      và số token/giây của lần gọi API. Sans-serif thì cột số không thẳng hàng. */
   #dbinfo,#quetout,#ai-out{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
-  /* event log — log là dữ liệu máy, cả khối đi mono */
-  #log{padding:10px 13px;max-height:340px;overflow:auto;font-family:var(--font-mono);font-size:12px}
-  #log .e{padding:3px 0;border-bottom:1px solid var(--line);white-space:pre-wrap;word-break:break-word}
+
+  /* ---- Nhật ký: full-width, mono, tô theo LOẠI sự kiện ---- */
+  #log{padding:10px 13px;max-height:300px;overflow:auto;font-family:var(--font-mono);font-size:12px}
+  #log .e{padding:3px 0;border-bottom:1px solid var(--line);white-space:pre-wrap;
+    word-break:break-word;color:var(--mid);animation:logvao .28s var(--ease) both}
+  #log .e:last-child{border-bottom:0}
+  @keyframes logvao{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   #log .t{color:var(--lo);margin-right:8px}
-  .e.warning{color:var(--pending)} .e.failure{color:var(--error)} .e.session\.started{color:var(--run)}
+  #log .a{color:var(--hi);margin-right:6px}
+  /* Loại sự kiện, KHÔNG phải mức độ: dispatch = vừa giao việc, queued = đang
+     xếp hàng/chờ duyệt, done = xong, error = hỏng, warn = còn chạy nhưng lệch. */
+  #log .e.dispatch{color:var(--core)}
+  #log .e.queued{color:var(--pending)}
+  #log .e.done{color:var(--done)}
+  #log .e.warn{color:var(--pending)}
+  #log .e.error{color:var(--error)}
+
   .banner{background:rgba(255,93,121,.1);border:1px solid rgba(255,93,121,.4);color:var(--error);
     border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;display:none}
   /* báo tin: trạng thái vẽ bằng CHẤM CSS, không dùng ký tự/emoji làm icon */
@@ -90,12 +175,17 @@
   .tele.on .d{background:var(--run)}
   .tele .phu{color:var(--mid);font-size:12px;line-height:1.5}
 
-  /* Có transition ở .btn/.go — máy nào bật "giảm chuyển động" thì phải tắt hết.
-     Chuyển động không phải trang trí với người bị rối loạn tiền đình. */
+  /* Có transition ở .btn/.go/.meter và animation ở nhịp thở + fade log — máy nào
+     bật "giảm chuyển động" thì phải tắt hết. Chuyển động không phải trang trí
+     với người bị rối loạn tiền đình: chấm nhấp nháy và thanh trượt là hai thứ
+     khó chịu nhất, nên tắt thẳng tên chúng chứ không chỉ trông vào luật chung. */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{
       animation-duration:.01ms !important;animation-iteration-count:1 !important;
       transition-duration:.01ms !important;scroll-behavior:auto !important}
+    .ag.run .st i,.ag.pending .st i{animation:none !important;opacity:1 !important;transform:none !important}
+    .meter i{transition:none !important}
+    #log .e{animation:none !important}
   }
 </style>
 </head>
@@ -146,16 +236,11 @@
     </div>
   </details>
 
-  <div class="grid">
+  <div class="bento">
     <div>
-      <h2>Phiên đang chạy · <span id="scount">0</span></h2>
-      <div class="card">
-        <table>
-          <thead><tr><th>#</th><th>Địa chỉ</th><th class="num">PID</th><th>Nơi làm việc</th><th></th></tr></thead>
-          <tbody id="sessions"></tbody>
-        </table>
-        <div id="s-empty" class="empty">Chưa có phiên nào. Dùng biểu mẫu bên phải để bật.</div>
-      </div>
+      <h2>Hạm đội <span class="dem" id="scount">0</span></h2>
+      <div id="ham" class="ham"></div>
+      <div id="ham-empty" class="card empty">Chưa có phiên nào. Dùng ô "Bật hạm đội" bên phải để bật.</div>
 
       <h2>Tài khoản</h2>
       <div class="card">
@@ -167,6 +252,29 @@
     </div>
 
     <div>
+      <h2>Tổng quan</h2>
+      <div class="card">
+        <div class="tq">
+          <div class="muc">
+            <div class="hang"><span class="nhan">Phiên đang chạy</span><span class="so" id="tq-phien">0</span></div>
+          </div>
+          <div class="muc">
+            <div class="hang"><span class="nhan">Token vào</span><span class="so" id="tq-vao">0</span></div>
+            <div class="meter" style="--c:var(--core)"><i id="m-vao"></i></div>
+          </div>
+          <div class="muc">
+            <div class="hang"><span class="nhan">Token ra</span><span class="so" id="tq-ra">0</span></div>
+            <div class="meter" style="--c:var(--link)"><i id="m-ra"></i></div>
+          </div>
+          <div class="muc">
+            <div class="hang"><span class="nhan">Chi phí đo được</span><span class="so" id="tq-usd">0</span></div>
+          </div>
+          <!-- Nói thẳng số này ở đâu ra. Ô nào chưa có nguồn thì ghi "chưa đo",
+               không lấp bằng số 0 — 0 đọc như "miễn phí", chưa đo là "không biết". -->
+          <div class="ghi" id="tq-nguon">chưa có số nào đo được.</div>
+        </div>
+      </div>
+
       <h2>Bật hạm đội</h2>
       <div class="card">
         <form id="fleet">
@@ -189,15 +297,21 @@
 
       <h2>Chạy workflow</h2>
       <div class="card">
-        <label>Quy trình</label>
-        <select id="wf-ten"></select>
-        <div id="wf-mota" class="hint" style="min-height:18px"></div>
-        <label>Việc cần làm <span class="hint">(thay biến <code>viec</code>, để trống thì dùng mặc định của flow)</span></label>
-        <input id="wf-viec" placeholder="Rà lại internal/store và chỉ ra chỗ đáng sửa nhất">
-        <div class="warn">Mỗi bước chạy bằng một tài khoản riêng, trong worktree riêng.
-          Xem <b>3D</b> để nhìn chúng làm việc, hoặc <b>Workflow</b> để sửa quy trình.</div>
-        <button id="wf-chay" class="go">Chạy workflow</button>
-        <div id="wf-ket" class="hint" style="margin-top:10px"></div>
+        <form id="wfform">
+          <div>
+            <label>Quy trình</label>
+            <select id="wf-ten"></select>
+          </div>
+          <div id="wf-mota" class="phu" style="min-height:18px;font-size:12px;color:var(--mid)"></div>
+          <div>
+            <label>Việc cần làm (thay biến <code>viec</code>, để trống thì dùng mặc định của flow)</label>
+            <input type="text" id="wf-viec" placeholder="Rà lại internal/store và chỉ ra chỗ đáng sửa nhất">
+          </div>
+          <div class="warnbox">Mỗi bước chạy bằng một tài khoản riêng, trong worktree riêng.
+            Xem <b>3D</b> để nhìn chúng làm việc, hoặc <b>Workflow</b> để sửa quy trình.</div>
+          <button id="wf-chay" class="go" type="submit">Chạy workflow</button>
+        </form>
+        <div id="wf-ket" class="empty" style="padding:0 14px 14px;font-size:12px"></div>
       </div>
 
       <h2>Hỏi thẳng AI API</h2>
@@ -229,18 +343,22 @@
       <h2>Máy &amp; dọn dẹp</h2>
       <div class="card">
         <div id="dbinfo" class="empty">đang đọc…</div>
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;padding:0 13px 13px">
           <button class="btn" id="quet">Quét tiến trình mồ côi</button>
           <button class="btn danger" id="quetgiet" disabled>Dừng những cái tìm được</button>
         </div>
         <div id="quetout" class="empty">Chưa quét.</div>
       </div>
+    </div>
+  </div>
 
-      <h2>Nhật ký sự kiện</h2>
-      <div class="card"><div id="log"></div></div>
-      <div style="margin-top:10px;text-align:right">
-        <button class="btn danger" id="stopall">Dừng hết</button>
-      </div>
+  <!-- Nhật ký full-width: một dòng log là một câu, cắt nó vào cột hẹp 340px thì
+       câu nào cũng xuống ba dòng và mắt không lướt được. -->
+  <div class="duoi">
+    <h2>Nhật ký sự kiện</h2>
+    <div class="card"><div id="log"></div></div>
+    <div style="margin-top:10px;text-align:right">
+      <button class="btn danger" id="stopall">Dừng hết</button>
     </div>
   </div>
 </div>
@@ -255,6 +373,14 @@ const $ = id => document.getElementById(id);
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 $('to3d').href = '3d.html';
 $('toflow').href = 'flow.html';
+
+// CHUA_DO: chữ dùng cho ô mà DTO chưa mang số về.
+//
+// /api/state trả về phiên CLI với đúng id/addr/pid/worktree/log/started — KHÔNG
+// có token, KHÔNG có chi phí. Nên hai ô đó trên card phải nói thẳng là chưa đo.
+// Điền 0 vào đấy là nói dối theo hướng dễ chịu nhất: 0 đọc như "phiên này miễn
+// phí", trong khi sự thật là nó đang tiêu hạn mức mà chưa ai đếm.
+const CHUA_DO = 'chưa đo';
 
 // ---- ba mặt mới: AI API, quét mồ côi, thông tin DB ----
 //
@@ -337,6 +463,7 @@ async function napDB(){
   try{
     const d = await api('/api/db');
     $('dbinfo').className = '';
+    $('dbinfo').style.padding = '13px';
     $('dbinfo').textContent = 'state.db · schema v' + d.schema +
       (d.can_nang_cap ? ' (bản binary này biết tới v' + d.schema_moi + ' — sẽ nâng khi mở)' : ' — mới nhất') +
       ' · ' + d.duong_dan;
@@ -346,7 +473,7 @@ async function napDB(){
 let moCoiCo = 0;
 async function quet(giet){
   const out = $('quetout');
-  out.className = ''; out.textContent = 'đang quét…';
+  out.className = ''; out.style.padding = '13px'; out.textContent = 'đang quét…';
   try{
     const d = await api('/api/quet', giet ? {method:'POST', body: JSON.stringify({giet:true})} : undefined);
     moCoiCo = (d.muc||[]).reduce((n,m)=> n + (m.procs||[]).length, 0);
@@ -367,15 +494,21 @@ async function quet(giet){
 $('quet').onclick = () => quet(false);
 $('quetgiet').onclick = () => { if(confirm('Dừng ' + moCoiCo + ' tiến trình đã tìm được?')) quet(true); };
 
+// aiDo: token của những lần hỏi AI API TRONG PHIÊN XEM NÀY. Nó là số thật do
+// server trả về (usage.vao/usage.ra), nên được phép vào meter Tổng quan.
+let aiDo = {vao:0, ra:0};
+
 $('aiform').onsubmit = async ev => {
   ev.preventDefault();
-  const out = $('ai-out'); out.className=''; out.textContent = 'đang hỏi…';
+  const out = $('ai-out'); out.className=''; out.style.padding='13px'; out.textContent = 'đang hỏi…';
   try{
     const d = await api('/api/ai', {method:'POST', body: JSON.stringify({
       route: $('ai-route').value, prompt: $('ai-prompt').value })});
     out.style.whiteSpace = 'pre-wrap';
     out.textContent = d.noi_dung + '\n\n— ' + d.model + ' · vào ' + d.usage.vao +
       ', ra ' + d.usage.ra + ', tổng ' + d.usage.tong + ' token · ' + d.giay.toFixed(1) + 's';
+    aiDo.vao += d.usage.vao||0; aiDo.ra += d.usage.ra||0;
+    veTongQuan();
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
 
@@ -390,20 +523,69 @@ function showErr(m){ const e=$('err');
 
 function elapsed(startUnix, now){ let s=Math.max(0,now-startUnix); if(s<60)return s+'s'; if(s<3600)return Math.floor(s/60)+'m'+(s%60)+'s'; return Math.floor(s/3600)+'h'+Math.floor((s%3600)/60)+'m'; }
 
+// hang/taiKhoan: tách provider:account. Hãng dùng để chọn sắc --prov-*, tài
+// khoản là phần được tô màu trạng thái trên card.
+function hang(addr){ const i=String(addr||'').indexOf(':'); return i<0 ? String(addr||'may') : String(addr).slice(0,i); }
+function taiKhoan(addr){ const i=String(addr||'').indexOf(':'); return i<0 ? '' : String(addr).slice(i+1); }
+
+// glyph: dấu nhận hãng, vẽ bằng SVG chứ không phải emoji (design system cấm
+// emoji làm icon: nó đổi hình theo hệ điều hành, không đổi màu theo trạng thái).
+// Mỗi hãng một hình khác nhau để nhận ra được cả khi in đen trắng.
+function glyph(h){
+  const p = {
+    claude:      `<path d="M8 1.5v13M1.5 8h13M3.4 3.4l9.2 9.2M12.6 3.4l-9.2 9.2"/>`,
+    codex:       `<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="1.9" fill="currentColor" stroke="none"/>`,
+    cursor:      `<path d="M8 1.8l6 11.4H2z"/>`,
+    gemini:      `<path d="M8 1.6l6.4 6.4L8 14.4 1.6 8z"/>`,
+    antigravity: `<path d="M8 1.6l6.4 6.4L8 14.4 1.6 8z"/><path d="M8 5.2v5.6"/>`,
+    grok:        `<path d="M2.6 2.6l10.8 10.8M13.4 2.6L2.6 13.4"/>`
+  }[h] || `<rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2"/>`;
+  return `<svg class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">${p}</svg>`;
+}
+
+// trangThai: phiên CLI chỉ có hai trạng thái ĐỌC ĐƯỢC từ DTO.
+//
+// pid > 0 nghĩa là có tiến trình thật đang chạy. pid <= 0 là phiên đã ghi sổ
+// nhưng chưa thấy tiến trình — đó là "pending", không phải "running". Ba trạng
+// thái còn lại (done/idle/error) không suy ra được từ /api/state nên trang này
+// KHÔNG bịa ra chúng: phiên đã dừng thì biến khỏi danh sách, và biến mất là câu
+// trả lời trung thực hơn một cái card xám nằm lại.
+function trangThai(s){ return (s.pid > 0) ? 'running' : 'pending'; }
+
 let profiles=[];
 function render(state){
   const now = state.now;
-  // sessions
-  const tb=$('sessions'); tb.innerHTML='';
-  (state.sessions||[]).forEach(s=>{
-    const where = s.worktree ? ('<code>'+s.worktree.split(/[\\/]/).slice(-2).join('/')+'</code>') : '<span style="color:var(--mid)">thư mục hiện tại</span>';
-    const tr=document.createElement('tr');
-    tr.innerHTML = `<td class="num">#${s.id}</td><td class="may">${s.addr}</td><td class="num">${s.pid}</td><td class="may">${where}</td>`+
-      `<td style="text-align:right"><button class="btn danger" data-stop="${s.id}">Dừng</button></td>`;
-    tb.appendChild(tr);
+  const ss = state.sessions||[];
+
+  // ---- Hạm đội: lưới card ----
+  const ham = $('ham'); ham.innerHTML='';
+  ss.forEach(s=>{
+    const st = trangThai(s);
+    const h = hang(s.addr), tk = taiKhoan(s.addr);
+    const noi = s.worktree ? s.worktree.split(/[\\/]/).slice(-2).join('/') : 'thư mục hiện tại';
+    const c = document.createElement('article');
+    c.className = 'ag song ' + (st==='running' ? 'run' : 'pending');
+    // --c là màu TRẠNG THÁI (rail, aura, pill); --prov là sắc HÃNG (chỉ glyph).
+    c.style.setProperty('--c', st==='running' ? 'var(--run)' : 'var(--pending)');
+    c.style.setProperty('--prov', 'var(--prov-' + h + ', var(--prov-may))');
+    c.innerHTML =
+      `<span class="rail"></span><span class="aura"></span>` +
+      `<div class="h1">${glyph(h)}` +
+        `<span class="who">${esc(h)}:<b>${esc(tk)}</b></span>` +
+        `<span class="st"><i></i>${st}</span></div>` +
+      `<div class="viec"><span class="verb">nơi làm</span>` +
+        `<span class="txt" title="${esc(s.log||'')}">${esc(noi)}</span></div>` +
+      `<div class="meta">` +
+        `<div><span class="k">tokens</span><span class="v trong" title="/api/state chưa mang token của phiên CLI về">${CHUA_DO}</span></div>` +
+        `<div><span class="k">cost</span><span class="v trong" title="/api/state chưa mang chi phí của phiên CLI về">${CHUA_DO}</span></div>` +
+        `<div><span class="k">elapsed</span><span class="v">${esc(elapsed(s.started, now))}</span></div>` +
+      `</div>` +
+      `<button class="btn danger dung" data-stop="${s.id}">Dừng</button>`;
+    ham.appendChild(c);
   });
-  $('scount').textContent = (state.sessions||[]).length;
-  $('s-empty').style.display = (state.sessions||[]).length ? 'none':'block';
+  $('scount').textContent = ss.length;
+  $('ham-empty').style.display = ss.length ? 'none':'block';
+  $('tq-phien').textContent = ss.length;
 
   // profiles
   profiles = state.profiles||[];
@@ -417,7 +599,7 @@ function render(state){
               : '<span class="pill off">chưa đăng nhập</span>';
     const act = p.active ? '<span class="dot" style="background:var(--run)"></span>' : '';
     const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${act}</td><td class="may">${p.provider}</td><td class="may">${p.account}</td><td class="may" style="color:var(--mid)">${p.identity||'—'}</td><td>${tok}</td>`;
+    tr.innerHTML = `<td>${act}</td><td class="may">${esc(p.provider)}</td><td class="may">${esc(p.account)}</td><td class="may" style="color:var(--mid)">${esc(p.identity||'—')}</td><td>${tok}</td>`;
     pb.appendChild(tr);
   });
   // fleet dropdown
@@ -426,10 +608,61 @@ function render(state){
     const o=document.createElement('option'); o.value=p.addr; o.textContent=p.addr; sel.appendChild(o);
   });
   if(cur) sel.value=cur;
+
+  napDoTuFlow(state);
+}
+
+// ---------------------------------------------------------------- Tổng quan
+//
+// Meter CHỈ ăn số thật. Hai nguồn duy nhất hiện có:
+//   1. /api/flow/detail?id=N — mỗi bước mang costUsd/tokensIn/tokensOut đã đo
+//      từ dữ liệu có cấu trúc của agent (0 nghĩa là provider không cho biết);
+//   2. /api/ai — usage.vao/usage.ra của những lần hỏi API trong phiên xem này.
+//
+// Phiên CLI ở /api/state KHÔNG có hai trường đó, nên nó không góp gì vào đây và
+// dòng ghi chú nói rõ điều ấy. Bề rộng thanh là TỶ LỆ vào/ra trong tổng token
+// đo được — một tỷ số có thật, không phải phần trăm của một hạn mức bịa ra.
+let doFlow = {vao:0, ra:0, usd:0, id:0, khoa:''};
+
+async function napDoTuFlow(state){
+  const r = (state.runs||[])[0];
+  if(!r){ veTongQuan(); return; }
+  const khoa = r.id + ':' + r.state;
+  if(khoa === doFlow.khoa){ veTongQuan(); return; }
+  try{
+    const d = await api('/api/flow/detail?id=' + r.id);
+    let vao=0, ra=0, usd=0;
+    (d.steps||[]).forEach(b=>{ vao += b.tokensIn||0; ra += b.tokensOut||0; usd += b.costUsd||0; });
+    doFlow = {vao, ra, usd, id:r.id, khoa};
+  }catch(e){ doFlow = {vao:0, ra:0, usd:0, id:r.id, khoa}; }
+  veTongQuan();
+}
+
+function veTongQuan(){
+  const vao = doFlow.vao + aiDo.vao, ra = doFlow.ra + aiDo.ra, usd = doFlow.usd;
+  const tong = vao + ra;
+  $('m-vao').style.width = (tong ? (100*vao/tong) : 0) + '%';
+  $('m-ra').style.width  = (tong ? (100*ra/tong)  : 0) + '%';
+  datSo($('tq-vao'), tong ? vao.toLocaleString('vi-VN') : null);
+  datSo($('tq-ra'),  tong ? ra.toLocaleString('vi-VN')  : null);
+  datSo($('tq-usd'), usd > 0 ? usd.toFixed(4) + ' USD' : null);
+  const ng = [];
+  if(doFlow.vao || doFlow.ra || doFlow.usd) ng.push('workflow #' + doFlow.id);
+  if(aiDo.vao || aiDo.ra) ng.push('AI API trong phiên xem này');
+  $('tq-nguon').textContent = ng.length
+    ? 'Đo từ: ' + ng.join(' · ') + '. Phiên CLI của hạm đội chưa báo token/chi phí nên không nằm trong số này.'
+    : 'Chưa có số nào đo được. Phiên CLI không báo token/chi phí; chạy workflow hoặc hỏi AI API thì mới có số.';
+}
+
+// datSo: null nghĩa là CHƯA ĐO. Ô rỗng nói thật hơn một số 0.
+function datSo(el, v){
+  el.textContent = (v == null) ? CHUA_DO : v;
+  el.classList.toggle('trong', v == null);
 }
 
 $('wf-ten').onchange = veMotaFlow;
-$('wf-chay').onclick = async ()=>{
+$('wfform').onsubmit = async ev=>{
+  ev.preventDefault();
   const ten = $('wf-ten').value;
   if(!ten){ showErr('chưa chọn quy trình'); return; }
   const b = $('wf-chay'); b.disabled = true; b.textContent = 'đang chạy…';
@@ -463,14 +696,38 @@ $('fleet').onsubmit = async e=>{
   try{ await api('/api/fleet',{method:'POST',body:JSON.stringify(body)}); }catch(err){ showErr(err.message); }
 };
 
-// nhật ký sự kiện
+// ------------------------------------------------------------- nhật ký
+//
+// Tô theo LOẠI việc, không theo mức độ nghiêm trọng: mắt cần phân biệt "vừa
+// giao việc" với "vừa xong" nhanh hơn là phân biệt info với warning.
+function loaiLog(t){
+  t = String(t||'');
+  if(t === 'failure' || t === 'flow.failed' || t === 'flow.rejected') return 'error';
+  if(t === 'warning') return 'warn';
+  if(t === 'flow.completed' || t === 'session.stopped' || t === 'clones.cleaned' ||
+     t === 'worktree.removed' || t === 'flow.approved') return 'done';
+  if(t === 'flow.waiting_approval' || t === 'flow.step') return 'queued';
+  if(t === 'session.started' || t === 'flow.started' || t === 'clones.created' ||
+     t === 'worktree.added' || t === 'profile.created') return 'dispatch';
+  return 'info';
+}
+
+// LOG_CAP: giữ khoảng 60 dòng. Log dashboard là thứ để LIẾC, không phải kho lưu
+// trữ — kho nằm ở state.db. Giữ 200 dòng như trước thì cuộn mỏi tay mà vẫn
+// không ai đọc, và DOM cứ phình theo thời gian mở tab.
+const LOG_CAP = 60;
 function logEvent(ev){
   const box=$('log'); const at=new Date((ev.time?Date.parse(ev.time):Date.now())).toLocaleTimeString();
-  const d=document.createElement('div'); d.className='e '+ev.type;
-  const label = ev.addr ? (ev.addr+' — ') : '';
-  d.innerHTML = `<span class="t">${at}</span>${label}${(ev.msg||'').replace(/</g,'&lt;')}`;
-  box.insertBefore(d, box.firstChild);
-  while(box.children.length>200) box.removeChild(box.lastChild);
+  const d=document.createElement('div'); d.className='e '+loaiLog(ev.type);
+  d.innerHTML = `<span class="t">${at}</span>` +
+    (ev.addr ? `<span class="a">${esc(ev.addr)}</span>` : '') + esc(ev.msg||'');
+  // Dòng mới ở DƯỚI rồi tự cuộn xuống — đọc log xuôi theo thời gian, giống mọi
+  // terminal. Chỉ cuộn khi người dùng đang ở sát đáy, để không giật mất chỗ họ
+  // đang đọc dở ở giữa.
+  const satDay = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.appendChild(d);
+  while(box.children.length > LOG_CAP) box.removeChild(box.firstChild);
+  if(satDay) box.scrollTop = box.scrollHeight;
 }
 
 // SSE: đọc snapshot trước (ở trên), rồi dùng event để cập nhật.
@@ -493,6 +750,7 @@ connect();
 // nghĩa là mỗi event lại bắn thêm ba request — ngược hẳn ý của chính dòng chú
 // thích đứng cạnh.) Quét mồ côi thì CỐ Ý không tự chạy: nó đọc bảng tiến trình
 // cả máy, phải do người dùng bấm.
+napFlow();
 napRoute();
 napDB();
 napTele();
