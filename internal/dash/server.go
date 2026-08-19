@@ -84,6 +84,12 @@ func New(a *api.API) *Server {
 	// điều khiển agent. Đằng nào nội dung này cũng nằm công khai trên GitHub.
 	m.Handle("/docs/", files)
 
+	// /vendor/ cũng CÔNG KHAI: three.js + font nhúng sẵn trong binary. Trang /docs/
+	// không đòi đăng nhập, nên font của nó cũng không được đòi — bắt đăng nhập ở
+	// đây thì chữ trang kế hoạch rơi về font hệ điều hành. Đây là asset tĩnh,
+	// không có bí mật nào trong đó.
+	m.Handle("/vendor/", files)
+
 	// Mọi thứ còn lại (dashboard 2D, 3D) cần đăng nhập. Riêng trang gốc thì đưa
 	// tới form thay vì ném 401 trần trụi.
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

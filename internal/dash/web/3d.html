@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Switch-Agent-Pro — 3D</title>
 <style>
-  :root{--bg:#0F172A;--fg:#F8FAFC;--sub:#94A3B8;--border:#475569;--run:#22C55E;
+  /* Font nằm sẵn trong binary (web/vendor) — offline tuyệt đối, không gọi Google Fonts.
+     Asset ngoài là asset có thể biến mất — đúng bài học màn 3D trắng trơn. */
+  @font-face{font-family:Inter;src:url("vendor/inter-variable.woff2") format("woff2");
+    font-weight:100 900;font-style:normal;font-display:swap}
+  @font-face{font-family:"Space Grotesk";src:url("vendor/space-grotesk-variable.woff2") format("woff2");
+    font-weight:300 700;font-style:normal;font-display:swap}
+  @font-face{font-family:"JetBrains Mono";src:url("vendor/jetbrains-mono-variable.woff2") format("woff2");
+    font-weight:100 800;font-style:normal;font-display:swap}
+  :root{--mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+    --bg:#0F172A;--fg:#F8FAFC;--sub:#94A3B8;--border:#475569;--run:#22C55E;
     --warn:#F59E0B;--limit:#EF4444;--idle:#64748B;--panel:rgba(30,41,59,.6);--ease:cubic-bezier(0.16,1,0.3,1)}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
@@ -14,7 +23,8 @@
   .panel{position:fixed;background:var(--panel);border:1px solid var(--border);border-radius:12px;
     backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 10px 20px rgba(0,0,0,.4)}
   #top{top:12px;left:12px;right:12px;height:50px;display:flex;align-items:center;gap:12px;padding:0 14px}
-  .b{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px}
+  .b{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;
+    font-family:"Space Grotesk",Inter,system-ui,sans-serif}
   .b small{color:var(--sub);font-weight:400;font-size:11px}
   #conn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
   #conn .d{width:9px;height:9px;border-radius:50%;background:var(--limit)}#conn.on .d{background:var(--run)}
@@ -26,17 +36,20 @@
   #legend span{display:flex;align-items:center;gap:6px;color:var(--sub)}
   .dot{width:9px;height:9px;border-radius:50%}
   #detail{bottom:12px;right:12px;width:250px;padding:14px;display:none}
-  #detail .a{font-size:17px;font-weight:600}
-  #detail .kv{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid rgba(71,85,105,.35)}
+  #detail .a{font-size:17px;font-weight:600;font-family:var(--mono)}
+  #detail .kv{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;
+    font-family:var(--mono);border-bottom:1px solid rgba(71,85,105,.35)}
   #detail .kv .k{color:var(--sub)}
   #detail button{margin-top:12px;width:100%;cursor:pointer;background:transparent;color:#fca5a5;
     border:1px solid rgba(239,68,68,.5);border-radius:8px;padding:8px;font:inherit;font-weight:600}
   #detail button:hover{background:rgba(239,68,68,.12)}
   #tip{position:fixed;transform:translate(12px,12px);pointer-events:none;z-index:8;background:#1E293B;
-    border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;display:none}
+    border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;
+    font-family:var(--mono);display:none}
   #fallback{position:fixed;inset:0;display:none;place-items:center;text-align:center;padding:24px}
   #fallback div{max-width:360px}#fallback a{color:#7dd3fc}
   .lbl{position:fixed;transform:translate(-50%,-50%);font-size:12px;font-weight:600;
+    font-family:var(--mono);
     text-shadow:0 0 10px rgba(0,0,0,.95);pointer-events:none;white-space:nowrap}
   .lbl small{display:block;color:var(--sub);font-weight:400;font-size:10px;text-align:center}
 </style>
@@ -66,12 +79,12 @@
 <div id="tip"></div>
 <div id="fallback"><div>
   <h2>Không tải được 3D</h2>
-  <p style="color:var(--sub)">Thư viện Three.js cần mạng để tải. Máy đang offline hoặc bị chặn.</p>
+  <p style="color:var(--sub)">Three.js nằm sẵn trong binary nên không phải lỗi mạng:
+    trình duyệt này không dựng được WebGL.</p>
   <p><a href="./">← Về dashboard 2D</a> (không cần mạng)</p>
 </div></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="vendor/three.min.js"></script>
 <script>
 // Xác thực bằng cookie phiên HttpOnly — trình duyệt tự gửi kèm. Không còn
 // token trên URL, nên link điều hướng cũng không phải mang theo gì.
@@ -98,10 +111,48 @@ scene.background = new THREE.Color(0x0F172A);
 scene.fog = new THREE.FogExp2(0x0a0f1e, 0.03);
 const camera = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 200);
 camera.position.set(0, 9, 17);
-const controls = new THREE.OrbitControls(camera, canvas);
-controls.enableDamping = true; controls.dampingFactor = .06; controls.enablePan = false;
-controls.minDistance = 6; controls.maxDistance = 40; controls.maxPolarAngle = Math.PI*0.49;
-controls.target.set(0,1,0); controls.autoRotate = !RM; controls.autoRotateSpeed = 0.4;
+// Orbit TỰ VIẾT TAY. OrbitControls là addon: một file rời nữa phải tải — dùng nó
+// là buộc phải có CDN, mà CDN chính là thứ làm màn 3D trắng trơn. Bản nhúng
+// chỉ giữ MỘT file three core. Hành vi giữ y hệt bản cũ: damping .06, không
+// pan, target (0,1,0), tự xoay nhẹ khi không bật reduce-motion, zoom 6..40,
+// clamp polar <= PI*0.49 để camera không lật qua cực.
+const controls = (function(){
+  const GAN = 6, XA = 40, POLAR_MAX = Math.PI*0.49, POLAR_MIN = 0.05;
+  const DAMP = .06, TU_XOAY = RM ? 0 : 2*Math.PI/3600*0.4; // 0.4 = autoRotateSpeed cũ
+  const target = new THREE.Vector3(0,1,0);
+  const off = camera.position.clone().sub(target);
+  // toạ độ cầu: r bán kính, polar góc với trục Y, azi góc quay quanh trục Y
+  const nay = {r: off.length(), polar: Math.acos(off.y/off.length()), azi: Math.atan2(off.x, off.z)};
+  const muon = {r: nay.r, polar: nay.polar, azi: nay.azi};
+  let keo = null;
+  canvas.addEventListener('pointerdown', e=>{ keo = {x:e.clientX, y:e.clientY};
+    if(canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e=>{ if(!keo) return;
+    muon.azi   -= (e.clientX - keo.x)*0.005;
+    muon.polar -= (e.clientY - keo.y)*0.005;
+    muon.polar = Math.min(POLAR_MAX, Math.max(POLAR_MIN, muon.polar));
+    keo = {x:e.clientX, y:e.clientY}; });
+  const buong = ()=>{ keo = null; };
+  canvas.addEventListener('pointerup', buong);
+  canvas.addEventListener('pointercancel', buong);
+  canvas.addEventListener('wheel', e=>{ e.preventDefault();
+    muon.r = Math.min(XA, Math.max(GAN, muon.r * (e.deltaY > 0 ? 1.1 : 1/1.1))); }, {passive:false});
+  return {
+    target: target,
+    // update() gọi mỗi frame — nhích dần tới góc muốn (damping) rồi đặt lại camera.
+    update: function(){
+      if(TU_XOAY && !keo) muon.azi -= TU_XOAY;
+      nay.azi   += (muon.azi   - nay.azi)*DAMP;
+      nay.polar += (muon.polar - nay.polar)*DAMP;
+      nay.r     += (muon.r     - nay.r)*DAMP;
+      const sin = Math.sin(nay.polar);
+      camera.position.set(target.x + nay.r*sin*Math.sin(nay.azi),
+                          target.y + nay.r*Math.cos(nay.polar),
+                          target.z + nay.r*sin*Math.cos(nay.azi));
+      camera.lookAt(target);
+    }
+  };
+})();
 scene.add(new THREE.AmbientLight(0x334155, 1.2));
 const key = new THREE.PointLight(0x22C55E, 0.6, 60); key.position.set(0,14,0); scene.add(key);
 const front = new THREE.DirectionalLight(0xffffff, 0.4); front.position.set(6,8,12); scene.add(front);
