@@ -1,5 +1,7 @@
 # Switch-Agent-Pro
 
+> ⚡ **Mới bắt đầu?** Xem ngay [**Hướng dẫn 5 phút đầu tiên (docs/BAT-DAU.md)**](docs/BAT-DAU.md) — dành riêng cho người không rành kỹ thuật (cách cài đặt 1 dòng, vượt cảnh báo Windows và 3 bước dùng ngay).
+
 **Local-first control plane điều phối nhiều coding agent và nhiều AI API.**
 Một file `.exe` **11 MB**, không phụ thuộc gì, chạy native trên **Windows**,
 có dashboard quan sát realtime.
@@ -307,6 +309,7 @@ chặn về mặt dữ liệu.
 
 | File | Nội dung |
 |---|---|
+| [`docs/BAT-DAU.md`](docs/BAT-DAU.md) | **5 phút đầu tiên** — hướng dẫn bắt đầu nhanh cho người không rành kỹ thuật |
 | [`docs/MASTER-PLAN.md`](docs/MASTER-PLAN.md) | **Lộ trình chính** — kiến trúc, 8 pha, DoD |
 | [`docs/THIET-KE.md`](docs/THIET-KE.md) | Vì sao thiết kế như vậy |
 | [`docs/DO-LUONG.md`](docs/DO-LUONG.md) | Báo cáo đo — cái gì đã chứng minh, cái gì chưa |
