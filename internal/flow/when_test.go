@@ -153,23 +153,29 @@ func TestCacNhanhDocLapChaySongSong(t *testing.T) {
 		{ID: "gop", Type: TypeNotify, Needs: []string{"a", "b", "c"}, Message: "gộp"},
 	}}
 
-	start := time.Now()
 	res, err := r.Start(context.Background(), f, t.TempDir(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	took := time.Since(start)
 
 	if res.State != store.RunDone {
 		t.Fatalf("phải xong, được %s", res.State)
 	}
+	// ĐÂY là phép đo chứng minh song song: đếm số bước CÙNG LÚC nằm trong
+	// RunAgents. maxSeen == 3 nghĩa là cả ba đã ở trong đó một lúc, không cách
+	// nào giải thích khác.
 	if sa.maxSeen < 3 {
 		t.Fatalf("ba nhánh độc lập phải chạy cùng lúc; số bước chạy đồng thời tối đa chỉ %d", sa.maxSeen)
 	}
-	// Tuần tự sẽ mất ~750ms; song song thì quanh ~250ms.
-	if took > 600*time.Millisecond {
-		t.Fatalf("có vẻ vẫn chạy tuần tự: mất %s", took)
-	}
+	// CỐ Ý BỎ phép đo bằng đồng hồ (trước đây: took > 600ms thì coi là tuần tự).
+	//
+	// Nó đo TẢI CỦA MÁY chứ không đo song song, nên đỏ oan mỗi khi `go test ./...`
+	// chạy cả bộ dưới tải — đo được nhiều lần trong ngày 19/08, và chính người
+	// soi độc lập cũng ghi nhận nó flaky y hệt trên main. Một test đỏ ngẫu nhiên
+	// còn tệ hơn không có test: nó dạy người ta bỏ qua màu đỏ.
+	//
+	// Bộ đếm ở trên đã chứng minh đúng điều cần chứng minh; thêm đồng hồ vào
+	// không chặt hơn, chỉ giòn hơn.
 }
 
 // Trần song song của dự án phải được tôn trọng.
