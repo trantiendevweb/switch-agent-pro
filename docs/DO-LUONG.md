@@ -3,7 +3,7 @@
 > "Đã đo — không suy luận." Mỗi ô ghi **đo thế nào** và **kết quả**. Chưa đo xong
 > thì provider/OS đó còn nhãn `experimental`, công cụ cảnh báo khi dùng.
 >
-> Cập nhật: 2026-08-17.
+> Cập nhật: 2026-08-19.
 
 ## Bảng trạng thái
 
@@ -1884,3 +1884,136 @@ trên bảng dữ liệu dày.
 Bài học: **giao diện là chỗ dễ trôi khỏi quy chuẩn nhất** vì Go không build ra nó.
 Nay checklist của design system có ba mục được máy canh, không còn trông vào việc
 người nhớ đọc.
+
+## 19/08 — Placeholder chưa thay lọt nguyên văn vào prompt gửi cho agent (lượt chạy #29)
+
+Lượt chạy #29 (flow `dem`) chạy dở thì máy tự khởi động lại. Khi đọc lại nhật ký,
+phát hiện lỗi im lặng nguy hiểm: biến giữ chỗ (placeholder) chưa thay thế bị gửi
+nguyên văn sang cho agent.
+
+- **Đo lúc nào**: Ngày 19/08/2026, khi phân tích nhật ký thực thi của lượt chạy #29.
+- **Đo bằng cách nào**: Đọc lại nội dung prompt thực tế mà hệ thống gửi cho agent ở
+  bước `soi`.
+- **Con số / Bằng chứng**: Bước `kiem-cuoi` (máy chấm chạy lệnh `go test`) bị hỏng
+  nên không để lại kết quả trong sổ biến. Hàm `Expand` cũ chỉ thay thế những biến
+  CÓ mặt trong bảng kết quả; biến nào vắng mặt thì giữ nguyên chuỗi thô. Hậu quả là
+  người soi (Grok) nhận nguyên văn chuỗi:
+  ```
+  Máy chấm nói gì:
+  {{steps.kiem-cuoi.output}}
+  ```
+  Agent ở bước sau vẫn tự tin phán xét như thể đã đọc phán quyết của máy chấm, dù
+  thực tế không nhận được gì. Toàn bộ lời hứa "máy chấm quyết định, không phải lời
+  agent" bốc hơi trong im lặng mà không có bất kỳ cảnh báo nào.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `c67a1ff`). Tách làm hai hàm xử lý:
+  1. `ExpandChay`: Với các bước agent và notify, tự động thay các biến còn sót bằng
+     câu thông báo trung thực `(bước "<tên bước>" không để lại kết quả)`.
+  2. Bước chạy lệnh shell thì kiểm tra bằng `BuocConSot` và **dừng ngay lập tức**
+     kèm thông báo lỗi rõ ràng: `tham số X cần kết quả của bước "Y" nhưng bước đó không để lại gì`.
+     Tuyệt đối không chốt chuỗi giả vào câu lệnh shell (ví dụ `go test -C (bước "x" không để lại kết quả)`
+     là đường dẫn bịa, sẽ làm lệnh hỏng bằng một lỗi chẳng liên quan tới nguyên nhân thật).
+  3. Bản `Expand` gốc giữ nguyên cho lệnh `sagent flow show` để xem thử khi chưa chạy.
+  - Nghiệm thu: Kiểm chứng bằng test `TestPromptGuiDiKhongDuocMangPlaceholderConSot` và
+    `TestShellThieuKetQuaThiDungVaGoiTenBuoc` trong `internal/flow/placeholder_test.go`.
+    Gỡ bản vá ra thì test đỏ ngay lập tức.
+
+## 19/08 — "agent báo lỗi: success" — chữ nghĩa tự mâu thuẫn làm giấu lý do thật (lượt #29)
+
+- **Đo lúc nào**: Ngày 19/08/2026, ở lượt chạy #29, bước `code-go`.
+- **Đo bằng cách nào**: Đọc dữ liệu có cấu trúc từ phản hồi JSON của Claude CLI khi
+  tài khoản gặp sự cố.
+- **Con số / Bằng chứng**: Claude CLI trả về cờ báo lỗi `is_error = true`, nhưng
+  trường phân loại phụ `subtype` lại mang giá trị `"success"`. Hàm hiển thị lỗi cũ
+  ghép thẳng `subtype` vào sau chữ "agent báo lỗi:", tạo ra thông báo vô nghĩa:
+  `agent báo lỗi: success`. Thông điệp này vừa tự mâu thuẫn vừa che giấu hoàn toàn
+  nguyên nhân lỗi thật nằm trong trường câu trả lời (`result`), ví dụ: `"Credit balance is too low"`
+  (tài khoản hết số dư/hạn mức).
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `c67a1ff`). Hàm `lyDo()` trong
+  `internal/provider/ketqua.go` đọc lý do theo thứ tự ưu tiên:
+  1. Lời agent trong câu trả lời thật (`result` / `TraLoi`).
+  2. Lý do kết thúc phiên (`terminal_reason` / `KetCuc`).
+  3. Lý do dừng (`stop_reason` / `DungViCo`).
+  4. Phân loại lỗi (`subtype` / `Loai`).
+  - Chủ động bỏ qua mọi giá trị tự nhận là `"success"`. Nếu không có lý do nào thì
+    nói thẳng `"không nói lý do"`, tuyệt đối không ghép chữ nghe cho có.
+  - Nghiệm thu: Test `TestCoLoiNhungSubtypeLaSuccess` và `TestCoLoiKhongCoResultThiLuiVeLyDoKhac`
+    trong `internal/provider/ketqua_lydo_test.go` bắt đúng trường hợp này.
+
+## 19/08 — Flow run không kiểm tài khoản trước, đốt một lượt 4 bước chết sẵn vì token hết hạn (lượt #29)
+
+- **Đo lúc nào**: Rạng sáng 19/08/2026 (lượt chạy #29 bấm chạy lúc 01:45).
+- **Đo bằng cách nào**: So sánh mốc thời gian hết hạn token của tài khoản `claude:tns`
+  (`18/08 23:44`) với thời điểm bấm chạy flow (`19/08 01:45`), và xem nhật ký thực thi
+  của lượt #29.
+- **Con số / Bằng chứng**: Token đã hết hạn trước đó 2 tiếng. Lượt chạy #29 đốt 9 bước,
+  trong đó có 4 bước chết chắc từ đầu (`code-go`, `sua-1`, `sua-2` và máy chấm kéo theo).
+  Hệ thống vốn đã biết tình trạng này (`Profile.HetHan` có từ commit `0bcb903`), nhưng
+  lệnh `flow run` không kiểm tra trước khi chạy. Hậu quả là toàn bộ quy trình vẫn chạy,
+  để lại đầy bước đỏ trong nhật ký ("agent báo lỗi", "không bật được phiên nào", máy chấm
+  đỏ theo), gây mất thời gian tìm lỗi trong code trong khi nguyên nhân thực sự chỉ là cần
+  đăng nhập lại.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `1f77a01`). Thêm cổng kiểm tra tài khoản
+  `KiemTaiKhoanFlow` trước khi chạy `flow run`:
+  1. Soi mọi tài khoản cần cho flow, tài khoản nào hỏng/hết hạn thì **DỪNG NGAY** trước
+     khi ghi bất kỳ lượt chạy nào vào cơ sở dữ liệu.
+  2. Thông báo dừng nói đủ 3 thứ: hỏng cái gì, kéo theo những bước nào, và lệnh sửa cụ thể
+     (ví dụ: `sagent claude:tns`).
+  3. Người dùng biết rõ mà vẫn muốn chạy tiếp thì dùng cờ `--cu-chay` (vẫn ghi cảnh báo
+     vào nhật ký để sau này tra cứu).
+  - Nghiệm thu: Test `TestChanKhiTokenDaHetHan` và `TestFlowRunChanTruocKhiGhiLanChayNao`
+    trong `internal/api/congkiem_test.go`. Gỡ cổng kiểm tra ra thì test đỏ ngay.
+
+## 19/08 — Người soi (Grok) phán NGƯỢC nhánh ở lượt #29 dù lệnh git ra kết quả đúng — CHƯA SỬA
+
+- **Đo lúc nào**: Lượt chạy #29 ngày 19/08/2026, ở bước `soi`.
+- **Đo bằng cách nào**: Đối chiếu kết quả lệnh `git log` mà Grok thực thi với nhận xét
+  do chính Grok trả về trong bước soi.
+- **Con số / Bằng chứng**:
+  - Bằng chứng trong git: Nhánh `sagent/may-1` có commit `4ea8141` do Antigravity tạo file
+    `docs/BAT-DAU.md` (sau đó được trộn ở commit `0b9e50b`), còn nhánh `sagent/tns-1`
+    hoàn toàn không có commit nào (0 commit) do `claude:tns` hết hạn token từ trước.
+  - Lệnh `git log --oneline main..sagent/tns-1` và `git log --oneline main..sagent/may-1`
+    do Grok chạy trong bước soi đã đọc ra đúng trạng thái trên.
+  - Tuy nhiên, khi viết kết luận, Grok phán **NGƯỢC HOÀN TOÀN**: gán toàn bộ việc tạo tài
+    liệu của `may-1` sang cho `tns-1`, và phán `may-1` chưa làm gì.
+  - *Lưu ý về bằng chứng*: Lịch sử git lưu giữ đầy đủ bằng chứng về commit của các nhánh
+    (`may-1` có commit, `tns-1` rỗng). Riêng câu chữ phán ngược cụ thể của Grok nằm trong
+    nhật ký thực thi của phiên chạy (runtime log / database), không được lưu trực tiếp vào git log.
+- **Đã sửa hay chưa**: **CHƯA SỬA — ghi rõ là chưa sửa**. Đây là lỗi suy luận logic / ngộ
+  nhận nhãn ngữ cảnh của mô hình ngôn ngữ lớn (Grok). Hiện hệ thống chưa có cơ chế kiểm
+  chéo tự động giữa phán quyết văn bản của agent soi với dữ liệu commit thực tế từ git.
+
+## 19/08 — Token hình dạng mới (expiresAt = 0) làm bảng trạng thái báo "sẵn sàng" vô điều kiện
+
+- **Đo lúc nào**: Chiều 19/08/2026 lúc 19:30, khi đăng nhập lại `claude:tns` bằng Claude CLI 2.1.229.
+- **Đo bằng cách nào**: Đọc trực tiếp cấu trúc file `.credentials.json` sinh ra sau khi đăng nhập.
+- **Con số / Bằng chứng**: File credentials của Claude CLI 2.1.229 sinh ra định dạng mới:
+  `expiresAt: 0` và có thêm trường `refreshTokenExpiresAt: 1789617873859` (mốc ngày 17/09/2026).
+  Hàm `TokenExpiry` cũ chỉ đọc `expiresAt`, khi thấy giá trị `0` thì trả về `false` ("không đọc được hạn").
+  Vì không đọc được hạn, cờ `HetHan` mặc định là `false`, khiến `sagent ds` và giao diện web
+  in chữ "sẵn sàng" **VÔ ĐIỀU KIỆN** cho tài khoản dù không biết chắc token còn sống hay không.
+  Nguy hiểm hơn, cổng kiểm tài khoản của `flow run` (vừa làm sáng 19/08) cũng bị mù theo vì dựa
+  trên đúng trường dữ liệu này.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `4fa396f`). Sửa hàm `TokenExpiry` trong `internal/provider/claude.go`:
+  1. Ưu tiên đọc `expiresAt` (nếu khác 0).
+  2. Nếu `expiresAt == 0`, lùi về đọc `refreshTokenExpiresAt`.
+  3. Chỉ khi cả hai trường đều không có mới báo "không biết" (để bên gọi không đoán mò theo hướng lạc quan).
+  - Lý do: Còn refresh token sống thì CLI tự động làm mới access token được khi chạy. Đó mới là
+    mốc trả lời cho câu hỏi "tài khoản này còn dùng được không".
+  - Nghiệm thu: Test `TestDocDuocHanKhiExpiresAtLaSo0` và `TestExpiresAtThatVanDuocUuTien`
+    trong `internal/provider/token_hinhdang_test.go`.
+
+## 19/08 — Huỷ lượt chạy bị cắt ngang: không để flow treo "đang chạy" vĩnh viễn
+
+- **Đo lúc nào**: Chiều 19/08/2026, sau hai lần quy trình bị cắt ngang (#29 chết theo máy tự khởi động lại lúc 01:47, #30 chết khi người dùng dừng tay lúc 19:37).
+- **Đo bằng cách nào**: Quan sát bảng lịch sử chạy trong dashboard và CLI sau khi phiên bị dừng đột ngột.
+- **Con số / Bằng chứng**: Lệnh huỷ cũ (`Reject`) chỉ xử lý được bước ĐANG CHỜ DUYỆT. Lượt chạy bị cắt ngang không có bước nào như vậy nên nằm lại trạng thái `running` vĩnh viễn trong cơ sở dữ liệu. Bảng lịch sử báo "đang chạy" trong khi không còn tiến trình nào sống.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `4fa396f`). Thêm lệnh dòng lệnh `sagent flow huy <#>` và API `POST /api/flow/cancel`. Các bước đang chạy dở được chuyển trạng thái sang `failed` CÓ GHI RÕ LÝ DO (tránh để trống làm người đọc sau này tưởng code hỏng); các bước đã hoàn thành được giữ nguyên. Tách bạch việc cập nhật sổ trạng thái với việc giết tiến trình. Nghiệm thu qua `internal/flow/huy_test.go`.
+
+## 19/08 — Dung lượng file thực thi .exe: 12.3 MB theo số đo thật
+
+- **Đo lúc nào**: Tối 19/08/2026 (commit `2922dd3`).
+- **Đo bằng cách nào**: Build bằng đúng cờ của quy trình phát hành (`-trimpath -ldflags "-s -w"`).
+- **Con số / Bằng chứng**: File thực thi `sagent.exe` có dung lượng thực tế là **12.3 MB** (làm tròn 12 MB). Con số 11 MB ghi trong tài liệu trước đó xuất phát từ thời điểm sản phẩm còn ít tính năng.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** (commit `2922dd3`). Cập nhật lại số đo thực tế trong `README.md` và `docs/BAT-DAU.md`.
+
