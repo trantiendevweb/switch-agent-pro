@@ -70,14 +70,21 @@ func (k KetQua) Hong() string {
 	// Cũng vì thế nó phải xét cả khi lượt chạy trông như THÀNH CÔNG: ca đo được ở
 	// lần chạy #21 quẩn 399 vòng mà bước vẫn `done`. Quẩn xong vẫn nặn ra được
 	// một câu trả lời là ca nguy hiểm nhất, không phải ca vô hại.
+	// NGOẠI LỆ: bị chặn quyền cho MỌI tool xét trước cả quẩn.
+	//
+	// Một agent bị từ chối quyền sẽ gọi lại đúng một lệnh nhiều lần — nhìn từ bộ
+	// đếm thì y hệt chạy quẩn. Nhưng hai chuyện này cần hai cách sửa khác hẳn:
+	// quẩn thì sửa prompt hoặc công cụ, còn bị chặn quyền thì cấp quyền. Nói
+	// "nghi chạy quẩn" cho một agent đang xin quyền là đẩy người đọc đi sai
+	// đường, và đây là chẩn đoán CỤ THỂ HƠN nên nó phải được nói trước.
+	if k.TuChoiSo > 0 && k.TraLoi == "" {
+		return "agent bị từ chối quyền cho mọi tool và không trả lời được gì"
+	}
 	if ly, biet := k.Quan(); biet && ly != "" {
 		return ly
 	}
 	if k.CoLoi {
 		return "agent báo lỗi: " + k.lyDo()
-	}
-	if k.TuChoiSo > 0 && k.TraLoi == "" {
-		return "agent bị từ chối quyền cho mọi tool và không trả lời được gì"
 	}
 	if k.TraLoi == "" {
 		if k.ToolHong > 0 {

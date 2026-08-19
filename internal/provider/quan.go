@@ -82,6 +82,13 @@ type demQuan struct {
 // được — bỏ qua, và KHÔNG tính là đã đọc được gì.
 func (d *demQuan) Them(chuKy string, ok bool) {
 	if !ok {
+		// NGẮT chuỗi đang chạy, đừng lặng lẽ bỏ qua.
+		//
+		// Bỏ qua thì dãy A A ? A A thành một chuỗi 4 — trong khi dấu hỏi hoàn
+		// toàn có thể là một lời gọi KHÁC mà ta chỉ không bóc nổi tham số. Đếm
+		// gộp qua chỗ mù là vu oan, mà vu oan thì tệ hơn bỏ sót: người đọc mất
+		// niềm tin vào lá chắn rồi tắt nó đi.
+		d.truoc, d.dai = "", 0
 		return
 	}
 	d.docDuoc = true

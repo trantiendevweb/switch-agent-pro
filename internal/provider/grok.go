@@ -215,5 +215,7 @@ func (grok) ArgsHoSo(dir string) []string {
 	return []string{"-m", c.DefaultModel}
 }
 
-// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
-func (grok) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
+// DocKetQua doc ban ghi NDJSON cua Grok — xem ketqua_grok.go de biet vi sao
+// day la viec gap: la chan chong chay quan sinh ra vi Grok, ma truoc do khong
+// bao gio chay duoc cho Grok.
+func (grok) DocKetQua(raw string) (KetQua, bool) { return docKetQuaGrok(raw) }
