@@ -230,7 +230,7 @@ let flowMota = {};
 async function napFlow(){
   try{
     const d = await api('/api/flows');
-    const sel = $('#wf-ten'); sel.innerHTML = '';
+    const sel = $('wf-ten'); sel.innerHTML = '';
     (d.flows||[]).forEach(f=>{
       flowMota[f.name] = (f.desc||'') + ' · ' + f.steps + ' bước';
       const o = document.createElement('option'); o.value = f.name; o.textContent = f.name;
@@ -239,12 +239,12 @@ async function napFlow(){
     veMotaFlow();
     // lần chạy gần nhất, để bấm xong biết đường xem tiếp
     const r = (d.runs||[])[0];
-    if(r) $('#wf-ket').innerHTML = 'Gần nhất: #'+r.id+' · '+esc(r.flow)+' · '+esc(r.state);
+    if(r) $('wf-ket').innerHTML = 'Gần nhất: #'+r.id+' · '+esc(r.flow)+' · '+esc(r.state);
   }catch(e){ }
 }
 function veMotaFlow(){
-  const n = $('#wf-ten').value;
-  $('#wf-mota').textContent = flowMota[n] || '';
+  const n = $('wf-ten').value;
+  $('wf-mota').textContent = flowMota[n] || '';
 }
 
 async function napRoute(){
@@ -360,18 +360,18 @@ function render(state){
   if(cur) sel.value=cur;
 }
 
-$('#wf-ten').onchange = veMotaFlow;
-$('#wf-chay').onclick = async ()=>{
-  const ten = $('#wf-ten').value;
+$('wf-ten').onchange = veMotaFlow;
+$('wf-chay').onclick = async ()=>{
+  const ten = $('wf-ten').value;
   if(!ten){ showErr('chưa chọn quy trình'); return; }
-  const b = $('#wf-chay'); b.disabled = true; b.textContent = 'đang chạy…';
-  $('#wf-ket').textContent = 'Đã gửi. Mỗi bước một agent — mở tab 3D để xem chúng làm việc.';
+  const b = $('wf-chay'); b.disabled = true; b.textContent = 'đang chạy…';
+  $('wf-ket').textContent = 'Đã gửi. Mỗi bước một agent — mở tab 3D để xem chúng làm việc.';
   try{
-    const viec = $('#wf-viec').value.trim();
+    const viec = $('wf-viec').value.trim();
     const d = await api('/api/flow/run', {method:'POST', headers:H,
       body: JSON.stringify({name:ten, vars: viec ? {viec} : {}})});
-    $('#wf-ket').innerHTML = 'Lần chạy <b>#'+(d.run||d.id||'?')+'</b> đang chạy. Xem kết quả từng bước ở tab Workflow, hoặc dòng lệnh: <code>sagent flow runs '+(d.run||d.id||'')+'</code>';
-  }catch(e){ showErr(e.message); $('#wf-ket').textContent=''; }
+    $('wf-ket').innerHTML = 'Lần chạy <b>#'+(d.run||d.id||'?')+'</b> đang chạy. Xem kết quả từng bước ở tab Workflow, hoặc dòng lệnh: <code>sagent flow runs '+(d.run||d.id||'')+'</code>';
+  }catch(e){ showErr(e.message); $('wf-ket').textContent=''; }
   b.disabled = false; b.textContent = 'Chạy workflow';
 };
 
