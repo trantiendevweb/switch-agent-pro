@@ -251,6 +251,10 @@ triết lý "một binary":
 **Vì sao không TUI / không app native:** TUI (Bubble Tea) nhanh nhưng không có
 3D; app native phá "một binary" và nặng. Web cục bộ được cả 3D lẫn gọn.
 
+> Bố cục của bốn mặt (mặt nào mở mặc định, theme, cột nào hiện, flow nào ghim,
+> có bật 3D không) do khối `[ui]` trong `.sagent/project.toml` điều khiển —
+> **xem mục 18**, phần đóng Pha 5d.
+
 **Hệ thiết kế (Design System):**
 
 Toàn bộ giao diện dashboard của Switch-Agent-Pro (cả màn 2D lẫn không gian 3D)
@@ -979,6 +983,369 @@ Khi hệ thống kiểm tra cấu hình luồng công việc (`flow.Validate`), 
 > **Thứ đã kiểm và chưa kiểm:**
 > - **Đã kiểm:** Soạn thảo đầy đủ mục 17 vào cả hai file tài liệu `docs/THIET-KE.md` và `internal/dash/web/docs/THIET-KE.md`, giải thích cặn kẽ nguyên lý `doc_duoc`, bài học số liệu token lượt #34, lỗi im lặng cắt dữ liệu lượt #29, và kiểm tra đối chiếu byte-for-byte đảm bảo 2 file mirror giống hệt nhau 100%.
 > - **Chưa kiểm:** Chạy thử nghiệm thực tế tính năng `doc_duoc` và cờ `--kho` trên binary `sagent.exe` mới, do phần mã nguồn Go đang được lập trình viên khác thực hiện song song.
+
+---
+
+## 18. `[ui]` — một hợp đồng, bốn mặt (Pha 5d)
+
+Mục tiêu 6 nói người dùng phải *nhìn thấy* đội agent. Pha 5d trả lời câu hỏi
+tiếp theo: **hai dự án khác nhau phải mở ra hai bố cục khác nhau mà không sửa
+mã.** Khối `[ui]` trong `.sagent/project.toml` là hợp đồng đó.
+
+| Khoá | Kiểu | Điều khiển cái gì |
+|---|---|---|
+| `default_surface` | `tui` \| `dashboard` \| `workflow` \| `3d` | gõ `sagent` không tham số thì ra mặt nào |
+| `theme` | `dark` \| `light` | nền của cả ba mặt web |
+| `columns` | mảng tên cột | cột nào hiện trên bảng Tài khoản của mặt 2D, **theo đúng thứ tự khai** |
+| `pinned_flows` | mảng tên flow | flow nào ghim lên đầu workflow board |
+| `enable_3d` | bool (mặc định `true`) | có lối vào mặt ba chiều hay không |
+
+### 1. Vì sao Pha 5b/5c đã xanh mà DoD vẫn CHƯA đạt?
+
+Trước lượt làm mục này, `grep` cả gói `internal/dash` **không ra một chỗ nào**
+chạm `UI.Theme` hay `UI.DefaultSurface`. Nghĩa là hợp đồng tồn tại, `sagent
+config` in nó ra, test cấu hình xanh — mà **không mặt nào tiêu thụ**. Bài học:
+một khoá cấu hình đọc được nhưng không ai đọc thì nó là tài liệu, không phải
+tính năng. DoD của Pha 5d vì thế được phát biểu theo *hành vi quan sát được*
+("hai project mở ra hai bố cục khác nhau, không sửa mã") chứ không theo *sự tồn
+tại của khoá*.
+
+### 2. Vì sao ba mặt web chỉ CHỈ ĐƯỜNG chứ không tự bật server?
+
+`sagent` không tham số trước đây **luôn** mở bảng chọn terminal. Nay nó đi theo
+`default_surface` — nhưng với ba giá trị web, nó chỉ **in URL và nhắc `sagent
+dash`**, không tự khởi động server.
+
+Lý do là ranh giới của sự đồng ý: `sagent dash` **chiếm terminal** cho tới khi
+Ctrl+C và **đòi mật khẩu đặt trước**. Gõ `sagent` để xem bảng tài khoản mà tự
+nhiên mọc ra một tiến trình đang nghe cổng là việc người dùng **không hề xin**.
+Cấu hình nói họ *thích* mặt nào, không phải *cho phép mở cổng thay họ*. Muốn
+bảng chọn dù cấu hình khai mặt web: `sagent ds`.
+
+Bảng ánh xạ tên mặt → đường dẫn nằm ở **đúng một chỗ** (`matWeb` trong
+`cmd/sagent/tui.go`). Thêm mặt thứ năm thì sửa đúng đó, không phải đi tìm chuỗi
+`"/flow.html"` rải trong mã. Và phần dựng lời chỉ đường được tách thành hàm
+riêng (`chiDuongMat`) để **test được** — chôn nó trong hàm phải mở API thật rồi
+chiếm terminal mới chạy tới thì không ai kiểm được, mà đúng chỗ đó mới quyết
+định gõ `sagent` sẽ ra cái gì.
+
+### 3. Vì sao cấu hình sai phải kêu lúc ĐỌC FILE, không phải lúc vẽ?
+
+`validate()` chặn ngay ở tầng cấu hình: theme lạ, tên cột lạ, và **mâu thuẫn**
+`default_surface = "3d"` cùng `enable_3d = false`.
+
+Ô mâu thuẫn là ví dụ rõ nhất. Không chặn thì cấu hình vẫn hợp lệ về mặt kiểu dữ
+liệu, người dùng mở dashboard và nhận một **trang trống** — không thông báo,
+không manh mối. Bắt lỗi lúc mở trình duyệt thì đã muộn; bắt lúc `sagent config`
+thì họ đọc được đúng câu giải thích.
+
+`CotTaiKhoan` là **nguồn duy nhất** cho tên cột, và nó khai ở tầng `config` chứ
+không ở tầng `dash`: mặt 2D và mặt 3D phải đọc chung một danh sách, không mặt nào
+tự chế bản riêng.
+
+### 4. Vì sao bảng đổi tên từ `CotPhien` thành `CotTaiKhoan`?
+
+Mỗi hàng là một **tài khoản**, không phải một phiên. Ba cột `pid` / `nhanh` /
+`bat_dau` nói về phiên mà tài khoản đó **đang** chạy — tài khoản rỗi thì ba ô
+trống, chứ bảng không đổi nghĩa. Chúng có mặt vì người vận hành hỏi *"con này
+đang chạy ở nhánh nào"* mà phải mở sang panel khác để tra thì bảng chưa làm xong
+việc của nó.
+
+Không khai `columns` thì giữ nguyên bốn cột cũ (`CotMacDinh`) — thêm hợp đồng
+mới không được đổi giao diện của người chưa yêu cầu gì.
+
+### 5. Vì sao `enable_3d` là `bool` thường chứ không phải `*bool`?
+
+`merge` decode **chồng lên** cấu hình đã mang sẵn giá trị mặc định. Nhờ vậy khoá
+**không khai** thì giữ `true` của tầng trên, còn khai `enable_3d = false` thì ghi
+đè thật. Đủ để phân biệt *"không nói gì"* với *"nói không"* — mà không phải kéo
+con trỏ đi khắp nơi.
+
+Khi tắt, mặt 2D **gỡ hẳn thẻ `<a>`** chứ không ẩn bằng CSS: một link ẩn bằng CSS
+vẫn nằm trong thứ tự Tab, tức người dùng bàn phím vẫn lạc vào một mặt đã bị tắt.
+
+### 6. Vì sao `[ui]` đi kèm `/api/state` chứ không có endpoint riêng?
+
+Mọi trang đã đọc ảnh chụp `/api/state` ngay khi kết nối. Gắn `ui` vào đó thì
+không trang nào phải **nhớ** fetch thêm một chỗ — trang nào quên sẽ lặng lẽ vẽ
+bằng bố cục mặc định mà không ai báo lỗi. Thêm endpoint mới còn kéo theo một
+action mới trong hợp đồng và một lệnh CLI tương ứng (luật ngang quyền bốn mặt),
+trong khi `sagent config` đã trả lời đúng câu hỏi đó ở terminal rồi.
+
+Server **giải sẵn giá trị mặc định** trước khi gửi: trả `columns: []` rồi để mỗi
+trang tự biết *"rỗng thì dùng bốn cột kia"* là cách bộ mặc định bị chép làm nhiều
+bản trong JavaScript rồi trôi khỏi nhau — đúng thứ đã xảy ra với bảng màu trước
+khi có `token.css`. Một luật, một chỗ; trang chỉ việc vẽ đúng thứ nhận được.
+
+Cùng tinh thần đó, một file `vendor/mat.js` giữ **một luật cho cả bốn trang**.
+`themeSom()` chạy ngay trong `<head>` để trang không nháy từ tối sang sáng.
+
+> [!NOTE]
+> **Chưa kiểm:** bố cục ở độ phân giải điện thoại khi `columns` khai đủ bảy cột —
+> bảng sẽ tràn ngang, chưa đo xem tràn thế nào.
+
+---
+
+## 19. Trạng thái `done`: hệ trạng thái phải có tên cho "XONG"
+
+### 1. Lỗ hổng đo được
+
+20/08/2026, bảng `sagent status` hiện **20/20 phiên** ở trạng thái `lost`, đọc ra
+là *"chết, chưa rõ vì sao"*. Mở `fleet.log` của phiên #157 thì thấy: agent **trả
+lời đúng**, NDJSON có dòng `{"type":"result","subtype":"success",...}`, **không
+lỗi nào**. Một lượt chạy thành công đọc ra y hệt một phiên chết bí ẩn.
+
+Nguyên nhân: `provider.PhanLoaiChet` chỉ đặt tên cho các kiểu **HỎNG**
+(`rate_limited` / `blocked` / `failed`). Lượt chạy không hỏng → trả chuỗi rỗng →
+phiên ở lại `lost`. **Hệ trạng thái không có tên cho "đã hoàn thành".**
+
+### 2. Vì sao đó không chỉ là chuyện chữ xấu
+
+Người vận hành nhìn bảng toàn *"chưa rõ vì sao"* thì hoặc hoảng vô cớ, hoặc quen
+mắt rồi thôi đọc — và **lần có phiên chết thật thì nó lẫn vào đám đông**. Một
+cảnh báo kêu cho mọi trường hợp là một cảnh báo không kêu cho trường hợp nào.
+
+### 3. Vì sao chỉ nói "xong" khi ĐỌC ĐƯỢC bản ghi kết quả
+
+`store.StateXong` / `provider.Xong` (`"done"`) được gán **chỉ khi** đọc được bản
+ghi có cấu trúc **và** bản ghi đó không báo hỏng. Provider chưa đo được năng lực
+`ket-qua-co-cau-truc` vẫn rơi về nhánh *không đọc được* và ở lại `lost`, đúng như
+cũ. Luật cũ không đổi: **thiếu dữ liệu thì không suy** — đoán "chắc là xong" còn
+tệ hơn nói "không biết".
+
+### 4. Vì sao `done` NẰM TRONG danh sách "tự kết thúc"
+
+Hàm `ChetBatThuong()` đổi tên thành `TuKetThuc()` và **có** `done` trong danh
+sách. Lý do: một lượt chạy xong xuôi vẫn có thể để lại tiến trình con, và **con
+của phiên thành công tiêu hạn mức y hệt con của phiên hỏng**. Bỏ `done` ra thì
+`sagent quet` mất hẳn một đường rà.
+
+Cái tên cũ chính là cái bẫy: `ChetBatThuong` khiến người đọc sau này tưởng loại
+`done` ra mới là đúng. Đổi tên là một phần của bản vá, không phải dọn dẹp.
+
+Câu SQL `IN (?,?,?,?)` chép cứng bốn dấu hỏi cũng phải chuyển sang sinh dấu hỏi
+theo độ dài danh sách — thêm trạng thái thứ năm mà quên chỗ đó thì phiên tàng
+hình khỏi mọi phép quét.
+
+### 5. Bài học về cách viết test
+
+Hai test cũ (`TestChayXongXuoiKhongBiGanTrangThaiHong`,
+`TestPhienChayXongKhongBiGanTrangThaiHong`) **ghim đúng cái lỗ hổng này**. Ý định
+của chúng đúng — *"đừng vu oan lượt chạy thành công là `failed`"* — nhưng cách
+thoả mãn rẻ nhất là **trả rỗng**, và bài kiểm cũ chấp nhận điều đó.
+
+> Một phép kiểm chỉ nói *"không được là A, B, C"* mà không nói *"phải là D"* thì
+> để ngỏ đúng một chỗ cho câu trả lời tệ nhất: **không là gì cả.**
+
+---
+
+## 20. `fleet --tu-duyet-quyen`: cờ do ADAPTER khai
+
+### 1. Vấn đề: tên cờ của Claude rò vào tay người dùng
+
+Muốn hạm đội làm được việc ở chế độ headless, agent con phải được tự duyệt tool —
+không thì nó dừng ở hộp thoại xin quyền mà không ai bấm được. Trước lượt này,
+cách duy nhất là người dùng **tự gõ** `-- --dangerously-skip-permissions`.
+
+Hai chỗ hỏng:
+
+1. Tên cờ **riêng của Claude** rò vào tay người dùng và vào mọi script họ viết.
+2. `sagent fleet codex:*` với cùng dòng đó sẽ **chạy sai mà không ai báo** —
+   provider khác thì cờ khác.
+
+### 2. Giải: hỏi adapter, không chép cứng
+
+`--tu-duyet-quyen` là một cờ **của sagent**; `ad.ArgsTuDuyetQuyen()` trả về cờ
+thật của provider đó. Đường flow đã hỏi adapter từ lâu (`argsChoBuoc`); đường
+fleet thì chưa — nay dùng lại đúng cơ chế đó nên hai đường không thể bất đồng về
+việc *"toàn quyền"* nghĩa là gì.
+
+Ba nhánh, và cả ba đều nói ra:
+
+| Adapter trả về | Hành vi |
+|---|---|
+| `daDo = false` | **TỪ CHỐI CHẠY**: *"xin `--tu-duyet-quyen` nhưng CHƯA ĐO cờ đó cho X — không khai bừa"* |
+| `daDo = true`, cờ rỗng | chạy tiếp + cảnh báo cờ là **thừa** (provider không có rào quyền nào) |
+| `daDo = true`, có cờ | chèn cờ vào **trước** args người dùng |
+
+Nhánh đầu là chỗ dễ làm sai nhất: khai bừa một cờ chưa đo làm **CLI con chết ngay
+dòng đầu**, tức đổi *"không đo được"* thành *"không chạy được"*.
+
+### 3. Người anh em của nó: `provider.CoConThieu`
+
+Cùng gốc bệnh, đo được cùng ngày. `fleet` truyền args **THÔ** cho CLI con, còn
+`flow` đi qua adapter. Người dùng gõ `-- -p "việc"` là agent chạy được, nhưng
+thiếu bộ cờ in bản ghi có cấu trúc thì công cụ không có gì để đọc.
+
+Số đo, **cùng một CLI, cùng những tài khoản, cùng một ngày**:
+
+| Đường | Đo được gì |
+|---|---|
+| `fleet` | 20/20 phiên `lost`, cột tokens và cost đều *"chưa đo"* |
+| `flow` (lượt #47) | **99.051** token vào · **81.492** token ra · **11,0572 USD** · đọc được cả lý do hỏng của bước `gop` |
+
+`CoConThieu` hỏi chính adapter xem bộ cờ còn thiếu gì rồi **bổ sung**, và phát
+cảnh báo nói rõ đã thêm gì — nó đổi định dạng stdout của agent, và người dùng có
+quyền biết. Thêm chứ không chỉ cảnh báo, vì không thêm thì bốn mặt đều mù, mà mù
+im lặng là đúng thứ dự án này lập ra để chống. Provider **chưa đo**
+`ket-qua-co-cau-truc` thì không thêm gì.
+
+### 4. Bài học
+
+> Một năng lực **đã đo được ở tầng adapter không tự đến mọi đường gọi.** Bốn mặt
+> điều khiển đọc chung một hợp đồng, nhưng hai đường **CHẠY** thì không — và
+> đường không hỏi adapter là đường mù.
+
+Test ngang quyền không bắt được chuyện này: nó kiểm mọi action **có** lệnh CLI,
+chứ không kiểm lệnh đó chạy ra **dữ liệu dùng được**.
+
+---
+
+## 21. `route kiem`: hỏi route còn sống TRƯỚC khi chạy
+
+### 1. Vì sao cần một lệnh riêng
+
+Đo 20/08/2026: route `deepseek` trả **HTTP 503 ba lần** lúc 16:54–16:56 rồi tự
+hồi phục. Khi chưa có lệnh này, cách duy nhất để biết là **gọi thật rồi hỏng** —
+tức hỏng **ở giữa** một lượt flow dài, chứ không phải lúc còn kịp đổi route.
+
+### 2. Vì sao đi bằng `GET /models` (không tốn token)
+
+> Một phép kiểm **có tính tiền** thì người ta sẽ thôi chạy nó, mà một health
+> check không ai chạy thì **bằng không có**.
+
+Đây là ràng buộc thiết kế, không phải tối ưu: giá của phép kiểm quyết định tần
+suất nó được dùng, và tần suất quyết định nó có giá trị hay không.
+
+### 3. Hai câu hỏi khác nhau: `Song` và `Dung()`
+
+- **`Song`** = *"nhà cung cấp còn đó không"*.
+- **`Dung()`** = *"gọi bây giờ thì chạy không"* — đòi thêm điều kiện **model khai
+  trong cấu hình có thật**.
+
+Tách hai cờ vì cách sửa khác hẳn nhau: route chết thì **đợi**, model khai sai thì
+**sửa cấu hình ngay**. Từng có `project.toml` khai `deepseek-chat`, một tên không
+tồn tại ở nhà bán lại đang dùng — route sống 100% mà mọi lượt gọi vẫn hỏng.
+
+### 4. Vì sao endpoint không có `/models` thì đánh dấu `KhongRo`
+
+Không phải endpoint nào cũng cài `/models`. Thiếu danh sách model thì **không
+được kết luận model khai sai** — công cụ báo *"không kiểm được tên model, chỉ
+biết là route sống"*.
+
+> **Im lặng khác phủ nhận.** Đây là cùng một luật với `PhanLoaiChet` ở mục 19 và
+> với `doc_duoc` ở mục 17: thiếu dữ liệu thì nói là thiếu, không suy.
+
+### 5. Vì sao kiểm SONG SONG
+
+Bốn route hỏi lần lượt, mỗi route chờ tối đa 15 giây, là gần một phút ngồi nhìn
+màn hình chỉ để biết có nên bấm chạy không — đủ lâu để người ta bỏ qua bước kiểm.
+Cùng lý do với mục 2: chi phí của phép kiểm quyết định nó có được chạy hay không.
+
+### 6. Ranh giới của lệnh này
+
+`route kiem` **không** biết hạn mức còn hay hết — cái đó chỉ lộ ra khi gọi thật.
+Lệnh in đúng câu đó ở cuối bảng, để không ai đọc một bảng toàn ✓ thành lời hứa.
+
+### 7. Vì sao `route.kiem` phải có đường vào từ web
+
+Luật ngang quyền bốn mặt đòi **mọi action** có đường vào từ mọi mặt. Endpoint đặt
+**sau guard đăng nhập** như mọi đường khác: một đường không cần đăng nhập mà gọi
+được ra Internet là một **máy dò cổng miễn phí** cho người lạ.
+
+---
+
+## 22. Refresh token XOAY VÒNG: từ "CHƯA ĐO" thành số đo
+
+### 1. Ô "chưa đo" nguy hiểm nhất, và vì sao nó tồn tại lâu
+
+`internal/profile/clone.go` mang cảnh báo *"⚠ CHƯA ĐO: token bị chép ra N chỗ thì
+khi hết hạn, N tiến trình có thể cùng refresh một lúc"* từ **Pha 2**. Cảnh báo mô
+tả **đúng** vùng nguy hiểm — nhưng vì chưa ai đo nên nó chỉ là một dòng chữ đứng
+cạnh một cái bẫy đang mở.
+
+### 2. Đo thế nào mà không mất tài khoản
+
+Phép đo này chạm vào đăng nhập thật, nên nó được thiết kế để **không mất gì**:
+
+1. Sao lưu `.credentials.json` của hồ sơ gốc và của bản clone; ghi **vân tay
+   SHA-256** (8 ký tự đầu) thay vì in token ra.
+2. Ép `expiresAt` của **bản clone** về quá khứ rồi chạy một lượt `claude -p` ngắn
+   → buộc CLI refresh.
+3. So vân tay refresh token trước/sau.
+4. Dựng một thư mục config **tạm** mang bản token CŨ rồi thử ở đó — token thật
+   vẫn nằm nguyên chỗ của nó.
+5. Chạy `sagent clone` để mang token mới về hồ sơ gốc; xoá thư mục tạm.
+
+### 3. Kết quả
+
+| Mốc | refresh token | access token |
+|---|---|---|
+| Trước (gốc và clone giống hệt nhau) | `5d708911` | `1a0b9b6c` |
+| Sau khi clone refresh — **clone** | **`1aa28b8c`** | `a2ae3dfd` |
+| Sau khi clone refresh — **gốc** | `5d708911` (không đổi) | `1a0b9b6c` |
+
+Thử bản CŨ trong thư mục tạm:
+
+```
+Failed to authenticate: OAuth session expired and could not be refreshed
+```
+
+Đúng nguyên văn câu đã làm hỏng bước `gop` của lượt chạy #47.
+
+**Kết luận: nhà cung cấp XOAY VÒNG refresh token** — mỗi lần refresh cấp một
+token mới và **giết token cũ ngay**.
+
+### 4. Vì sao hệ quả nặng hơn phỏng đoán cũ
+
+Phỏng đoán từ Pha 2 là *"N tiến trình đua nhau refresh"*. Thực tế:
+
+> Chép token ra N chỗ **không cần N tiến trình đua nhau** mới hỏng. **MỘT** bản
+> refresh là N−1 bản còn lại chết — và **hồ sơ gốc cũng là một trong số đó**.
+
+Chuỗi đã làm mất phiên `claude:phu`: clone refresh → token mới nằm trong clone,
+gốc giữ token cũ đã bị vô hiệu → không ai chạy `clean` (chỗ **duy nhất** gọi
+`SyncBackTokens` lúc đó) → lượt sau `FleetStart` gọi `Clone`, chép token **đã
+chết** đè lên token **đang sống** → refresh thất bại → mất phiên.
+
+### 5. Bản vá, và điều nó KHÔNG cứu được
+
+`profile.Clone` gọi `SyncBackTokens` **trước khi** chép đè, nên công refresh lan
+ra mọi bản thay vì bị token cũ nuốt mất. Lỗi ở bước đồng bộ **không chặn** việc
+chạy — tệ nhất là quay về hành vi cũ.
+
+Đối chứng trên máy thật, khi hồ sơ gốc đang cầm token đã chết:
+
+```
+TRƯỚC:  gốc refresh=5d708911   (đã chết)
+$ sagent clone claude:phu --copies 1
+SAU:    gốc refresh=1aa28b8c   clone refresh=1aa28b8c   (đều sống)
+```
+
+> [!WARNING]
+> **Đồng bộ ngược cứu được GIỮA CÁC LƯỢT, không cứu được TRONG LÚC CHẠY.** Hai
+> bản đang chạy cùng lúc, một bản tới mốc refresh và xoay token đi, thì bản kia
+> cầm token đã chết **ngay giữa việc** — không có chỗ nào để chen vào mà đồng bộ.
+
+Vì vậy `fleet` nói thẳng: **lượt chạy dài thì chia cho NHIỀU TÀI KHOẢN, đừng chạy
+nhiều bản của một tài khoản.** Nó cũng cảnh báo trước khi bật nếu token còn dưới
+2 giờ — access token của Claude sống ~7,5 giờ, nên hạm đội chạy qua đêm **chắc
+chắn** vượt mốc refresh.
+
+Câu cảnh báo này **rẽ theo năng lực adapter**, không theo tên provider: provider
+khai `PrivateFiles()` rỗng (Antigravity giữ token trong Windows Credential
+Manager) thì không có file nào được chép, và câu *"token chép ra N chỗ"* sẽ là
+một câu **sai sự thật** in ra mỗi lần chạy.
+
+### 6. Bài học lớn nhất
+
+> Giữa *"biết là có thể hỏng"* và *"biết hỏng thế nào"* là khoảng cách của một
+> tài khoản bị mất đăng nhập giữa lượt chạy. **Chỗ nào trong mã còn chữ CHƯA ĐO
+> thì chỗ đó là một cái bẫy đang chờ, không phải một ghi chú lịch sự.**
+
+> [!NOTE]
+> **Còn treo:** đường clone về lâu dài cần **một người giữ token duy nhất**, không
+> phải N bản sao — thiết kế đó chưa làm.
 
 
 
