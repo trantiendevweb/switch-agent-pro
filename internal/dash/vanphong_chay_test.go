@@ -54,11 +54,26 @@ func TestVanPhongChayThatVoiDomGia(t *testing.T) {
 	if _, err := os.ReadFile(hn); err != nil {
 		t.Fatalf("khong doc duoc %s: %v", hn, err)
 	}
-	ra, err := exec.Command(node, hn, tam).CombinedOutput()
-	if err != nil {
-		t.Fatalf("van phong hong khi chay that:\n%s", ra)
+
+	// Chay HAI luot. Nguoi dung bat "giam chuyen dong" thi ca vong lap dong hinh
+	// bi cat bot — do la mot duong ma KHONG luot nao truoc gio di qua. Duong
+	// giao viec chang han: no phai duoc dat toa do moi khung hinh, va neu doan
+	// cap nhat do nam nham ben trong nhanh `if(!RM)` thi sau duong nam nguyen o
+	// goc toa do, thanh sau vach cheo vo nghia giua san.
+	for _, che := range []struct{ ten, co string }{
+		{"thuong", ""},
+		{"giam chuyen dong", "rm"},
+	} {
+		tv := []string{hn, tam}
+		if che.co != "" {
+			tv = append(tv, che.co)
+		}
+		ra, err := exec.Command(node, tv...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("van phong hong khi chay that (che do %s):\n%s", che.ten, ra)
+		}
+		t.Logf("\n--- che do %s ---\n%s", che.ten, ra)
 	}
-	t.Logf("\n%s", ra)
 }
 
 // LUAT NGANG QUYEN (MASTER-PLAN §2c): mat nao cung phai DIEU KHIEN duoc, khong

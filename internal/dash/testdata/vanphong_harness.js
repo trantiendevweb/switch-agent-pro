@@ -54,6 +54,12 @@ function attr(n) {
 
 const veLai = [];
 const nhomTao = [];   // moi Group duoc tao, de do lai vi tri noi that
+const lineTao = [];   // moi duong giao viec, de kiem no co duoc dat toa do khong
+
+// Nguoi dung bat "giam chuyen dong" thi ca vong lap dong hinh bi cat bot. Chay
+// them mot luot o che do do de biet duong giao viec CO duoc cap nhat khong —
+// neu khong, no nam nguyen o goc toa do, tuc la mot vach cheo vo nghia giua san.
+const RM_GIA = process.argv[3] === 'rm';
 let demLine = 0, demHat = 0;
 // Hinh cau la lop RIENG de dem duoc: hat chay doc duong giao viec la Mesh duy
 // nhat dung hinh cau trong ca canh.
@@ -79,7 +85,7 @@ const THREE = {
   Mesh: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; this.isMesh = true;
       if (g instanceof GeoCau) demHat++; } },
   Group: class extends Obj { constructor() { super(); nhomTao.push(this); } },
-  Line: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; demLine++; } },
+  Line: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; demLine++; lineTao.push(this); } },
   LineSegments: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } },
   GridHelper: class extends Obj { constructor() { super(); this.material = { transparent: false, opacity: 1 }; } },
   AnimationMixer: class {
@@ -177,7 +183,7 @@ const ctx = {
   THREE, console, Math, JSON, Promise, Error, Float32Array, Array, Object,
   String, Number, Boolean, Date, Set, Map,
   document: { getElementById: id => kho[id] || null, createElement: elMoi, body: { appendChild(c) { return c; } } },
-  matchMedia: () => ({ matches: false }),
+  matchMedia: () => ({ matches: RM_GIA }),
   getComputedStyle: () => ({ getPropertyValue: n => (n === '--link' ? '#39D9E0' : '#123456') }),
   innerWidth: 1600, innerHeight: 900, devicePixelRatio: 1,
   addEventListener() {}, setInterval() {}, setTimeout() {},
@@ -241,10 +247,24 @@ setTimeout(() => {
   // 2) DUONG GIAO VIEC dung bang so canh `needs` giua HAI nhan vat khac nhau.
   //    Sau buoc gia o tren cho ra dung 6 canh, trong do 1 canh dang hoat dong
   //    (gop xong -> code-go dang chay).
+  const hatMong = RM_GIA ? 0 : 1;   // giam chuyen dong thi KHONG dung hat chay
   console.log('  duong noi   :', demLine, '(cho doi 6)');
-  console.log('  hat chay    :', demHat, '(cho doi 1)');
+  console.log('  hat chay    :', demHat, '(cho doi ' + hatMong + ')');
   if (demLine !== 6) { console.error('  HONG: so duong noi sai'); hong++; }
-  if (demHat !== 1) { console.error('  HONG: so hat sai'); hong++; }
+  if (demHat !== hatMong) { console.error('  HONG: so hat sai'); hong++; }
+
+  // Duong noi phai duoc DAT TOA DO moi khung hinh. Chua dat thi ca sau diem con
+  // nam o goc — sau vach cheo qua giua san, khong noi len dieu gi.
+  const dat = lineTao.slice(-6).filter(l => {
+    const a2 = l.geometry.attributes.position;
+    return a2 && a2.array[1] > 1.1 && a2.array[4] > 1.1;
+  });
+  console.log('  duong da dat toa do:', dat.length + '/6');
+  if (dat.length !== 6) {
+    console.error('  HONG: duong giao viec khong duoc cap nhat toa do' +
+      (RM_GIA ? ' o che do giam chuyen dong' : ''));
+    hong++;
+  }
 
   // 3) HINH HOC PHONG. Toi khong co mat de nhin canh 3D, nen phai DO. Ba dieu:
   //    (a) moi mon noi that nam trong long phong, khong xuyen qua vach;
