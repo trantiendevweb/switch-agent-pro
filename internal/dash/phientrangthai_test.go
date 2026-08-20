@@ -16,7 +16,7 @@ import (
 //
 // Luật của việc này: bốn mặt chỉ ĐỌC LẠI `Session.State` từ /api/state, không
 // mặt nào tự suy. Ba nhóm test dưới đây canh đúng điều đó — một nhóm cho hợp
-// đồng dữ liệu, hai nhóm cho hai trang THẬT SỰ vẽ phiên (index.html và 3d.html;
+// đồng dữ liệu, hai nhóm cho hai trang THẬT SỰ vẽ phiên (index.html và trung-tam.html;
 // flow.html và vanphong.html đọc /api/flow/detail, không đụng tới phiên).
 
 const logChanQuyenWeb = `{"type":"result","subtype":"success","is_error":false,"result":"",` +
@@ -107,30 +107,30 @@ func TestMat2DDocLaiStateChuKhongSuyTuPID(t *testing.T) {
 	}
 }
 
-// 3d.html cũng vậy: orb phải lấy màu từ `state`, không phải mặc định "sống thì
+// Mặt Trung tâm cũng vậy: orb phải lấy màu từ `state`, không phải mặc định "sống thì
 // đang chạy". Bản cũ có đúng dòng `const tt = A && A.state === 'pending' ?
 // 'pending' : 'running';` — một phiên chết vẫn ra orb xanh đang đập.
-func TestMat3DDocLaiStateChuKhongMacDinhRunning(t *testing.T) {
-	ma := boComment(doc3D(t))
+func TestMatTrungTamDocLaiStateChuKhongMacDinhRunning(t *testing.T) {
+	ma := boComment(docTrungTam(t))
 	if !regexp.MustCompile(`function\s+ttPhien\s*\([^)]*\)\s*\{[^}]*s\.state`).MatchString(ma) {
-		t.Error("3d.html: không có ttPhien() đọc s.state — màn 3D đang tự đoán trạng thái phiên")
+		t.Error("trung-tam.html: không có ttPhien() đọc s.state — màn 3D đang tự đoán trạng thái phiên")
 	}
 	if regexp.MustCompile(`const\s+tt\s*=\s*A\s*&&\s*A\.state\s*===\s*'pending'\s*\?\s*'pending'\s*:\s*'running'`).MatchString(ma) {
-		t.Error("3d.html: còn dòng mặc-định-running cũ — phiên đã chết vẫn ra orb xanh")
+		t.Error("trung-tam.html: còn dòng mặc-định-running cũ — phiên đã chết vẫn ra orb xanh")
 	}
 	for _, tt := range []string{"rate_limited", "blocked", "failed"} {
 		if !strings.Contains(ma, tt) {
-			t.Errorf("3d.html không biết trạng thái %q", tt)
+			t.Errorf("trung-tam.html không biết trạng thái %q", tt)
 		}
 	}
 	// Màu phải đi qua mauToken (tức vendor/token.css), không phải mã màu chép cứng.
 	for _, d := range []string{"MAU_PHIEN", "mauPhien"} {
 		if !strings.Contains(ma, d) {
-			t.Errorf("3d.html thiếu %s — bảng màu trạng thái phiên không có nguồn chung", d)
+			t.Errorf("trung-tam.html thiếu %s — bảng màu trạng thái phiên không có nguồn chung", d)
 		}
 	}
 	if regexp.MustCompile(`MAU_PHIEN\s*=\s*\{[^}]*0x[0-9a-fA-F]{6}`).MatchString(ma) {
-		t.Error("3d.html: MAU_PHIEN chép cứng mã màu thay vì đọc token.css — " +
+		t.Error("trung-tam.html: MAU_PHIEN chép cứng mã màu thay vì đọc token.css — " +
 			"sửa token.css thì 3D giữ màu cũ, im lặng")
 	}
 }
@@ -144,7 +144,7 @@ func TestHaiMatNoiCungMotBoNhanTrangThai(t *testing.T) {
 		"blocked":      "bị chặn quyền",
 		"failed":       "lỗi nhà cung cấp",
 	}
-	for _, ten := range []string{"index.html", "3d.html"} {
+	for _, ten := range []string{"index.html", "trung-tam.html"} {
 		b, err := os.ReadFile(filepath.Join("web", ten))
 		if err != nil {
 			t.Fatal(err)

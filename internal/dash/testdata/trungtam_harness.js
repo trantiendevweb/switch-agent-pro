@@ -158,6 +158,7 @@ function elMoi(tag) {
     tagName: tag, style: {}, children: [], className: '', textContent: '',
     classList: { add() {}, remove() {}, contains() { return false; } },
     appendChild(c) { this.children.push(c); return c; },
+    get title() { return this._t || ''; }, set title(v) { this._t = v; },
     remove() { e.goBo = true; }, setPointerCapture() {},
     _h: {},
     addEventListener(t, f) { (this._h[t] = this._h[t] || []).push(f); },
@@ -229,7 +230,9 @@ const ctx = {
   getComputedStyle: () => ({ getPropertyValue: n => (n === '--link' ? '#39D9E0' : '#123456') }),
   innerWidth: 1600, innerHeight: 900, devicePixelRatio: 1,
   addEventListener(t, f) { (phimCua[t] = phimCua[t] || []).push(f); },
-  setInterval() {}, setTimeout() {},
+  // setInterval/setTimeout la no-op: hieu ung go chu chay bang chung, va bai
+  // kiem khong cho no. Nhung DONG dau tien phai duoc tao ngay, de con dem duoc.
+  setInterval() { return 0; }, clearInterval() {}, setTimeout() { return 0; },
   requestAnimationFrame(f) { khung = f; },
   EventSource: class {},
   fetch: async (u) => {
@@ -563,6 +566,52 @@ setTimeout(async () => {
     const soLog = kho['hud-log'].children.length;
     console.log('  nhat ky: ' + soLog + ' dong');
     if (!soLog) { console.error('  HONG: nhat ky rong sau khi da chay lenh'); hong++; }
+
+    // (g) CU MO MAN o che do GIAM CHUYEN DONG phai in DU bon dong ngay, khong
+    //     go tung ky tu. Nguoi bao giam chuyen dong khong co nghia la ho khong
+    //     can doc — cat hieu ung ma cat luon noi dung la hieu sai y ho.
+    if (RM_GIA) {
+      const co = kho['hud-log'].children.filter(d =>
+        String(d.title || '').indexOf('sẵn sàng') >= 0 ||
+        String(d.textContent || '').indexOf('sẵn sàng') >= 0).length;
+      console.log('  mo man (giam chuyen dong): ' + kho['hud-log'].children.length +
+        ' dong, co dong "san sang" = ' + (co > 0));
+      if (kho['hud-log'].children.length < 4) {
+        console.error('  HONG: che do giam chuyen dong in thieu dong mo man'); hong++;
+      }
+    }
+
+    // (h) BA VONG SO LIEU quanh loi. Moi vong hai duong: ranh nen (ve du 1 vong)
+    //     va cung so lieu (ve theo ti le that) -> 6 duong.
+    //
+    //     Loc theo DO DAI MANG: vong dung 129 diem (387 so), con duong giao viec
+    //     va beam chi 2 diem (6 so). Nho vay dem duoc rieng vong ma khong phai
+    //     mang them mot danh sach nua.
+    const vongVe = lineTao.filter(l => {
+      const a2 = l.geometry.attributes.position;
+      if (!a2 || a2.array.length < 300) return false;
+      for (let i = 0; i < a2.array.length; i++) if (a2.array[i] !== 0) return true;
+      return false;
+    }).length;
+    console.log('  vong so lieu: ' + vongVe + '/6 duong da co toa do');
+    if (vongVe !== 6) {
+      console.error('  HONG: cho doi 6 duong vong (3 vong x [ranh + cung]), dem duoc ' + vongVe);
+      hong++;
+    }
+    // Va ranh nen PHAI khac cung so lieu: hai duong trung nhau nghia la cung
+    // dang ve du ca vong, tuc no khong doc du lieu nao ca.
+    const dai = lineTao.filter(l => l.geometry.attributes.position &&
+      l.geometry.attributes.position.array.length >= 300);
+    if (dai.length >= 2) {
+      const a = dai[0].geometry.attributes.position.array;
+      const b = dai[1].geometry.attributes.position.array;
+      let giong = true;
+      for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { giong = false; break; }
+      if (giong) {
+        console.error('  HONG: ranh nen va cung so lieu trung khit — cung khong doc du lieu nao');
+        hong++;
+      }
+    }
   }
 
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');

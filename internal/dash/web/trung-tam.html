@@ -339,8 +339,8 @@ const MAU_TT = {running:mauToken('--run'), done:mauToken('--done'),
 // hỏng; `lost` xám vì nó đúng nghĩa KHÔNG BIẾT. Mặt 2D chia y hệt — hai mặt
 // phải đọc như MỘT sản phẩm.
 //
-// Chuyển sang đây khi gộp hai mặt ba chiều: phần này được thêm vào 3d.html ở
-// lượt #46, mà 3d.html thì vừa bị gộp đi. Xoá trang mà bỏ luôn việc trong đó là
+// Chuyển sang đây khi gộp hai mặt ba chiều: phần này được thêm vào mặt sơ đồ ở
+// lượt #46, mà mặt đó thì vừa bị gộp đi. Xoá trang mà bỏ luôn việc trong đó là
 // đánh rơi tính năng không ai thấy.
 const MAU_PHIEN = {running:mauToken('--run'), pending:mauToken('--pending'),
                    rate_limited:mauToken('--pending'), blocked:mauToken('--error'),
@@ -1458,6 +1458,88 @@ vanhQuyDao.rotation.x = Math.PI/2; vanhQuyDao.position.y = CAO_LOI; tangTren.add
 // sẽ học cách bỏ qua nó, kéo theo bỏ qua cả lúc nó có nghĩa.
 const CHAY = tt => tt === 'running' || tt === 'pending' || tt === 'waiting';
 
+// ---- BA VÒNG SỐ LIỆU QUANH LÕI ----
+//
+// Ba cung tròn đồng tâm, mỗi cung là MỘT THƯỚC thật, vẽ theo tỉ lệ phần trăm:
+//   trong  — phần trăm bước đã xong của lượt chạy
+//   giữa   — phần trăm phiên đang chạy trên trần max_parallel_sessions
+//   ngoài  — token đã tiêu, so với mốc tham chiếu (xem GHI CHÚ bên dưới)
+//
+// GHI CHÚ QUAN TRỌNG về vòng ngoài: token KHÔNG có trần thật để chia — hạn mức
+// thuê bao không lộ ra dưới dạng con số. Nên vòng này lấy mốc TRÔI: giá trị lớn
+// nhất từng thấy trong phiên xem. Nó trả lời được "đang tiêu nhanh hay chậm so
+// với chính nó", KHÔNG trả lời "còn bao nhiêu" — và con số thật vẫn nằm ở HUD
+// bên trái. Vẽ một vòng đầy 100% rồi để người ta tưởng là sắp hết hạn mức thì
+// tệ hơn là không vẽ.
+const VONG = [
+  {r: 2.6, key: 'buoc',  ten: 'bước xong'},
+  {r: 3.2, key: 'phien', ten: 'phiên chạy'},
+  {r: 3.8, key: 'token', ten: 'token'}
+];
+const vongSo = [];
+let tokenDinh = 0;      // mốc trôi cho vòng ngoài
+
+// Cung tròn vẽ bằng Line nhiều điểm chứ không phải TorusGeometry: torus không
+// cắt được theo phần trăm mà không dựng lại hình mỗi khung hình.
+function taoCung(r, mau, mo){
+  const n = 128;
+  const h = new THREE.BufferGeometry();
+  h.setAttribute('position', new THREE.BufferAttribute(new Float32Array((n + 1) * 3), 3));
+  const l = new THREE.Line(h, new THREE.LineBasicMaterial(
+    {color: mau, transparent: true, opacity: mo}));
+  l.userData = {n, r};
+  return l;
+}
+
+// Vẽ lại một cung theo tỉ lệ 0..1. Điểm thừa dồn hết về điểm cuối — three vẽ
+// đoạn dài 0 thì không ra pixel nào, nên cung tự cắt đúng chỗ.
+function veCung(l, ti){
+  const {n, r} = l.userData;
+  const pos = l.geometry.attributes.position;
+  const het = Math.max(0, Math.min(1, ti));
+  for(let i = 0; i <= n; i++){
+    const t = Math.min(i / n, het);
+    const a = -Math.PI/2 + t * Math.PI * 2;
+    pos.setXYZ(i, Math.cos(a) * r, 0, Math.sin(a) * r);
+  }
+  pos.needsUpdate = true;
+}
+
+(function dungVongSo(){
+  VONG.forEach(v=>{
+    // Rãnh nền: cả vòng, rất mờ — để mắt biết cung kia đang lấp được bao nhiêu
+    // trên tổng bao nhiêu. Không có rãnh thì 30% và 90% trông giống nhau.
+    const ranh = taoCung(v.r, MAU_LINK, .10);
+    veCung(ranh, 1);
+    ranh.position.y = CAO_LOI; tangTren.add(ranh);
+    const cung = taoCung(v.r, MAU_LINK, .85);
+    veCung(cung, 0);
+    cung.position.y = CAO_LOI; tangTren.add(cung);
+    vongSo.push({...v, ranh, cung});
+  });
+})();
+
+function capNhatVongSo(){
+  const ss = (hamDoi && hamDoi.sessions) || [];
+  const chay = ss.filter(s => s.state === 'running').length;
+  const tran = (hamDoi && hamDoi.maxParallel) || 4;
+  let tok = 0;
+  ss.forEach(s => { tok += (s.tokens || 0); });
+  if(tok > tokenDinh) tokenDinh = tok;
+  const xong = flowSteps.filter(s => s.state === 'done').length;
+  const ti = {
+    buoc:  flowSteps.length ? xong / flowSteps.length : 0,
+    phien: tran ? chay / tran : 0,
+    // Chưa có gì để so thì để RỖNG, không vẽ một cung đầy cho đẹp.
+    token: tokenDinh ? tok / tokenDinh : 0
+  };
+  vongSo.forEach(v=>{
+    veCung(v.cung, ti[v.key]);
+    v.cung.material.opacity = 0.85 * tang;
+    v.ranh.material.opacity = 0.10 * tang;
+  });
+}
+
 const cauAgent = {};    // khoá nhân vật -> {g, beam, hat, tia, goc}
 
 function taoCau(mau){
@@ -1575,6 +1657,7 @@ function capNhatQuyDao(dt, gio){
       A.tia.material.opacity = 0.30 * tang;
     } else A.tia.visible = false;
   }
+  capNhatVongSo();
   loiVo.material.opacity = 0.8 * tang;
   loiTrong.material.opacity = 0.3 * tang;
   halo.material.opacity = (0.42 + (RM ? 0 : 0.12*Math.sin(gio*1.1))) * tang;
@@ -2182,11 +2265,55 @@ napNoiThat().then(()=>{
 // Giảm chuyển động thì vào thẳng sàn, không diễn.
 datGocHud();
 addEventListener('resize', datGocHud);
+
+// Chữ gõ máy: từng dòng chạy ra từng ký tự, kiểu terminal đang bóc tải.
+//
+// Đây là chuyển động THỨ HAI trong trang không mã hoá thông tin gì (cùng với cú
+// hạ camera), và nó được giữ vì hai lý do có thật: nó lấp đúng khoảng 1,4 giây
+// camera đang bay — nếu không thì đó là một khoảng chờ trống — và bốn dòng nó
+// gõ ra chính là bốn câu người mở trang lần đầu cần biết.
+//
+// Giảm chuyển động thì in thẳng cả bốn dòng, không gõ. Người bảo giảm chuyển
+// động không có nghĩa là họ không cần đọc.
+const DONG_MO_MAN = [
+  'trung tâm · nối tới sagent',
+  'nạp mô hình nhân vật và bộ nội thất',
+  'đọc lượt chạy từ /api/flow/detail',
+  'sẵn sàng — gõ / để ra lệnh'
+];
+
+function goChu(ds, xong){
+  let i = 0;
+  const tiep = ()=>{
+    if(i >= ds.length){ if(xong) xong(); return; }
+    const chu = ds[i++];
+    const el = document.createElement('div');
+    el.className = 'me';
+    const t = document.createElement('time');
+    t.textContent = '··';
+    el.appendChild(t);
+    const noi = document.createTextNode('');
+    el.appendChild(noi);
+    $('hud-log').appendChild(el);
+    let k = 0;
+    const nhip = setInterval(()=>{
+      noi.nodeValue = chu.slice(0, ++k);
+      // textContent của cả dòng đổi theo nodeValue, nhưng vài trình duyệt cũ
+      // không nhận — gán lại cho chắc, và giữ cả dấu thời gian.
+      el.title = chu;
+      if(k >= chu.length){ clearInterval(nhip); setTimeout(tiep, 90); }
+    }, 16);
+  };
+  tiep();
+}
+
 if(RM){
   controls.datR(R_SAN, true);
+  DONG_MO_MAN.forEach(d => ghiLog(d, 'me'));
 }else{
   controls.datR(R_CAO, true);
-  setTimeout(()=>{ controls.datR(R_SAN); ghiLog('trung tâm sẵn sàng — gõ / để ra lệnh', 'me'); }, 1400);
+  goChu(DONG_MO_MAN);
+  setTimeout(()=>{ controls.datR(R_SAN); }, 1400);
 }
 
 refresh(); connect(); tick();
