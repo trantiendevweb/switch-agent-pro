@@ -12,7 +12,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
 )
 
-// Mat VAN PHONG (web/vanphong.html) la mat thu nam cua dashboard, them 20/08
+// Mat VAN PHONG (web/trung-tam.html) la mat thu nam cua dashboard, them 20/08
 // theo docs/KE-HOACH-VAN-PHONG.md — Dot 3. No khac ba mat 2D va khac ca
 // 3d.html (so do): day la NOI LAM VIEC, bon phong theo LOAI VIEC + mot sanh
 // chung, nhan vat di lai giua cac phong khi buoc doi loai viec.
@@ -29,19 +29,19 @@ import (
 //   - trang tien tay dung OrbitControls -> pha rang buoc nhung mot file core;
 //   - bon mat cu khong co link sang -> tinh nang co ma khong ai tim thay.
 
-func docVanPhong(t *testing.T) string {
+func docTrungTam(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("web", "vanphong.html"))
+	b, err := os.ReadFile(filepath.Join("web", "trung-tam.html"))
 	if err != nil {
-		t.Fatalf("khong doc duoc web/vanphong.html: %v", err)
+		t.Fatalf("khong doc duoc web/trung-tam.html: %v", err)
 	}
 	return string(b)
 }
 
-// maVanPhong: phan MA THAT SU CHAY (da bo comment). boComment o mat3d_test.go.
-func maVanPhong(t *testing.T) string {
+// maTrungTam: phan MA THAT SU CHAY (da bo comment). boComment o mat3d_test.go.
+func maTrungTam(t *testing.T) string {
 	t.Helper()
-	return boComment(docVanPhong(t))
+	return boComment(docTrungTam(t))
 }
 
 func docGLB(t *testing.T) []byte {
@@ -57,7 +57,7 @@ func docGLB(t *testing.T) []byte {
 // (TestDuongVendorTroDungFile o offline_asset_test.go kiem tiep rang chung tro
 // dung file co that.)
 func TestVanPhongNapDuBaAssetNhung(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	can := map[string]string{
 		"vendor/three.min.js":        "nhan ba chieu",
 		"vendor/GLTFLoader.js":       "bo doc .glb — loader da vendor, khong phai addon hieu ung",
@@ -75,7 +75,7 @@ func TestVanPhongNapDuBaAssetNhung(t *testing.T) {
 // nham mot chu thi mixer khong tim thay action, nhan vat dung im o tu the bind
 // pose — canh van ve ra, khong loi nao, va nguoi xem tuong la "dang ranh".
 func TestVanPhongDungDungSauClipCoThatTrongGLB(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	glb := string(docGLB(t))
 
 	// clip -> viec that dang sau no (theo ke hoach Dot 3)
@@ -102,7 +102,7 @@ func TestVanPhongDungDungSauClipCoThatTrongGLB(t *testing.T) {
 // internal/flow phai co cho ngoi; vai RONG (chua phan vai) phai roi ve sanh
 // chung, khong duoc doan ho vao mot phong nao cho dep doi hinh.
 func TestVanPhongDuBonPhongVaSanhChung(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 
 	for _, p := range []string{"Phòng họp", "Phòng code", "Phòng test", "Phòng review", "Sảnh chung"} {
 		if !strings.Contains(s, p) {
@@ -151,7 +151,7 @@ func TestVanPhongDuBonPhongVaSanhChung(t *testing.T) {
 // mat. Mat nay tu suy vai tu ten buoc hay tu do thi needs la bat dau lech voi
 // hai mat kia, va lech kieu do khong ai bao loi.
 func TestVanPhongLayVaiTuFlowDetail(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	for _, d := range []string{"/api/flows", "/api/flow/detail", "/api/events"} {
 		if !strings.Contains(s, d) {
 			t.Errorf("vanphong.html khong goi %s — mat nay phai doc cung nguon voi 2D va 3D", d)
@@ -167,7 +167,7 @@ func TestVanPhongLayVaiTuFlowDetail(t *testing.T) {
 // overlay chu khong phai 3D text (3D text nhoe khi xoay, va khong dung duoc
 // --font-mono cua token).
 func TestVanPhongBongThoaiLayOutputThat(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 
 	// Chu trong bong phai DEN TU truong output, va den qua dung mot duong: ham
 	// loiThoai. Kiem `strings.Contains(s, ".output")` cho ca file la chua du —
@@ -208,7 +208,7 @@ func TestVanPhongBongThoaiLayOutputThat(t *testing.T) {
 // May cham la NHAN VAT RIENG, khac hinh voi agent. Buoc test/lint/shell/merge
 // khong co agent nao dung sau; ve chung thanh nguoi la noi doi ve ai da lam.
 func TestVanPhongMayChamKhacHinhAgent(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	if !strings.Contains(s, "taoMayCham") {
 		t.Fatal("vanphong.html khong co ham dung may cham — buoc may se deo lot hinh agent")
 	}
@@ -232,7 +232,7 @@ func TestVanPhongMayChamKhacHinhAgent(t *testing.T) {
 // trang; test nay kiem chieu con lai — thay the phai co that, khong phai bo
 // addon di roi de camera dung im.
 func TestVanPhongCameraOrbitTuViet(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	can := map[string]string{
 		"pointerdown":   "keo de xoay",
 		"wheel":         "lan de zoom",
@@ -250,7 +250,7 @@ func TestVanPhongCameraOrbitTuViet(t *testing.T) {
 // Do la duong vong ma "bang mau thu tu" da quay ve mot lan: token.css doi mot
 // ma thi trang nay giu ma cu, im lang, khong ai bao loi.
 func TestVanPhongKhongChepMaMauVaoTrang(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	if !strings.Contains(s, "mauToken(") {
 		t.Fatal("vanphong.html khong doc mau tu token.css qua mauToken()")
 	}
@@ -268,7 +268,7 @@ func TestVanPhongKhongChepMaMauVaoTrang(t *testing.T) {
 // prefers-reduced-motion phai TAT HAN chuyen dong, khong phai giam bot: mixer
 // khong chay, nhan vat khong di, camera khong tu xoay.
 func TestVanPhongTatChuyenDongKhiGiamChuyenDong(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	if !strings.Contains(s, "prefers-reduced-motion") {
 		t.Fatal("vanphong.html khong doc prefers-reduced-motion")
 	}
@@ -277,11 +277,23 @@ func TestVanPhongTatChuyenDongKhiGiamChuyenDong(t *testing.T) {
 			"vong lap JS van chay thi nhan vat van di lai")
 	}
 	// Vong lap phai co nhanh chan: mixer.update va buoc di deu nam trong if(!RM).
+	//
+	// Quet MOI nhanh if(!RM), khong chi nhanh dau tien. Ban truoc chi lay nhanh
+	// dau, nen chi can them mot ham co if(!RM) o phia tren la test do trong khi
+	// ma van dung — va chuyen do da xay ra that luc gop hai mat. Mot bai kiem
+	// gay vi THU TU HAM trong file thi lan sau nguoi ta sua no cho im, chu khong
+	// sua cai no dinh bat.
 	re := regexp.MustCompile(`(?s)if\s*\(\s*!RM\s*\)\s*\{(.*?)\n  \}`)
-	m := re.FindStringSubmatch(s)
-	if m == nil || !strings.Contains(m[1], "mixer.update") {
-		t.Error("mixer.update khong nam trong nhanh if(!RM) — bat giam chuyen dong ma nhan vat " +
-			"van hoat hinh la khong ton trong lua chon cua nguoi dung")
+	coChan := false
+	for _, m := range re.FindAllStringSubmatch(s, -1) {
+		if strings.Contains(m[1], "mixer.update") {
+			coChan = true
+			break
+		}
+	}
+	if !coChan {
+		t.Error("mixer.update khong nam trong nhanh if(!RM) nao — bat giam chuyen dong ma nhan " +
+			"vat van hoat hinh la khong ton trong lua chon cua nguoi dung")
 	}
 	if !strings.Contains(s, "RM ? 0 :") {
 		t.Error("camera van tu xoay khi bat giam chuyen dong")
@@ -291,7 +303,7 @@ func TestVanPhongTatChuyenDongKhiGiamChuyenDong(t *testing.T) {
 // Hong thi phai noi THIEU FILE NAO. Man den im lang la kieu hong du an nay so
 // nhat: nguoi dung doan la loi mang, trong khi asset nam ngay trong binary.
 func TestVanPhongBaoRoThieuFileNao(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	if !strings.Contains(s, "function baoThieu") {
 		t.Fatal("vanphong.html khong co duong bao loi — canh trong tron thi khong ai biet vi sao")
 	}
@@ -304,24 +316,29 @@ func TestVanPhongBaoRoThieuFileNao(t *testing.T) {
 	}
 }
 
-// Tinh nang co ma khong ai tim thay thi bang khong co. Bon mat cu deu phai co
-// duong sang van phong.
-func TestBonMatCuDeuCoLinkSangVanPhong(t *testing.T) {
-	for _, ten := range []string{"index.html", "flow.html", "hoi-thoai.html", "3d.html"} {
+// Tinh nang co ma khong ai tim thay thi bang khong co. Moi mat deu phai co
+// duong sang Trung tam.
+//
+// GHI CHU KHI GOP (20/08): hai mat ba chieu — "3D" (so do quy dao) va "Van
+// phong" (san lam viec) — gop lam MOT, ten "Trung tam". Chung von ve CUNG mot
+// du lieu bang hai ngon ngu, va nguoi dung phai tu ghep trong dau. Nen bai nay
+// doi ten link theo, va danh sach trang giam tu nam xuong bon.
+func TestMoiMatDeuCoLinkSangTrungTam(t *testing.T) {
+	for _, ten := range []string{"index.html", "flow.html", "hoi-thoai.html", "trung-tam.html"} {
 		b, err := os.ReadFile(filepath.Join("web", ten))
 		if err != nil {
 			t.Fatalf("%s: %v", ten, err)
 		}
 		s := string(b)
-		re := regexp.MustCompile(`(?is)<a[^>]*href\s*=\s*["']/?vanphong\.html["'][^>]*>([^<]*)</a>`)
+		re := regexp.MustCompile(`(?is)<a[^>]*href\s*=\s*["']/?trung-tam\.html["'][^>]*>([^<]*)</a>`)
 		m := re.FindStringSubmatch(s)
 		if m == nil {
-			t.Errorf("%s khong co the <a> nao tro toi vanphong.html — mat moi khong co duong vao "+
-				"tu bon mat cu thi khong ai mo duoc no", ten)
+			t.Errorf("%s khong co the <a> nao tro toi trung-tam.html — mat gop khong co duong vao "+
+				"tu cac mat khac thi khong ai mo duoc no", ten)
 			continue
 		}
-		if !strings.Contains(m[1], "Văn phòng") {
-			t.Errorf("%s: link toi vanphong.html ghi %q, muon chu \"Văn phòng\" — mot hanh dong "+
+		if !strings.Contains(m[1], "Trung tâm") {
+			t.Errorf("%s: link toi trung-tam.html ghi %q, muon chu \"Trung tâm\" — mot hanh dong "+
 				"giu mot ten xuyen suot", ten, strings.TrimSpace(m[1]))
 		}
 	}
@@ -333,18 +350,18 @@ func TestVanPhongPhucVuVaDoiDangNhap(t *testing.T) {
 	s := newTestServer(t)
 
 	w := httptest.NewRecorder()
-	s.ServeHTTP(w, req("GET", "/vanphong.html"))
+	s.ServeHTTP(w, req("GET", "/trung-tam.html"))
 	if w.Code != http.StatusUnauthorized {
-		t.Errorf("GET /vanphong.html chua dang nhap: ma %d, muon 401 — trang nay bay ra "+
+		t.Errorf("GET /trung-tam.html chua dang nhap: ma %d, muon 401 — trang nay bay ra "+
 			"output cua agent", w.Code)
 	}
 
-	r := req("GET", "/vanphong.html")
+	r := req("GET", "/trung-tam.html")
 	r.AddCookie(dangNhap(t, s, "127.0.0.1:4600"))
 	w = httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
-		t.Fatalf("GET /vanphong.html da dang nhap: ma %d, muon 200", w.Code)
+		t.Fatalf("GET /trung-tam.html da dang nhap: ma %d, muon 200", w.Code)
 	}
 	if !strings.Contains(w.Body.String(), "vendor/RobotExpressive.glb") {
 		t.Error("trang phuc vu ra khong phai vanphong.html")

@@ -34,8 +34,7 @@ func TestMoiTrangTinhDeuCoVanXacThuc(t *testing.T) {
 	for _, d := range []string{
 		"/",                 // 2D — tu tra index.html
 		"/docs/",            // ke hoach — cung tu tra index.html
-		"/vanphong.html",    // van phong 3D
-		"/3d.html",          // so do 3D
+		"/trung-tam.html",   // trung tam (van phong + quy dao, da gop)
 		"/flow.html",        // bang workflow
 		"/hoi-thoai.html",   // hoi thoai
 		"/vendor/token.css", // bang mau dung chung

@@ -93,6 +93,85 @@
   #ct-bao:empty{display:none}
   @media (max-width:720px){ #chitiet{right:12px;left:12px;bottom:12px;width:auto;max-height:50vh} }
 
+  /* ---- KHUNG HUD ----
+     Luật màu của dự án được NỚI ở đúng một chỗ, do người dùng quyết: --link
+     (cyan) giờ được dùng cho KHUNG hologram — viền, cung, lưới, gạch chân. Năm
+     màu trạng thái (--run/--pending/--done/--error/--idle) vẫn CHỈ dành cho
+     trạng thái agent, không cái nào bị cyan lấn. Nhờ vậy vẫn nhìn phát biết ai
+     đang chạy, ai hỏng — thứ đắt nhất của màn hình này. */
+  #hud-goc{position:fixed;inset:0;pointer-events:none;z-index:2;width:100%;height:100%}
+  #hud-goc .cung{fill:none;stroke:var(--link);stroke-width:1;opacity:.20;
+    stroke-dasharray:38 26;transform-origin:0 0;animation:quayCham 26s linear infinite}
+  #hud-goc .cung.b{opacity:.13;stroke-dasharray:14 40;animation:quayNguoc 17s linear infinite}
+  @keyframes quayCham{to{transform:rotate(360deg)}}
+  @keyframes quayNguoc{to{transform:rotate(-360deg)}}
+
+  /* Vệt quét: một dải mảnh trôi từ trên xuống, rất mờ. Nó KHÔNG mã hoá thông
+     tin nào — là thứ trang trí duy nhất được giữ, vì nó thuộc về khung. */
+  #quet{position:fixed;left:0;right:0;height:140px;pointer-events:none;z-index:1;
+    background:linear-gradient(180deg,transparent,rgba(57,217,224,.045),transparent);
+    animation:quetXuong 7s linear infinite}
+  @keyframes quetXuong{from{top:-140px}to{top:100%}}
+
+  .hud{position:fixed;z-index:3;pointer-events:none;font-family:var(--font-mono)}
+  #hud-so{left:14px;top:74px;display:flex;flex-direction:column;gap:10px}
+  #hud-so .o{border-left:2px solid var(--link);padding:2px 0 2px 9px;min-width:118px}
+  #hud-so b{display:block;font-size:19px;font-weight:600;color:var(--hi);line-height:1.1;
+    letter-spacing:-.01em}
+  #hud-so span{font-size:9.5px;color:var(--lo);text-transform:uppercase;letter-spacing:.09em}
+
+  #hud-log{right:14px;top:74px;width:250px;max-height:38vh;overflow:hidden;
+    display:flex;flex-direction:column;gap:3px;font-size:10.5px;line-height:1.4;
+    /* Mờ dần ở mép trên: dòng cũ trôi đi thay vì bị cắt cụt. */
+    mask-image:linear-gradient(180deg,transparent,#000 26px);
+    -webkit-mask-image:linear-gradient(180deg,transparent,#000 26px)}
+  #hud-log div{color:var(--mid);border-left:1px solid var(--line-2);padding-left:7px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:hienRa .35s var(--ease)}
+  #hud-log div.er{color:var(--error);border-left-color:var(--error)}
+  #hud-log div.ok{color:var(--done);border-left-color:var(--done)}
+  #hud-log div.me{color:var(--link);border-left-color:var(--link)}
+  #hud-log time{color:var(--lo);margin-right:6px}
+  @keyframes hienRa{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+
+  /* ---- THANH LỆNH ---- */
+  #lenh{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);z-index:6;
+    display:flex;align-items:center;gap:8px;width:min(560px,calc(100% - 28px));
+    padding:9px 12px;border-radius:12px;
+    background:rgba(12,14,23,.80);border:1px solid rgba(57,217,224,.28);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    box-shadow:0 0 0 1px rgba(57,217,224,.06),0 12px 34px rgba(0,0,0,.55)}
+  #lenh:focus-within{border-color:rgba(57,217,224,.6);
+    box-shadow:0 0 0 1px rgba(57,217,224,.16),0 12px 34px rgba(0,0,0,.55)}
+  #lenh .nhac{color:var(--link);font-family:var(--font-mono);font-weight:700;font-size:14px}
+  #lenh input{flex:1;background:none;border:0;outline:none;color:var(--hi);
+    font-family:var(--font-mono);font-size:13px;min-width:0}
+  #lenh input::placeholder{color:var(--lo)}
+  #lenh button{background:none;border:1px solid var(--line-2);border-radius:8px;
+    color:var(--mid);cursor:pointer;padding:3px 9px;font-size:13px}
+  #lenh button:hover{color:var(--hi);border-color:var(--link)}
+  #lenh button:focus-visible,#lenh input:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+  #lenh-bao{position:fixed;left:50%;bottom:106px;transform:translateX(-50%);z-index:6;
+    max-width:min(560px,calc(100% - 28px));font-family:var(--font-mono);font-size:11.5px;
+    color:var(--mid);text-align:center;pointer-events:none;text-shadow:0 0 10px rgba(0,0,0,.9)}
+  #lenh-bao:empty{display:none}
+  #lenh-bao.er{color:var(--error)}
+  #lenh-bao.ok{color:var(--run)}
+
+  @media (max-width:720px){
+    #hud-log{display:none}          /* 250px trên màn 390px là nuốt mất cảnh */
+    #hud-so{top:auto;bottom:112px;flex-direction:row;gap:12px;flex-wrap:wrap}
+    #hud-so .o{min-width:0}
+    #hud-so b{font-size:15px}
+    #lenh{bottom:12px}
+    #lenh-bao{bottom:62px}
+    #quet{display:none}
+  }
+  @media (prefers-reduced-motion: reduce){
+    #quet{display:none}
+    #hud-goc .cung{animation:none}
+    #hud-log div{animation:none}
+  }
+
   #thieu{position:fixed;inset:0;display:none;place-items:center;text-align:center;padding:24px;z-index:9}
   #thieu div{max-width:420px}
   #thieu a{color:var(--link)}
@@ -118,20 +197,40 @@
 <div id="top" class="panel">
   <div class="b">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 5v10L12 22 3.5 17V7z"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
-    Switch-Agent-Pro <small>Văn phòng · dữ liệu thật</small>
+    Switch-Agent-Pro <small>Trung tâm · dữ liệu thật</small>
   </div>
   <div id="flowname" style="font-size:12px;color:var(--link);font-weight:600;font-family:var(--font-mono)"></div>
   <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
   <div class="nav">
     <a href="./">2D</a>
-    <a href="3d.html">3D</a>
-    <a class="on" href="vanphong.html">Văn phòng</a>
+    <a class="on" href="trung-tam.html">Trung tâm</a>
     <a href="flow.html">Workflow</a>
     <a href="hoi-thoai.html">Hội thoại</a>
     <a href="/docs/">Plan</a>
     <a href="/logout">Thoát</a>
   </div>
 </div>
+
+<!-- KHUNG HUD. Bốn góc là cung tròn quay chậm — thứ duy nhất ở đây thuần trang
+     trí, và nó được phép vì nó là KHUNG chứ không giả vờ mang thông tin. Mọi con
+     số bên trong đều từ /api/state và /api/flow/detail. -->
+<svg id="hud-goc" aria-hidden="true">
+  <g class="goc"><circle class="cung a" r="54"/><circle class="cung b" r="42"/></g>
+  <g class="goc"><circle class="cung a" r="54"/><circle class="cung b" r="42"/></g>
+</svg>
+<div id="quet" aria-hidden="true"></div>
+
+<!-- Số liệu bám viền trái. Mỗi ô một câu hỏi người vận hành hỏi trong một giây:
+     đang chạy mấy phiên, đốt bao nhiêu token, hết bao nhiêu tiền. -->
+<div id="hud-so" class="hud">
+  <div class="o"><b id="so-phien">—</b><span>phiên đang chạy</span></div>
+  <div class="o"><b id="so-token">—</b><span>token đã tiêu</span></div>
+  <div class="o"><b id="so-tien">—</b><span>chi phí</span></div>
+  <div class="o"><b id="so-buoc">—</b><span>bước xong / tổng</span></div>
+</div>
+
+<!-- Nhật ký sự kiện THẬT (SSE), trôi lên ở mép phải. -->
+<div id="hud-log" class="hud" aria-live="polite" aria-label="Nhật ký sự kiện"></div>
 
 <div id="legend" class="panel">
   <span><i class="dot" style="background:var(--run)"></i>đang chạy</span>
@@ -141,8 +240,22 @@
   <span><i class="dot" style="background:var(--idle)"></i>chưa chạy</span>
   <span><i class="ln"></i>đang giao việc</span>
   <span id="scount" style="color:var(--hi)">0 nhân vật</span>
-  <span style="color:var(--lo)">chạm vào người để xem chi tiết · ← → đổi người · Esc đóng</span>
+  <span id="tang-chu" style="color:var(--link)">sàn</span>
 </div>
+
+<!-- THANH LỆNH. Gõ là chạy — người dùng chọn thẳng "làm hết, không hỏi lại".
+     Bù lại: mọi lệnh đã chạy đều để lại một dòng trong nhật ký bên phải, và
+     `dừng` nằm ngay đó. Lệnh sai tên flow thì báo lỗi chứ KHÔNG bật gì. -->
+<form id="lenh" autocomplete="off">
+  <span class="nhac">&gt;</span>
+  <input id="lenh-o" type="text" spellcheck="false"
+         placeholder="chạy doi-4 · dừng 46 · hỏi … · quét · trợ giúp"
+         aria-label="Thanh lệnh" />
+  <button type="submit" aria-label="Chạy lệnh"><svg width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+    stroke-linejoin="round"><path d="M9 10L4 15l5 5"/><path d="M20 4v7a4 4 0 01-4 4H4"/></svg></button>
+</form>
+<div id="lenh-bao" role="status"></div>
 
 <!-- Bảng chi tiết: hiện khi bấm vào một nhân vật. Luật ngang quyền đòi mặt nào
      cũng phải ĐIỀU KHIỂN được, không chỉ để ngắm — trước bản này mặt văn phòng
@@ -156,6 +269,7 @@
   <div id="ct-nut">
     <a id="ct-hoithoai" href="hoi-thoai.html">Mở hội thoại</a>
     <button id="ct-huy" type="button">Huỷ lượt chạy</button>
+    <button id="ct-dungphien" type="button">Dừng phiên</button>
   </div>
   <div id="ct-bao"></div>
 </div>
@@ -277,6 +391,15 @@ const laMay = typ => LOAI_MAY.indexOf(typ) >= 0;
 
 // ---- three.js: cảnh, đèn, camera ----
 const canvas = $('scene');
+// three.min.js hỏng hoặc chưa nạp thì biến THREE không tồn tại, và trang chết
+// ngay dòng dùng nó đầu tiên — không lỗi nào hiện ra, chỉ một màn đen. Chặn ở
+// đây để nói rõ THIẾU FILE NÀO, giống hệt cách xử lý .glb bên dưới.
+if(typeof THREE === 'undefined'){
+  baoThieu('vendor/three.min.js',
+    'Không nạp được thư viện ba chiều. File nằm trong binary, không tải từ mạng — ' +
+    'nhiều khả năng bản build thiếu asset.');
+  throw new Error('thiếu THREE');
+}
 let renderer;
 // WebGLRenderer NÉM khi trình duyệt không dựng được context (máy ảo không GPU,
 // driver cũ, WebGL bị tắt). Không bắt thì trang ra màn đen im lặng.
@@ -319,7 +442,13 @@ const controls = (function(){
   canvas.addEventListener('pointercancel', buong);
   canvas.addEventListener('wheel', e=>{ e.preventDefault();
     muon.r = Math.min(XA, Math.max(GAN, muon.r * (e.deltaY > 0 ? 1.1 : 1/1.1))); }, {passive:false});
-  return { target, update(){
+  return { target,
+    // Bán kính là thứ ĐIỀU KHIỂN CẢ HAI TẦNG: lăn chuột ra xa thì văn phòng mờ
+    // đi và quỹ đạo hiện lên, lại gần thì ngược lại. Một con số, hai thế giới —
+    // nên nó phải mở ra ngoài chứ không nằm kín trong bao đóng này.
+    layR(){ return nay.r; },
+    datR(r, ngay){ muon.r = Math.min(XA, Math.max(GAN, r)); if(ngay) nay.r = muon.r; },
+    update(){
     if(TU_XOAY && !keo) muon.azi -= TU_XOAY;
     nay.azi   += (muon.azi   - nay.azi)*DAMP;
     nay.polar += (muon.polar - nay.polar)*DAMP;
@@ -332,9 +461,24 @@ const controls = (function(){
   }};
 })();
 
+// Tầng: 0 = đứng trên sàn văn phòng, 1 = lùi ra toàn cảnh quỹ đạo. Suy THẲNG từ
+// bán kính camera nên không có "chế độ" nào phải bấm để đổi — kéo chuột là nó
+// chuyển liên tục, và mọi thứ trong cảnh đọc chung một con số này.
+const R_SAN = 30, R_CAO = 78;
+let tang = 0;
+const muot = x => x*x*(3 - 2*x);   // smoothstep: vào/ra mượt, không giật ở hai đầu
+function tinhTang(){
+  const r = controls.layR();
+  tang = muot(Math.min(1, Math.max(0, (r - 42) / (70 - 42))));
+}
+
 scene.add(new THREE.AmbientLight(MAU_CHU, 0.75));
-const den = new THREE.DirectionalLight(MAU_CHU, 0.85);
-den.position.set(9, 18, 12); scene.add(den);
+// Đèn CHÍNH tên `key` — đúng quy ước ánh sáng, và có bài kiểm riêng gác chuyện
+// nó THẬT SỰ vào scene. Bản sơ đồ cũ từng có đúng cái đèn này bị nuốt sau một
+// dấu `//` cùng dòng: đèn được tạo, được đặt tên, và không bao giờ sáng.
+const key = new THREE.DirectionalLight(MAU_CHU, 0.85);
+key.position.set(9, 18, 12);
+scene.add(key);
 const denPhu = new THREE.DirectionalLight(MAU_CORE, 0.35);
 denPhu.position.set(-12, 10, -8); scene.add(denPhu);
 
@@ -1155,8 +1299,12 @@ function capNhat(){
   // Thứ tự để mũi tên bàn phím đi vòng — đúng thứ tự đang xếp trong `dan`.
   thuTuChon = dan.map(d => d.khoa);
 
-  // Dựng SAU cùng: dungCapNoi chỉ nối những nhân vật đã có mặt trong nhanVat.
+  // Dựng SAU cùng: dungCapNoi và dungQuyDao đều chỉ nối/xếp những nhân vật đã
+  // có mặt trong nhanVat.
   dungCapNoi();
+  dungQuyDao(dan);
+  dungClickable();
+  capNhatHudSo();
   // Bảng chi tiết phải theo dữ liệu mới. Để nó đứng im trong khi bước đã đổi
   // trạng thái là nói dối ngay giữa màn hình. Nhân vật biến mất thì đóng bảng.
   if(chonKhoa && !nhanVat[chonKhoa]) dongChiTiet(); else veChiTiet();
@@ -1166,6 +1314,12 @@ function capNhat(){
 // ---- dữ liệu: MỘT nguồn cho cả ba mặt — /api/flow/detail ----
 async function refresh(){
   try{
+    // Hạm đội đọc từ ĐÚNG /api/state mà mặt 2D đang đọc — một nguồn, hai cách
+    // vẽ. Hỏng thì bỏ qua, vì phần văn phòng bên dưới không phụ thuộc nó.
+    try{
+      const sr = await fetch('/api/state', {headers:H});
+      if(sr.ok) hamDoi = await sr.json();
+    }catch(_){}
     const fr = await fetch('/api/flows', {headers:H});
     if(!fr.ok) return;
     const fd = await fr.json();
@@ -1194,8 +1348,223 @@ function connect(){
   const es = new EventSource('/api/events');
   es.onopen  = ()=>{ $('conn').classList.add('on'); $('conntext').textContent = 'đã kết nối'; };
   es.onerror = ()=>{ $('conn').classList.remove('on'); $('conntext').textContent = 'mất kết nối'; };
-  es.onmessage = ev=>{ let e; try{ e = JSON.parse(ev.data); }catch(_){ return; }
-    if(String(e.type).startsWith('flow.')) refresh(); };
+  es.onmessage = ev=>{
+    let e; try{ e = JSON.parse(ev.data); }catch(_){ return; }
+    const t = String(e.type || '');
+    // Nhật ký nhận MỌI sự kiện, không riêng flow.*: nó là luồng dữ liệu thật của
+    // hệ, và giấu bớt loại nào đi thì lúc cần lại không có.
+    const chu = (e.addr ? e.addr + ' · ' : '') + (e.msg || t);
+    ghiLog(chu, /fail|error|hong/i.test(t) ? 'er' : (/done|xong/i.test(t) ? 'ok' : ''));
+    if(t.startsWith('flow.') || t.startsWith('session.')) refresh();
+  };
+}
+
+// ---- TẦNG TRÊN: LÕI ĐIỀU PHỐI + QUỸ ĐẠO AGENT ----
+//
+// Đây là nửa còn lại của phép gộp. Trước bản này có HAI mặt ba chiều: một mặt
+// sơ đồ (lõi + quỹ đạo) và một mặt văn phòng (phòng ốc + người). Chúng vẽ CÙNG
+// một dữ liệu bằng hai ngôn ngữ khác nhau, và người dùng phải tự ghép trong
+// đầu — mở tab này xong nhớ lấy rồi mở tab kia.
+//
+// Giờ là MỘT thế giới: lõi treo trên nóc văn phòng, mỗi agent có hai thân —
+// một cơ thể đứng dưới sàn và một quả cầu trên quỹ đạo — nối với nhau bằng một
+// tia sáng. Lùi camera ra thì tầng trên rõ dần, lại gần thì sàn rõ dần. Không
+// có nút "đổi chế độ" nào cả, vì không cần: cùng một thứ, nhìn từ hai độ cao.
+
+// "Bloom" đúng nghĩa là EffectComposer + UnrealBloomPass — cả hai đều là addon
+// three.js phải tải thêm file, mà bản này nhúng thẳng vào binary nên chỉ giữ
+// MỘT file three core. Thay bằng cách cũ mà hiệu quả: sprite gradient toả tròn,
+// blending cộng, nên chồng lớp là sáng dồn lên đúng như quầng thật.
+function texQuang(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0,   'rgba(255,255,255,1)');
+  g.addColorStop(0.22,'rgba(255,255,255,.55)');
+  g.addColorStop(0.55,'rgba(255,255,255,.14)');
+  g.addColorStop(1,   'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0,0,128,128);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+}
+const TEX_QUANG = texQuang();
+function taoQuang(mau, co, mo){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: TEX_QUANG, color: mau, blending: THREE.AdditiveBlending,
+    depthWrite: false, transparent: true, opacity: mo === undefined ? .85 : mo}));
+  s.scale.setScalar(co);
+  return s;
+}
+
+const CAO_LOI = 15;     // lõi treo trên nóc, cao hơn vách phòng hẳn một tầng
+const R_VANH = 11;   // bán kính vành quả cầu quanh lõi
+const tangTren = new THREE.Group(); scene.add(tangTren);
+
+// Lõi: khung dây chứ không phải khối đặc. Khối đặc thì mỗi lần camera xoay qua
+// là nó che mất quả cầu phía sau; khung dây nhìn xuyên được, và nó đọc ra "bộ
+// khung điều phối" thay vì một hòn đá.
+const loi = new THREE.Group(); loi.position.y = CAO_LOI; tangTren.add(loi);
+const loiVo = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8, 1),
+  new THREE.MeshBasicMaterial({color:MAU_CORE, wireframe:true, transparent:true, opacity:.8}));
+const loiTrong = new THREE.Mesh(new THREE.IcosahedronGeometry(0.95, 0),
+  new THREE.MeshBasicMaterial({color:MAU_CORE, transparent:true, opacity:.3}));
+const halo = taoQuang(MAU_CORE, 11, .5);
+loi.add(loiVo); loi.add(loiTrong); loi.add(halo);
+
+// Vành quỹ đạo: quả cầu xếp ĐỀU trên một vành, không thả trôi. Thả trôi là lỗi
+// trực quan số một của bản sơ đồ đầu tiên — mắt không đếm được, không so được.
+const MAU_LINK = mauToken('--link');
+const vanhQuyDao = new THREE.Mesh(new THREE.TorusGeometry(R_VANH, 0.035, 6, 200),
+  new THREE.MeshBasicMaterial({color:MAU_LINK, transparent:true, opacity:.22}));
+vanhQuyDao.rotation.x = Math.PI/2; vanhQuyDao.position.y = CAO_LOI; tangTren.add(vanhQuyDao);
+
+// CHAY: trạng thái nào ĐANG LÀM VIỆC thật. Hạt chỉ chạy ở những trạng thái này
+// — hạt chạy lúc bước đã xong là chuyển động không mã hoá thông tin gì, và mắt
+// sẽ học cách bỏ qua nó, kéo theo bỏ qua cả lúc nó có nghĩa.
+const CHAY = tt => tt === 'running' || tt === 'pending' || tt === 'waiting';
+
+const cauAgent = {};    // khoá nhân vật -> {g, beam, hat, tia, goc}
+
+function taoCau(mau){
+  const g = new THREE.Group();
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.52, 20, 16),
+    new THREE.MeshBasicMaterial({color:mau}));
+  const v = new THREE.Mesh(new THREE.TorusGeometry(0.86, 0.028, 6, 40),
+    new THREE.MeshBasicMaterial({color:mau, transparent:true, opacity:.55}));
+  v.rotation.x = Math.PI/2;
+  const q = taoQuang(mau, 3.0, .7);
+  g.add(c); g.add(v); g.add(q);
+  g.userData = {cau:c, vanh:v, quang:q};
+  return g;
+}
+
+function xoaCauAgent(khoa){
+  const A = cauAgent[khoa];
+  if(!A) return;
+  tangTren.remove(A.g); tangTren.remove(A.tia); tangTren.remove(A.beam);
+  if(A.hat){ tangTren.remove(A.hat); A.hat.material.dispose(); }
+  A.beam.geometry.dispose();
+  A.g.traverse(o=>{
+    if(o.geometry && !o.isSprite) o.geometry.dispose();
+    if(o.material) o.material.dispose();
+  });
+  A.tia.geometry.dispose();
+  delete cauAgent[khoa];
+}
+
+// Dựng lại vành quả cầu theo đúng dàn nhân vật đang có dưới sàn. Mỗi quả cầu
+// nối xuống CƠ THỂ của chính nó bằng một tia — đó là chỗ hai tầng dính vào
+// nhau, và cũng là thứ trả lời câu "quả cầu này là ai" mà không cần đọc nhãn.
+function dungQuyDao(dan){
+  Object.keys(cauAgent).forEach(k=>{ if(!dan.some(d => d.khoa === k)) xoaCauAgent(k); });
+  dan.forEach((d, i)=>{
+    const tong = Math.max(1, dan.length);
+    const goc = (i / tong) * Math.PI * 2;
+    let A = cauAgent[d.khoa];
+    if(!A){
+      const g = taoCau(MAU_TT['']);
+      tangTren.add(g);
+      const hh = new THREE.BufferGeometry();
+      hh.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const tia = new THREE.Line(hh, new THREE.LineBasicMaterial(
+        {color:MAU_LINK, transparent:true, opacity:.30}));
+      tangTren.add(tia);
+      // beam: LÕI -> quả cầu. Không có nó thì quả cầu trôi lơ lửng và không đọc
+      // ra là "agent này được lõi điều phối".
+      const bh = new THREE.BufferGeometry();
+      bh.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const beam = new THREE.Line(bh, new THREE.LineBasicMaterial(
+        {color:MAU_LINK, transparent:true, opacity:.22}));
+      tangTren.add(beam);
+      A = cauAgent[d.khoa] = {g, tia, beam, goc, nhip: i * 1.37};
+    }
+    A.goc = goc;
+    const st = d.st;
+    const tt = st && st.state ? st.state : '';
+    // Hạt chạy dọc beam CHỈ khi bước đang làm việc thật, và CHỈ khi người dùng
+    // không bảo giảm chuyển động. Tạo rồi để đứng im là một chấm sáng vô nghĩa.
+    if(CHAY(tt) && !RM){
+      if(!A.hat){
+        A.hat = new THREE.Mesh(hinhHat, matHat.clone());
+        tangTren.add(A.hat);
+      }
+    }else if(A.hat){
+      tangTren.remove(A.hat); A.hat.material.dispose(); A.hat = null;
+    }
+    const mau = MAU_TT[tt];
+    A.g.userData.cau.material.color.setHex(mau === undefined ? MAU_TT[''] : mau);
+    A.g.userData.vanh.material.color.setHex(mau === undefined ? MAU_TT[''] : mau);
+    A.g.userData.quang.material.color.setHex(mau === undefined ? MAU_TT[''] : mau);
+    A.tt = tt;
+  });
+}
+
+// Mỗi khung hình: đặt quả cầu lên vành, kéo tia xuống cơ thể, và nhấp nháy theo
+// trạng thái. Nhịp nhanh = đang chạy, chậm = đang chờ, đứng yên = xong/hỏng —
+// nhịp ở đây MÃ HOÁ một thông tin, không phải cho sinh động.
+function capNhatQuyDao(dt, gio){
+  for(const k in cauAgent){
+    const A = cauAgent[k];
+    const B = nhanVat[k];
+    const x = Math.cos(A.goc) * R_VANH, z = Math.sin(A.goc) * R_VANH;
+    const y = CAO_LOI + (RM ? 0 : Math.sin(gio * 0.6 + A.nhip) * 0.5);
+    A.g.position.set(x, y, z);
+    const nhanh = A.tt === 'running' ? 2.6 : (A.tt === 'pending' || A.tt === 'waiting' ? 1.1 : 0);
+    const p = nhanh ? (0.5 + 0.5*Math.sin(gio*nhanh + A.nhip)) : 1;
+    A.g.userData.quang.material.opacity = (0.35 + 0.5*p) * tang;
+    A.g.userData.quang.scale.setScalar(3.0 * (1 + p*0.12));
+    A.g.userData.cau.material.opacity = tang;
+    A.g.userData.vanh.material.opacity = 0.55 * tang;
+    // Tia nối quả cầu với cơ thể dưới sàn. Không có cơ thể (chưa dựng xong) thì
+    // giấu tia đi, chứ không kéo nó xuống gốc toạ độ.
+    // beam từ lõi ra quả cầu, và hạt trôi dọc nó.
+    const bp = A.beam.geometry.attributes.position;
+    bp.setXYZ(0, 0, CAO_LOI, 0);
+    bp.setXYZ(1, x, y, z);
+    bp.needsUpdate = true;
+    A.beam.visible = tang > 0.04;
+    A.beam.material.opacity = 0.22 * tang;
+    if(A.hat){
+      A.hatT = ((A.hatT || 0) + dt * 0.5) % 1;
+      A.hat.position.set(x*A.hatT, CAO_LOI + (y - CAO_LOI)*A.hatT, z*A.hatT);
+      A.hat.visible = tang > 0.04;
+      A.hat.material.opacity = tang;
+      A.hat.material.transparent = true;
+    }
+    if(B){
+      const pos = A.tia.geometry.attributes.position;
+      pos.setXYZ(0, x, y - 0.6, z);
+      pos.setXYZ(1, B.pos.x, (B.cao || 1.8) + 0.2, B.pos.z);
+      pos.needsUpdate = true;
+      A.tia.visible = tang > 0.04;
+      A.tia.material.opacity = 0.30 * tang;
+    } else A.tia.visible = false;
+  }
+  loiVo.material.opacity = 0.8 * tang;
+  loiTrong.material.opacity = 0.3 * tang;
+  halo.material.opacity = (0.42 + (RM ? 0 : 0.12*Math.sin(gio*1.1))) * tang;
+  vanhQuyDao.material.opacity = 0.22 * tang;
+  tangTren.visible = tang > 0.02;
+  if(!RM){ loi.rotation.y += dt * 0.35; loi.rotation.x = 0.12 * Math.sin(gio * 0.4); }
+}
+
+// Những gì tầng dưới phải nhường khi camera lùi ra. Không nhường thì ở toàn
+// cảnh có 95 món nội thất và một rừng nhãn chen nhau trên vài chục pixel — vừa
+// nặng vừa không đọc được gì.
+let tangCu = -1;
+function capNhatTheoTang(){
+  // Mắt camera cũng phải nâng theo: đứng sàn thì nhìn ngang tầm người, lùi ra
+  // thì nhìn vào lõi. Không nâng thì lùi ra chỉ thấy sàn nhà chiếm nửa màn.
+  controls.target.y += ((1.2 + tang * (CAO_LOI - 5)) - controls.target.y) * 0.06;
+
+  const hienNoiThat = tang < 0.78;
+  if(Math.abs(tang - tangCu) < 0.002) return;   // chỉ đụng DOM khi thật sự đổi
+  tangCu = tang;
+  phongDaDung.forEach(p=>{
+    if(p.mauNhom) p.mauNhom.visible = hienNoiThat;
+    else if(p.hopNhom) p.hopNhom.visible = hienNoiThat;
+  });
+  const c = $('tang-chu');
+  if(c) c.textContent = tang < 0.2 ? 'sàn' : (tang > 0.8 ? 'toàn cảnh' : 'đang chuyển');
 }
 
 // ---- BẤM VÀO NHÂN VẬT ----
@@ -1207,6 +1576,18 @@ function connect(){
 // Ở đây đối tượng không phải phiên hạm đội mà là BƯỚC của lượt chạy, nên hành
 // động đúng là: xem đủ chi tiết bước đó, mở hội thoại, và huỷ lượt chạy.
 const tia = new THREE.Raycaster();
+// Danh sách bắn tia: THÂN người, VÒNG dưới chân (to hơn nên dễ trúng), và QUẢ
+// CẦU trên quỹ đạo. Dựng lại mỗi lần cập nhật dàn nhân vật.
+let clickable = [];
+function dungClickable(){
+  clickable = [];
+  for(const k in nhanVat){
+    const A = nhanVat[k];
+    if(A.obj)  clickable.push(A.obj);
+    if(A.vong) clickable.push(A.vong);
+  }
+  for(const k in cauAgent) clickable.push(cauAgent[k].g);
+}
 const chuot = new THREE.Vector2();
 let chonKhoa = '';          // nhân vật đang mở bảng chi tiết
 let flowRunID = 0;
@@ -1238,7 +1619,10 @@ function khoaTuDoiTuong(o){
     chuot.x =  ((e.clientX - r.left)/r.width )*2 - 1;
     chuot.y = -((e.clientY - r.top )/r.height)*2 + 1;
     tia.setFromCamera(chuot, camera);
-    const trung = tia.intersectObjects(scene.children, true);
+    // Bắn vào DANH SÁCH clickable, không phải cả cảnh. Cả cảnh nghĩa là gần 400
+    // món nội thất cộng vách cộng hành lang — vừa tốn, vừa dễ trúng cái bàn
+    // đứng trước mặt người thay vì trúng người.
+    const trung = tia.intersectObjects(clickable, true);
     for(const t of trung){
       const k = khoaTuDoiTuong(t.object);
       if(k && nhanVat[k]){ moChiTiet(k); return; }
@@ -1294,7 +1678,43 @@ function veChiTiet(){
   const chay = flowRunID > 0 && flowTrangThai === 'running';
   huy.disabled = !chay;
   huy.title = chay ? ('huỷ lượt chạy #' + flowRunID) : 'chỉ huỷ được lượt đang chạy';
+
+  // Nút dừng phiên chỉ bật khi tài khoản này THẬT SỰ có phiên đang chạy trong
+  // /api/state. Bật sẵn rồi bấm mới báo "không có phiên" là hứa suông.
+  const dp = $('ct-dungphien');
+  const ph = phienCuaNhanVat(A);
+  dp.disabled = !ph;
+  dp.title = ph ? ('dừng phiên #' + ph.id + ' của ' + A.prof)
+                : 'tài khoản này không có phiên nào đang chạy';
 }
+
+// DỪNG PHIÊN. Mặt sơ đồ cũ bấm vào quả cầu là dừng đúng phiên hạm đội đó; gộp
+// hai mặt mà đánh rơi khả năng ấy thì bản gộp NGHÈO hơn tổng hai bản cũ, và đó
+// là kiểu thoái lui khó thấy nhất — không ai báo lỗi, chỉ là một hôm nào đó
+// người dùng đi tìm cái nút cũ và không còn.
+//
+// Ở đây "phiên" khác "lượt chạy": lượt chạy là cả flow, phiên là MỘT tiến trình
+// agent đang sống. Hai nút, hai đường API, đặt cạnh nhau và ghi rõ tên.
+function phienCuaNhanVat(A){
+  if(!A || A.may || !hamDoi || !hamDoi.sessions) return null;
+  return hamDoi.sessions.find(x =>
+    x.state === 'running' && (x.addr === A.prof || (x.addr && x.addr.indexOf(A.prof) === 0))) || null;
+}
+
+$('ct-dungphien').addEventListener('click', async ()=>{
+  const A = chonKhoa ? nhanVat[chonKhoa] : null;
+  const ph = phienCuaNhanVat(A);
+  const bao = $('ct-bao');
+  if(!ph){ bao.textContent = 'không có phiên nào đang chạy cho tài khoản này'; return; }
+  bao.textContent = 'đang dừng phiên #' + ph.id + '…';
+  try{
+    const r = await fetch('/api/stop', {method:'POST', headers:H, body: JSON.stringify({id: ph.id})});
+    if(!r.ok){ bao.textContent = 'dừng không được: HTTP ' + r.status; return; }
+    bao.textContent = 'đã dừng phiên #' + ph.id;
+    ghiLog('lệnh: dừng phiên #' + ph.id, 'me');
+    refresh();
+  }catch(e){ bao.textContent = 'dừng không được: ' + (e && e.message ? e.message : e); }
+});
 
 $('ct-dong').addEventListener('click', dongChiTiet);
 
@@ -1337,6 +1757,191 @@ $('ct-huy').addEventListener('click', async ()=>{
     bao.textContent = 'huỷ không được: ' + (err && err.message ? err.message : err);
   }
 });
+
+// ---- HUD: SỐ LIỆU · NHẬT KÝ · THANH LỆNH ----
+//
+// Ba thứ này là phần "điều khiển được" của màn hình, và chúng đọc/ghi qua ĐÚNG
+// những đường API mà CLI và mặt 2D đang dùng — không có đường riêng nào cho 3D.
+// Luật ngang quyền không phải là "mặt nào cũng có nút", mà là "mọi mặt gọi cùng
+// một hợp đồng".
+
+let hamDoi = null;       // ảnh chụp /api/state gần nhất
+
+function soGon(n){
+  if(!n) return '0';
+  if(n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if(n >= 1e3) return (n/1e3).toFixed(1) + 'k';
+  return String(n);
+}
+
+function capNhatHudSo(){
+  const ss = (hamDoi && hamDoi.sessions) || [];
+  const chay = ss.filter(s => s.state === 'running').length;
+  let tok = 0, tien = 0;
+  ss.forEach(s=>{
+    tok  += (s.tokens || 0);
+    tien += (s.costUSD || s.cost || 0);
+  });
+  const xong = flowSteps.filter(s => s.state === 'done').length;
+  $('so-phien').textContent = String(chay);
+  // KHÔNG bịa số. Chưa đo được token thì hiện dấu gạch, không hiện 0 — số 0 nói
+  // "đã đo, và bằng không", còn gạch nói "chưa biết". Hai câu khác hẳn nhau, và
+  // dự án này đã trả giá vì lẫn lộn đúng hai câu đó.
+  $('so-token').textContent = tok ? soGon(tok) : '—';
+  $('so-tien').textContent  = tien ? ('$' + tien.toFixed(2)) : '—';
+  $('so-buoc').textContent  = flowSteps.length ? (xong + '/' + flowSteps.length) : '—';
+}
+
+// Nhật ký: dòng THẬT từ bus sự kiện, cắt còn 22 dòng gần nhất.
+const LOG_TOI_DA = 22;
+function ghiLog(chu, loai){
+  const el = $('hud-log');
+  if(!el) return;
+  const d = document.createElement('div');
+  if(loai) d.className = loai;
+  const t = document.createElement('time');
+  const n = new Date();
+  t.textContent = String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+  d.appendChild(t);
+  d.appendChild(document.createTextNode(chu));
+  d.title = chu;
+  el.appendChild(d);
+  while(el.children.length > LOG_TOI_DA) el.removeChild(el.firstChild);
+}
+
+// ---- THANH LỆNH ----
+//
+// Người dùng chọn thẳng: "làm hết, không hỏi lại". Nên KHÔNG có cổng xác nhận.
+// Bù lại hai thứ, và hai thứ này không phải cổng, chúng là phép lịch sự tối
+// thiểu của một cái nút bắn được đạn thật:
+//   1. Mọi lệnh đã chạy đều để lại một dòng trong nhật ký bên phải.
+//   2. Gõ sai tên flow thì BÁO LỖI chứ không bật đại một flow gần giống. Đoán
+//      hộ ở đây nghĩa là gõ nhầm một chữ thì bốn agent thật khởi động.
+const TRO_GIUP = [
+  'chạy <flow> [biến=giá trị]  — chạy workflow',
+  'dừng <số>                   — huỷ lượt chạy',
+  'hỏi <câu>                   — gọi AI API (route mặc định)',
+  'quét                        — tìm tiến trình mồ côi',
+  'sàn / toàn cảnh             — đổi tầng nhìn',
+  'trợ giúp                    — bảng này'
+];
+
+function baoLenh(chu, loai){
+  const b = $('lenh-bao');
+  b.className = loai || '';
+  b.textContent = chu;
+}
+
+async function chayLenh(dong){
+  const s = dong.trim();
+  if(!s) return;
+  const [dau, ...con] = s.split(/\s+/);
+  const con1 = con.join(' ');
+  const d = dau.toLowerCase();
+
+  if(d === 'trợ' || d === 'trogiup' || d === 'help' || s.toLowerCase().startsWith('trợ giúp')){
+    TRO_GIUP.forEach(x => ghiLog(x, 'me'));
+    baoLenh('đã in bảng lệnh ở nhật ký bên phải');
+    return;
+  }
+  if(d === 'sàn' || d === 'san'){ controls.datR(R_SAN); baoLenh('hạ xuống sàn'); return; }
+  if(d === 'toàn' || d === 'toan' || s.toLowerCase().startsWith('toàn cảnh')){
+    controls.datR(R_CAO); baoLenh('lùi ra toàn cảnh'); return;
+  }
+
+  if(d === 'chạy' || d === 'chay'){
+    if(!con.length){ baoLenh('thiếu tên flow: chạy <flow>', 'er'); return; }
+    const ten = con[0];
+    const bien = {};
+    con.slice(1).forEach(x=>{ const i = x.indexOf('='); if(i > 0) bien[x.slice(0,i)] = x.slice(i+1); });
+    baoLenh('đang bật flow ' + ten + '…');
+    try{
+      const r = await fetch('/api/flow/run', {method:'POST', headers:H,
+        body: JSON.stringify({flow: ten, vars: bien})});
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok){
+        baoLenh('không chạy được: ' + (j.error || ('HTTP ' + r.status)), 'er');
+        ghiLog('lệnh HỎNG: chạy ' + ten + ' — ' + (j.error || r.status), 'er');
+        return;
+      }
+      baoLenh('đã bật flow ' + ten + (j.id ? (' — lượt #' + j.id) : ''), 'ok');
+      ghiLog('lệnh: chạy ' + ten + (j.id ? (' → #' + j.id) : ''), 'me');
+      refresh();
+    }catch(e){ baoLenh('không chạy được: ' + e.message, 'er'); }
+    return;
+  }
+
+  if(d === 'dừng' || d === 'dung' || d === 'huỷ' || d === 'huy'){
+    const id = parseInt(String(con[0] || '').replace('#',''), 10);
+    if(!id){ baoLenh('thiếu số lượt chạy: dừng <số>', 'er'); return; }
+    try{
+      const r = await fetch('/api/flow/cancel', {method:'POST', headers:H,
+        body: JSON.stringify({id})});
+      if(!r.ok){ baoLenh('không dừng được: HTTP ' + r.status, 'er'); return; }
+      baoLenh('đã gửi lệnh dừng lượt #' + id, 'ok');
+      ghiLog('lệnh: dừng #' + id, 'me');
+      refresh();
+    }catch(e){ baoLenh('không dừng được: ' + e.message, 'er'); }
+    return;
+  }
+
+  if(d === 'hỏi' || d === 'hoi'){
+    if(!con1){ baoLenh('thiếu câu hỏi: hỏi <câu>', 'er'); return; }
+    baoLenh('đang hỏi AI…');
+    try{
+      // route rỗng = đường mặc định + dự phòng, đúng như `sagent api "câu hỏi"`.
+      const r = await fetch('/api/ai', {method:'POST', headers:H,
+        body: JSON.stringify({route:'', prompt: con1})});
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok){ baoLenh('hỏi không được: ' + (j.error || ('HTTP ' + r.status)), 'er'); return; }
+      const tra = String(j.noiDung || j.content || '').split('\n').filter(Boolean)[0] || '(rỗng)';
+      baoLenh(tra.length > 120 ? tra.slice(0,120) + '…' : tra, 'ok');
+      ghiLog('hỏi → ' + (j.route || '?') + ': ' + tra, 'me');
+    }catch(e){ baoLenh('hỏi không được: ' + e.message, 'er'); }
+    return;
+  }
+
+  if(d === 'quét' || d === 'quet'){
+    try{
+      const r = await fetch('/api/quet', {method:'POST', headers:H, body:'{}'});
+      const j = await r.json().catch(()=>({}));
+      baoLenh(r.ok ? ('quét xong: ' + JSON.stringify(j)) : ('quét hỏng: HTTP ' + r.status),
+              r.ok ? 'ok' : 'er');
+      ghiLog('lệnh: quét', 'me');
+    }catch(e){ baoLenh('quét hỏng: ' + e.message, 'er'); }
+    return;
+  }
+
+  baoLenh('không hiểu lệnh "' + dau + '" — gõ: trợ giúp', 'er');
+}
+
+$('lenh').addEventListener('submit', e=>{
+  e.preventDefault();
+  const o = $('lenh-o');
+  const v = o.value;
+  o.value = '';
+  chayLenh(v);
+});
+// Gõ "/" ở bất cứ đâu là nhảy vào thanh lệnh — thói quen của mọi công cụ dòng
+// lệnh trong trình duyệt.
+addEventListener('keydown', e=>{
+  if(e.key !== '/' || e.ctrlKey || e.metaKey) return;
+  const o = document.activeElement;
+  if(o && (o.tagName === 'INPUT' || o.tagName === 'TEXTAREA' || o.isContentEditable)) return;
+  e.preventDefault();
+  $('lenh-o').focus();
+});
+
+// ---- KHUNG HUD: cung tròn ở hai góc ----
+//
+// SVG không nhận calc() trong transform, nên đặt bằng JS và đặt lại khi đổi cỡ
+// màn. Rẻ: hai phép gán mỗi lần resize, không phải mỗi khung hình.
+function datGocHud(){
+  const g = document.querySelectorAll('#hud-goc .goc');
+  if(g.length < 2) return;
+  g[0].setAttribute('transform', 'translate(58,118)');
+  g[1].setAttribute('transform', 'translate(' + (innerWidth - 58) + ',' + (innerHeight - 58) + ')');
+}
 
 // ---- vòng lặp ----
 // Chiếu một điểm world sang toạ độ màn hình.
@@ -1435,12 +2040,16 @@ function chieu(){
   // khoảng đó chiếu lên màn hình. Đứng im thì chúng đè nhau vĩnh viễn. Đẩy dọc
   // thì nhãn vẫn nằm đúng trên đầu chủ của nó, không hề trượt sang người bên
   // cạnh — chỉ dịch NGANG mới gây nhầm người.
-  datLopNhan(nhanKhac, daDat, 0.5, oNguoi());
+  // Nhãn tên tắt hẳn khi đã lùi ra toàn cảnh: ở đó sáu cái nhãn chen trong vài
+  // chục pixel, đọc không ra mà còn che mất chính thứ đang nhìn. Quả cầu trên
+  // quỹ đạo mới là thứ mang tin ở tầng đó.
+  if(tang < 0.62) datLopNhan(nhanKhac, daDat, 0.5, oNguoi());
+  else nhanKhac.forEach(l => { l.el.style.display = 'none'; });
   // BÓNG THOẠI TẮT Ở KHỔ ĐIỆN THOẠI. Một bóng rộng 200px trên màn 390px là che
   // gần hết cảnh, mà sáu cái thì không còn gì để nhìn. Chỗ đọc câu đầy đủ giờ là
   // bảng chi tiết — chạm vào người là ra, và ra nguyên văn chứ không cắt 110 ký
   // tự. Tắt hẳn còn hơn bày ra rồi chồng lên nhau.
-  if(innerWidth >= 720) datLopNhan(bongThoai, daDat, 1, oNguoi());
+  if(innerWidth >= 720 && tang < 0.35) datLopNhan(bongThoai, daDat, 1, oNguoi());
   else bongThoai.forEach(b => { b.el.style.display = 'none'; });
   // Tên phòng nhường cuối: nó là nhãn của KHUNG, hai lớp trên là dữ liệu.
   datLopNhan(nhanPhong, daDat, 0.5, l => l.pos);
@@ -1488,6 +2097,9 @@ function tick(){
     }
   }
   capNhatCapNoi(dt);
+  tinhTang();
+  capNhatQuyDao(dt, dongHo.elapsedTime);
+  capNhatTheoTang();
   controls.update();
   chieu();
   renderer.render(scene, camera);
@@ -1507,6 +2119,21 @@ napNoiThat().then(()=>{
   lapNoiThatSanh();
   if(soMauHong) console.error('nội thất:', soMauHong, 'mẫu hỏng — giữ bản khối hộp cho những chỗ đó');
 });
+
+// ---- CÚ MỞ MÀN ----
+//
+// Mở ra là toàn cảnh, rồi camera tự hạ xuống sàn. Đây là chuyển động DUY NHẤT
+// trong trang không mã hoá thông tin gì, và nó được giữ vì nó dạy người dùng
+// một điều thật: hai tầng này là MỘT thế giới, lăn chuột là đi lại giữa chúng.
+// Giảm chuyển động thì vào thẳng sàn, không diễn.
+datGocHud();
+addEventListener('resize', datGocHud);
+if(RM){
+  controls.datR(R_SAN, true);
+}else{
+  controls.datR(R_CAO, true);
+  setTimeout(()=>{ controls.datR(R_SAN); ghiLog('trung tâm sẵn sàng — gõ / để ra lệnh', 'me'); }, 1400);
+}
 
 refresh(); connect(); tick();
 setInterval(refresh, 5000);

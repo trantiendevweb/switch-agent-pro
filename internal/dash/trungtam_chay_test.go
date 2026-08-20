@@ -32,7 +32,7 @@ func TestVanPhongChayThatVoiDomGia(t *testing.T) {
 		t.Skip("khong co node — bo qua. Bai nay chi chay duoc o may co node.")
 	}
 
-	ma := layScriptTrong(docVanPhong(t))
+	ma := layScriptTrong(docTrungTam(t))
 	if len(ma) < 5000 {
 		t.Fatalf("chi rut duoc %d ky tu script tu vanphong.html — gan nhu chac chan "+
 			"la bo rut nham, khong phai trang bi rong", len(ma))
@@ -50,7 +50,7 @@ func TestVanPhongChayThatVoiDomGia(t *testing.T) {
 	//
 	// Toi vua dinh dung cai bay do that: them ba phep kiem cu bam vao harness,
 	// chay lai, "ok (cached)", va suyt tuong la chung da chay.
-	hn := filepath.Join("testdata", "vanphong_harness.js")
+	hn := filepath.Join("testdata", "trungtam_harness.js")
 	if _, err := os.ReadFile(hn); err != nil {
 		t.Fatalf("khong doc duoc %s: %v", hn, err)
 	}
@@ -84,7 +84,7 @@ func TestVanPhongChayThatVoiDomGia(t *testing.T) {
 // Mot lan bay lai giao dien co the giu nguyen bang chi tiet ma go mat cai nut —
 // luc do bai chay-that van xanh, vi bang van mo.
 func TestVanPhongDieuKhienDuocChuKhongChiDeNgam(t *testing.T) {
-	s := maVanPhong(t)
+	s := maTrungTam(t)
 	can := map[string]string{
 		"/api/flow/cancel": "huy luot chay — hanh dong nang nhat, phai lam duoc tu day",
 		"hoi-thoai.html":   "mo hoi thoai cua dung luot chay dang xem",

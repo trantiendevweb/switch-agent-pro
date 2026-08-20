@@ -316,9 +316,9 @@
     <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
     <nav style="display:flex;gap:8px">
       <a class="btn" href="./" style="text-decoration:none;border-color:var(--hi);background:rgba(255,255,255,.09)">2D</a>
-      <a class="btn" id="to3d" href="3d.html" style="text-decoration:none">3D</a>
-      <a class="btn" id="tovp" href="vanphong.html" style="text-decoration:none">Văn phòng</a>
+      <a class="btn" id="tovp" href="trung-tam.html" style="text-decoration:none">Trung tâm</a>
       <a class="btn" id="toflow" href="flow.html" style="text-decoration:none">Workflow</a>
+      <a class="btn" href="hoi-thoai.html" style="text-decoration:none">Hội thoại</a>
       <a class="btn" href="/docs/" style="text-decoration:none">Plan</a>
       <a class="btn" href="/logout" style="text-decoration:none">Thoát</a>
     </nav>
@@ -556,7 +556,6 @@ const $ = id => document.getElementById(id);
 // esc: chèn dữ liệu do agent/route trả về vào innerHTML một cách an toàn. Thiếu
 // nó thì tên flow hay lỗi có ký tự < > sẽ vỡ layout, tệ hơn là chèn được thẻ lạ.
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-$('to3d').href = '3d.html';
 $('toflow').href = 'flow.html';
 
 // CHUA_DO: chữ dùng cho ô mà DTO chưa mang số về.

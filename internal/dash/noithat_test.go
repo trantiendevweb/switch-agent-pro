@@ -27,7 +27,7 @@ var reMauNoiThat = regexp.MustCompile(`(?s)const MAU_NOI_THAT\s*=\s*\[(.*?)\]`)
 
 func mauNoiThat(t *testing.T) []string {
 	t.Helper()
-	m := reMauNoiThat.FindStringSubmatch(docVanPhong(t))
+	m := reMauNoiThat.FindStringSubmatch(docTrungTam(t))
 	if m == nil {
 		t.Fatal("vanphong.html khong con mang MAU_NOI_THAT — bo noi that phai khai o MOT cho")
 	}
@@ -102,7 +102,7 @@ func TestGiuGiayPhepBoNoiThat(t *testing.T) {
 		}
 	}
 	// Va ma nguon phai noi ro no lay o dau.
-	s := docVanPhong(t)
+	s := docTrungTam(t)
 	for _, c := range []string{"Kenney", "CC0"} {
 		if !strings.Contains(s, c) {
 			t.Errorf("vanphong.html khong ghi nguon/giay phep bo noi that (%q)", c)

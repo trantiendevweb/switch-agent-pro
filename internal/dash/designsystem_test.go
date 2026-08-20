@@ -31,7 +31,7 @@ import (
 // Ngay 20/08 them mat thu nam — vanphong.html. Truoc do bien nay ten `bonTrang`
 // va co dung bon phan tu; giu ten cu thi cai ten se noi doi ve so trang, dung
 // kieu lech im lang ma ca file nay sinh ra de chan.
-var cacTrang = []string{"index.html", "flow.html", "hoi-thoai.html", "3d.html", "vanphong.html"}
+var cacTrang = []string{"index.html", "flow.html", "hoi-thoai.html", "trung-tam.html", "trung-tam.html"}
 
 // tokenStatus: nam bien TRANG THAI — cai duy nhat trong bo token duoc phep co
 // mau. Chung phai co dung MOT nguon.

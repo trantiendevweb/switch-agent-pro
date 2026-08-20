@@ -63,7 +63,7 @@ func TestMatKhauQuaNganBiTuChoi(t *testing.T) {
 // Chưa đăng nhập, mở bằng trình duyệt → chuyển tới form thay vì 401 trần trụi.
 func TestChuaDangNhapThiChuyenToiForm(t *testing.T) {
 	s := serverWithLogin(t)
-	r := httptest.NewRequest("GET", "/3d.html", nil)
+	r := httptest.NewRequest("GET", "/trung-tam.html", nil)
 	r.Host = "127.0.0.1:4600"
 	r.Header.Set("Accept", "text/html")
 	w := httptest.NewRecorder()

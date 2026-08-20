@@ -121,6 +121,11 @@ const THREE = {
     }
   },
   Vector2: class { constructor(x = 0, y = 0) { this.x = x; this.y = y; } },
+  IcosahedronGeometry: Geo,
+  CanvasTexture: class { constructor() { this.encoding = 0; } },
+  SpriteMaterial: Mat,
+  Sprite: class extends Obj { constructor(m) { super(); this.material = m; this.isSprite = true; } },
+  AdditiveBlending: 2,
   Raycaster: class {
     setFromCamera() {}
     intersectObjects(ds) {
@@ -157,7 +162,18 @@ function elMoi(tag) {
     _h: {},
     addEventListener(t, f) { (this._h[t] = this._h[t] || []).push(f); },
     getBoundingClientRect() { return { left: 0, top: 0, width: 1600, height: 900 }; },
+    getContext() {
+      return {
+        createRadialGradient() { return { addColorStop() {} }; },
+        fillRect() {}, set fillStyle(v) {}, get fillStyle() { return ''; }
+      };
+    },
+    focus() {}, value: '',
+    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); },
+    querySelectorAll() { return []; },
+    setAttribute() {}, appendChild2: null,
     goBo: false, hidden: false, disabled: false, title: '', href: '',
+    get firstChild() { return this.children[0] || null; },
     get offsetWidth() { return rong; },
     get offsetHeight() { return this.className === 'thoai' ? 54 : 26; }
   };
@@ -182,7 +198,10 @@ function deNhau(a, b) {
 const kho = {};
 ['scene', 'conn', 'conntext', 'flowname', 'scount', 'thieu', 'thieuten', 'thieuly',
   'chitiet', 'ct-dong', 'ct-ten', 'ct-phu', 'ct-bang', 'ct-out', 'ct-nut',
-  'ct-hoithoai', 'ct-huy', 'ct-bao']
+  'ct-hoithoai', 'ct-huy', 'ct-dungphien', 'ct-bao',
+  // HUD + thanh lenh cua mat Trung tam
+  'hud-goc', 'hud-log', 'so-phien', 'so-token', 'so-tien', 'so-buoc',
+  'lenh', 'lenh-o', 'lenh-bao', 'tang-chu']
   .forEach(id => { kho[id] = elMoi('div'); });
 
 const buocGia = [
@@ -200,7 +219,9 @@ const ctx = {
   String, Number, Boolean, Date, Set, Map,
   document: {
     getElementById: id => kho[id] || null, createElement: elMoi,
+    createTextNode: t => ({ nodeValue: String(t), textContent: String(t) }),
     body: { appendChild(c) { return c; } },
+    querySelectorAll() { return [{ setAttribute() {} }, { setAttribute() {} }]; },
     // Ma that hoi activeElement de biet nguoi dung co dang go trong o nhap khong.
     activeElement: null
   },
@@ -216,6 +237,17 @@ const ctx = {
     if (s.endsWith('.glb')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
     if (s.indexOf('/api/flows') >= 0) return { ok: true, json: async () => ({ runs: [{ id: 46, flow: 'doi-4', state: 'running' }] }) };
     if (s.indexOf('/api/flow/detail') >= 0) return { ok: true, json: async () => ({ steps: buocGia }) };
+    if (s.indexOf('/api/state') >= 0) return {
+      ok: true, json: async () => ({ sessions: [
+        { id: 1, state: 'running', tokens: 12500, costUSD: 0.42 },
+        { id: 2, state: 'stopped', tokens: 3100, costUSD: 0.11 }
+      ] })
+    };
+    // Duong ghi (POST) cua thanh lenh — tra ve nhu that de kiem duoc lenh.
+    if (s.indexOf('/api/flow/run') >= 0) return { ok: true, json: async () => ({ id: 99 }) };
+    if (s.indexOf('/api/flow/cancel') >= 0) return { ok: true, json: async () => ({ cancelled: 'ok' }) };
+    if (s.indexOf('/api/ai') >= 0) return { ok: true, json: async () => ({ noiDung: 'OK', route: 'grok' }) };
+    if (s.indexOf('/api/quet') >= 0) return { ok: true, json: async () => ({ da: 0 }) };
     return { ok: false };
   }
 };
@@ -231,7 +263,7 @@ try {
 }
 
 // Cho refresh() (async) chay xong, roi quay 60 khung hinh.
-setTimeout(() => {
+setTimeout(async () => {
   if (!khung) { console.error('NO: khong ai goi requestAnimationFrame'); process.exit(1); }
   try {
     for (let i = 0; i < 60; i++) khung();
@@ -450,12 +482,17 @@ setTimeout(() => {
   if (demClone !== 95) {
     console.error('  HONG: so mon noi that sai — cho doi 95, dem duoc ' + demClone); hong++;
   }
-  //    Nam nhom khoi hop (4 phong + sanh) phai bi TAT sau khi mau ve. Con hien
-  //    la hai lop ban ghe chong len nhau, nhin ra ngay la loi.
+  //    Bon nhom khoi hop cua bon phong + nhom cua sanh phai bi TAT sau khi mau
+  //    ve. Con hien la hai lop ban ghe chong len nhau, nhin ra ngay la loi.
+  //
+  //    Dem >= 5 chu khong == 5: so nhom bi tat con phu thuoc TANG camera dang o
+  //    dau (tang tren tat khi dung san, noi that tat khi lui ra toan canh). Chot
+  //    mot con so chinh xac o day la bien mot bai kiem ve BAN GHE thanh mot bai
+  //    kiem ve vi tri camera — do nham thu, va se do moi khi doi cu mo man.
   const anDi = nhomTao.filter(g => g.visible === false).length;
-  console.log('  nhom khoi hop da tat:', anDi + '/5');
-  if (anDi !== 5) {
-    console.error('  HONG: cho doi 5 nhom khoi hop bi tat, dem duoc ' + anDi); hong++;
+  console.log('  nhom khoi hop da tat:', anDi + ' (toi thieu 5)');
+  if (anDi < 5) {
+    console.error('  HONG: cho doi it nhat 5 nhom khoi hop bi tat, dem duoc ' + anDi); hong++;
   }
 
   // 6) KHO DIEN THOAI. Man hep thi nhan chen nhau nang hon han, va luot tach de
@@ -474,6 +511,59 @@ setTimeout(() => {
   console.log('  kho 390x844: ' + om.length + ' nhan, ' + deM + ' cho de, ' + bayM + ' nhan bay khoi man');
   if (deM) { console.error('  HONG: o kho dien thoai con ' + deM + ' cho de nhau'); hong++; }
   if (bayM) { console.error('  HONG: ' + bayM + ' nhan bi day len khoi mep tren man hinh'); hong++; }
+
+  // 7) MAT TRUNG TAM: hai tang, HUD so lieu, nhat ky, thanh lenh.
+  if (ctx.chayLenh) {
+    // (a) LUI RA TOAN CANH -> nhan ten phai TAT, de nhuong cho qua cau tren quy
+    //     dao. Con hien thi sau cai nhan chen trong vai chuc pixel: doc khong ra
+    //     ma con che mat chinh thu dang nhin.
+    //
+    //     LAI CAMERA BANG LENH chu khong dua vao cu mo man: che do giam chuyen
+    //     dong vao THANG san (khong dien), nen mot bai kiem dua vao cu mo man se
+    //     do o che do do trong khi ma hoan toan dung. Bai kiem gay vi mot lua
+    //     chon hop le cua nguoi dung la bai kiem sai.
+    await ctx.chayLenh('toàn cảnh');
+    for (let i = 0; i < 120; i++) khung();
+    const nhanCao = soDo.map(oCuaNhan).filter(Boolean).filter(o => o.ten === 'lbl').length;
+    console.log('  tang toan canh: ' + nhanCao + ' nhan ten hien (cho doi 0)');
+    if (nhanCao !== 0) { console.error('  HONG: o toan canh van con nhan ten'); hong++; }
+
+    // (b) Lenh "san" phai ha camera xuong, va nhan ten phai quay lai.
+    await ctx.chayLenh('sàn');
+    for (let i = 0; i < 90; i++) khung();
+    const nhanSan = soDo.map(oCuaNhan).filter(Boolean).filter(o => o.ten === 'lbl').length;
+    console.log('  tang san      : ' + nhanSan + ' nhan ten hien (cho doi 6)');
+    if (nhanSan !== 6) { console.error('  HONG: ha xuong san ma nhan ten khong quay lai'); hong++; }
+
+    // (c) HUD so lieu doc tu /api/state THAT: mot phien dang chay, 15600 token.
+    console.log('  HUD: ' + kho['so-phien'].textContent + ' phien · ' +
+      kho['so-token'].textContent + ' token · ' + kho['so-tien'].textContent);
+    if (kho['so-phien'].textContent !== '1') {
+      console.error('  HONG: so phien dang chay sai — cho doi 1'); hong++;
+    }
+    if (kho['so-token'].textContent === '—') {
+      console.error('  HONG: co du lieu token ma HUD van hien dau gach'); hong++;
+    }
+
+    // (d) Thanh lenh chay THAT. Nguoi dung chon "lam het, khong hoi lai", nen
+    //     go xong la da goi API that — bai kiem nay gac dung dieu do.
+    await ctx.chayLenh('chạy doi-4');
+    const bao = kho['lenh-bao'].textContent;
+    console.log('  lenh "chay doi-4" -> ' + JSON.stringify(bao));
+    if (!/#99/.test(bao)) { console.error('  HONG: lenh chay khong goi duoc /api/flow/run'); hong++; }
+
+    // (e) Go sai ten lenh thi KHONG duoc bat gi ca, phai bao loi. Doan ho o day
+    //     nghia la go nham mot chu thi bon agent that khoi dong.
+    await ctx.chayLenh('chayy doi-4');
+    if (!/không hiểu/.test(kho['lenh-bao'].textContent)) {
+      console.error('  HONG: lenh sai khong bao loi — go nham la bat agent that'); hong++;
+    }
+
+    // (f) Nhat ky phai co dong that.
+    const soLog = kho['hud-log'].children.length;
+    console.log('  nhat ky: ' + soLog + ' dong');
+    if (!soLog) { console.error('  HONG: nhat ky rong sau khi da chay lenh'); hong++; }
+  }
 
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');
   process.exit(hong ? 1 : 0);
