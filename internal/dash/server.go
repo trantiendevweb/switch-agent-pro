@@ -330,7 +330,9 @@ func (s *Server) Run(host string, port int) error {
 
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
-		return fmt.Errorf("không mở được cổng %d: %w (thử --port khác)", port, err)
+		// Nói RÕ ai đang giữ cổng — xem đầu congban.go để biết vì sao chỗ này đáng
+		// một file riêng.
+		return loiCongBan(port, err)
 	}
 
 	giaoThuc := "http"
