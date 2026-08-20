@@ -48,6 +48,13 @@ var (
 	ngay    = ""
 )
 
+// dashPortMacDinh là cổng `sagent dash` dùng khi không có `--port`.
+//
+// Là hằng chứ không phải số rời, vì lời chỉ đường của mặt mặc định (tui.go) in
+// ra đúng cổng này. Hai chỗ mà trôi khỏi nhau thì người dùng bấm vào URL được
+// bảo là đúng rồi nhận trang trắng — mà không có test nào bắt được.
+const dashPortMacDinh = 4600
+
 var commands map[string]command
 
 func init() {
@@ -103,7 +110,7 @@ func main() {
 	defer console.Dat()()
 	args := os.Args[1:]
 	if len(args) == 0 {
-		runTUI()
+		moMatMacDinh()
 		return
 	}
 	switch args[0] {
@@ -533,7 +540,7 @@ func cmdDash(args []string) {
 		cmdSetPassword(rest)
 		return
 	}
-	port, args := intFlag(args, "--port", 4600)
+	port, args := intFlag(args, "--port", dashPortMacDinh)
 	host, args := strFlag(args, "--host", "127.0.0.1")
 	tran, args := boolFlag(args, "--http-tran")
 	epTLS, _ := boolFlag(args, "--tls")
@@ -655,6 +662,21 @@ func cmdConfig() {
 		fmt.Printf("  policy.require_approval %v\n", c.Policy.RequireApprovalFor)
 	}
 	fmt.Printf("  ui.default_surface      %s\n", c.UI.DefaultSurface)
+	fmt.Printf("  ui.theme                %s\n", c.UI.Theme)
+	// Ba khoá dưới đây thường KHÔNG được khai. In "(mặc định: …)" thay vì bỏ
+	// trống, vì dòng trống khiến người đọc tưởng tính năng chưa có — mà thật ra
+	// nó đang chạy bằng giá trị mặc định.
+	if len(c.UI.Columns) > 0 {
+		fmt.Printf("  ui.columns              %s\n", strings.Join(c.UI.Columns, ", "))
+	} else {
+		fmt.Printf("  ui.columns              (mặc định: %s)\n", strings.Join(config.CotMacDinh, ", "))
+	}
+	if len(c.UI.PinnedFlows) > 0 {
+		fmt.Printf("  ui.pinned_flows         %s\n", strings.Join(c.UI.PinnedFlows, ", "))
+	} else {
+		fmt.Printf("  ui.pinned_flows         (không ghim flow nào)\n")
+	}
+	fmt.Printf("  ui.enable_3d            %v\n", c.UI.Enable3D)
 	fmt.Printf("\n  api version             %d · event schema %d\n\n", api.Version, events.SchemaVersion)
 }
 

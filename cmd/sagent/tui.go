@@ -23,6 +23,59 @@ func isInteractive() bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
+// matWeb ánh xạ tên mặt trong `ui.default_surface` sang đường dẫn thật trên
+// dashboard và một câu người đọc hiểu được.
+//
+// Bảng này là chỗ DUY NHẤT biết mặt nào nằm ở URL nào — thêm mặt thứ năm thì
+// sửa đúng đây, không phải đi tìm chuỗi "/flow.html" rải trong mã.
+var matWeb = map[string]struct{ Duong, Ten string }{
+	"dashboard": {"/", "Dashboard 2D"},
+	"workflow":  {"/flow.html", "Workflow board"},
+	"3d":        {"/trung-tam.html", "Trung tâm (3D)"},
+}
+
+// moMatMacDinh chọn mặt để mở khi gõ `sagent` không tham số, theo
+// `ui.default_surface` của cấu hình đã gộp. Đây là phần terminal của Pha 5d:
+// hai project khác nhau gõ cùng một lệnh phải ra hai chỗ khác nhau.
+//
+// VÌ SAO ba mặt web chỉ CHỈ ĐƯỜNG chứ không tự bật server: `sagent dash` chiếm
+// terminal cho tới khi Ctrl+C và đòi mật khẩu đã đặt trước — gõ `sagent` mà tự
+// nhiên mọc ra một tiến trình đang nghe cổng là việc người dùng không hề xin.
+// Cấu hình nói họ THÍCH mặt nào, không phải cho phép mở cổng thay họ.
+func moMatMacDinh() {
+	a, done := open()
+	mat := a.Config().UI.DefaultSurface
+	done()
+
+	loi, laWeb := chiDuongMat(mat, dashPortMacDinh)
+	if !laWeb {
+		// "" hoặc "tui" — và bất cứ giá trị nào lọt qua được validate cũng chỉ
+		// còn hai khả năng đó, nên nhánh này không cần báo lỗi.
+		runTUI()
+		return
+	}
+	fmt.Print(loi)
+}
+
+// chiDuongMat dựng lời chỉ đường tới một mặt web, hoặc báo `false` nếu tên mặt
+// không phải mặt web (tức là mặt terminal).
+//
+// Tách khỏi moMatMacDinh để TEST ĐƯỢC: phần còn lại của moMatMacDinh phải mở
+// API thật rồi chiếm terminal mới chạy tới đây, nên chôn ở trong thì không ai
+// kiểm được — mà đúng chỗ này mới quyết định gõ `sagent` sẽ ra cái gì.
+func chiDuongMat(mat string, port int) (string, bool) {
+	w, laWeb := matWeb[mat]
+	if !laWeb {
+		return "", false
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n  Mặt mặc định của dự án này là %s (ui.default_surface = %q).\n\n", w.Ten, mat)
+	fmt.Fprintf(&b, "    Bật server:  sagent dash\n")
+	fmt.Fprintf(&b, "    Rồi mở:      http://127.0.0.1:%d%s\n\n", port, w.Duong)
+	fmt.Fprintf(&b, "  Muốn bảng chọn terminal thay vì mặt này: sagent ds\n\n")
+	return b.String(), true
+}
+
 // runTUI là mặt terminal tương tác: gõ `sagent` không tham số là vào đây.
 // Giống tinh thần tk v1 — gõ số để mở tài khoản, chữ cái cho việc khác.
 func runTUI() {
