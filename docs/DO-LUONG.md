@@ -2184,3 +2184,27 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   để chặn — nó biến một cảnh báo có ích thành một nút bấm cho im. Giá của việc đo
   thật ở đây là **0,096977 USD** và khoảng một phút; giá của việc bấm cho im là cả
   bảng năng lực nói về một phiên bản không còn tồn tại trên máy.
+
+## 20/08 — Đường API: DeepSeek và Grok chạy thật qua `modelapi.vn`
+
+- **Đo lúc nào**: 20/08/2026, 22:41.
+- **Đo bằng cách nào**: `sagent api <route> "Tra loi dung mot tu: OK"` — đi đúng
+  đường `internal/aiapi` mà flow node `model` dùng, không phải gọi tắt bằng curl.
+- **Con số / Bằng chứng** (đọc lại từ `sagent api --lich-su`, bảng `api_calls`):
+
+  | Route | Model | Vào | Ra | Tổng | Thời gian |
+  |---|---|---|---|---|---|
+  | `deepseek` | `deepseek-v4-flash` | 90 | 37 | **127** | **2,3s** |
+  | `grok` | `grok-4.5` | 214 | 830 | **1044** | **13,6s** |
+
+  Cùng một câu hỏi, cùng một nhà bán lại: Grok tiêu **8,2 lần** số token và chậm
+  **5,9 lần**. Với những bước chỉ cần một câu trả lời ngắn (bước `soi`, bước gộp
+  báo cáo), đó là khoảng cách đáng để chọn route thay vì để mặc định.
+- **Đã sửa hay chưa**: **ĐÃ ĐO**, không phải sửa mã nào — đúng như kế hoạch Pha 4
+  dự đoán ("cấu trúc đã generic nên nhiều khả năng chỉ là thêm route"). Ô ⬜ của
+  DeepSeek trong Pha 4 chuyển thành ✅ kèm số. OpenRouter/Ollama vẫn ⬜: chưa có
+  key, và Ollama chưa cài trên máy này.
+- **Bài học**: cùng ngày lúc 16:54–16:56 route `deepseek` trả **HTTP 503 ba lần**
+  rồi tự hồi phục. Cách duy nhất để biết điều đó là **gọi thật rồi hỏng** — route
+  engine chưa có `health`. Một lượt flow dài chọn nhầm route đúng lúc nhà cung cấp
+  chập chờn thì hỏng ở giữa chừng, chứ không hỏng lúc còn kịp đổi.

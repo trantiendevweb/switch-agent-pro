@@ -369,13 +369,26 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   `StartDetached` — tiến trình cha mở file log rồi không đóng, mỗi lần `fleet`
   rò một handle và trên Windows khoá luôn file. Có test hồi quy cho bug
   "đoán số thứ tự worktree".
-- [ ] ~~`sagentd` daemon~~ **bỏ** (xem mục 2b) — `dash` sẽ là server tạm.
-- [ ] Project discovery + `.sagent/project.toml`.
-- [ ] Workspace backend: directory + **Git worktree**.
-- [ ] Process backend native Windows/Linux; tmux tuỳ chọn (Linux).
-- [ ] Session state machine + event stream.
-- [ ] Route engine cơ bản: chọn provider/model/profile, health, fallback, usage/cost event.
-- [ ] Recovery khi daemon/process chết; cleanup orphan an toàn.
+
+> **Dọn ngày 20/08/2026:** danh sách dưới đây từng chép lại nguyên bản kế hoạch
+> gốc, nên bốn mục ĐÃ XONG ở trên vẫn còn nằm đây dưới dạng `[ ]` — kế hoạch nói
+> sai về chính nó, đúng thứ dự án này lấy "đo được" làm gốc để chống. Mỗi dòng
+> dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.
+
+- [x] ~~`sagentd` daemon~~ **bỏ** (xem mục 2b) — `dash` là server thay thế, đã chạy.
+- [x] Project discovery + `.sagent/project.toml` — trùng mục đã xong ở trên.
+- [x] Workspace backend: directory + **Git worktree** — trùng mục đã xong ở trên.
+- [x] Process backend native Windows (`profile.StartDetached`). Nhánh Linux và
+  tmux **bỏ** theo quyết định "CHỈ WINDOWS" ở đầu tài liệu.
+- [x] Session state machine + event stream — `internal/events` (bus + SSE) và
+  `Session.State` ba trạng thái đo được của Pha 5b.
+- [x] Recovery khi process chết; cleanup orphan an toàn — `status` đối chiếu PID
+  thật và tự đánh dấu `lost`; `sagent quet` (`SessionSweep`) tìm tiến trình mồ côi.
+- [ ] **Route engine — còn thiếu đúng một mảnh: `health`.** Chọn route ✅, fallback
+  một lần ✅, usage/cost event ✅ (bảng `api_calls`, migration v7). Chưa có cách hỏi
+  "route này còn sống không" TRƯỚC khi chạy — `grep -ri health internal/aiapi
+  internal/api` không ra gì. Hệ quả đo được 20/08: route `deepseek` trả HTTP 503
+  ba lần lúc 16:54–16:56, và cách duy nhất để biết là **gọi thật rồi hỏng**.
 - **DoD:** 4 session cùng profile + 3 profile khác chạy đúng policy; 10 session đồng thời
   không hỏng config/state; restart daemon phục hồi đúng; ≥2 repo khác stack; không session
   nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.
@@ -490,8 +503,13 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - ✅ **Lịch sử lời gọi API**: lưu vào bảng `api_calls` ở migration v7 trong `state.db`
     (thời điểm, route, model, token vào-ra, chi phí, thành-bại, lý do hỏng); không lưu
     prompt và câu trả lời để bảo đảm riêng tư.
-  - ⬜ DeepSeek/OpenRouter/Ollama: chưa đo. Cấu trúc đã generic nên nhiều khả năng chỉ
-    là thêm route, nhưng **chưa đo thì chưa nói là chạy được**.
+  - ✅ **DeepSeek: ĐÃ ĐO** (20/08/2026, 22:41) — `sagent api deepseek` chạy thật qua
+    `modelapi.vn`, model `deepseek-v4-flash`: vào 90, ra 37, tổng **127 token / 2,3s**.
+    Cùng lượt đo `grok-4.5`: vào 214, ra 830, tổng **1044 token / 13,6s**. Đúng như
+    dự đoán "chỉ là thêm route" — không phải sửa mã nào. Lưu ý đã đo: key này KHÔNG
+    dùng được ở `api.deepseek.com` (401), chỉ dùng được ở nhà bán lại; và route này
+    trả HTTP 503 ba lần lúc 16:54–16:56 cùng ngày rồi tự hồi phục.
+  - ⬜ OpenRouter/Ollama: chưa đo — chưa có key, và Ollama chưa cài trên máy này.
 
 ### Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)
 🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
