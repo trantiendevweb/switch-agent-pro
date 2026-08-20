@@ -45,8 +45,12 @@ var implemented = map[string]bool{
 	TypeTest: true, TypeLint: true,
 	// review = agent đọc kết quả bước trước; chỉ là agent có prompt dựng sẵn
 	TypeReview: true,
-	// còn chờ đường API và cơ chế merge an toàn
-	TypeModel: false, TypeMerge: false,
+	// model = gọi thẳng model API. Bật 20/08: đường API đã có, đã đo thật (có
+	// usage, có chuyển route dự phòng, có sổ lời gọi). Xem TypeModel trong
+	// internal/flow/step.go.
+	TypeModel: true,
+	// còn chờ cơ chế merge an toàn
+	TypeMerge: false,
 }
 
 // Chính sách khi một bước hỏng.
@@ -174,6 +178,10 @@ type Step struct {
 	//
 	// Không khai (nil) = không kiểm gì, y như trước.
 	PhaiCo []string `toml:"phai_co,omitempty" json:"phaiCo,omitempty"`
+
+	// Route là route API cho node `model`. Rỗng = `default_route` rồi tới route
+	// dự phòng, y như `sagent api "câu hỏi"`. Không dùng cho node khác.
+	Route string `toml:"route,omitempty" json:"route,omitempty"`
 
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`

@@ -805,8 +805,18 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
     [[flow.doi-4.step]]
       id = "soi"
       vai_tro = "soi"
-      type = "agent"
-      profile = "grok:api"
+      # ĐO ĐƯỢC 20/08: CLI grok hỏng VĨNH VIỄN — HTTP 410 "Live search is
+      # deprecated. Please switch to the Agent Tools API". Hai lượt liền (#46,
+      # #47) người soi trả về đúng một câu xin lỗi và vẫn được ghi là xong.
+      #
+      # Cùng nhà cung cấp đó qua ĐƯỜNG API thì vẫn trả lời bình thường — đã đo
+      # 13,7s / 903 token. Nên bước này chuyển sang node `model`: gọi thẳng API,
+      # không qua CLI. Đây cũng là lần đầu node `model` được dùng thật.
+      #
+      # `route` để rỗng = default_route rồi tới dự phòng, y như `sagent api`.
+      # Nhờ vậy một nhà cung cấp sập thì người soi tự chuyển sang nhà kia thay vì
+      # biến mất.
+      type = "model"
       needs = ["kiem-2", "code-doc"]
       # Người soi CHỈ được đọc kết quả máy chấm, không được đọc lời hai người
       # thợ tự khai (code-go, code-doc, sua). Soi mà đọc lời tự khai thì nó bị

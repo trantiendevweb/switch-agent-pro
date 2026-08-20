@@ -22,6 +22,19 @@ type AgentRunner interface {
 	RunAgents(ctx context.Context, profile, model, prompt string, copies int, worktree, tuDuyetQuyen bool) (KetQuaAgent, error)
 }
 
+// ModelRunner gọi THẲNG model API — đường thứ hai của dự án, không qua CLI agent.
+//
+// Tách khỏi AgentRunner vì hai đường khác nhau về mọi mặt đáng kể: đường agent
+// tiêu hạn mức thuê bao và chạy được lệnh trên máy; đường API tiêu tiền theo
+// token và chỉ trả về chữ. Gộp chung một interface thì bước gọi API sẽ mang theo
+// những tham số vô nghĩa với nó (worktree, tự duyệt quyền, copies).
+//
+// route rỗng = dùng `default_route` rồi tới route dự phòng — cùng luật với
+// `sagent api "câu hỏi"`.
+type ModelRunner interface {
+	GoiModel(ctx context.Context, route, prompt string) (KetQuaAgent, error)
+}
+
 // KetQuaAgent là những gì một lượt chạy agent trả về cho bộ thực thi flow.
 type KetQuaAgent struct {
 	Output    string  // kết quả cho bước sau dùng
@@ -35,6 +48,10 @@ type Runner struct {
 	DB    *store.DB
 	Bus   *events.Bus
 	Agent AgentRunner
+
+	// Model chạy node `model`. nil = chưa cắm, và node `model` sẽ báo lỗi rõ
+	// ràng thay vì im lặng bỏ qua.
+	Model ModelRunner
 
 	// MaxParallel là trần số bước/agent chạy cùng lúc, lấy từ policy của dự án.
 	MaxParallel int

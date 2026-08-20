@@ -384,6 +384,21 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 		}
 		return r.Agent.RunAgents(ctx, s.Profile, s.Model, ExpandChay(s.Prompt, vars), n, s.Worktree, s.TuDuyetQuyen)
 
+	// Node `model`: gọi THẲNG model API. Khai từ đầu dự án với ghi chú "chờ
+	// đường API (Pha 1/4)" — đường đó nay đã có, đã đo thật, và có cả bộ chuyển
+	// route dự phòng.
+	//
+	// Vì sao cần: người soi của doi-4 chạy bằng CLI grok, mà CLI đó vừa hỏng
+	// vĩnh viễn (HTTP 410 "Live search is deprecated"). Cùng nhà cung cấp đó qua
+	// đường API thì vẫn trả lời bình thường — đã đo. Không có node này thì mọi
+	// lượt chạy đều mất người soi chỉ vì một cái CLI đổi API.
+	case TypeModel:
+		if r.Model == nil {
+			return KetQuaAgent{}, fmt.Errorf("node `model` cần đường AI API nhưng chưa được cắm " +
+				"(xem internal/api: Runner.Model)")
+		}
+		return r.Model.GoiModel(ctx, s.Route, ExpandChay(s.Prompt, vars))
+
 	case TypeShell, TypeTest, TypeLint:
 		argv := s.Run
 		if len(argv) == 0 {

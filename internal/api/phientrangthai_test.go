@@ -199,3 +199,25 @@ func TestSweepVanThayPhienMangTrangThaiMoi(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Bo chay flow do internal/api dung PHAI co ca hai duong: duong agent (CLI) va
+// duong model API. Thieu duong nao thi moi flow dung node do se hong.
+//
+// BAI NAY LAP DUNG MOT LO DA HA: bon bai kiem node `model` nam o internal/flow
+// va deu dung Runner TU DUNG TRONG TEST, nen go cau noi o api.runner() thi ca
+// bon van xanh. "Cho hong nam o CHO GOI" — lan thu ba trong du an nay.
+func TestBoChayFlowCoDuCaHaiDuong(t *testing.T) {
+	a, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	r := a.runner(Addr{})
+	if r.Agent == nil {
+		t.Error("Runner.Agent nil — moi buoc agent se hong")
+	}
+	if r.Model == nil {
+		t.Error("Runner.Model nil — moi node `model` se hong, va nguoi soi cua doi-4 " +
+			"chay bang node do (CLI grok da hong vinh vien tu 20/08)")
+	}
+}

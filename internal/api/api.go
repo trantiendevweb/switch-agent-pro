@@ -987,6 +987,28 @@ func (a *API) FlowValidate(dir string) ([]flow.Problem, error) {
 
 // agentBridge nối bước `agent` của flow vào fleet — và ĐỢI xong, vì flow cần
 // biết bước trước kết thúc mới đi tiếp.
+// modelBridge nối node `model` của flow sang đường AI API.
+//
+// Cầu RIÊNG, không nhét vào agentBridge: hai đường khác nhau về mọi mặt đáng kể
+// — đường agent tiêu hạn mức thuê bao và chạy được lệnh trên máy, đường API tiêu
+// tiền theo token và chỉ trả về chữ. Gộp chung thì bước gọi API sẽ mang theo
+// những tham số vô nghĩa với nó.
+type modelBridge struct{ a *API }
+
+func (b modelBridge) GoiModel(ctx context.Context, route, prompt string) (flow.KetQuaAgent, error) {
+	kq, err := b.a.AICall(ctx, route, prompt)
+	if err != nil {
+		return flow.KetQuaAgent{}, err
+	}
+	// Usage đi CÙNG output: cả hai sinh ra trong cùng một lượt gọi, tách ra hai
+	// đường thì bước nào tính tiền bước nấy sẽ lệch.
+	return flow.KetQuaAgent{
+		Output:   kq.NoiDung,
+		TokenVao: kq.Usage.Vao,
+		TokenRa:  kq.Usage.Ra,
+	}, nil
+}
+
 type agentBridge struct {
 	a        *API
 	fallback Addr
@@ -1329,6 +1351,7 @@ func (a *API) runner(defaultProfile Addr) *flow.Runner {
 	return &flow.Runner{
 		DB: a.db, Bus: a.bus,
 		Agent:          agentBridge{a: a, fallback: defaultProfile},
+		Model:          modelBridge{a: a},
 		DefaultProfile: mac,
 		MaxParallel:    a.cfg.Policy.MaxParallelSessions,
 		// Node `test`/`lint` lấy lệnh từ .sagent/project.toml, khỏi lặp lại
