@@ -463,6 +463,8 @@ const CHO_BAN = [[-2.9, 1.0], [0, 1.0], [2.9, 1.0], [-2.9, -2.6], [0, -2.6], [2.
 const CHO_HOP = [[0, -2.05, 0], [0, 2.05, Math.PI], [-1.85, -2.05, 0],
                  [-1.85, 2.05, Math.PI], [1.85, -2.05, 0], [1.85, 2.05, Math.PI]];
 
+const phongDaDung = [];   // phòng đã dựng, để lắp mẫu .glb vào khi chúng về
+
 function dungPhong(p){
   // Góc phòng = hướng từ phòng nhìn về sảnh. Cả phòng nằm trong một Group xoay
   // đúng góc đó, nên bản vẽ bên dưới chỉ cần viết MỘT lần.
@@ -501,25 +503,35 @@ function dungPhong(p){
 
   // Nội thất + chỗ đứng. Hai thứ này sinh ra từ CÙNG một mảng toạ độ, nên bàn và
   // người không bao giờ lệch nhau.
+  //
+  // Nội thất KHỐI HỘP nằm trong một nhóm riêng. Khi bộ mẫu .glb tải xong, nhóm
+  // này bị TẮT và nhóm mẫu bật lên — cả hai dựng từ chung một mảng toạ độ nên
+  // không thể lệch nhau. Giữ lại bản khối hộp vì nó là ĐƯỜNG LUI: mẫu hỏng hay
+  // chưa về thì phòng vẫn có bàn ghế, chứ không trơ ra một tấm ván trống — đúng
+  // cái người dùng đã phàn nàn.
   const cho = p.kieu === 'hop' ? CHO_HOP : CHO_BAN;
+  const hop = new THREE.Group(); g.add(hop);
+  p.hopNhom = hop;
   if(p.kieu === 'hop'){
     const ban = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.09, 2.0), matBan);
-    ban.position.y = 0.75; g.add(ban);
+    ban.position.y = 0.75; hop.add(ban);
     [-2.2, 2.2].forEach(dx=>{
       const ch = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 1.7), matChan);
-      ch.position.set(dx, 0.37, 0); g.add(ch);
+      ch.position.set(dx, 0.37, 0); hop.add(ch);
     });
     cho.forEach(c=>{
-      themGhe(g, c[0] - Math.sin(c[2])*0.85, c[1] - Math.cos(c[2])*0.85, c[2]);
+      themGhe(hop, c[0] - Math.sin(c[2])*0.85, c[1] - Math.cos(c[2])*0.85, c[2]);
     });
-    themBang(g, 3.8, 1.4);
+    themBang(hop, 3.8, 1.4);
   } else {
-    cho.forEach(c => themBanLamViec(g, c[0], c[1]));
-    themBang(g, 3.2, 1.1);
-    if(p.kieu === 'may'){ themTuMay(g, -4.05); themTuMay(g, 4.05); }
-    else themTu(g, -NUA_PHONG + 0.62);
+    cho.forEach(c => themBanLamViec(hop, c[0], c[1]));
+    themBang(hop, 3.2, 1.1);
+    if(p.kieu === 'may'){ themTuMay(hop, -4.05); themTuMay(hop, 4.05); }
+    else themTu(hop, -4.05);
   }
   p.cho = cho.map(c => ({v: chuyen(p, c[0], c[1]), quay: p.goc + (c.length > 2 ? c[2] : 0)}));
+  p.nhom = g;
+  phongDaDung.push(p);
 
   // Hành lang nối phòng với sảnh: nói rằng nhân vật ĐI ĐƯỢC từ đây sang kia.
   const d = Math.hypot(p.x, p.z);
@@ -556,18 +568,147 @@ sanhSan.rotation.x = -Math.PI/2; sanhSan.position.y = -0.02; scene.add(sanhSan);
 const sanhVanh = new THREE.Mesh(new THREE.TorusGeometry(R_SANH, 0.05, 8, 96),
   new THREE.MeshBasicMaterial({color:MAU_VACH, transparent:true, opacity:.5}));
 sanhVanh.rotation.x = Math.PI/2; sanhVanh.position.y = 0.02; scene.add(sanhVanh);
+// Bản khối hộp của sảnh, cũng nằm trong nhóm riêng để còn tắt được khi mẫu về.
+const sanhHop = new THREE.Group(); scene.add(sanhHop);
 (function noiThatSanh(){
   const mat = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.28, 0.09, 32), matBan);
-  mat.position.y = 0.70; scene.add(mat);
+  mat.position.y = 0.70; sanhHop.add(mat);
   const tru = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.44, 0.66, 16), matChan);
-  tru.position.y = 0.33; scene.add(tru);
+  tru.position.y = 0.33; sanhHop.add(tru);
   for(let i = 0; i < 4; i++){
     const a = i/4*Math.PI*2 + Math.PI/4;
     const don = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.33, 0.44, 16), matGhe);
-    don.position.set(Math.cos(a)*2.35, 0.22, Math.sin(a)*2.35); scene.add(don);
+    don.position.set(Math.cos(a)*2.35, 0.22, Math.sin(a)*2.35); sanhHop.add(don);
   }
 })();
 themNhanPhong(SANH.ten, SANH.mo, new THREE.Vector3(0, 4.2, 0));
+
+// ---- BỘ NỘI THẤT THẬT (Kenney Furniture Kit, CC0) ----
+//
+// Nội thất khối hộp ở trên là do tôi tự nặn, và trần thẩm mỹ của nó thấp: sáu
+// cái hộp xám vẫn ra sáu cái hộp xám. Bộ này là ĐỒ CÓ SẴN, cùng đường với
+// RobotExpressive.glb — học/chép được thì chép, đúng luật của dự án.
+//
+// Giấy phép: Creative Commons Zero (CC0), Kenney (kenney.nl), bản Furniture Kit
+// 2.0. Nguyên văn giấy phép nằm ở vendor/noithat/GIAY-PHEP.txt. Dùng được cho
+// mọi mục đích, kể cả thương mại, không bắt buộc ghi công — nhưng vẫn ghi.
+//
+// TỈ LỆ: bộ này vẽ ở khoảng nửa cỡ thật. ĐO nguyên bộ bằng cách đọc min/max của
+// accessor POSITION trong từng .glb, không đoán:
+//
+//   desk            0.73 × 0.38 × 0.56   ×2 →  1.46 m  (bàn làm việc)
+//   table           0.84 × 0.33 × 0.45   ×2 →  1.68 m  (bàn họp)
+//   bookcaseClosed  0.40 × 0.85 × 0.25   ×2 →  1.70 m cao (tủ hồ sơ)
+//   loungeSofa      0.98 × 0.46 × 0.41   ×2 →  1.96 m  (ghế sảnh)
+//
+// Một hệ số ×2 duy nhất cho cả bộ, vì chúng vốn được vẽ thành MỘT bộ — chỉnh
+// riêng từng món là bắt đầu lệch tỉ lệ với nhau.
+//
+// HƯỚNG: đo trọng tâm của phần đỉnh (trên 60% chiều cao) rồi so với tâm hộp
+// bao. Lưng ghế, tấm hậu tủ, thân màn hình đều lệch về -z ở MỌI mẫu — nghĩa là
+// cả bộ quay mặt về +z. Nhờ nhất quán đó mới xếp được bằng một luật chung.
+const TI_LE_NOI_THAT = 2;
+const MAU_NOI_THAT = ['desk', 'chairDesk', 'computerScreen', 'computerKeyboard',
+                      'table', 'chair', 'bookcaseClosed', 'bookcaseClosedDoors',
+                      'plantSmall1', 'rugRound', 'tableCoffee', 'loungeSofa'];
+const phoiMau = {};       // tên -> Object3D gốc, clone ra để dùng
+let soMauHong = 0;
+
+// Gốc toạ độ của bộ này nằm ở GÓC hộp bao, không phải tâm (đo được: desk có
+// x∈[-0.01,0.72], z∈[-0.38,0.18]). Đặt theo toạ độ gốc là mỗi món lệch đi nửa
+// thân mình. Nên căn lại: tâm đáy về đúng gốc.
+function chuanMau(o){
+  o.scale.setScalar(TI_LE_NOI_THAT);
+  o.updateMatrixWorld(true);
+  const h = new THREE.Box3().setFromObject(o);
+  o.position.set(-(h.min.x + h.max.x)/2, -h.min.y, -(h.min.z + h.max.z)/2);
+  const boc = new THREE.Group();
+  boc.add(o);
+  return boc;
+}
+
+// Một bản dùng được của mẫu. Clone THẲNG được vì đây là lưới TĨNH — chỉ mô hình
+// có xương (robot) mới phải parse lại, và đó là lý do file này parse .glb nhân
+// vật nhiều lần mà nội thất thì không.
+function mau(ten, x, z, quay, cao){
+  const p = phoiMau[ten];
+  if(!p) return null;
+  const o = p.clone(true);
+  o.position.set(x, cao || 0, z);
+  o.rotation.y = quay || 0;
+  return o;
+}
+
+function napNoiThat(){
+  return Promise.all(MAU_NOI_THAT.map(ten =>
+    fetch('vendor/noithat/' + ten + '.glb')
+      .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      .then(buf => new Promise((ok, tach) =>
+        loader.parse(buf, '', g => ok(g.scene), tach)))
+      .then(o => { phoiMau[ten] = chuanMau(o); })
+      // Một mẫu hỏng KHÔNG được kéo sập cả bộ, và càng không được kéo sập cảnh:
+      // đường lui là bộ khối hộp vẫn còn nguyên đó.
+      .catch(e => { soMauHong++; console.error('nội thất', ten, 'hỏng:', e.message); })
+  ));
+}
+
+// Lắp nội thất thật vào một phòng, DÙNG LẠI đúng mảng toạ độ đã dựng khối hộp.
+function lapNoiThat(p){
+  const g = new THREE.Group();
+  const cho = p.kieu === 'hop' ? CHO_HOP : CHO_BAN;
+  const them = (o)=>{ if(o) g.add(o); };
+
+  if(p.kieu === 'hop'){
+    them(mau('table', 0, 0, 0));
+    // Bàn họp dài 1.68 m mà phòng cần 5.2 — ghép ba cái nối nhau thay vì kéo
+    // giãn một cái: kéo giãn thì chân bàn béo ra, nhìn là biết bị bóp.
+    them(mau('table', -1.7, 0, 0));
+    them(mau('table',  1.7, 0, 0));
+    cho.forEach(c => them(mau('chair',
+      c[0] - Math.sin(c[2])*0.85, c[1] - Math.cos(c[2])*0.85, c[2])));
+    them(mau('plantSmall1', -3.9, -3.9, 0));
+    them(mau('plantSmall1',  3.9, -3.9, 0));
+  } else {
+    cho.forEach(c=>{
+      const x = c[0], z = c[1];
+      // Người đứng ở (x,z) quay mặt về +z (ra cửa). Bàn ở TRƯỚC mặt họ, xoay
+      // 180° để mặt dùng của bàn hướng về người; màn hình cũng xoay theo, nếu
+      // không thì nó quay lưng vào chính người đang gõ.
+      them(mau('desk', x, z + 0.85, Math.PI));
+      them(mau('computerScreen', x, z + 1.02, Math.PI, 0.76));
+      them(mau('computerKeyboard', x, z + 0.62, Math.PI, 0.76));
+      // Ghế ở SAU lưng người, quay cùng hướng với người.
+      them(mau('chairDesk', x, z - 0.85, 0));
+    });
+    if(p.kieu === 'may'){
+      them(mau('bookcaseClosedDoors', -4.0, -4.0, 0));
+      them(mau('bookcaseClosedDoors',  4.0, -4.0, 0));
+    } else {
+      them(mau('bookcaseClosed', -4.0, -4.0, 0));
+    }
+    them(mau('plantSmall1', 4.0, -4.0, 0));
+  }
+  p.nhom.add(g);
+  p.mauNhom = g;
+  // Chỉ TẮT khối hộp khi đã lắp được ít nhất một món: mất cả hai là phòng trống
+  // trơn, đúng thứ phải tránh.
+  if(g.children.length) p.hopNhom.visible = false;
+}
+
+function lapNoiThatSanh(){
+  const g = new THREE.Group();
+  const them = (o)=>{ if(o) g.add(o); };
+  them(mau('rugRound', 0, 0, 0));
+  them(mau('tableCoffee', 0, 0, 0));
+  // Ba ghế quay mặt vào giữa sảnh. Mẫu quay mặt về +z, nên góc quay = hướng từ
+  // ghế nhìn về tâm.
+  [0, 2*Math.PI/3, 4*Math.PI/3].forEach(a=>{
+    const x = Math.cos(a)*2.6, z = Math.sin(a)*2.6;
+    them(mau('loungeSofa', x, z, Math.atan2(-x, -z)));
+  });
+  scene.add(g);
+  if(g.children.length) sanhHop.visible = false;
+}
 
 const luoi = new THREE.GridHelper(90, 45, MAU_SAN2, MAU_SAN);
 luoi.material.transparent = true; luoi.material.opacity = .22; luoi.position.y = -0.16;
@@ -1358,6 +1499,14 @@ addEventListener('resize', ()=>{
   renderer.setSize(innerWidth, innerHeight);
 });
 renderer.setSize(innerWidth, innerHeight);
+
+// Nội thất thật nạp SONG SONG với dữ liệu, và cảnh không chờ nó: phòng đã có
+// bàn ghế khối hộp ngay từ khung hình đầu, mẫu về lúc nào thì thay lúc đó.
+napNoiThat().then(()=>{
+  phongDaDung.forEach(lapNoiThat);
+  lapNoiThatSanh();
+  if(soMauHong) console.error('nội thất:', soMauHong, 'mẫu hỏng — giữ bản khối hộp cho những chỗ đó');
+});
 
 refresh(); connect(); tick();
 setInterval(refresh, 5000);

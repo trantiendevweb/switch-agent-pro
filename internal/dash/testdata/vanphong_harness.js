@@ -34,6 +34,11 @@ class Obj {
   traverse(f) { f(this); this.children.forEach(c => c.traverse && c.traverse(f)); }
   lookAt() {}
   updateProjectionMatrix() {}
+  updateMatrixWorld() {}
+  // Noi that la luoi TINH nen ma that clone thang. Ban gia phai clone THAT su,
+  // khong duoc tra ve chinh no — tra ve chinh no thi 95 mon do noi that deu la
+  // MOT doi tuong, va bai kiem se xanh trong khi canh chi co mot cai ban.
+  clone() { const o = new this.constructor(); demClone++; return o; }
 }
 class Geo {
   constructor() { this.attributes = {}; }
@@ -55,6 +60,7 @@ function attr(n) {
 const veLai = [];
 const nhomTao = [];   // moi Group duoc tao, de do lai vi tri noi that
 const lineTao = [];   // moi duong giao viec, de kiem no co duoc dat toa do khong
+let demClone = 0;     // so mon noi that that su duoc lap vao canh
 
 // Nguoi dung bat "giam chuyen dong" thi ca vong lap dong hinh bi cat bot. Chay
 // them mot luot o che do do de biet duong giao viec CO duoc cap nhat khong —
@@ -76,7 +82,13 @@ const THREE = {
   PerspectiveCamera: class extends Obj {},
   Color: Col, Vector3: V3,
   FogExp2: class {},
-  Box3: class { setFromObject() { this.max = { y: 1.8 }; this.min = { y: 0 }; return this; } },
+  Box3: class {
+    setFromObject() {
+      this.min = { x: -0.5, y: 0, z: -0.5 };
+      this.max = { x: 0.5, y: 1.8, z: 0.5 };
+      return this;
+    }
+  },
   AmbientLight: class extends Obj {}, DirectionalLight: class extends Obj {},
   MeshStandardMaterial: Mat, MeshBasicMaterial: Mat, LineBasicMaterial: Mat,
   BoxGeometry: GeoHop, CylinderGeometry: GeoTru, PlaneGeometry: GeoPhang, CircleGeometry: Geo,
@@ -425,7 +437,28 @@ setTimeout(() => {
   banRaCuaSo('keydown', { key: 'Escape', preventDefault: ngan });
   if (!bang.hidden) { console.error('  HONG: Esc khong dong duoc bang'); hong++; }
 
-  // 5) KHO DIEN THOAI. Man hep thi nhan chen nhau nang hon han, va luot tach de
+  // 5) NOI THAT THAT (Kenney CC0) phai duoc LAP VAO, va ban khoi hop phai TAT.
+  //
+  //    So mon dem duoc tu chinh so do phong, khong phai con so lay dai:
+  //      phong hop  : 3 ban + 6 ghe + 2 cay                      = 11
+  //      phong ban x2: (6 cho x 4 mon) + 1 tu + 1 cay = 26 moi phong = 52
+  //      phong may  : (6 cho x 4 mon) + 2 tu may + 1 cay          = 27
+  //      sanh chung : 1 tham + 1 ban tra + 3 ghe                  =  5
+  //                                                          tong = 95
+  //    Lech con so nay nghia la mot phong bi bo sot, hoac mot mon bi lap hai lan.
+  console.log('  noi that lap vao:', demClone + '/95 mon');
+  if (demClone !== 95) {
+    console.error('  HONG: so mon noi that sai — cho doi 95, dem duoc ' + demClone); hong++;
+  }
+  //    Nam nhom khoi hop (4 phong + sanh) phai bi TAT sau khi mau ve. Con hien
+  //    la hai lop ban ghe chong len nhau, nhin ra ngay la loi.
+  const anDi = nhomTao.filter(g => g.visible === false).length;
+  console.log('  nhom khoi hop da tat:', anDi + '/5');
+  if (anDi !== 5) {
+    console.error('  HONG: cho doi 5 nhom khoi hop bi tat, dem duoc ' + anDi); hong++;
+  }
+
+  // 6) KHO DIEN THOAI. Man hep thi nhan chen nhau nang hon han, va luot tach de
   //    chi biet day LEN — day mai thi nhan bay len khoi mep tren, tuc la mat
   //    han. O 1600px chuyen do khong xay ra nen khong the thay bang mat thuong.
   ctx.innerWidth = 390; ctx.innerHeight = 844;
