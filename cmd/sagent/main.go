@@ -481,15 +481,21 @@ func cmdStop(args []string) {
 func cmdFleet(args []string) {
 	mine, child := splitDashDash(args)
 	worktree, mine := boolFlag(mine, "--worktree")
+	// `--tu-duyet-quyen`: cờ THẬT do adapter khai, không phải chuỗi gõ tay.
+	// Trước đây muốn hạm đội làm được việc thì phải tự gõ
+	// `-- --dangerously-skip-permissions` — tên cờ của Claude rò vào tay người
+	// dùng, và `fleet codex:*` sẽ chạy sai mà không ai báo.
+	tuDuyet, mine := boolFlag(mine, "--tu-duyet-quyen")
 	copies, rest := intFlag(mine, "--copies", 2)
 	if len(rest) == 0 {
 		fail(fmt.Errorf(`thiếu tài khoản. Ví dụ:
-  sagent fleet claude:phu --copies 4 --worktree -- -p "tóm tắt repo này"`))
+  sagent fleet claude:phu --copies 4 --worktree --tu-duyet-quyen -- -p "tóm tắt repo này"`))
 	}
 	a, done := open()
 	defer done()
 	res, err := a.FleetStart(api.FleetRequest{
-		Addr: api.ParseAddr(rest[0]), Copies: copies, Worktree: worktree, Args: child,
+		Addr: api.ParseAddr(rest[0]), Copies: copies, Worktree: worktree,
+		Args: child, TuDuyetQuyen: tuDuyet,
 	})
 	if err != nil {
 		fail(err)

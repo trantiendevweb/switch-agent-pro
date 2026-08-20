@@ -386,7 +386,6 @@ func (a *API) RouteKiem(ctx context.Context) []aiapi.SucKhoe {
 	return ra
 }
 
-
 // ProfileRun — action "profile.run". Chạy CLI tương tác, CHIẾM terminal cho tới
 // khi người dùng thoát. Chỉ mặt terminal gọi được; các mặt khác dùng fleet.
 func (a *API) ProfileRun(addr Addr, args []string) error {
@@ -715,6 +714,7 @@ func (a *API) ThuTuRoute(route string) []string {
 	}
 	return thuTu
 }
+
 // AICall — action "api.call". Gọi thẳng AI API theo route, chuyển sang route dự
 // phòng ĐÚNG MỘT LẦN nếu route chính hỏng.
 //
@@ -907,6 +907,14 @@ type FleetRequest struct {
 	Copies   int
 	Worktree bool
 	Args     []string // lệnh headless cho CLI con
+	// TuDuyetQuyen bật cờ để agent con TỰ DUYỆT mọi tool ở chế độ headless.
+	//
+	// Cờ THẬT do adapter khai (`ArgsTuDuyetQuyen`), không phải chuỗi người dùng
+	// gõ tay. Trước đây muốn hạm đội làm được việc thì phải tự gõ
+	// `-- --dangerously-skip-permissions`, tức là tên cờ của Claude rò vào tay
+	// người dùng và vào mọi script — provider khác thì cờ khác, mà không ai báo.
+	// Đường flow đã hỏi adapter từ lâu (`argsChoBuoc`); đường fleet thì chưa.
+	TuDuyetQuyen bool
 }
 
 // FleetStart — action "fleet.start". Áp chính sách của dự án TRƯỚC khi chạy.
@@ -954,9 +962,31 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 		}
 	}
 
+	// Cờ tự-duyệt-quyền HỎI ADAPTER, không chép cứng tên cờ của Claude.
+	//
+	// Dùng lại đúng `argsChoBuoc` mà đường flow đã dùng, nên hai đường không thể
+	// bất đồng về việc "toàn quyền" nghĩa là gì. Prompt truyền rỗng và bỏ phần
+	// HeadlessArgs sinh ra, vì fleet nhận args THÔ từ người dùng — ở đây chỉ cần
+	// đúng phần cờ quyền.
+	args := req.Args
+	if req.TuDuyetQuyen {
+		co, daDo := ad.ArgsTuDuyetQuyen()
+		if !daDo {
+			return fleet.Result{}, fmt.Errorf("xin `--tu-duyet-quyen` nhưng CHƯA ĐO cờ đó cho %s "+
+				"— không khai bừa; bỏ cờ hoặc dùng provider khác", ad.Name())
+		}
+		if len(co) == 0 {
+			// Đã đo, và provider không có rào nào: cờ là thừa, không phải lỗi.
+			a.bus.Warnf("%s không có rào quyền nào nên `--tu-duyet-quyen` là thừa — "+
+				"agent vốn đã chạy tool tự do.", ad.Name())
+		} else {
+			args = append(append([]string{}, co...), args...)
+		}
+	}
+
 	return fleet.FanOut(a.db, a.bus, ad, req.Addr.Account, fleet.Opts{
 		Copies: req.Copies, Worktree: req.Worktree,
-	}, req.Args)
+	}, args)
 }
 
 // ---------------------------- bản clone ----------------------------

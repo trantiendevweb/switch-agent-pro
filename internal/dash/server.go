@@ -917,7 +917,6 @@ func (s *Server) handleRouteKiem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"muc": out})
 }
 
-
 // handleSoRoute — action "route.list". Sổ route ↔ cấu hình, chỉ đọc.
 //
 // KHÔNG kèm key, chỉ key_id — sổ cũng chỉ giữ đúng chừng đó (migration v8).
@@ -1037,16 +1036,20 @@ func (s *Server) handleFleet(w http.ResponseWriter, r *http.Request) {
 		Copies   int    `json:"copies"`
 		Worktree bool   `json:"worktree"`
 		Command  string `json:"command"` // phần sau "--", dạng một chuỗi
+		// TuDuyetQuyen: cờ thật do adapter khai. Mặt web KHÔNG được gửi tên cờ
+		// của một provider cụ thể — đó là kiến thức của lõi, không phải của trình duyệt.
+		TuDuyetQuyen bool `json:"tuDuyetQuyen"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, err)
 		return
 	}
 	res, err := s.api.FleetStart(api.FleetRequest{
-		Addr:     api.ParseAddr(req.Addr),
-		Copies:   req.Copies,
-		Worktree: req.Worktree,
-		Args:     splitArgs(req.Command),
+		Addr:         api.ParseAddr(req.Addr),
+		Copies:       req.Copies,
+		Worktree:     req.Worktree,
+		Args:         splitArgs(req.Command),
+		TuDuyetQuyen: req.TuDuyetQuyen,
 	})
 	if err != nil {
 		writeErr(w, err)
