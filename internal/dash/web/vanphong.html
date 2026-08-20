@@ -62,6 +62,37 @@
     box-shadow:0 8px 18px rgba(0,0,0,.5);transition:opacity .18s var(--ease)}
   .thoai b{display:block;font-size:10px;color:var(--mid);font-weight:600;margin-bottom:3px}
 
+  /* Bảng chi tiết một nhân vật. Đơn sắc như mọi khung khác; chỉ dòng trạng thái
+     mang màu, vì nó là trạng thái agent. */
+  #chitiet{right:12px;bottom:56px;width:min(360px,calc(100% - 24px));max-height:56vh;overflow:auto;
+    padding:14px 16px;z-index:7}
+  #chitiet[hidden]{display:none}
+  #ct-dong{position:absolute;top:8px;right:10px;background:none;border:0;color:var(--mid);
+    font-size:20px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:6px}
+  #ct-dong:hover{color:var(--hi);background:rgba(255,255,255,.07)}
+  #ct-ten{font-family:var(--font-mono);font-weight:700;font-size:14px;padding-right:26px}
+  #ct-phu{font-size:11px;color:var(--mid);margin-top:2px}
+  #ct-bang{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:12px 0 0;font-size:12px}
+  #ct-bang dt{color:var(--lo)}
+  #ct-bang dd{margin:0;font-family:var(--font-mono);color:var(--hi);overflow-wrap:anywhere}
+  /* Output THẬT của bước, không cắt bớt như bóng thoại: bảng này là chỗ người ta
+     mở ra để ĐỌC, khác với bóng thoại chỉ liếc qua. */
+  #ct-out{margin-top:12px;font-family:var(--font-mono);font-size:11px;line-height:1.5;
+    color:var(--mid);white-space:pre-wrap;overflow-wrap:anywhere;max-height:22vh;overflow:auto;
+    border-top:1px solid var(--line);padding-top:10px}
+  #ct-out:empty{display:none}
+  #ct-nut{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  #ct-nut a,#ct-nut button{font:inherit;font-size:12px;font-weight:600;padding:8px 12px;
+    border-radius:8px;border:1px solid var(--line-2);background:none;color:var(--hi);
+    text-decoration:none;cursor:pointer}
+  #ct-nut a:hover,#ct-nut button:hover{background:rgba(255,255,255,.07)}
+  #ct-nut a:focus-visible,#ct-nut button:focus-visible,#ct-dong:focus-visible{
+    outline:2px solid var(--core);outline-offset:2px}
+  #ct-huy[disabled]{opacity:.45;cursor:not-allowed}
+  #ct-bao{margin-top:8px;font-size:11px;color:var(--mid)}
+  #ct-bao:empty{display:none}
+  @media (max-width:720px){ #chitiet{right:12px;left:12px;bottom:12px;width:auto;max-height:50vh} }
+
   #thieu{position:fixed;inset:0;display:none;place-items:center;text-align:center;padding:24px;z-index:9}
   #thieu div{max-width:420px}
   #thieu a{color:var(--link)}
@@ -110,6 +141,22 @@
   <span><i class="dot" style="background:var(--idle)"></i>chưa chạy</span>
   <span><i class="ln"></i>đang giao việc</span>
   <span id="scount" style="color:var(--hi)">0 nhân vật</span>
+</div>
+
+<!-- Bảng chi tiết: hiện khi bấm vào một nhân vật. Luật ngang quyền đòi mặt nào
+     cũng phải ĐIỀU KHIỂN được, không chỉ để ngắm — trước bản này mặt văn phòng
+     là mặt duy nhất bấm vào không ra gì. -->
+<div id="chitiet" class="panel" hidden role="dialog" aria-modal="false" aria-labelledby="ct-ten">
+  <button id="ct-dong" aria-label="Đóng bảng chi tiết">×</button>
+  <div id="ct-ten"></div>
+  <div id="ct-phu"></div>
+  <dl id="ct-bang"></dl>
+  <div id="ct-out"></div>
+  <div id="ct-nut">
+    <a id="ct-hoithoai" href="hoi-thoai.html">Mở hội thoại</a>
+    <button id="ct-huy" type="button">Huỷ lượt chạy</button>
+  </div>
+  <div id="ct-bao"></div>
 </div>
 
 <div id="thieu"><div>
@@ -690,6 +737,7 @@ function dungNguoi(A){
     chuanCao(root, 1.8);
     A.obj = root; A.cao = 1.8;
     root.position.copy(A.pos);
+    ganKhoa(root, A.khoa);
     scene.add(root);
     A.mixer = new THREE.AnimationMixer(root);
     A.act = {};
@@ -708,6 +756,7 @@ function themNhanVat(khoa, prof, may, tint){
     A.obj = taoMayCham(MAU_TT['']);
     chuanCao(A.obj, 1.45);
     A.cao = 1.45;
+    ganKhoa(A.obj, khoa);
     scene.add(A.obj);
     return A;
   }
@@ -925,6 +974,7 @@ function capNhat(){
       A.vong = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.055, 8, 40),
         new THREE.MeshBasicMaterial({color:mau, transparent:true, opacity:.85}));
       A.vong.rotation.x = Math.PI/2;
+      ganKhoa(A.vong, d.khoa);
       scene.add(A.vong);
     }
     A.vong.material.color.setHex(mau);
@@ -962,6 +1012,9 @@ function capNhat(){
 
   // Dựng SAU cùng: dungCapNoi chỉ nối những nhân vật đã có mặt trong nhanVat.
   dungCapNoi();
+  // Bảng chi tiết phải theo dữ liệu mới. Để nó đứng im trong khi bước đã đổi
+  // trạng thái là nói dối ngay giữa màn hình. Nhân vật biến mất thì đóng bảng.
+  if(chonKhoa && !nhanVat[chonKhoa]) dongChiTiet(); else veChiTiet();
   $('flowname').textContent = flowName ? ('flow: ' + flowName) : 'chưa có lượt chạy nào';
 }
 
@@ -973,8 +1026,10 @@ async function refresh(){
     const fd = await fr.json();
     const runs = fd.runs || [];
     const run = runs.find(r => r.state === 'running') || runs[0];
-    if(!run){ flowName = ''; flowSteps = []; capNhat(); return; }
+    if(!run){ flowName = ''; flowSteps = []; flowRunID = 0; flowTrangThai = ''; capNhat(); return; }
     flowName = run.flow;
+    flowRunID = run.id;
+    flowTrangThai = run.state || '';
     const dr = await fetch('/api/flow/detail?id=' + run.id, {headers:H});
     if(dr.ok){
       const d = await dr.json();
@@ -997,6 +1052,123 @@ function connect(){
   es.onmessage = ev=>{ let e; try{ e = JSON.parse(ev.data); }catch(_){ return; }
     if(String(e.type).startsWith('flow.')) refresh(); };
 }
+
+// ---- BẤM VÀO NHÂN VẬT ----
+//
+// Trước bản này, văn phòng là mặt DUY NHẤT bấm vào không ra gì — chỉ để ngắm.
+// Luật ngang quyền (MASTER-PLAN §2c) đòi mặt nào cũng điều khiển được, và mặt
+// 3d.html vốn đã có raycaster bấm vào cầu để dừng phiên.
+//
+// Ở đây đối tượng không phải phiên hạm đội mà là BƯỚC của lượt chạy, nên hành
+// động đúng là: xem đủ chi tiết bước đó, mở hội thoại, và huỷ lượt chạy.
+const tia = new THREE.Raycaster();
+const chuot = new THREE.Vector2();
+let chonKhoa = '';          // nhân vật đang mở bảng chi tiết
+let flowRunID = 0;
+let flowTrangThai = '';
+
+// Gắn khoá lên đối tượng để tia bắn trúng còn biết nó là ai. Gán THÊM một thuộc
+// tính chứ không thay cả userData: máy chấm giữ tham chiếu vật liệu màn hình
+// trong đó, thay cả cục là màn hình thôi đổi màu theo trạng thái.
+function ganKhoa(obj, khoa){ if(obj) obj.userData.khoa = khoa; }
+
+// Đi ngược lên cha cho tới khi gặp đối tượng có khoá: tia bắn trúng một mesh con
+// nằm sâu trong mô hình robot, không trúng thẳng gốc.
+function khoaTuDoiTuong(o){
+  while(o){ if(o.userData && o.userData.khoa) return o.userData.khoa; o = o.parent; }
+  return '';
+}
+
+(function batBamNhanVat(){
+  // Phân biệt BẤM với KÉO XOAY: cùng một con chuột làm hai việc. Không đo quãng
+  // đường thì mỗi lần xoay camera xong nhả tay là bảng chi tiết bật lên.
+  let dau = null;
+  canvas.addEventListener('pointerdown', e=>{ dau = {x:e.clientX, y:e.clientY}; });
+  canvas.addEventListener('pointerup', e=>{
+    if(!dau) return;
+    const xa = Math.hypot(e.clientX - dau.x, e.clientY - dau.y);
+    dau = null;
+    if(xa > 6) return;                     // đó là kéo xoay, không phải bấm
+    const r = canvas.getBoundingClientRect();
+    chuot.x =  ((e.clientX - r.left)/r.width )*2 - 1;
+    chuot.y = -((e.clientY - r.top )/r.height)*2 + 1;
+    tia.setFromCamera(chuot, camera);
+    const trung = tia.intersectObjects(scene.children, true);
+    for(const t of trung){
+      const k = khoaTuDoiTuong(t.object);
+      if(k && nhanVat[k]){ moChiTiet(k); return; }
+    }
+    dongChiTiet();                          // bấm ra chỗ trống = đóng bảng
+  });
+})();
+
+function moChiTiet(khoa){ chonKhoa = khoa; veChiTiet(); }
+function dongChiTiet(){
+  chonKhoa = '';
+  $('chitiet').hidden = true;
+  $('ct-bao').textContent = '';
+}
+
+function veChiTiet(){
+  const A = chonKhoa ? nhanVat[chonKhoa] : null;
+  const b = $('chitiet');
+  if(!A){ b.hidden = true; return; }
+  const st = A.buoc;
+  const tt = st ? (st.state || '') : '';
+  b.hidden = false;
+  $('ct-ten').textContent = A.may ? ('máy chấm · ' + A.prof) : A.prof;
+  $('ct-phu').textContent = A.may
+    ? 'bước do máy chạy — không agent nào đứng sau'
+    : 'tài khoản agent';
+
+  const bang = $('ct-bang');
+  bang.textContent = '';
+  const dong = (ten, gia, mau)=>{
+    if(!gia) return;
+    const dt = document.createElement('dt'); dt.textContent = ten;
+    const dd = document.createElement('dd'); dd.textContent = gia;
+    if(mau) dd.style.color = mau;
+    bang.appendChild(dt); bang.appendChild(dd);
+  };
+  dong('bước',    st ? st.id : '');
+  dong('vai trò', st ? (st.vaiTro || 'chưa phân vai') : 'chưa phân vai');
+  dong('loại',    st ? st.type : '');
+  // Trạng thái là chỗ DUY NHẤT trong bảng này mang màu — đúng luật màu chung.
+  dong('trạng thái', tt || 'chờ', chuoiMau(MAU_TT[tt] !== undefined ? MAU_TT[tt] : MAU_TT['']));
+  const p = PHONG.concat([SANH]).find(x => x.khoa === A.phongKhoa);
+  dong('phòng', p ? p.ten : '');
+  if(st && (st.needs || []).length) dong('chờ bước', st.needs.join(', '));
+
+  // Output ĐẦY ĐỦ, không cắt. Bóng thoại chỉ để liếc; bảng này là chỗ mở ra ĐỌC.
+  $('ct-out').textContent = st && st.output ? String(st.output) : '';
+
+  $('ct-hoithoai').href = flowRunID ? ('hoi-thoai.html#run=' + flowRunID) : 'hoi-thoai.html';
+  // Chỉ huỷ được lượt ĐANG chạy. Nút mờ đi kèm lý do còn hơn nút bấm được mà bấm
+  // xong mới báo lỗi.
+  const huy = $('ct-huy');
+  const chay = flowRunID > 0 && flowTrangThai === 'running';
+  huy.disabled = !chay;
+  huy.title = chay ? ('huỷ lượt chạy #' + flowRunID) : 'chỉ huỷ được lượt đang chạy';
+}
+
+$('ct-dong').addEventListener('click', dongChiTiet);
+addEventListener('keydown', e=>{ if(e.key === 'Escape') dongChiTiet(); });
+$('ct-huy').addEventListener('click', async ()=>{
+  if(!flowRunID) return;
+  const bao = $('ct-bao');
+  bao.textContent = 'đang huỷ lượt #' + flowRunID + '…';
+  try{
+    const r = await fetch('/api/flow/cancel', {method:'POST', headers:H,
+      body: JSON.stringify({id: flowRunID})});
+    // Nuốt lỗi ở đây là kiểu hỏng tệ nhất của một cái nút: người dùng bấm, không
+    // thấy gì, tưởng đã huỷ, rồi agent vẫn chạy tiếp và đốt tiếp hạn mức.
+    if(!r.ok){ bao.textContent = 'huỷ không được: HTTP ' + r.status; return; }
+    bao.textContent = 'đã gửi lệnh huỷ lượt #' + flowRunID;
+    refresh();
+  }catch(err){
+    bao.textContent = 'huỷ không được: ' + (err && err.message ? err.message : err);
+  }
+});
 
 // ---- vòng lặp ----
 // Chiếu một điểm world sang toạ độ màn hình.

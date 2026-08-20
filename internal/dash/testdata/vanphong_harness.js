@@ -102,8 +102,23 @@ const THREE = {
       ok({ scene: s, animations: ['Idle', 'Walking', 'Running', 'Wave', 'ThumbsUp', 'No'].map(n => ({ name: n })) });
     }
   },
+  Vector2: class { constructor(x = 0, y = 0) { this.x = x; this.y = y; } },
+  Raycaster: class {
+    setFromCamera() {}
+    intersectObjects(ds) {
+      const ra = [];
+      const di = o => { ra.push({ object: o }); (o.children || []).forEach(di); };
+      (ds || []).forEach(di);
+      return ra;
+    }
+  },
   sRGBEncoding: 1, ACESFilmicToneMapping: 2, LoopOnce: 3, LoopRepeat: 4
 };
+
+// Ban mot su kien vao phan tu — de mo phong cu bam that.
+function banRa(el, loai, ev) {
+  (el._h[loai] || []).forEach(f => f(ev));
+}
 
 // Moi phan tu giu MOT co dinh suot doi. Bien doi moi lan doc thi bai kiem tra
 // de nhau ben duoi khong con nghia gi: script cache mot con so, con bai kiem lai
@@ -116,8 +131,11 @@ function elMoi(tag) {
     tagName: tag, style: {}, children: [], className: '', textContent: '',
     classList: { add() {}, remove() {}, contains() { return false; } },
     appendChild(c) { this.children.push(c); return c; },
-    remove() { e.goBo = true; }, addEventListener() {}, setPointerCapture() {},
-    goBo: false,
+    remove() { e.goBo = true; }, setPointerCapture() {},
+    _h: {},
+    addEventListener(t, f) { (this._h[t] = this._h[t] || []).push(f); },
+    getBoundingClientRect() { return { left: 0, top: 0, width: 1600, height: 900 }; },
+    goBo: false, hidden: false, disabled: false, title: '', href: '',
     get offsetWidth() { return rong; },
     get offsetHeight() { return this.className === 'thoai' ? 54 : 26; }
   };
@@ -140,7 +158,9 @@ function deNhau(a, b) {
   return a.l < b.r - 2 && a.r > b.l + 2 && a.t < b.d - 2 && a.d > b.t + 2;
 }
 const kho = {};
-['scene', 'conn', 'conntext', 'flowname', 'scount', 'thieu', 'thieuten', 'thieuly']
+['scene', 'conn', 'conntext', 'flowname', 'scount', 'thieu', 'thieuten', 'thieuly',
+  'chitiet', 'ct-dong', 'ct-ten', 'ct-phu', 'ct-bang', 'ct-out', 'ct-nut',
+  'ct-hoithoai', 'ct-huy', 'ct-bao']
   .forEach(id => { kho[id] = elMoi('div'); });
 
 const buocGia = [
@@ -311,6 +331,37 @@ setTimeout(() => {
     }
     console.log('  phong ' + kieu + ': ' + mon.length + ' mon (' + day.length + ' mon day), do xong');
   });
+  // 4) BAM VAO NHAN VAT phai mo bang chi tiet, KEO XOAY thi khong duoc mo.
+  //    Luat ngang quyen: mat nao cung phai dieu khien duoc, khong chi de ngam.
+  const canvas = kho['scene'], bang = kho['chitiet'];
+  bang.hidden = true;
+
+  // (a) Keo xoay camera: nha tay o cho khac -> KHONG duoc mo bang.
+  banRa(canvas, 'pointerdown', { clientX: 800, clientY: 450 });
+  banRa(canvas, 'pointerup', { clientX: 860, clientY: 470 });
+  if (!bang.hidden) { console.error('  HONG: keo xoay camera lai mo bang chi tiet'); hong++; }
+
+  // (b) Bam that: xuong va len cung mot cho -> mo bang, ten phai la nhan vat that.
+  banRa(canvas, 'pointerdown', { clientX: 800, clientY: 450 });
+  banRa(canvas, 'pointerup', { clientX: 801, clientY: 451 });
+  if (bang.hidden) {
+    console.error('  HONG: bam vao nhan vat khong mo duoc bang chi tiet'); hong++;
+  } else {
+    const ten = kho['ct-ten'].textContent;
+    const co = buocGia.some(b => ten === b.profile || ten === 'máy chấm · ' + b.id);
+    console.log('  bang chi tiet:', JSON.stringify(ten),
+      '| so dong:', kho['ct-bang'].children.length,
+      '| nut Huy khoa:', kho['ct-huy'].disabled);
+    if (!co) { console.error('  HONG: ten trong bang khong khop nhan vat that nao'); hong++; }
+    if (!kho['ct-bang'].children.length) { console.error('  HONG: bang chi tiet rong'); hong++; }
+    // Luot chay gia dang `running` -> nut Huy PHAI bam duoc.
+    if (kho['ct-huy'].disabled) { console.error('  HONG: luot dang chay ma nut Huy bi khoa'); hong++; }
+  }
+
+  // (c) Bam nut dong -> bang phai an.
+  banRa(kho['ct-dong'], 'click', {});
+  if (!bang.hidden) { console.error('  HONG: bam dong ma bang van hien'); hong++; }
+
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');
   process.exit(hong ? 1 : 0);
 }, 400);
