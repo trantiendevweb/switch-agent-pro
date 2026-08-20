@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -19,6 +20,28 @@ import (
 
 // ProjectDirName là thư mục cấu hình nằm trong repo của người dùng.
 const ProjectDirName = ".sagent"
+
+// CotPhien liệt kê MỌI cột mà bảng phiên của mặt 2D vẽ được, và là nguồn duy
+// nhất để `ui.columns` được kiểm.
+//
+// Khai ở tầng config chứ không ở tầng dash, vì `sagent config` phải báo được
+// tên cột sai NGAY LÚC ĐỌC FILE — bắt lỗi lúc mở trình duyệt thì đã muộn, và
+// mặt web nào cũng phải đọc chung một danh sách này chứ không tự chế bản riêng.
+var CotPhien = []string{"provider", "tai_khoan", "danh_tinh", "trang_thai", "pid", "nhanh", "bat_dau"}
+
+// CotMacDinh là bộ cột dùng khi `ui.columns` không khai — đúng bốn cột mà bảng
+// phiên đang vẽ từ trước, nên không khai gì thì giao diện KHÔNG đổi.
+var CotMacDinh = []string{"provider", "tai_khoan", "danh_tinh", "trang_thai"}
+
+// CotHopLe cho biết tên cột có vẽ được không.
+func CotHopLe(ten string) bool {
+	for _, c := range CotPhien {
+		if c == ten {
+			return true
+		}
+	}
+	return false
+}
 
 // Config là cấu hình đã gộp đủ các tầng.
 type Config struct {
@@ -43,9 +66,28 @@ type Config struct {
 		RequireApprovalFor  []string `toml:"require_approval_for"`
 	} `toml:"policy"`
 
+	// UI là hợp đồng của Pha 5d: hai project khác nhau mở ra hai bố cục khác
+	// nhau mà KHÔNG sửa mã. Mọi khoá ở đây chỉ là dữ liệu — mặt nào tiêu thụ
+	// được thì tiêu thụ, tắt mặt đó đi lõi vẫn chạy.
 	UI struct {
 		DefaultSurface string `toml:"default_surface"` // tui | dashboard | workflow | 3d
-		Theme          string `toml:"theme"`
+		Theme          string `toml:"theme"`           // dark | light
+
+		// Columns chọn cột nào hiện trên bảng phiên của mặt 2D, THEO ĐÚNG THỨ
+		// TỰ khai. Rỗng = giữ bộ mặc định; không phải "giấu hết cột".
+		Columns []string `toml:"columns"`
+
+		// PinnedFlows ghim flow lên đầu workflow board. Tên phải khớp tên trong
+		// flows.toml; tên lạ thì mặt board bỏ qua chứ không dựng flow ma.
+		PinnedFlows []string `toml:"pinned_flows"`
+
+		// Enable3D = false thì ẩn hẳn lối vào mặt ba chiều. Mặc định true.
+		//
+		// Là bool thường chứ không phải *bool có lý do: `merge` decode chồng lên
+		// cấu hình đã có mặc định, nên khoá KHÔNG khai thì giữ true của tầng
+		// trước, còn khai `enable_3d = false` thì ghi đè thật. Đủ để phân biệt
+		// "không nói gì" với "nói không".
+		Enable3D bool `toml:"enable_3d"`
 	} `toml:"ui"`
 
 	// AI là ĐƯỜNG THỨ HAI: gọi thẳng API thay vì qua CLI agent.
@@ -78,6 +120,7 @@ func Default() Config {
 	c.Policy.MaxParallelSessions = 4
 	c.UI.DefaultSurface = "tui"
 	c.UI.Theme = "dark"
+	c.UI.Enable3D = true
 	return c
 }
 
@@ -141,6 +184,22 @@ func (c Config) validate() error {
 	default:
 		return fmt.Errorf("ui.default_surface = %q — chỉ nhận tui|dashboard|workflow|3d", c.UI.DefaultSurface)
 	}
+	switch c.UI.Theme {
+	case "", "dark", "light":
+	default:
+		return fmt.Errorf("ui.theme = %q — chỉ nhận dark|light", c.UI.Theme)
+	}
+	for _, cot := range c.UI.Columns {
+		if !CotHopLe(cot) {
+			return fmt.Errorf("ui.columns có %q — chỉ nhận %s", cot, strings.Join(CotPhien, "|"))
+		}
+	}
+	// Bắt mâu thuẫn NGAY Ở ĐÂY thay vì để mặt web tự xử: khai mặt mặc định là
+	// 3d rồi lại tắt 3d thì mở dashboard sẽ ra trang trống, mà người dùng không
+	// hiểu vì sao — cấu hình sai phải kêu lúc đọc file, không phải lúc vẽ.
+	if c.UI.DefaultSurface == "3d" && !c.UI.Enable3D {
+		return fmt.Errorf("ui.default_surface = \"3d\" nhưng ui.enable_3d = false — mâu thuẫn")
+	}
 	if c.Policy.MaxParallelSessions < 0 {
 		return fmt.Errorf("policy.max_parallel_sessions không được âm")
 	}
@@ -170,7 +229,10 @@ require_approval_for  = ["merge", "deploy"]
 
 [ui]
 default_surface = "tui"       # tui | dashboard | workflow | 3d
-theme           = "dark"
+theme           = "dark"      # dark | light
+# columns      = ["provider", "tai_khoan", "danh_tinh", "trang_thai"]
+# pinned_flows = ["kiem-tra-nhanh"]
+# enable_3d    = true
 
 # LƯU Ý: file này KHÔNG được chứa API key hay token. Chỉ tham chiếu bằng ID.
 `
