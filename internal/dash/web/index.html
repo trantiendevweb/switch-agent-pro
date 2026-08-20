@@ -15,6 +15,9 @@
   body{margin:0;background:var(--void);color:var(--hi);
     font-family:var(--font-body);line-height:1.5;
     -webkit-font-smoothing:antialiased}
+  /* Khi ngăn kéo mở, nền không được cuộn theo: cuộn nền lúc đang gõ trong ngăn
+     kéo làm mất chỗ người ta đang đọc dở. */
+  body.khoa{overflow:hidden}
   a{color:var(--link)}
   /* Dữ liệu máy đi mono, kể cả khi nằm lọt giữa câu văn. */
   code{font-family:var(--font-mono);font-size:.9em}
@@ -59,17 +62,26 @@
   .btn:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--core);outline-offset:2px}
   .empty{padding:16px;color:var(--mid);font-size:13px}
 
+  /* ------------------------------------------------------- thanh công cụ
+     Sáu ô thao tác nay nằm trong ngăn kéo, mỗi ô một nút ở đây. Nút vẫn là
+     KHUNG nên giữ đơn sắc — không tô màu trạng thái lên chúng. */
+  .cong{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .cong .nk{display:inline-flex;align-items:center;gap:7px}
+  .cong .nk::before{content:"";width:5px;height:5px;border-radius:1px;
+    background:var(--lo);flex:none;transition:background .15s var(--ease)}
+  .cong .nk:hover::before,.cong .nk[aria-expanded=true]::before{background:var(--hi)}
+  .cong .nk[aria-expanded=true]{border-color:var(--hi);background:rgba(255,255,255,.07)}
+  .cong .nk:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+
   /* ---------------------------------------------------------------- bento
-     Hạm đội chiếm chính · cột phải là Tổng quan + các ô điều khiển · Nhật ký
-     nằm dưới cùng, full-width.
+     Màn chính CHỈ còn thứ phải nhìn liên tục: Hạm đội (lưới card) chiếm chính ·
+     cột phải là Tiến độ lượt chạy · Nhật ký full-width dưới cùng.
 
      Vì sao bỏ bảng phiên: bảng bắt mắt đọc theo HÀNG, mà cái người vận hành
      cần là "liếc phát biết cả hạm đội đang thế nào" — tức đọc theo KHỐI. Bảng
      5 cột với PID và đường dẫn dài cũng không xuống được điện thoại. */
-  .bento{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+  .bento{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
   .duoi{margin-top:4px}
-  /* Dưới 720px: một cột. Card tự co nhờ auto-fill nên không cần luật riêng. */
-  @media(max-width:720px){.bento{grid-template-columns:1fr}}
 
   /* ---- lưới card Hạm đội ---- */
   .ham{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px}
@@ -116,6 +128,87 @@
   .ag .dung{position:absolute;right:10px;bottom:10px;opacity:0;transform:translateY(3px);
     pointer-events:none;transition:opacity .15s var(--ease),transform .15s var(--ease)}
   .ag.song:hover .dung,.ag.song:focus-within .dung{opacity:1;transform:none;pointer-events:auto}
+
+  /* ------------------------------------------- Tiến độ lượt chạy (màn chính)
+     Vì sao nó ở đây chứ không nằm trong ngăn kéo: đây là thứ phải nhìn LIÊN
+     TỤC. Hạm đội chỉ nói có mấy tiến trình đang sống — nó không trả lời được
+     "lượt chạy tới bước nào, gãy ở đâu". Không có khối này thì câu đó chỉ trả
+     lời được bằng cách bới nhật ký hoặc gõ `sagent flow runs N`.
+
+     Màu ở đây CHỈ mã hoá trạng thái bước (--c), khung vẫn đơn sắc. */
+  .td{padding:13px 14px}
+  .td[hidden]{display:none}
+  .td .dau{display:flex;align-items:center;gap:8px}
+  .td .ten{font-family:var(--font-mono);font-size:12.5px;color:var(--hi);min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .td .st{margin-left:auto;flex:none;display:flex;align-items:center;gap:5px;
+    font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--c);
+    background:rgba(255,255,255,.05);border-radius:999px;padding:2px 8px 2px 6px}
+  .td .st i{width:6px;height:6px;border-radius:50%;background:var(--c);display:block;flex:none}
+  /* Lượt đang chạy thì chấm thở đúng nhịp của card agent đang chạy — hai mặt
+     nói cùng một ngôn ngữ. Lượt đã xong/đã hỏng thì đứng im. */
+  .td.run .st i{animation:nhiptho 1.05s var(--ease) infinite}
+  .td .dem{margin-top:10px;display:flex;align-items:baseline;gap:7px;font-size:12px;color:var(--mid)}
+  .td .dem b{font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+    font-size:16px;color:var(--hi);font-weight:600}
+  /* Mạch bước: mỗi bước một vạch, tô theo trạng thái CỦA CHÍNH BƯỚC ĐÓ. Liếc
+     một cái là thấy đã qua mấy vạch và vạch nào đỏ. */
+  .td .mach{margin-top:9px;display:flex;gap:3px}
+  .td .mach b{flex:1;height:5px;border-radius:2px;background:var(--c);
+    transition:background .3s var(--ease)}
+  .td .ds{list-style:none;margin:11px 0 0;padding:0;display:grid;gap:5px;
+    max-height:184px;overflow:auto}
+  .td .ds li{display:flex;align-items:center;gap:7px;font-size:12px}
+  .td .ds li i{width:6px;height:6px;border-radius:50%;background:var(--c);flex:none;display:block}
+  .td .ds .b{font-family:var(--font-mono);font-size:11.5px;color:var(--hi);min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .td .ds .tt{margin-left:auto;flex:none;font-family:var(--font-mono);font-size:10px;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--lo)}
+  /* Bước hỏng được kéo lên thành một khối riêng: nó là thứ người ta mở
+     dashboard để tìm, không thể bắt họ dò trong danh sách. */
+  .td .hong{margin-top:11px;border:1px solid rgba(255,93,121,.4);background:rgba(255,93,121,.08);
+    border-radius:8px;padding:8px 10px;font-size:12px;color:var(--error);line-height:1.45}
+  .td .hong[hidden]{display:none}
+  .td .hong b{font-family:var(--font-mono)}
+  .td .so{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .td .so .k{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--lo)}
+  .td .so .v{display:block;margin-top:2px;font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums;font-size:12px;color:var(--hi)}
+  .td .so .v.trong{color:var(--lo);font-size:10.5px;letter-spacing:.02em}
+
+  /* ------------------------------------------------- ngăn kéo trượt từ phải
+     Sáu ô thao tác (bật hạm đội, chạy workflow, hỏi AI API, báo tin, máy & dọn
+     dẹp, tổng quan) nằm hết trong đây. Chúng vẫn ở trong DOM ngay từ lúc tải
+     nên mọi thứ nạp sẵn như cũ — chỉ khác là chúng không chiếm màn hình. */
+  .man{position:fixed;inset:0;background:rgba(3,4,10,.62);z-index:40;
+    opacity:0;pointer-events:none;transition:opacity .22s var(--ease)}
+  .man.mo{opacity:1;pointer-events:auto}
+  .ngankeo{position:fixed;top:0;right:0;bottom:0;z-index:41;width:min(430px,100%);
+    display:flex;flex-direction:column;background:var(--panel);
+    border-left:1px solid var(--line);box-shadow:-18px 0 44px rgba(0,0,0,.5);
+    transform:translateX(101%);visibility:hidden;
+    transition:transform .26s var(--ease),visibility 0s .26s}
+  .ngankeo.mo{transform:none;visibility:visible;
+    transition:transform .26s var(--ease),visibility 0s}
+  .ngankeo:focus-visible{outline:2px solid var(--core);outline-offset:-3px}
+  .nk-dau{display:flex;align-items:center;gap:10px;flex:none;
+    padding:14px 14px 11px;border-bottom:1px solid var(--line)}
+  .nk-dau h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--mid);font-family:var(--font-display)}
+  .nk-dau .nk-dong{margin-left:auto;flex:none}
+  .nk-than{flex:1;overflow:auto;padding:2px 14px calc(18px + var(--safe-b))}
+  .nk-o[hidden]{display:none}
+  .nk-o .card{margin-top:12px}
+  .nk-o > h2:first-child{margin-top:14px}
+
+  /* Dưới 720px: một cột, và ngăn kéo phủ full màn — trên điện thoại một tấm
+     panel 430px vừa che gần hết màn vừa để hở một dải nền vô dụng. */
+  @media(max-width:720px){
+    .bento{grid-template-columns:1fr}
+    .ngankeo{width:100%;border-left:0;box-shadow:none}
+    .cong{gap:6px}
+  }
 
   /* ---- Tổng quan: meter chạy bằng transition width ---- */
   .tq{padding:13px 14px}
@@ -175,17 +268,22 @@
   .tele.on .d{background:var(--run)}
   .tele .phu{color:var(--mid);font-size:12px;line-height:1.5}
 
-  /* Có transition ở .btn/.go/.meter và animation ở nhịp thở + fade log — máy nào
-     bật "giảm chuyển động" thì phải tắt hết. Chuyển động không phải trang trí
-     với người bị rối loạn tiền đình: chấm nhấp nháy và thanh trượt là hai thứ
-     khó chịu nhất, nên tắt thẳng tên chúng chứ không chỉ trông vào luật chung. */
+  /* Có transition ở .btn/.go/.meter/ngăn kéo và animation ở nhịp thở + fade log
+     — máy nào bật "giảm chuyển động" thì phải tắt hết. Chuyển động không phải
+     trang trí với người bị rối loạn tiền đình: chấm nhấp nháy, thanh trượt và
+     một tấm panel bay ngang màn hình là ba thứ khó chịu nhất, nên tắt thẳng tên
+     chúng chứ không chỉ trông vào luật chung. */
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{
       animation-duration:.01ms !important;animation-iteration-count:1 !important;
       transition-duration:.01ms !important;scroll-behavior:auto !important}
-    .ag.run .st i,.ag.pending .st i{animation:none !important;opacity:1 !important;transform:none !important}
-    .meter i{transition:none !important}
+    .ag.run .st i,.ag.pending .st i,.td.run .st i{animation:none !important;opacity:1 !important;transform:none !important}
+    .meter i,.td .mach b{transition:none !important}
     #log .e{animation:none !important}
+    /* Ngăn kéo hiện/ẩn TỨC THÌ: nó vẫn phải mở được, chỉ là không trượt. */
+    .ngankeo{transition:none !important}
+    .ngankeo.mo{transition:none !important}
+    .man{transition:none !important}
   }
 </style>
 </head>
@@ -208,13 +306,27 @@
 
   <div id="err" class="banner"></div>
 
-  <!-- Hướng dẫn nằm NGAY TRÊN, không giấu trong tài liệu: người mở dashboard lần
-       đầu nhìn thấy ba ô "Bật hạm đội / Chạy workflow / Hỏi AI API" mà không biết
-       khác nhau chỗ nào, cái nào tiêu hạn mức thuê bao, cái nào tiêu tiền. -->
-  <details id="huongdan" class="card" style="margin-bottom:16px" open>
-    <summary style="cursor:pointer;font-weight:700;font-size:15px">Bắt đầu từ đâu — đọc 30 giây</summary>
+  <!-- Thanh công cụ: mỗi ô thao tác một nút, bấm là ngăn kéo trượt ra từ phải.
+       Trước đây sáu ô này bày cùng lúc ở cột phải và chiếm chỗ suốt cả buổi —
+       trong khi mỗi ô chỉ dùng vài lần. Nay màn hình để dành cho thứ nhìn liên
+       tục, đổi lấy đúng một cú bấm khi cần thao tác. -->
+  <nav class="cong" id="cong" aria-label="Thao tác">
+    <button type="button" class="btn nk" data-nk="fleet" aria-controls="ngankeo">Bật hạm đội</button>
+    <button type="button" class="btn nk" data-nk="wf" aria-controls="ngankeo">Chạy workflow</button>
+    <button type="button" class="btn nk" data-nk="ai" aria-controls="ngankeo">Hỏi AI API</button>
+    <button type="button" class="btn nk" data-nk="tele" aria-controls="ngankeo">Báo tin Telegram</button>
+    <button type="button" class="btn nk" data-nk="may" aria-controls="ngankeo">Máy &amp; dọn dẹp</button>
+    <button type="button" class="btn nk" data-nk="tq" aria-controls="ngankeo">Tổng quan</button>
+  </nav>
+
+  <!-- Hướng dẫn 30 giây: gấp lại sẵn nên chỉ chiếm một dòng, không tranh chỗ
+       với ba khối chính. Vẫn để ở màn chính chứ không nhét vào ngăn kéo vì
+       người mở dashboard lần đầu chưa biết ngăn kéo có gì. -->
+  <details id="huongdan" class="card" style="margin-bottom:16px;padding:12px 14px">
+    <summary style="cursor:pointer;font-weight:700;font-size:14px">Bắt đầu từ đâu — đọc 30 giây</summary>
     <div style="margin-top:10px;font-size:13px;line-height:1.7;color:var(--mid)">
-      <b style="color:var(--hi)">1. Bạn có ba cách giao việc, khác nhau về TIỀN:</b>
+      <b style="color:var(--hi)">1. Bạn có ba cách giao việc, khác nhau về TIỀN</b>
+      (cả ba nằm trên thanh công cụ ngay trên đầu trang):
       <table style="margin:8px 0 12px;width:100%">
         <tr><td style="width:150px"><b style="color:var(--hi)">Bật hạm đội</b></td>
             <td>Bật N phiên agent song song trên MỘT tài khoản. Tiêu <b>hạn mức thuê bao</b>. Dùng khi muốn nhiều agent cùng cày một việc.</td></tr>
@@ -227,9 +339,9 @@
       Chúng không đụng thư mục làm việc chính của bạn. Xong việc thì xem
       <code>git log main..sagent/&lt;tài khoản&gt;-1</code> rồi tự quyết có trộn hay không.
       <br><br>
-      <b style="color:var(--hi)">3. Muốn xem ai đang làm gì</b> — mở tab <b>3D</b>: mỗi tài khoản một robot,
-      đang làm việc thì gõ tay, đang chuyển kết quả cho bước sau thì vung tay về phía người nhận.
-      Tab <b>Workflow</b> để sửa quy trình bằng cách kéo thả.
+      <b style="color:var(--hi)">3. Muốn xem ai đang làm gì</b> — khối <b>Tiến độ lượt chạy</b> bên phải nói
+      workflow đang tới bước nào và gãy ở đâu. Mở tab <b>3D</b> để nhìn từng robot làm việc,
+      tab <b>Workflow</b> để sửa quy trình bằng cách kéo thả.
       <br><br>
       <span style="color:var(--pending)">Cột "chưa đăng nhập" của antigravity là ĐÚNG và không sửa được:
       nó giữ token trong Windows Credential Manager nên không đọc ra danh tính. Nó vẫn chạy bình thường.</span>
@@ -240,19 +352,136 @@
     <div>
       <h2>Hạm đội <span class="dem" id="scount">0</span></h2>
       <div id="ham" class="ham"></div>
-      <div id="ham-empty" class="card empty">Chưa có phiên nào. Dùng ô "Bật hạm đội" bên phải để bật.</div>
-
-      <h2>Tài khoản</h2>
-      <div class="card">
-        <table>
-          <thead><tr><th></th><th>Provider</th><th>Tài khoản</th><th>Danh tính</th><th>Trạng thái</th></tr></thead>
-          <tbody id="profiles"></tbody>
-        </table>
-      </div>
+      <div id="ham-empty" class="card empty">Chưa có phiên nào. Bấm "Bật hạm đội" trên thanh công cụ.</div>
     </div>
 
     <div>
-      <h2>Tổng quan</h2>
+      <h2>Tiến độ lượt chạy <span class="dem" id="td-ma"></span></h2>
+      <div class="card">
+        <div id="td" class="td" hidden>
+          <div class="dau">
+            <span class="ten" id="td-ten">—</span>
+            <span class="st"><i></i><span id="td-tt">—</span></span>
+          </div>
+          <div class="dem">bước <b id="td-thu">0</b> / <b id="td-tong">0</b>
+            <span id="td-gio" style="margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--lo)"></span></div>
+          <div class="mach" id="td-mach"></div>
+          <ol class="ds" id="td-ds"></ol>
+          <div class="hong" id="td-hong" hidden></div>
+          <div class="so">
+            <div><span class="k">token vào</span><span class="v" id="td-vao">0</span></div>
+            <div><span class="k">token ra</span><span class="v" id="td-ra">0</span></div>
+            <div><span class="k">chi phí</span><span class="v" id="td-usd">0</span></div>
+          </div>
+        </div>
+        <div id="td-trong" class="empty">Chưa có lượt chạy nào. Bấm "Chạy workflow" trên thanh công cụ.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nhật ký full-width: một dòng log là một câu, cắt nó vào cột hẹp 360px thì
+       câu nào cũng xuống ba dòng và mắt không lướt được. -->
+  <div class="duoi">
+    <h2>Nhật ký sự kiện</h2>
+    <div class="card"><div id="log"></div></div>
+    <div style="margin-top:10px;text-align:right">
+      <button class="btn danger" id="stopall">Dừng hết</button>
+    </div>
+  </div>
+</div>
+
+<div id="man" class="man"></div>
+
+<!-- Ngăn kéo: một khung, sáu ô, mỗi lúc chỉ một ô hiện. Cả sáu vẫn nằm trong
+     DOM từ lúc tải nên napFlow/napRoute/napDB/napTele đổ dữ liệu vào như cũ. -->
+<aside id="ngankeo" class="ngankeo" role="dialog" aria-modal="true" aria-labelledby="nk-ten" tabindex="-1">
+  <div class="nk-dau">
+    <h3 id="nk-ten">Thao tác</h3>
+    <button type="button" class="btn nk-dong" id="nk-dong">Đóng</button>
+  </div>
+  <div class="nk-than">
+
+    <section class="nk-o" data-o="fleet" hidden>
+      <div class="card">
+        <form id="fleet">
+          <div>
+            <label>Tài khoản</label>
+            <select id="f-addr"></select>
+          </div>
+          <div class="row">
+            <div><label>Số phiên</label><input type="number" id="f-copies" value="3" min="1" max="16"></div>
+            <div style="display:flex;align-items:flex-end"><label class="chk"><input type="checkbox" id="f-wt" checked> git worktree riêng</label></div>
+          </div>
+          <div>
+            <label>Lệnh headless (sau <code>--</code>)</label>
+            <input type="text" id="f-cmd" placeholder='-p "tóm tắt repo này"'>
+          </div>
+          <div class="warnbox">N phiên trên một tài khoản tiêu hạn mức gấp N. Hành vi khi nhiều phiên cùng refresh token <b>chưa được đo</b>.</div>
+          <button class="go" type="submit">Bật hạm đội</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="nk-o" data-o="wf" hidden>
+      <div class="card">
+        <form id="wfform">
+          <div>
+            <label>Quy trình</label>
+            <select id="wf-ten"></select>
+          </div>
+          <div id="wf-mota" class="phu" style="min-height:18px;font-size:12px;color:var(--mid)"></div>
+          <div>
+            <label>Việc cần làm (thay biến <code>viec</code>, để trống thì dùng mặc định của flow)</label>
+            <input type="text" id="wf-viec" placeholder="Rà lại internal/store và chỉ ra chỗ đáng sửa nhất">
+          </div>
+          <div class="warnbox">Mỗi bước chạy bằng một tài khoản riêng, trong worktree riêng.
+            Tiến độ hiện ở khối <b>Tiến độ lượt chạy</b> ngoài màn chính.</div>
+          <button id="wf-chay" class="go" type="submit">Chạy workflow</button>
+        </form>
+        <div id="wf-ket" class="empty" style="padding:0 14px 14px;font-size:12px"></div>
+      </div>
+    </section>
+
+    <section class="nk-o" data-o="ai" hidden>
+      <div class="card">
+        <form id="aiform">
+          <div class="row">
+            <div><label>Route</label><select id="ai-route"></select></div>
+          </div>
+          <label>Câu hỏi</label>
+          <input type="text" id="ai-prompt" placeholder="tóm tắt repo này trong 1 câu">
+          <div class="warnbox">Đường này tiêu <b>tiền theo token</b>, khác hạm đội tiêu hạn mức thuê bao. Số token hiện ra sau khi chạy.</div>
+          <button class="go" type="submit">Gửi</button>
+        </form>
+        <div id="ai-out" class="empty">Chưa hỏi gì.</div>
+      </div>
+    </section>
+
+    <section class="nk-o" data-o="tele" hidden>
+      <div class="card">
+        <div id="tele" class="tele">
+          <div class="hang"><span class="d"></span><span id="tele-tt">đang đọc…</span></div>
+          <div id="tele-phu" class="phu"></div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="tele-thu" disabled>Gửi tin thử</button>
+          </div>
+          <div id="tele-ket" class="phu" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="nk-o" data-o="may" hidden>
+      <div class="card">
+        <div id="dbinfo" class="empty">đang đọc…</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;padding:0 13px 13px">
+          <button class="btn" id="quet">Quét tiến trình mồ côi</button>
+          <button class="btn danger" id="quetgiet" disabled>Dừng những cái tìm được</button>
+        </div>
+        <div id="quetout" class="empty">Chưa quét.</div>
+      </div>
+    </section>
+
+    <section class="nk-o" data-o="tq" hidden>
       <div class="card">
         <div class="tq">
           <div class="muc">
@@ -275,93 +504,17 @@
         </div>
       </div>
 
-      <h2>Bật hạm đội</h2>
-      <div class="card">
-        <form id="fleet">
-          <div>
-            <label>Tài khoản</label>
-            <select id="f-addr"></select>
-          </div>
-          <div class="row">
-            <div><label>Số phiên</label><input type="number" id="f-copies" value="3" min="1" max="16"></div>
-            <div style="display:flex;align-items:flex-end"><label class="chk"><input type="checkbox" id="f-wt" checked> git worktree riêng</label></div>
-          </div>
-          <div>
-            <label>Lệnh headless (sau <code>--</code>)</label>
-            <input type="text" id="f-cmd" placeholder='-p "tóm tắt repo này"'>
-          </div>
-          <div class="warnbox">N phiên trên một tài khoản tiêu hạn mức gấp N. Hành vi khi nhiều phiên cùng refresh token <b>chưa được đo</b>.</div>
-          <button class="go" type="submit">Bật hạm đội</button>
-        </form>
+      <h2 style="margin-top:18px">Tài khoản</h2>
+      <div class="card" style="margin-top:0">
+        <table>
+          <thead><tr><th></th><th>Provider</th><th>Tài khoản</th><th>Danh tính</th><th>Trạng thái</th></tr></thead>
+          <tbody id="profiles"></tbody>
+        </table>
       </div>
+    </section>
 
-      <h2>Chạy workflow</h2>
-      <div class="card">
-        <form id="wfform">
-          <div>
-            <label>Quy trình</label>
-            <select id="wf-ten"></select>
-          </div>
-          <div id="wf-mota" class="phu" style="min-height:18px;font-size:12px;color:var(--mid)"></div>
-          <div>
-            <label>Việc cần làm (thay biến <code>viec</code>, để trống thì dùng mặc định của flow)</label>
-            <input type="text" id="wf-viec" placeholder="Rà lại internal/store và chỉ ra chỗ đáng sửa nhất">
-          </div>
-          <div class="warnbox">Mỗi bước chạy bằng một tài khoản riêng, trong worktree riêng.
-            Xem <b>3D</b> để nhìn chúng làm việc, hoặc <b>Workflow</b> để sửa quy trình.</div>
-          <button id="wf-chay" class="go" type="submit">Chạy workflow</button>
-        </form>
-        <div id="wf-ket" class="empty" style="padding:0 14px 14px;font-size:12px"></div>
-      </div>
-
-      <h2>Hỏi thẳng AI API</h2>
-      <div class="card">
-        <form id="aiform">
-          <div class="row">
-            <div><label>Route</label><select id="ai-route"></select></div>
-          </div>
-          <label>Câu hỏi</label>
-          <input type="text" id="ai-prompt" placeholder="tóm tắt repo này trong 1 câu">
-          <div class="warnbox">Đường này tiêu <b>tiền theo token</b>, khác hạm đội tiêu hạn mức thuê bao. Số token hiện ra sau khi chạy.</div>
-          <button class="go" type="submit">Gửi</button>
-        </form>
-        <div id="ai-out" class="empty">Chưa hỏi gì.</div>
-      </div>
-
-      <h2>Báo tin Telegram</h2>
-      <div class="card">
-        <div id="tele" class="tele">
-          <div class="hang"><span class="d"></span><span id="tele-tt">đang đọc…</span></div>
-          <div id="tele-phu" class="phu"></div>
-          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn" id="tele-thu" disabled>Gửi tin thử</button>
-          </div>
-          <div id="tele-ket" class="phu" style="margin-top:8px"></div>
-        </div>
-      </div>
-
-      <h2>Máy &amp; dọn dẹp</h2>
-      <div class="card">
-        <div id="dbinfo" class="empty">đang đọc…</div>
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;padding:0 13px 13px">
-          <button class="btn" id="quet">Quét tiến trình mồ côi</button>
-          <button class="btn danger" id="quetgiet" disabled>Dừng những cái tìm được</button>
-        </div>
-        <div id="quetout" class="empty">Chưa quét.</div>
-      </div>
-    </div>
   </div>
-
-  <!-- Nhật ký full-width: một dòng log là một câu, cắt nó vào cột hẹp 340px thì
-       câu nào cũng xuống ba dòng và mắt không lướt được. -->
-  <div class="duoi">
-    <h2>Nhật ký sự kiện</h2>
-    <div class="card"><div id="log"></div></div>
-    <div style="margin-top:10px;text-align:right">
-      <button class="btn danger" id="stopall">Dừng hết</button>
-    </div>
-  </div>
-</div>
+</aside>
 
 <script>
 // Xác thực bằng cookie phiên HttpOnly — trình duyệt tự gửi kèm. Không còn
@@ -382,7 +535,81 @@ $('toflow').href = 'flow.html';
 // phí", trong khi sự thật là nó đang tiêu hạn mức mà chưa ai đếm.
 const CHUA_DO = 'chưa đo';
 
-// ---- ba mặt mới: AI API, quét mồ côi, thông tin DB ----
+// ------------------------------------------------------------- ngăn kéo
+//
+// Vì sao gom sáu ô thao tác vào đây thay vì bày cả sáu ra cột phải:
+// màn hình phải để dành cho thứ nhìn LIÊN TỤC — hạm đội đang chạy gì, lượt chạy
+// tới bước nào, nhật ký vừa bắn ra cái gì. Sáu ô kia là việc THỈNH THOẢNG: bật
+// hạm đội một lần rồi ngồi xem cả buổi. Bày sẵn cả sáu là lấy nửa màn hình vĩnh
+// viễn để đổi lấy việc tiết kiệm đúng một cú bấm.
+const NK_TEN = {
+  fleet: 'Bật hạm đội',
+  wf:    'Chạy workflow',
+  ai:    'Hỏi thẳng AI API',
+  tele:  'Báo tin Telegram',
+  may:   'Máy và dọn dẹp',
+  tq:    'Tổng quan'
+};
+// nutMo: nút đã mở ngăn kéo. Đóng xong phải TRẢ tiêu điểm về đúng nó — người
+// dùng bàn phím mà mất chỗ đứng thì phải Tab lại từ đầu trang.
+let nutMo = null;
+
+function nkDangMo(){ return $('ngankeo').classList.contains('mo'); }
+
+// focusDuoc: mọi thứ bấm/gõ được ĐANG HIỆN trong ngăn kéo. Cần cho bẫy tiêu
+// điểm: không bẫy thì Tab đi tiếp ra sau lưng tấm màn, con trỏ nằm trên thứ
+// người dùng không nhìn thấy và không biết mình đang ở đâu.
+function focusDuoc(){
+  const q = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  return Array.from($('ngankeo').querySelectorAll(q)).filter(el => el.offsetParent !== null);
+}
+
+function moNganKeo(key, nut){
+  document.querySelectorAll('.nk-o').forEach(o => { o.hidden = (o.getAttribute('data-o') !== key); });
+  $('nk-ten').textContent = NK_TEN[key] || 'Thao tác';
+  nutMo = nut || null;
+  $('ngankeo').classList.add('mo');
+  $('man').classList.add('mo');
+  document.body.classList.add('khoa');
+  document.querySelectorAll('.nk').forEach(b => {
+    b.setAttribute('aria-expanded', b.getAttribute('data-nk') === key ? 'true' : 'false');
+  });
+  const ds = focusDuoc();
+  (ds[0] || $('ngankeo')).focus();
+}
+
+function dongNganKeo(){
+  if(!nkDangMo()) return;
+  $('ngankeo').classList.remove('mo');
+  $('man').classList.remove('mo');
+  document.body.classList.remove('khoa');
+  document.querySelectorAll('.nk').forEach(b => b.setAttribute('aria-expanded', 'false'));
+  if(nutMo && document.contains(nutMo)) nutMo.focus();
+  nutMo = null;
+}
+
+document.querySelectorAll('.nk').forEach(b => {
+  b.setAttribute('aria-expanded', 'false');
+  b.onclick = () => moNganKeo(b.getAttribute('data-nk'), b);
+});
+$('nk-dong').onclick = dongNganKeo;
+$('man').onclick = dongNganKeo;
+
+document.addEventListener('keydown', e => {
+  if(!nkDangMo()) return;
+  if(e.key === 'Escape'){ e.preventDefault(); dongNganKeo(); return; }
+  if(e.key !== 'Tab') return;
+  const ds = focusDuoc();
+  if(!ds.length){ e.preventDefault(); $('ngankeo').focus(); return; }
+  const dau = ds[0], cuoi = ds[ds.length - 1];
+  if(e.shiftKey && (document.activeElement === dau || document.activeElement === $('ngankeo'))){
+    e.preventDefault(); cuoi.focus();
+  }else if(!e.shiftKey && document.activeElement === cuoi){
+    e.preventDefault(); dau.focus();
+  }
+});
+
+// ---- ba mặt khác: AI API, quét mồ côi, thông tin DB ----
 //
 // Cùng đi qua /api/* như mọi thứ khác, nên chúng ngang quyền với CLI chứ không
 // phải tính năng hạng hai gắn thêm.
@@ -612,6 +839,82 @@ function render(state){
   napDoTuFlow(state);
 }
 
+// -------------------------------------------------- Tiến độ lượt chạy
+//
+// HỢP ĐỒNG DỮ LIỆU — hai đường, không đường nào bịa thêm:
+//   /api/state       → runs[] {id, flow, state, started}, mới nhất đứng trước;
+//   /api/flow/detail → steps[] theo THỨ TỰ ĐỊNH NGHĨA, mỗi bước mang
+//                      {id, state, msg, costUsd, tokensIn, tokensOut} với
+//                      state ∈ pending|running|done|failed|skipped|waiting.
+//
+// Từ hai thứ đó suy ra đúng ba câu trả lời mà người vận hành cần: đang ở bước
+// thứ mấy trên tổng mấy, có bước nào gãy không (gãy ở đâu, lời nhắn gì), và
+// lượt này đã ăn bao nhiêu token/tiền.
+const MAU_BUOC = {
+  done:    'var(--done)',
+  running: 'var(--run)',
+  failed:  'var(--error)',
+  waiting: 'var(--pending)',
+  pending: 'var(--idle)',
+  skipped: 'var(--idle)'
+};
+function mauBuoc(st){ return MAU_BUOC[st] || 'var(--idle)'; }
+// Màu của cả lượt chạy: chỉ bốn trạng thái, và không cái nào bịa ra.
+function mauRun(st){
+  if(st === 'running') return 'var(--run)';
+  if(st === 'failed' || st === 'error') return 'var(--error)';
+  if(st === 'done' || st === 'completed') return 'var(--done)';
+  return 'var(--pending)';
+}
+
+function veTienDo(run, buoc, now){
+  const box = $('td'), trong = $('td-trong');
+  if(!run){
+    box.hidden = true; trong.style.display = 'block';
+    $('td-ma').textContent = '';
+    return;
+  }
+  box.hidden = false; trong.style.display = 'none';
+  box.className = 'td' + (run.state === 'running' ? ' run' : '');
+  box.style.setProperty('--c', mauRun(run.state));
+  $('td-ma').textContent = '#' + run.id;
+  $('td-ten').textContent = run.flow || '(không tên)';
+  $('td-tt').textContent = run.state || '—';
+  $('td-gio').textContent = run.started ? elapsed(run.started, now || Math.floor(Date.now()/1000)) : '';
+
+  const tong = buoc.length;
+  // "Bước thứ mấy": bước ĐANG CHẠY nếu có, không thì là số bước đã qua. Đếm cả
+  // skipped vào phần đã qua — bước bị bỏ vẫn là bước không phải chờ nữa.
+  const dangChay = buoc.findIndex(b => b.state === 'running');
+  const qua = buoc.filter(b => b.state === 'done' || b.state === 'skipped' || b.state === 'failed').length;
+  $('td-thu').textContent = dangChay >= 0 ? (dangChay + 1) : qua;
+  $('td-tong').textContent = tong;
+
+  $('td-mach').innerHTML = buoc.map(b =>
+    `<b style="--c:${mauBuoc(b.state)}" title="${esc(b.id)} · ${esc(b.state||'')}"></b>`).join('');
+  $('td-ds').innerHTML = buoc.map(b =>
+    `<li style="--c:${mauBuoc(b.state)}"><i></i>` +
+    `<span class="b">${esc(b.id)}</span>` +
+    `<span class="tt">${esc(b.state||'—')}</span></li>`).join('');
+
+  // Bước hỏng kéo lên trên: đây là thứ người ta mở dashboard để tìm, không thể
+  // bắt họ dò trong danh sách bước.
+  const hong = buoc.find(b => b.state === 'failed');
+  const h = $('td-hong');
+  if(hong){
+    h.hidden = false;
+    h.innerHTML = 'Hỏng ở bước <b>' + esc(hong.id) + '</b>' + (hong.msg ? ' — ' + esc(hong.msg) : '');
+  }else{
+    h.hidden = true; h.innerHTML = '';
+  }
+
+  let vao=0, ra=0, usd=0;
+  buoc.forEach(b => { vao += b.tokensIn||0; ra += b.tokensOut||0; usd += b.costUsd||0; });
+  datSo($('td-vao'), (vao||ra) ? vao.toLocaleString('vi-VN') : null);
+  datSo($('td-ra'),  (vao||ra) ? ra.toLocaleString('vi-VN')  : null);
+  datSo($('td-usd'), usd > 0 ? usd.toFixed(4) + ' USD' : null);
+}
+
 // ---------------------------------------------------------------- Tổng quan
 //
 // Meter CHỈ ăn số thật. Hai nguồn duy nhất hiện có:
@@ -623,18 +926,26 @@ function render(state){
 // dòng ghi chú nói rõ điều ấy. Bề rộng thanh là TỶ LỆ vào/ra trong tổng token
 // đo được — một tỷ số có thật, không phải phần trăm của một hạn mức bịa ra.
 let doFlow = {vao:0, ra:0, usd:0, id:0, khoa:''};
+let buocFlow = [];
 
 async function napDoTuFlow(state){
   const r = (state.runs||[])[0];
-  if(!r){ veTongQuan(); return; }
+  if(!r){ buocFlow = []; veTienDo(null, [], state.now); veTongQuan(); return; }
   const khoa = r.id + ':' + r.state;
-  if(khoa === doFlow.khoa){ veTongQuan(); return; }
+  // Lượt ĐANG CHẠY thì phải đọc lại mỗi vòng: run.state đứng nguyên là
+  // "running" suốt cả lượt, nên khoá cache theo nó là đóng băng tiến độ ở bước
+  // đầu tiên — đúng kiểu hỏng im lặng, khối vẫn vẽ ra đầy đủ mà số không đổi.
+  if(khoa === doFlow.khoa && r.state !== 'running'){
+    veTienDo(r, buocFlow, state.now); veTongQuan(); return;
+  }
   try{
     const d = await api('/api/flow/detail?id=' + r.id);
     let vao=0, ra=0, usd=0;
     (d.steps||[]).forEach(b=>{ vao += b.tokensIn||0; ra += b.tokensOut||0; usd += b.costUsd||0; });
     doFlow = {vao, ra, usd, id:r.id, khoa};
-  }catch(e){ doFlow = {vao:0, ra:0, usd:0, id:r.id, khoa}; }
+    buocFlow = d.steps||[];
+  }catch(e){ doFlow = {vao:0, ra:0, usd:0, id:r.id, khoa}; buocFlow = []; }
+  veTienDo(r, buocFlow, state.now);
   veTongQuan();
 }
 
@@ -666,12 +977,13 @@ $('wfform').onsubmit = async ev=>{
   const ten = $('wf-ten').value;
   if(!ten){ showErr('chưa chọn quy trình'); return; }
   const b = $('wf-chay'); b.disabled = true; b.textContent = 'đang chạy…';
-  $('wf-ket').textContent = 'Đã gửi. Mỗi bước một agent — mở tab 3D để xem chúng làm việc.';
+  $('wf-ket').textContent = 'Đã gửi. Tiến độ hiện ở khối Tiến độ lượt chạy ngoài màn chính.';
   try{
     const viec = $('wf-viec').value.trim();
     const d = await api('/api/flow/run', {method:'POST', headers:H,
       body: JSON.stringify({name:ten, vars: viec ? {viec} : {}})});
-    $('wf-ket').innerHTML = 'Lần chạy <b>#'+(d.run||d.id||'?')+'</b> đang chạy. Xem kết quả từng bước ở tab Workflow, hoặc dòng lệnh: <code>sagent flow runs '+(d.run||d.id||'')+'</code>';
+    $('wf-ket').innerHTML = 'Lần chạy <b>#'+(d.run||d.id||'?')+'</b> đang chạy. Xem tiến độ ngoài màn chính, hoặc dòng lệnh: <code>sagent flow runs '+(d.run||d.id||'')+'</code>';
+    refresh();
   }catch(e){ showErr(e.message); $('wf-ket').textContent=''; }
   b.disabled = false; b.textContent = 'Chạy workflow';
 };
@@ -739,7 +1051,9 @@ function connect(){
     let e; try{ e=JSON.parse(ev.data); }catch(_){ return; }
     logEvent(e);
     // trạng thái đổi thì đọc lại ảnh chụp đầy đủ (không dựng UI chỉ từ event)
-    if(['session.started','session.stopped','clones.cleaned','worktree.removed'].includes(e.type)) refresh();
+    if(['session.started','session.stopped','clones.cleaned','worktree.removed',
+        'flow.started','flow.step','flow.completed','flow.failed',
+        'flow.waiting_approval','flow.approved','flow.rejected'].includes(e.type)) refresh();
   };
 }
 
