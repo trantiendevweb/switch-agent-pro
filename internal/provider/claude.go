@@ -264,3 +264,24 @@ func timClaudeExe() string {
 	}
 	return ""
 }
+
+// NangLuc — bảng khai báo, mọi dòng lấy từ phép đo đã ghi ở trên trong file này.
+func (claude) NangLuc() []NangLuc {
+	return []NangLuc{
+		Duoc(NLHeadless, "`claude -p` chạy không tương tác; thêm --output-format stream-json "+
+			"--verbose thì dòng cuối {\"type\":\"result\"} mang is_error/stop_reason/usage (đo 18/08)"),
+		Duoc(NLChonModel, "`claude --model <tên>` trên bản 2.1.229, nhận cả bí danh ngắn "+
+			"(sonnet/opus/haiku) lẫn id đầy đủ"),
+		Duoc(NLTuDuyetQuyen, "`claude --help`: --dangerously-skip-permissions "+
+			"\"Bypass all permission checks\""),
+		Duoc(NLThuMuc, "`claude --help`: --add-dir <directories...>"),
+		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào của Claude phải đọc từ thư mục hồ sơ "+
+			"rồi chuyển thành cờ — model đã truyền tường minh qua --model"),
+		Duoc(NLKetQuaCoCauTruc, "docKetQuaClaude đọc dòng {\"type\":\"result\"} của NDJSON: "+
+			"is_error, subtype, permission_denials, api_error_status, usage, total_cost_usd"),
+		Duoc(NLTachTaiKhoan, "token là file .credentials.json trong thư mục CLAUDE_CONFIG_DIR"),
+		Duoc(NLHanToken, "refreshTokenExpiresAt trong claudeAiOauth; đo 20/08: access ~8 tiếng, "+
+			"refresh còn tới 16/09 — câu hỏi \"còn dùng được không\" đọc mốc refresh"),
+		Duoc(NLDanhTinh, "oauthAccount.emailAddress trong .claude.json của chính hồ sơ"),
+	}
+}

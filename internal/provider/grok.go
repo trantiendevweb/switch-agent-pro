@@ -224,3 +224,33 @@ func (grok) ArgsHoSo(dir string) []string {
 func (grok) ModelArgs(model string) []string { return []string{"-m", model} }
 
 func (grok) DocKetQua(raw string) (KetQua, bool) { return docKetQuaGrok(raw) }
+
+// NangLuc — bảng khai báo cho Grok. Dòng tu-duyet-quyen là lý do cả cái kiểu ba
+// trạng thái này tồn tại: nó KHÔNG LÀM ĐƯỢC vì provider không có rào nào để mở,
+// chứ không phải vì chưa ai đo. Hai chuyện đó khác nhau, và chuyện thứ nhất là
+// chuyện an ninh phải nói ra.
+func (grok) NangLuc() []NangLuc {
+	return []NangLuc{
+		Duoc(NLHeadless, "`grok -p \"<prompt>\"` in kết quả ra stdout; kèm --max-tool-rounds 60 "+
+			"(mặc định 400) vì lần chạy #21 nó gọi đúng `ls -la` 399 lần liên tiếp qua cmd.exe"),
+		Duoc(NLChonModel, "`grok -m <model>` BẮT BUỘC: `grok -p` bỏ qua defaultModel trong chính "+
+			"user-settings.json và dùng grok-code-fast-1; modelapi.vn trả 503 \"No available "+
+			"channel\" cho model đó (đo 18/08)"),
+		Khong(NLTuDuyetQuyen, "KHÔNG có rào nào để mở: `grok --help` không có approval, sandbox "+
+			"hay permission — nó chạy tool tự do theo thiết kế. Cờ là thừa vì KHÔNG CÓ RÀO, chứ "+
+			"không phải vì chưa đo. Chỉ có --max-tool-rounds giới hạn số vòng"),
+		Duoc(NLThuMuc, "`grok --help`: -d, --directory <dir>  set working directory"),
+		Duoc(NLCoTuHoSo, "đọc defaultModel trong .grok/user-settings.json của CHÍNH hồ sơ đang "+
+			"chạy rồi ép thành `-m`; không ép thì mọi bước Grok hỏng lặng lẽ vì grok in lỗi 503 "+
+			"ra như một câu trả lời bình thường và bước vẫn tính là xong"),
+		Duoc(NLKetQuaCoCauTruc, "docKetQuaGrok đọc bản ghi NDJSON — lá chắn chống chạy quẩn sinh "+
+			"ra vì Grok mà trước đó không bao giờ chạy được cho Grok"),
+		Duoc(NLTachTaiKhoan, "apiKey + baseURL nằm trong .grok/user-settings.json dưới "+
+			"USERPROFILE; chạy trong HOME giả thì CLI báo \"API key required\""),
+		Khong(NLHanToken, "API key KHÔNG có hạn dùng đọc được từ file — đây là provider duy nhất "+
+			"dùng API key thay vì OAuth: không trình duyệt, không token hết hạn. Đúng sự thật, "+
+			"không phải chưa làm"),
+		Duoc(NLDanhTinh, "hiện baseURL · defaultModel thay cho email — provider này không có khái "+
+			"niệm tài khoản người dùng. TUYỆT ĐỐI không trả về apiKey"),
+	}
+}

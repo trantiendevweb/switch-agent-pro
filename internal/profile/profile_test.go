@@ -78,3 +78,13 @@ func (fakeAdapter) ArgsHoSo(string) []string { return nil }
 func (fakeAdapter) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }
 
 func (fakeAdapter) ModelArgs(string) []string { return nil }
+
+// NangLuc: adapter GIẢ nên khai CHƯA ĐO hết — nó không đo được gì trên máy nào
+// cả. Khai bừa "làm được" ở đây là bộ conformance của gói provider bắt ngay.
+func (fakeAdapter) NangLuc() []provider.NangLuc {
+	out := make([]provider.NangLuc, 0, len(provider.MoiNangLuc))
+	for _, m := range provider.MoiNangLuc {
+		out = append(out, provider.Chua(m.Khoa, "adapter giả trong test — không đo gì"))
+	}
+	return out
+}

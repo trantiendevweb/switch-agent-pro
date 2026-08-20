@@ -140,3 +140,12 @@ func (adapterMoiTruong) ArgsHoSo(string) []string { return nil }
 func (adapterMoiTruong) DocKetQua(string) (provider.KetQua, bool) { return provider.KetQua{}, false }
 
 func (adapterMoiTruong) ModelArgs(string) []string { return nil }
+
+// NangLuc: adapter GIA, khai CHUA DO het -- xem ghi chu o fakeAdapter.
+func (adapterMoiTruong) NangLuc() []provider.NangLuc {
+	out := make([]provider.NangLuc, 0, len(provider.MoiNangLuc))
+	for _, m := range provider.MoiNangLuc {
+		out = append(out, provider.Chua(m.Khoa, "adapter gia trong test - khong do gi"))
+	}
+	return out
+}

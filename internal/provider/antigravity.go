@@ -140,3 +140,30 @@ func (antigravity) ArgsHoSo(string) []string { return nil }
 func (antigravity) ModelArgs(string) []string { return nil }
 
 func (antigravity) DocKetQua(raw string) (KetQua, bool) { return docKetQuaAntigravity(raw) }
+
+// NangLuc — bảng khai báo cho Antigravity. Dòng đáng đọc nhất là
+// tach-nhieu-tai-khoan: đây là provider DUY NHẤT khai KHÔNG LÀM ĐƯỢC, và đó là
+// một kết luận đã đo chứ không phải một khoảng trống.
+func (antigravity) NangLuc() []NangLuc {
+	return []NangLuc{
+		Duoc(NLHeadless, "`agy -p \"<prompt>\"` chạy không tương tác; --output-format stream-json "+
+			"cho bản ghi NDJSON có cấu trúc"),
+		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh"),
+		Duoc(NLTuDuyetQuyen, "`agy --help` + chạy thật (lần chạy #10, #11): agent đọc được repo "+
+			"và trả đúng \"Go\" với --dangerously-skip-permissions"),
+		Duoc(NLThuMuc, "`agy --help`: --add-dir. Chạy thật trong git worktree: không có cờ thì "+
+			"1/3 đúng (hai lượt kia báo \"chưa có repository nào được mở\"), có cờ thì 4/4 đúng"),
+		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong ~/.gemini phải chuyển thành cờ"),
+		Duoc(NLKetQuaCoCauTruc, "docKetQuaAntigravity đọc bản ghi NDJSON của `--output-format "+
+			"stream-json`"),
+		Khong(NLTachTaiKhoan, "KHÔNG — token nằm trong Windows Credential Manager dưới khoá TÊN "+
+			"CỐ ĐỊNH `gemini:antigravity`, không theo thư mục config. Đo: chạy trong HOME giả "+
+			"(đổi cả USERPROFILE + APPDATA + LOCALAPPDATA) VẪN dùng đúng danh tính đã đăng nhập. "+
+			"Mỗi máy một tài khoản Antigravity"),
+		Chua(NLHanToken, "CHƯA ĐO: token nằm trong Credential Manager, đọc nội dung nó nghĩa là "+
+			"chạm vào chính thứ cần bảo vệ chỉ để lấy một dấu thời gian — chưa đủ lý do"),
+		Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC: sau khi đăng nhập bằng `agy`, không file nào trong "+
+			"~/.gemini bị cập nhật email (google_accounts.json vẫn mang dấu thời gian của lần "+
+			"đăng nhập Gemini CLI cũ)"),
+	}
+}

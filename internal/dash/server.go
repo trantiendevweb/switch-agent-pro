@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
+	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
@@ -71,6 +72,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/so/ho-so", s.guard(s.handleSoHoSo))
 	m.HandleFunc("/api/so/route", s.guard(s.handleSoRoute))
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
+	m.HandleFunc("/api/nang-luc", s.guard(s.handleNangLuc))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
@@ -869,6 +871,57 @@ func (s *Server) handleSoRoute(w http.ResponseWriter, r *http.Request) {
 		out = append(out, dto{m.Ten, m.BaseURLSo, m.BaseURLCauHinh, m.Model, m.KeyID, m.TrangThai})
 	}
 	writeJSON(w, map[string]any{"muc": out})
+}
+
+// handleNangLuc — action "provider.nang-luc". Bảng provider nào làm được gì.
+//
+// DTO liệt kê tường minh từng trường như mọi đường khác ở đây. Riêng bảng này
+// thì không có gì phải giấu: nó chỉ mang KHOÁ, TRẠNG THÁI và BẰNG CHỨNG — toàn
+// chữ viết sẵn trong mã nguồn, không đọc file hồ sơ nào, không chạm token nào.
+// Nhờ vậy nó trả lời được cả khi chưa đăng nhập provider nào.
+//
+// `mo` (câu mô tả) đi kèm từ provider.MoiNangLuc chứ không chép sang JS: khoá
+// `chon-model` mà mặt web tự đặt tên là "Chọn model" thì hai mặt nói hai kiểu,
+// và sửa một bên sẽ quên bên kia.
+func (s *Server) handleNangLuc(w http.ResponseWriter, r *http.Request) {
+	ds, err := s.api.NangLuc(strings.TrimSpace(r.URL.Query().Get("provider")))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	type mucDTO struct {
+		Khoa      string `json:"khoa"`
+		Mo        string `json:"mo"`
+		TrangThai string `json:"trang_thai"`
+		BangChung string `json:"bang_chung"`
+	}
+	type provDTO struct {
+		Provider string   `json:"provider"`
+		Muc      []mucDTO `json:"muc"`
+		Lech     []string `json:"lech"`
+	}
+	mo := map[string]string{}
+	for _, m := range provider.MoiNangLuc {
+		mo[m.Khoa] = m.Mo
+	}
+	out := make([]provDTO, 0, len(ds))
+	var soChuaDo int
+	for _, p := range ds {
+		d := provDTO{Provider: p.Provider, Muc: make([]mucDTO, 0, len(p.Muc)), Lech: p.Lech}
+		if d.Lech == nil {
+			d.Lech = []string{}
+		}
+		for _, m := range p.Muc {
+			if m.TrangThai == provider.ChuaDo {
+				soChuaDo++
+			}
+			d.Muc = append(d.Muc, mucDTO{m.Khoa, mo[m.Khoa], string(m.TrangThai), m.BangChung})
+		}
+		out = append(out, d)
+	}
+	// so_chua_do là con số người vận hành cần liếc: nó đếm những chỗ hệ thống
+	// đang phải đoán. Để mặt web tự cộng thì mỗi mặt cộng một kiểu.
+	writeJSON(w, map[string]any{"provider": out, "so_chua_do": soChuaDo})
 }
 
 // handleDB — action "db.admin", CHỈ phần đọc.

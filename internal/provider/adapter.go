@@ -125,6 +125,21 @@ type Adapter interface {
 
 	// Verify chứng minh trên MÁY NÀY việc tách thư mục là tách thật.
 	Verify() []Check
+
+	// NangLuc khai TỪNG năng lực trong provider.MoiNangLuc ở một trong BA trạng
+	// thái, kèm bằng chứng.
+	//
+	// Vì sao nó là một phương thức của interface chứ không phải một bảng tra ở
+	// đâu đó: bảng tra thì sửa adapter xong quên sửa bảng, và không có gì báo.
+	// Ở đây, thêm một adapter mà quên khai là KHÔNG BIÊN DỊCH ĐƯỢC; khai lệch
+	// với hành vi thật thì conformance test đỏ (nangluc_test.go gọi KiemNangLuc).
+	//
+	// Vì sao đáng có, dù mọi thông tin này đã nằm rải rác trong bình luận: bình
+	// luận chỉ người đọc mã mới thấy. Người vận hành đứng trước `sagent fleet
+	// cursor:x` không có cách nào biết cursor CHƯA ĐO cờ tự duyệt quyền cho tới
+	// khi lượt chạy dừng lại hỏi. Bảng này là câu trả lời đó, và nó đi ra được
+	// cả bốn mặt điều khiển.
+	NangLuc() []NangLuc
 }
 
 var registry = map[string]Adapter{}
