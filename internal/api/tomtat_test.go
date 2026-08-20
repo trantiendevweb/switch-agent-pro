@@ -344,3 +344,52 @@ func TestBanInNoiRoBangChungDocLucNao(t *testing.T) {
 		t.Errorf("bản in không ghi mốc thời gian của bằng chứng git:\n%s", tt.VanBan)
 	}
 }
+
+// BAY THU TU, do 20/08 khi chay that `flow tom-tat 34`.
+//
+// Bo doi chieu so loi agent voi git O HIEN TAI. Nhung luot #34 da duoc tron vao
+// main xong, nen sagent/tns-1 gio dung 0 commit — trong khi luc luot do chay no
+// CO commit 3ad36a1. Ket qua: bo do ket toi ca BON loi khai DUNG.
+//
+// Vu oan te hon bo sot: nguoi doc mat niem tin roi tat bo do di, va mat luon
+// nhung lan no bat dung.
+func TestNhanhDaTronThiKhongKetToi(t *testing.T) {
+	k := Khai{Buoc: "soi", Loai: "nhan-tron", Nhanh: []string{"sagent/tns-1"},
+		Cau: "TNS: NEN TRON"}
+	bang := map[string]NhanhChung{
+		"sagent/tns-1": {Nhanh: "sagent/tns-1", Commit: 0, Rong: true,
+			MotDong: "nhánh sagent/tns-1: KHÔNG có commit nào"},
+	}
+
+	// daTron=false: khong co commit that nao trong luot -> ket toi that.
+	sai := doiChieu(k, bang, false)
+	if len(sai) != 1 || sai[0].ChuaChacSai {
+		t.Fatalf("nhanh rong va luot khong co commit that thi phai ket toi, duoc %+v", sai)
+	}
+
+	// daTron=true: luot CO commit that -> KHONG ket toi, chi neu ra.
+	chuaRo := doiChieu(k, bang, true)
+	if len(chuaRo) != 1 {
+		t.Fatalf("van phai neu ra, duoc %d muc", len(chuaRo))
+	}
+	if !chuaRo[0].ChuaChacSai {
+		t.Fatal("luot co commit that ma van ket toi — day la vu oan")
+	}
+	if !strings.Contains(chuaRo[0].Noi, "chưa kết luận được") {
+		t.Fatalf("phai noi thang la chua ket luan duoc: %q", chuaRo[0].Noi)
+	}
+}
+
+// Cung the voi loi khai theo NHOM (khuon `TNS: NEN TRON` noi ve mot NGUOI).
+func TestKhaiTheoNhomDaTronCungKhongKetToi(t *testing.T) {
+	k := Khai{Buoc: "soi", Loai: "nhan-tron", Nhom: true,
+		Nhanh: []string{"sagent/may-1", "sagent/may-1-2"}, Cau: "MAY: NEN TRON"}
+	bang := map[string]NhanhChung{
+		"sagent/may-1":   {Nhanh: "sagent/may-1", Rong: true, MotDong: "nhánh sagent/may-1: KHÔNG có commit nào"},
+		"sagent/may-1-2": {Nhanh: "sagent/may-1-2", Rong: true, MotDong: "nhánh sagent/may-1-2: KHÔNG có commit nào"},
+	}
+	ra := doiChieu(k, bang, true)
+	if len(ra) != 1 || !ra[0].ChuaChacSai {
+		t.Fatalf("khai theo nhom, luot co commit that -> khong duoc ket toi: %+v", ra)
+	}
+}

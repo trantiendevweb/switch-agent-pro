@@ -32,8 +32,26 @@ func flowTomTat(arg string) {
 		fmt.Println("  " + d)
 	}
 	fmt.Println()
-	if len(tt.MauThuan) > 0 {
-		fmt.Printf("  %d chỗ lời agent chọi với git. Đọc nguyên văn từng bước: sagent flow runs %d\n\n",
-			len(tt.MauThuan), id)
+	// Đếm RIÊNG hai loại. Gộp chung thì một lượt đã trộn xong hiện "4 chỗ lời
+	// agent chọi với git" trong khi không có chỗ nào chọi cả — đúng kiểu vu oan
+	// làm người đọc thôi tin bộ dò.
+	sai, chuaRo := 0, 0
+	for _, m := range tt.MauThuan {
+		if m.ChuaChacSai {
+			chuaRo++
+		} else {
+			sai++
+		}
+	}
+	switch {
+	case sai > 0 && chuaRo > 0:
+		fmt.Printf("  %d chỗ lời agent CHỌI với git, %d chỗ chưa kết luận được. "+
+			"Đọc nguyên văn từng bước: sagent flow runs %d\n\n", sai, chuaRo, id)
+	case sai > 0:
+		fmt.Printf("  %d chỗ lời agent CHỌI với git. Đọc nguyên văn từng bước: sagent flow runs %d\n\n",
+			sai, id)
+	case chuaRo > 0:
+		fmt.Printf("  Không chỗ nào chọi với git. %d chỗ chưa kết luận được vì nhánh "+
+			"có thể đã trộn sau khi chạy.\n\n", chuaRo)
 	}
 }

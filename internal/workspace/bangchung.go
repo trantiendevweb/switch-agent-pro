@@ -84,3 +84,16 @@ func NhanhMacDinh(repoRoot string) (string, error) {
 }
 
 var errKhongRoNhanh = errors.New("không xác định được nhánh mặc định của repo")
+
+// CommitCoThat hỏi git xem một mã commit có tồn tại trong repo không.
+//
+// Hỏi git chứ không tin hình dạng chuỗi: "deadbeef" trông y như mã commit. Đây
+// là cách phân biệt "agent khai khống một mã" với "agent khai thật, và commit
+// đó nay đã nằm trong nhánh nền".
+func CommitCoThat(dir, ma string) bool {
+	if dir == "" || len(ma) < 7 {
+		return false
+	}
+	_, err := run(dir, "cat-file", "-e", ma+"^{commit}")
+	return err == nil
+}

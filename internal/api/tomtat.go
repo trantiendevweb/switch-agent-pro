@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -132,10 +133,14 @@ type Khai struct {
 }
 
 // MauThuan là một chỗ lời agent chọi với git.
+//
+// ChuaChacSai = nhánh rỗng NHƯNG lượt chạy có mã commit thật, tức nhánh nhiều
+// khả năng đã được trộn vào nhánh nền sau khi chạy. Không kết tội, chỉ nêu ra.
 type MauThuan struct {
-	Khai Khai   `json:"khai"`
-	Git  string `json:"git"`
-	Noi  string `json:"noi"`
+	ChuaChacSai bool   `json:"chuaChacSai,omitempty"`
+	Khai        Khai   `json:"khai"`
+	Git         string `json:"git"`
+	Noi         string `json:"noi"`
 }
 
 // ---------------------------------------------------------------- bản tóm tắt
@@ -151,12 +156,16 @@ type BuocTomTat struct {
 
 // TomTat là toàn bộ câu trả lời của action "flow.tom-tat".
 type TomTat struct {
-	RunID   int64  `json:"id"`
-	Flow    string `json:"flow"`
-	State   string `json:"state"`
-	Dir     string `json:"dir"`
-	Started int64  `json:"started"`
-	Goc     string `json:"goc"`
+	// CommitThat là các mã commit agent khai trong lượt VÀ git xác nhận có thật.
+	// Có nó nghĩa là lượt này đã đẻ ra việc thật, nên nhánh rỗng nhiều khả năng
+	// là đã trộn chứ không phải chưa làm gì.
+	CommitThat []string `json:"commitThat,omitempty"`
+	RunID      int64    `json:"id"`
+	Flow       string   `json:"flow"`
+	State      string   `json:"state"`
+	Dir        string   `json:"dir"`
+	Started    int64    `json:"started"`
+	Goc        string   `json:"goc"`
 
 	DaLam   []BuocTomTat `json:"daLam"`
 	ChuaLam []BuocTomTat `json:"chuaLam"`
@@ -225,6 +234,7 @@ func lamTomTat(run store.Run, steps map[string]store.StepRun, def flow.Flow,
 	// thiếu việc đã thật sự xảy ra.
 	daCo := map[string]bool{}
 	nhacToi := map[string]bool{}
+	t.CommitThat = timCommitCoThat(run.Dir, steps)
 	xep := func(id, typ, prof string, st store.StepRun) {
 		daCo[id] = true
 		b := BuocTomTat{ID: id, Type: typ, Profile: prof, State: st.State}
@@ -255,7 +265,7 @@ func lamTomTat(run store.Run, steps map[string]store.StepRun, def flow.Flow,
 		khai := append(doTruong(id, st.Output, nhomTK), doKhai(id, st.Output, ten)...)
 		for _, k := range khai {
 			t.Khai = append(t.Khai, k)
-			t.MauThuan = append(t.MauThuan, doiChieu(k, bang)...)
+			t.MauThuan = append(t.MauThuan, doiChieu(k, bang, len(t.CommitThat) > 0)...)
 		}
 		for _, n := range timTokenNhanh(st.Output) {
 			if _, biet := bang[n]; !biet {
@@ -293,9 +303,9 @@ func lamTomTat(run store.Run, steps map[string]store.StepRun, def flow.Flow,
 //
 // Nhánh KhongRo KHÔNG bị tính là mâu thuẫn: "không đọc được" không phải bằng
 // chứng của bất cứ điều gì.
-func doiChieu(k Khai, bang map[string]NhanhChung) []MauThuan {
+func doiChieu(k Khai, bang map[string]NhanhChung, daTron bool) []MauThuan {
 	if k.Nhom {
-		return doiChieuNhom(k, bang)
+		return doiChieuNhom(k, bang, daTron)
 	}
 	var ra []MauThuan
 	for _, ten := range k.Nhanh {
@@ -303,19 +313,27 @@ func doiChieu(k Khai, bang map[string]NhanhChung) []MauThuan {
 		if !ok || n.KhongRo || !n.Rong {
 			continue
 		}
-		ra = append(ra, MauThuan{
+		mt := MauThuan{
 			Khai: k, Git: n.MotDong,
 			Noi: fmt.Sprintf("lời agent mâu thuẫn với git: bước %q khai %s cho %s (%q), "+
 				"nhưng git nói %s — TIN GIT.",
 				k.Buoc, tenLoaiKhai[k.Loai], ten, k.Cau, n.MotDong),
-		})
+		}
+		if daTron {
+			mt.ChuaChacSai = true
+			mt.Noi = fmt.Sprintf("chưa kết luận được: bước %q khai %s cho %s (%q), "+
+				"git nói %s — NHƯNG lượt này có commit thật, nhánh nhiều khả năng đã "+
+				"được trộn vào nhánh nền sau khi chạy.",
+				k.Buoc, tenLoaiKhai[k.Loai], ten, k.Cau, n.MotDong)
+		}
+		ra = append(ra, mt)
 	}
 	return ra
 }
 
 // doiChieuNhom soi lời khai nói về MỘT NGƯỜI: chỉ kết luận sai khi mọi nhánh của
 // người đó đều rỗng. Còn một nhánh có việc thì lời khai vẫn đứng được.
-func doiChieuNhom(k Khai, bang map[string]NhanhChung) []MauThuan {
+func doiChieuNhom(k Khai, bang map[string]NhanhChung, daTron bool) []MauThuan {
 	var co []string
 	for _, ten := range k.Nhanh {
 		n, ok := bang[ten]
@@ -327,12 +345,20 @@ func doiChieuNhom(k Khai, bang map[string]NhanhChung) []MauThuan {
 	if len(co) == 0 {
 		return nil
 	}
-	return []MauThuan{{
+	mt := MauThuan{
 		Khai: k, Git: strings.Join(co, "; "),
 		Noi: fmt.Sprintf("lời agent mâu thuẫn với git: bước %q khai %s cho %s (%q), "+
 			"nhưng git nói %s — TIN GIT.",
 			k.Buoc, tenLoaiKhai[k.Loai], strings.Join(k.Nhanh, ", "), k.Cau, strings.Join(co, "; ")),
-	}}
+	}
+	if daTron {
+		mt.ChuaChacSai = true
+		mt.Noi = fmt.Sprintf("chưa kết luận được: bước %q khai %s cho %s (%q), "+
+			"git nói %s — NHƯNG lượt này có commit thật, nhánh nhiều khả năng đã "+
+			"được trộn vào nhánh nền sau khi chạy.",
+			k.Buoc, tenLoaiKhai[k.Loai], strings.Join(k.Nhanh, ", "), k.Cau, strings.Join(co, "; "))
+	}
+	return []MauThuan{mt}
 }
 
 // doTruong dò lời khai theo KHUÔN DÒNG mà flow của dự án bắt agent trả về:
@@ -755,8 +781,22 @@ func vietTomTat(t TomTat) string {
 	b.WriteString("\nĐỐI CHIẾU LỜI AGENT VỚI GIT\n")
 	switch {
 	case len(t.MauThuan) > 0:
+		// Tách hai loại: kết tội thật, và chỗ chưa kết luận được. Trộn chung thì
+		// một lượt đã trộn xong hiện toàn dấu ✗ — người đọc mất niềm tin vào bộ
+		// dò rồi tắt nó đi, và mất luôn cả những lần nó bắt đúng.
 		for _, m := range t.MauThuan {
-			b.WriteString("  ✗ " + m.Noi + "\n")
+			if !m.ChuaChacSai {
+				b.WriteString("  ✗ " + m.Noi + "\n")
+			}
+		}
+		for _, m := range t.MauThuan {
+			if m.ChuaChacSai {
+				b.WriteString("  ? " + m.Noi + "\n")
+			}
+		}
+		if len(t.CommitThat) > 0 {
+			fmt.Fprintf(&b, "    (git xác nhận %d mã commit agent khai là CÓ THẬT: %s)\n",
+				len(t.CommitThat), strings.Join(t.CommitThat, ", "))
 		}
 	case len(t.Khai) > 0:
 		fmt.Fprintf(&b, "  ✓ %d lời khai về nhánh, không lời nào chọi với git\n", len(t.Khai))
@@ -879,4 +919,42 @@ func gitRa(dir string, args ...string) (string, error) {
 	c.Dir = dir
 	out, err := c.Output()
 	return strings.TrimSpace(string(out)), err
+}
+
+// ---------------------------------------------------------------------------
+// BẪY THỨ TƯ, phát hiện 20/08 khi chạy thật `flow tom-tat 34`.
+//
+// Bộ đối chiếu so lời agent với git Ở HIỆN TẠI. Nhưng lượt chạy #34 đã được
+// trộn vào main xong, nên `sagent/tns-1` giờ đúng 0 commit — trong khi lúc lượt
+// đó chạy nó CÓ commit 3ad36a1. Kết quả: bộ dò kết tội cả bốn lời khai đúng.
+//
+// Vu oan còn tệ hơn bỏ sót: người đọc mất niềm tin vào bộ dò rồi tắt nó đi, và
+// thế là mất luôn cả những lần nó bắt đúng.
+//
+// Phân biệt bằng BẰNG CHỨNG, không bằng suy đoán: agent khai mã commit trong
+// output ("COMMIT: 3ad36a1"). Mã đó còn tồn tại trong repo nghĩa là commit CÓ
+// THẬT — nhánh rỗng chỉ vì đã trộn. Không tồn tại mới là khai khống.
+
+var reCommit = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
+
+// timCommitCoThat quét mọi output của lượt chạy, lấy các chuỗi trông như mã
+// commit rồi HỎI GIT xem có thật không. Trả về danh sách mã có thật.
+//
+// Hỏi git chứ không tin hình dạng: "deadbeef" cũng khớp mẫu hex.
+func timCommitCoThat(dir string, steps map[string]store.StepRun) []string {
+	thay := map[string]bool{}
+	var ra []string
+	for _, st := range steps {
+		for _, m := range reCommit.FindAllString(st.Output, -1) {
+			if thay[m] {
+				continue
+			}
+			thay[m] = true
+			if workspace.CommitCoThat(dir, m) {
+				ra = append(ra, m)
+			}
+		}
+	}
+	sort.Strings(ra)
+	return ra
 }
