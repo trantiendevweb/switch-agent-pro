@@ -13,7 +13,10 @@ sagent là **local-first control plane** điều phối nhiều coding-agent CLI
 
 1. **Offline tuyệt đối lúc runtime.** KHÔNG load `three.js` từ CDN, KHÔNG load font từ Google Fonts, KHÔNG gọi API ngoài để render. Mọi asset phải **vendor** (tải về nhét vào bundle nhúng). *(Bài học thật: bản prototype để three.js ở cdnjs → màn 3D trắng trơn trong môi trường thật.)*
 2. **Vanilla, không Node build.** HTML/CSS/JS thuần. Không React/Vue/bundler. Assets nhúng qua Go `embed`.
-3. **three.js chỉ MỘT file core.** KHÔNG dùng addon `OrbitControls`, `EffectComposer`, `UnrealBloomPass` — chúng kéo theo nhiều file, dễ vỡ khi nhúng. → Camera orbit **tự viết tay**; "bloom" (quầng sáng) làm bằng **additive glow sprite** (sprite radial-gradient chồng lớp), không post-processing.
+3. **three.js: cấm addon HIỆU ỨNG, cho phép LOADER đã vendor.** (Sửa 20/08 — luật cũ cấm *mọi* addon, gộp nhầm hai thứ khác nhau.)
+   - **Vẫn cấm**: `OrbitControls`, `EffectComposer`, `UnrealBloomPass`. Chúng kéo theo chuỗi phụ thuộc dài, và đều có cách tự viết rẻ hơn → camera orbit **tự viết tay**; "bloom" bằng **additive glow sprite**, không post-processing.
+   - **Cho phép**: loader độc lập như `GLTFLoader`, với điều kiện **vendor vào binary**. Nó không kéo theo gì, và mở ra thứ không tự viết được: `RobotExpressive.glb` (CC0) có sẵn 13 clip hoạt hình **đặt tên theo trạng thái** (Idle/Walking/Running/Wave/ThumbsUp/No) — đúng thứ view văn phòng cần.
+   - Điều kiện không đổi: **không tải từ mạng lúc chạy** (INV-UI-1).
 4. **Không secret ra client.** Giữ nguyên nguyên tắc DTO allowlist của repo — UI chỉ nhận field trong allowlist, không nhận token/API key.
 5. **Đã đo — không suy luận.** Con số hiển thị (token, cost, PID) phải từ state thật; đừng bịa số "cho đẹp".
 
@@ -64,11 +67,12 @@ sagent là **local-first control plane** điều phối nhiều coding-agent CLI
 ## Anti-pattern (thấy là sửa)
 
 - ❌ Thả agent trôi tự do trong không gian → khó đọc. Dùng ring/lưới có trật tự.
-- ❌ Dùng addon three.js (OrbitControls/EffectComposer) trong bản nhúng.
+- ❌ Dùng addon HIỆU ỨNG three.js (OrbitControls/EffectComposer/BloomPass). Loader đã vendor thì được — xem ràng buộc 3.
 - ❌ Load asset (three.js/font/icon) từ CDN lúc runtime.
 - ❌ Rải màu ra chrome; màu chỉ cho status.
 - ❌ 3D text cho label; dùng HTML overlay.
 - ❌ Thêm animation không mã hoá thông tin (motion phải nói "đang chạy", "vừa xong"…), thừa là thấy giả/AI-made.
+  - **Ngoại lệ DUY NHẤT** (chốt 20/08): nhịp thở/cử động nhỏ của nhân vật lúc đứng yên, để cảnh không chết cứng. Ngoại lệ này dừng ở đó — đi lại, vẫy tay, đổi phòng đều phải có việc thật đứng sau.
 - ❌ Sans-serif cho số liệu; data luôn mono.
 
 ## Data contract (chỗ cắm feed thật)
@@ -93,7 +97,7 @@ Nối vào state thật của sagent qua WebSocket/SSE (đúng field trong DTO a
 ## Checklist trước khi commit thay đổi giao diện
 
 - [ ] Không có URL ngoài nào load lúc runtime (three.js/font/icon đã vendor).
-- [ ] Chỉ 1 file three core; không import addon.
+- [ ] Không import addon hiệu ứng; loader (nếu có) đã vendor vào binary.
 - [ ] Màu mới (nếu có) nằm trong token status; chrome vẫn đơn sắc.
 - [ ] 2D và 3D đọc chung một model; đổi data thấy đồng bộ.
 - [ ] Số liệu từ state thật, trong DTO allowlist, không lộ secret.
