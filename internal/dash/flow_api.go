@@ -205,9 +205,14 @@ func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
 	// Trả về theo THỨ TỰ ĐỊNH NGHĨA để mặt web dựng được mạch trên xuống dưới
 	// mà không phải tự sắp xếp lại đồ thị.
 	type buocDTO struct {
-		ID        string   `json:"id"`
-		Type      string   `json:"type"`
-		Profile   string   `json:"profile"`
+		ID      string `json:"id"`
+		Type    string `json:"type"`
+		Profile string `json:"profile"`
+		// VaiTro lấy từ ĐỊNH NGHĨA flow (flows.toml), không phải từ sổ: sổ chỉ
+		// ghi việc đã chạy, còn vai trò là thứ người dùng khai. Bước có trong sổ
+		// mà flows.toml đã bỏ thì rỗng — không có chỗ nào để lấy, và đoán thì
+		// sai.
+		VaiTro    string   `json:"vaiTro"`
 		Needs     []string `json:"needs"`
 		State     string   `json:"state"`
 		Msg       string   `json:"msg"`
@@ -220,13 +225,13 @@ func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	ds := make([]buocDTO, 0, len(def.Steps))
 	daCo := map[string]bool{}
-	them := func(id, typ, prof string, needs []string, st store.StepRun) {
+	them := func(id, typ, prof, vai string, needs []string, st store.StepRun) {
 		daCo[id] = true
 		if needs == nil {
 			needs = []string{}
 		}
 		ds = append(ds, buocDTO{
-			ID: id, Type: typ, Profile: prof, Needs: needs,
+			ID: id, Type: typ, Profile: prof, VaiTro: vai, Needs: needs,
 			State: st.State, Msg: st.Msg, Prompt: st.Prompt, Output: st.Output,
 			Attempt: st.Attempt, CostUSD: st.CostUSD,
 			TokensIn: st.TokensIn, TokensOut: st.TokensOut,
@@ -234,13 +239,13 @@ func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range def.Steps {
 		d := def.Steps[i]
-		them(d.ID, d.Type, d.Profile, d.Needs, steps[d.ID])
+		them(d.ID, d.Type, d.Profile, d.VaiTro, d.Needs, steps[d.ID])
 	}
 	// Bước có trong sổ nhưng flows.toml đã bỏ (flow sửa sau khi chạy) vẫn phải
 	// hiện — giấu đi thì người đọc tưởng lượt chạy ít bước hơn thực tế.
 	for id, st := range steps {
 		if !daCo[id] {
-			them(id, "", "", nil, st)
+			them(id, "", "", "", nil, st)
 		}
 	}
 
