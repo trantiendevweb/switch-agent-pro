@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
@@ -34,8 +35,8 @@ func runTUI() {
 
 	in := bufio.NewScanner(os.Stdin)
 	for {
-		list, running := snapshot()
-		printMenu(list, running)
+		list, running, hong := snapshot()
+		printMenu(list, running, hong)
 
 		fmt.Print("   Chọn (số=mở · t=thêm · d=đồng bộ · x=xoá · s=phiên · ?=trợ giúp · Enter=thoát): ")
 		if !in.Scan() {
@@ -79,7 +80,7 @@ func runTUI() {
 
 // snapshot đọc một lần trạng thái để vẽ bảng, rồi đóng ngay — không giữ store
 // mở trong lúc chờ người dùng gõ.
-func snapshot() ([]api.Profile, []store.Session) {
+func snapshot() ([]api.Profile, []store.Session, []store.Session) {
 	a, done := open()
 	defer done()
 	list, err := a.ProfileList()
@@ -87,10 +88,14 @@ func snapshot() ([]api.Profile, []store.Session) {
 		fail(err)
 	}
 	running, _ := a.SessionList()
-	return list, running
+	// Phiên vừa chết BẤT THƯỜNG: bảng chọn phải nói được "hạm đội trống vì hết
+	// hạn mức" chứ không chỉ nói "hạm đội trống". Cùng nguồn với dashboard 2D
+	// và màn 3D — không mặt nào tự suy trạng thái.
+	hong, _ := a.SessionHong(5)
+	return list, running, hong
 }
 
-func printMenu(list []api.Profile, running []store.Session) {
+func printMenu(list []api.Profile, running, hong []store.Session) {
 	fmt.Println()
 	fmt.Println("  Tài khoản AI trên máy này")
 	fmt.Println()
@@ -114,6 +119,16 @@ func printMenu(list []api.Profile, running []store.Session) {
 	}
 	if len(running) > 0 {
 		fmt.Printf("\n     %d phiên đang chạy — bấm s để xem\n", len(running))
+	}
+	// Hạm đội trống có hai nghĩa hoàn toàn khác nhau: việc xong, hay agent chết
+	// giữa chừng. Bảng chọn im lặng thì người dùng chỉ thấy nghĩa thứ nhất.
+	if len(hong) > 0 {
+		now := time.Now()
+		fmt.Println()
+		for _, s := range hong {
+			fmt.Println(dongPhienHong(s, now))
+		}
+		fmt.Println("     (phiên đã chết — bấm s để xem đủ)")
 	}
 	fmt.Println()
 }

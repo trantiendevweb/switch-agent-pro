@@ -140,10 +140,24 @@ func TestNutDungHienKhiHoverVaKhiTabToi(t *testing.T) {
 		t.Error("index.html: thieu .ag.song:focus-within .dung — tab toi nut Dung " +
 			"thi no van vo hinh")
 	}
-	// Chi card cua phien dang chay/dang cho moi duoc mang lop .song.
-	if !regexp.MustCompile(`className\s*=\s*'ag song `).MatchString(s) {
-		t.Error("index.html: JS khong gan lop .song cho card phien — luat hover se " +
-			"khong bao gio khop")
+	// Chi card cua phien DANG SONG moi duoc mang lop .song.
+	//
+	// Truoc schema v9 luoi chi co card phien dang chay, nen phep kiem cu la
+	// `className = 'ag song ` — mot chuoi co dinh. Nay luoi mang ca phien vua
+	// chet (rate_limited/blocked/failed/lost), va card cua chung PHAI khong co
+	// .song: nut Dung cua mot phien da chet la nut vo nghia, con nhip tho tren
+	// mot cai xac la noi doi bang hoat hoa.
+	//
+	// Nen phep kiem doi thanh: van con lop 'ag song ' cho phien song, VA co mot
+	// nhanh rieng 'ag chet' cho phien chet.
+	ma := boComment(s)
+	if !strings.Contains(ma, `'ag song `) {
+		t.Error("index.html: JS khong gan lop .song cho card phien dang song — " +
+			"luat hover se khong bao gio khop")
+	}
+	if !strings.Contains(ma, `'ag chet'`) {
+		t.Error("index.html: JS khong co nhanh 'ag chet' — card cua phien da chet " +
+			"dang duoc mang lop .song, tuc no van tho va van co nut Dung")
 	}
 }
 

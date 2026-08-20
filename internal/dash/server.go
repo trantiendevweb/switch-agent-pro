@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
+	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
 //go:embed web
@@ -525,6 +526,21 @@ type sessionDTO struct {
 	Worktree string `json:"worktree,omitempty"`
 	Log      string `json:"log,omitempty"`
 	Started  int64  `json:"started"` // unix giây
+
+	// State là trạng thái ĐÃ QUYẾT ở hợp đồng (api → store → provider). Mặt web
+	// chỉ đọc lại, KHÔNG suy: trước đây index.html tự tính "running/pending" từ
+	// pid, còn 3d.html tự đoán từ bước flow — hai mặt, hai luật, cùng một dữ
+	// liệu. Nay chỉ có một luật, và nó nằm ngoài trình duyệt.
+	State string `json:"state"`
+	// LyDo/HanMucDenLai rỗng khi KHÔNG ĐO ĐƯỢC. Trang phải hiển thị đúng chỗ
+	// trống đó chứ không được lấp bằng chữ suy ra.
+	LyDo         string `json:"lyDo,omitempty"`
+	HanMucDenLai int64  `json:"hanMucDenLai,omitempty"` // unix giây, 0 = không rõ
+}
+
+func phienDTO(s store.Session) sessionDTO {
+	return sessionDTO{s.ID, s.Addr(), s.PID, s.Worktree, s.Log, s.Started.Unix(),
+		s.State, s.StateLyDo, s.HanMucDenLai}
 }
 
 // ---------------------------- endpoint ----------------------------
@@ -544,9 +560,24 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	for _, p := range profiles {
 		ps = append(ps, profileDTO{p.Addr(), p.Provider, p.Account, p.Identity, p.HasToken, p.HetHan, p.Active})
 	}
-	ss := make([]sessionDTO, 0, len(sessions))
-	for _, s := range sessions {
-		ss = append(ss, sessionDTO{s.ID, s.Addr(), s.PID, s.Worktree, s.Log, s.Started.Unix()})
+	// Phiên vừa chết BẤT THƯỜNG đi chung mảng `sessions` với phiên đang chạy,
+	// phân biệt bằng trường `state`.
+	//
+	// Vì sao chung một mảng: nếu tách hai mảng thì mỗi trang phải nhớ đọc cả
+	// hai, và trang nào quên sẽ mất hẳn cái card "hết hạn mức" mà không ai báo
+	// lỗi — đúng kiểu lệch im lặng. Chung một mảng thì trang cũ vẫn vẽ được,
+	// chỉ là vẽ thêm.
+	hong, err := s.api.SessionHong(20)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	ss := make([]sessionDTO, 0, len(sessions)+len(hong))
+	for _, x := range sessions {
+		ss = append(ss, phienDTO(x))
+	}
+	for _, x := range hong {
+		ss = append(ss, phienDTO(x))
 	}
 	// runs: `flow.runs` khai đường vào từ web CHÍNH LÀ endpoint này, nên thiếu
 	// nó thì mặt web không có cách nào biết lượt chạy nào đang chạy — mà test

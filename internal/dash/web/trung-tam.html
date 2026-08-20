@@ -329,6 +329,42 @@ const MAU_TT = {running:mauToken('--run'), done:mauToken('--done'),
                 failed:mauToken('--error'), pending:mauToken('--pending'),
                 skipped:mauToken('--idle'), waiting:mauToken('--pending'),
                 '':mauToken('--idle')};
+// ---- TRẠNG THÁI PHIÊN (schema v9) ----
+//
+// Khác MAU_TT ở trên: đó là trạng thái của BƯỚC flow, còn đây là trạng thái của
+// PHIÊN — một tiến trình agent đang sống. Hai thứ khác nhau và không được trộn.
+//
+// Chia màu theo VIỆC PHẢI LÀM: `rate_limited` là "chờ rồi chạy lại được" nên
+// mang sắc chờ; `blocked`/`failed` là "phải sửa mới chạy được" nên mang sắc
+// hỏng; `lost` xám vì nó đúng nghĩa KHÔNG BIẾT. Mặt 2D chia y hệt — hai mặt
+// phải đọc như MỘT sản phẩm.
+//
+// Chuyển sang đây khi gộp hai mặt ba chiều: phần này được thêm vào 3d.html ở
+// lượt #46, mà 3d.html thì vừa bị gộp đi. Xoá trang mà bỏ luôn việc trong đó là
+// đánh rơi tính năng không ai thấy.
+const MAU_PHIEN = {running:mauToken('--run'), pending:mauToken('--pending'),
+                   rate_limited:mauToken('--pending'), blocked:mauToken('--error'),
+                   failed:mauToken('--error'), lost:mauToken('--idle'),
+                   stopped:mauToken('--idle')};
+const NHAN_PHIEN = {running:'đang chạy', pending:'đang mở',
+                    rate_limited:'hết hạn mức', blocked:'bị chặn quyền',
+                    failed:'lỗi nhà cung cấp', lost:'chết, chưa rõ vì sao',
+                    stopped:'đã dừng'};
+// Đọc LẠI state của DTO. Đường lui chỉ dùng khi server cũ không gửi `state`.
+function ttPhien(s){ return s.state || (s.pid > 0 ? 'running' : 'pending'); }
+function mauPhien(tt){ return MAU_PHIEN[tt] !== undefined ? MAU_PHIEN[tt] : MAU_PHIEN.lost; }
+
+// "Hết hạn mức" mà không nói BAO GIỜ cấp lại thì người vận hành vẫn phải ngồi
+// đoán. Mốc này đến từ rate_limit_info.resetsAt — dấu thời gian THẬT của nhà
+// cung cấp, không phải phỏng đoán của công cụ.
+function capLai(unix){
+  if(!unix) return '';
+  const con = unix - Math.floor(Date.now()/1000);
+  if(con <= 0) return 'đã cấp lại — chạy lại được';
+  const h = Math.floor(con/3600), m = Math.floor((con%3600)/60);
+  return 'cấp lại sau ' + (h ? h + 'h' + m + 'm' : m + 'm');
+}
+
 // Sắc HÃNG = da robot. DANH TÍNH chứ không phải trạng thái, nên nó chỉ nằm trên
 // nhân vật; vòng dưới chân mới mang màu trạng thái.
 const TINT = {claude:mauToken('--prov-claude'), codex:mauToken('--prov-codex'),
@@ -1679,13 +1715,28 @@ function veChiTiet(){
   huy.disabled = !chay;
   huy.title = chay ? ('huỷ lượt chạy #' + flowRunID) : 'chỉ huỷ được lượt đang chạy';
 
-  // Nút dừng phiên chỉ bật khi tài khoản này THẬT SỰ có phiên đang chạy trong
+  // PHIÊN của tài khoản này — khác BƯỚC ở trên. Nếu phiên đã chết thì nói VÌ SAO
+  // và BAO GIỜ chạy lại được, chứ không chỉ nói "chết".
+  //
+  // Đây là chỗ ba trạng thái đo được của schema v9 hiện ra: `lost` cũ trả lời
+  // "nó không còn chạy" nhưng không trả lời câu người vận hành thật sự hỏi —
+  // chạy lại được ngay, hay phải chờ hạn mức, hay phải cấp quyền.
+  const ph = phienCuaNhanVat(A, true);
+  if(ph){
+    const tp = ttPhien(ph);
+    dong('phiên', '#' + ph.id + ' · ' + (NHAN_PHIEN[tp] || tp), chuoiMau(mauPhien(tp)));
+    if(ph.lyDo) dong('vì sao', ph.lyDo);
+    const lai = capLai(ph.hanMucDenLai);
+    if(lai) dong('hạn mức', lai);
+  }
+
+  // Nút dừng phiên chỉ bật khi tài khoản này THẬT SỰ có phiên ĐANG CHẠY trong
   // /api/state. Bật sẵn rồi bấm mới báo "không có phiên" là hứa suông.
   const dp = $('ct-dungphien');
-  const ph = phienCuaNhanVat(A);
-  dp.disabled = !ph;
-  dp.title = ph ? ('dừng phiên #' + ph.id + ' của ' + A.prof)
-                : 'tài khoản này không có phiên nào đang chạy';
+  const phChay = phienCuaNhanVat(A);
+  dp.disabled = !phChay;
+  dp.title = phChay ? ('dừng phiên #' + phChay.id + ' của ' + A.prof)
+                    : 'tài khoản này không có phiên nào đang chạy';
 }
 
 // DỪNG PHIÊN. Mặt sơ đồ cũ bấm vào quả cầu là dừng đúng phiên hạm đội đó; gộp
@@ -1695,10 +1746,13 @@ function veChiTiet(){
 //
 // Ở đây "phiên" khác "lượt chạy": lượt chạy là cả flow, phiên là MỘT tiến trình
 // agent đang sống. Hai nút, hai đường API, đặt cạnh nhau và ghi rõ tên.
-function phienCuaNhanVat(A){
+// Phiên của một nhân vật. `moiTrangThai = true` thì lấy cả phiên đã chết — bảng
+// chi tiết cần nó để nói VÌ SAO chết; nút Dừng thì chỉ quan tâm phiên đang sống.
+function phienCuaNhanVat(A, moiTrangThai){
   if(!A || A.may || !hamDoi || !hamDoi.sessions) return null;
-  return hamDoi.sessions.find(x =>
-    x.state === 'running' && (x.addr === A.prof || (x.addr && x.addr.indexOf(A.prof) === 0))) || null;
+  const hop = x => x.addr === A.prof || (x.addr && x.addr.indexOf(A.prof) === 0);
+  if(moiTrangThai) return hamDoi.sessions.find(hop) || null;
+  return hamDoi.sessions.find(x => x.state === 'running' && hop(x)) || null;
 }
 
 $('ct-dungphien').addEventListener('click', async ()=>{
