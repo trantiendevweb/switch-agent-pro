@@ -90,13 +90,15 @@ Gỡ: xoá `%USERPROFILE%\bin\sagent.exe`. Dữ liệu nằm ở `~/.ai-accounts
 
 | Lệnh | Làm gì |
 |---|---|
-| `sagent` | Bảng tài khoản |
+| `sagent` | Mở **mặt mặc định của dự án** (`[ui] default_surface`) — không khai gì thì là bảng chọn terminal |
+| `sagent ds` | Bảng tài khoản (luôn là bảng, bất kể `[ui]` khai gì) |
 | `sagent <provider:tên>` | Chạy CLI bằng tài khoản đó (mặc định provider `claude`) |
 | `sagent goc` | Chạy bằng tài khoản gốc |
 | `sagent them <provider:tên>` | Tạo tài khoản mới rồi đăng nhập |
 | `sagent dong-bo [--dry-run]` | Đồng bộ cấu hình dùng chung sang mọi tài khoản |
 | `sagent xoa <provider:tên>` | Xoá tài khoản (an toàn) |
 | `sagent verify [provider]` | Chạy bộ "đã đo" trên máy bạn |
+| `sagent route` · `sagent route kiem` | Sổ route API · hỏi route còn dùng được không (**không tốn token**) |
 | `sagent init` · `sagent config` | Tạo/xem cấu hình dự án |
 
 Địa chỉ hoá `provider:account`, nên `sagent phu` == `sagent claude:phu`.
@@ -136,13 +138,25 @@ Vài chỗ **phải biết trước**, đều là giới hạn của CLI bên d�
 ### Chạy nhiều agent song song
 
 ```bash
-sagent fleet claude:phu --copies 4 --worktree -- -p "sửa lỗi trong repo"
+sagent fleet claude:phu --copies 4 --worktree --tu-duyet-quyen -- -p "sửa lỗi trong repo"
 sagent status          # phiên nào đang chạy, PID, worktree/log ở đâu
 sagent stop all        # dừng hết (giết cả cây tiến trình con)
 sagent quet            # tìm tiến trình còn sống của phiên đã tự chết
 sagent quet --giet     # ...và dừng chúng
 sagent clean claude:phu   # gỡ worktree + xoá clone — an toàn, không xuyên junction
 ```
+
+**`--tu-duyet-quyen`** cho agent con tự duyệt mọi tool ở chế độ headless — nếu không,
+agent dừng ở hộp thoại xin quyền mà không ai bấm được. Cờ này **hỏi adapter** tên cờ
+thật chứ không chép cứng: `claude` ra `--dangerously-skip-permissions`, provider khác
+ra cờ khác. Trước đây phải tự gõ `-- --dangerously-skip-permissions`, tức tên cờ của
+Claude rò vào script của bạn và `fleet codex:*` chạy sai mà không ai báo. Provider
+**chưa đo** cờ đó thì lệnh **từ chối chạy** chứ không khai bừa; provider không có rào
+quyền nào thì báo cờ là thừa rồi chạy tiếp.
+
+`fleet` cũng tự bổ sung bộ cờ khiến lượt chạy **đo được** (ví dụ với Claude là
+`--output-format stream-json --verbose`) và nói rõ đã thêm gì — thiếu chúng thì công cụ
+không đọc được token/chi phí/lý do hỏng, và mọi phiên rơi về "chết, chưa rõ vì sao".
 
 Hai lớp tách biệt, mỗi lớp giải một bài:
 
@@ -154,6 +168,62 @@ Hai lớp tách biệt, mỗi lớp giải một bài:
 Worktree đặt **ngoài repo** (`~/.ai-accounts/.worktrees/…`) nên `git status` của bạn
 không bị rác. `clean` gỡ worktree nhưng **giữ nhánh** — việc agent làm nằm trong đó —
 và **từ chối gỡ** worktree còn thay đổi chưa commit (muốn bỏ thật thì thêm `--force`).
+
+#### Phiên kết thúc mang trạng thái gì
+
+| Trạng thái | Bảng hiện | Nghĩa |
+|---|---|---|
+| `running` / `stopped` | đang chạy · đã dừng | còn sống · bị `sagent stop` dừng |
+| `done` | **xong** | lượt chạy **kết thúc bình thường** và công cụ **đọc được** bản ghi kết quả |
+| `rate_limited` | hết hạn mức | kèm mốc cấp lại nếu CLI nói được |
+| `blocked` | bị chặn quyền | mọi tool bị từ chối |
+| `failed` | lỗi nhà cung cấp | CLI trả mã lỗi |
+| `lost` | chết, chưa rõ vì sao | **không đọc được** kết quả — nói thẳng là không biết, không đoán |
+
+`done` là trạng thái **mới thêm 20/08/2026**, và nó vá một lỗi đo được: trước đó hệ
+trạng thái chỉ có tên cho các kiểu **hỏng**, nên một lượt chạy xong xuôi (agent trả lời
+đúng, bản ghi có dòng `result`, không lỗi nào) cũng rơi vào cùng sọt `lost` và hiện ra
+là *"chết, chưa rõ vì sao"*. Trong một ảnh chụp `sagent status` cùng ngày, **20/20
+phiên** hiện như vậy — phần lớn nhiều khả năng đã chạy xong tốt đẹp. Bảng toàn báo động
+giả thì người vận hành hoặc hoảng vô cớ, hoặc quen mắt rồi thôi đọc; và lần có phiên
+chết thật thì nó lẫn vào đám đông.
+
+Công cụ chỉ nói "xong" khi **đọc được** bản ghi kết quả. Provider chưa đo được kết quả
+có cấu trúc vẫn về `lost` như cũ — thiếu dữ liệu thì không suy.
+
+`done` vẫn nằm trong danh sách "tự kết thúc, không qua `stop`" mà `sagent quet` rà: một
+lượt chạy xong xuôi vẫn có thể để lại tiến trình con, và con của phiên thành công tiêu
+hạn mức y hệt con của phiên hỏng.
+
+### Đường API trực tiếp: kiểm route trước khi chạy
+
+```bash
+sagent api ds                 # route nào đang khai trong cấu hình
+sagent api <route> "câu hỏi"  # gọi thẳng model, không qua CLI agent
+sagent api --lich-su          # đã gọi những gì, tiêu bao nhiêu
+sagent route                  # đối chiếu: cấu hình khai gì ↔ sổ ghi đã gọi thật qua đâu
+sagent route kiem             # hỏi từng route CÓ DÙNG ĐƯỢC KHÔNG — không tốn token
+```
+
+`route kiem` đi bằng `GET /models` nên **không tính tiền**: một phép kiểm có tính tiền
+thì người ta sẽ thôi chạy nó, mà health check không ai chạy thì bằng không có. Nó hỏi
+mọi route **song song** (bốn route hỏi lần lượt, mỗi route chờ tới 15 giây, là gần một
+phút ngồi nhìn màn hình).
+
+Nó trả lời **hai câu khác nhau**, và cách sửa cũng khác nhau:
+
+- **route còn sống không** — nhà cung cấp còn đó không;
+- **model khai có thật không** — route sống mà tên model sai thì mọi lượt gọi vẫn hỏng.
+  Từng có cấu hình khai `deepseek-chat`, một tên không tồn tại ở nhà bán lại đang dùng.
+
+Endpoint không cài `/models` thì đánh dấu *không kiểm được tên model* chứ **không** kết
+luận model sai — im lặng khác phủ nhận.
+
+Vì sao cần lệnh này: đo 20/08/2026, route `deepseek` trả **HTTP 503 ba lần** lúc
+16:54–16:56 rồi tự hồi phục. Khi chưa có `route kiem`, cách duy nhất để biết là **gọi
+thật rồi hỏng** — tức hỏng ở giữa lượt chạy dài, chứ không phải lúc còn kịp đổi route.
+
+> `route kiem` **không** biết hạn mức còn hay hết — cái đó chỉ lộ ra khi gọi thật.
 
 ### Cấu hình theo từng dự án
 
@@ -172,8 +242,47 @@ workspace = "worktree"        # fleet tự bật worktree, khỏi gõ --worktree
 max_parallel_sessions = 4     # trần cứng, gõ --copies 9 cũng bị hạ xuống 4
 require_approval_for  = ["merge", "deploy"]
 [ui]
-default_surface = "tui"       # tui | dashboard | workflow | 3d
+default_surface = "tui"       # gõ `sagent` không tham số thì ra mặt nào
+theme           = "dark"      # dark | light — dùng chung cho cả bốn mặt
+columns         = ["provider", "tai_khoan", "trang_thai", "pid", "nhanh"]
+pinned_flows    = ["kiem-tra-nhanh"]
+enable_3d       = false       # ẩn hẳn lối vào mặt ba chiều
 ```
+
+#### `[ui]` điều khiển THẬT cả bốn mặt
+
+Bốn mặt điều khiển đọc **một** hợp đồng `[ui]`, nên hai dự án khác nhau mở ra hai bố cục
+khác nhau mà **không sửa mã**:
+
+| Khoá | Mặt terminal | Dashboard 2D | Workflow board | Mặt 3D |
+|---|---|---|---|---|
+| `default_surface` | `tui` → vào thẳng bảng chọn | `dashboard` → `/` | `workflow` → `/flow.html` | `3d` → `/trung-tam.html` |
+| `theme` | — | nền sáng/tối | nền sáng/tối | nền sáng/tối |
+| `columns` | — | chọn + **xếp thứ tự** cột bảng Tài khoản | — | — |
+| `pinned_flows` | — | — | ghim flow lên đầu | — |
+| `enable_3d` | — | `false` → **gỡ hẳn** thẻ link, không chỉ ẩn bằng CSS | — | tắt lối vào |
+
+Chi tiết đáng biết, đều là bài học phải trả giá:
+
+- **`sagent` không tham số đi theo `default_surface`.** Trước Pha 5d nó *luôn* mở bảng
+  chọn, nên khoá này chỉ là một dòng chữ trong `sagent config` chứ không điều khiển gì.
+  Ba mặt web chỉ **chỉ đường** (in URL + nhắc `sagent dash`) chứ không tự bật server:
+  `sagent dash` chiếm terminal tới khi Ctrl+C và đòi mật khẩu đặt trước — gõ `sagent`
+  mà tự nhiên mọc ra một tiến trình đang nghe cổng là việc bạn không hề xin. Vẫn muốn
+  bảng chọn thì gõ `sagent ds`.
+- **Cột hợp lệ**: `provider`, `tai_khoan`, `danh_tinh`, `trang_thai`, `pid`, `nhanh`,
+  `bat_dau` — mỗi hàng là một **tài khoản**, ba cột `pid`/`nhanh`/`bat_dau` nói về phiên
+  tài khoản đó đang chạy (rỗi thì trống). Không khai `columns` thì giữ nguyên bốn cột cũ.
+- **Sai thì kêu lúc ĐỌC FILE, không phải lúc vẽ.** Theme lạ, tên cột lạ, và mâu thuẫn
+  `default_surface = "3d"` + `enable_3d = false` đều bị `sagent config` chặn ngay. Bắt
+  lỗi lúc mở trình duyệt thì đã muộn — bạn nhận một trang trống mà không hiểu vì sao.
+- **`enable_3d` phân biệt "không nói gì" với "nói không".** Không khai thì giữ `true`
+  của tầng trên; khai `enable_3d = false` thì ghi đè thật.
+- Giá trị đã giải sẵn **ở server** rồi mới gửi kèm `/api/state`, chứ không để mỗi trang
+  tự đoán "rỗng nghĩa là dùng bốn cột kia" — bộ mặc định chép làm nhiều bản trong
+  JavaScript sẽ trôi khỏi nhau.
+
+`sagent config` in đủ bốn khoá này, khoá không khai thì nói rõ đang dùng mặc định.
 
 ### Dashboard
 
@@ -234,8 +343,51 @@ và thời điểm, không tự giết: Windows dùng lại PID nên danh sách 
 không liên quan, và bạn phải là người quyết.
 
 > Hai điều công cụ nói thẳng mỗi lần chạy `fleet`: N phiên trên một tài khoản
-> **tiêu hạn mức gấp N**, và hành vi khi nhiều phiên **cùng refresh token thì chưa
-> đo** — xem [`docs/DO-LUONG.md`](docs/DO-LUONG.md).
+> **tiêu hạn mức gấp N**, và nhà cung cấp **xoay vòng refresh token** — xem mục ngay
+> dưới đây và [`docs/DO-LUONG.md`](docs/DO-LUONG.md).
+
+### Nhà cung cấp XOAY VÒNG refresh token (đã đo 20/08/2026)
+
+Ô "chưa đo" nguy hiểm nhất của dự án nay **đã đo xong**, và kết quả nặng hơn phỏng đoán cũ.
+
+**Cách đo** (thiết kế để không mất gì, vì phép đo này chạm vào đăng nhập thật): sao lưu
+`.credentials.json` của hồ sơ gốc lẫn bản clone, ghi **vân tay SHA-256** thay vì in
+token; ép `expiresAt` của bản clone về quá khứ rồi chạy một lượt `claude -p` ngắn để
+buộc CLI refresh; so vân tay trước/sau; rồi thử bản token **cũ** trong một thư mục config
+tạm.
+
+| Mốc | refresh token | access token |
+|---|---|---|
+| Trước (gốc và clone giống hệt) | `5d708911` | `1a0b9b6c` |
+| Sau khi clone refresh — **clone** | **`1aa28b8c`** | `a2ae3dfd` |
+| Sau khi clone refresh — **gốc** | `5d708911` (không đổi) | `1a0b9b6c` |
+
+Chạy bằng bản cũ `5d708911`:
+
+```
+Failed to authenticate: OAuth session expired and could not be refreshed
+```
+
+**Kết luận:** mỗi lần refresh cấp một token mới và **giết token cũ ngay**. Chép token ra
+N chỗ **không cần N tiến trình đua nhau** mới hỏng — **một** bản refresh là N−1 bản còn
+lại chết, và hồ sơ gốc cũng là một trong số đó. Đây chính là chuỗi đã làm `claude:phu`
+mất phiên giữa lượt chạy #47.
+
+**Đã vá:** `profile.Clone` mang token mới nhất **về hồ sơ gốc trước khi** chép đè, nên
+công refresh không bị đánh rơi. Đối chứng trên máy thật, lúc hồ sơ gốc đang cầm token đã chết:
+
+```
+TRƯỚC:  gốc refresh=5d708911   (đã chết)
+$ sagent clone claude:phu --copies 1
+SAU:    gốc refresh=1aa28b8c   clone refresh=1aa28b8c   (đều sống)
+```
+
+> ⚠ **Bản vá cứu được GIỮA CÁC LƯỢT, không cứu được TRONG LÚC CHẠY.** Hai bản đang chạy
+> cùng lúc, một bản tới mốc refresh và xoay token đi, thì bản kia cầm token đã chết ngay
+> giữa việc — không có chỗ nào để chen vào mà đồng bộ. **Lượt chạy dài thì chia cho
+> NHIỀU TÀI KHOẢN, đừng chạy nhiều bản của một tài khoản.** `fleet` in đúng câu này khi
+> `--copies > 1`, và cảnh báo trước nếu token còn dưới 2 giờ (access token của Claude
+> sống ~7,5 giờ, nên hạm đội chạy qua đêm chắc chắn vượt mốc refresh).
 
 ### Sao lưu cơ sở dữ liệu
 
@@ -297,11 +449,15 @@ Không tô hồng:
 | Sao lưu / khôi phục `state.db`, chặn hạ cấp binary | ✅ |
 | Provider | ✅ **5**: claude · codex · cursor · antigravity · grok |
 | Chạy nhiều tài khoản một provider | ✅ 4/5 — Antigravity **không** (token ở Credential Manager) |
-| Đường API (nhiều AI API) | ⬜ chưa có API key để verify |
+| Đường API (nhiều AI API) | ✅ DeepSeek + Grok chạy thật qua `modelapi.vn`; `route kiem` kiểm được route/model, **không tốn token** |
+| Hành vi khi nhiều phiên cùng refresh token | ✅ **đã đo 20/08**: nhà cung cấp **xoay vòng** — đã vá, nhưng chỉ cứu giữa các lượt |
+| Phiên chạy xong đọc ra đúng là "xong" | ✅ trạng thái `done` (trước đó lẫn vào `lost`) |
+| `[ui]` điều khiển cả bốn mặt, không sửa mã | ✅ Pha 5d xong: `default_surface` · `theme` · `columns` · `pinned_flows` · `enable_3d` |
 | TLS cho dashboard | ✅ HTTPS mặc định khi phơi ra mạng (chứng chỉ tự ký, in vân tay) |
 
-**Đang bị chặn:** đường AI API (Pha 4) chưa làm — nhưng key Grok đã đo được nên hết
-chặn về mặt dữ liệu.
+**Còn treo:** OpenRouter và Ollama vẫn ⬜ — chưa có key, và Ollama chưa cài trên máy đo.
+Route engine chưa có lịch kiểm định kỳ: `route kiem` là lệnh bạn tự gõ, không phải cái
+chạy nền.
 
 > **Năm provider giấu danh tính ở năm chỗ khác nhau**, và ba trong số đó khác với thứ
 > tài liệu của họ gợi ý. Bảng đo đầy đủ ở [`docs/DO-LUONG.md`](docs/DO-LUONG.md).
