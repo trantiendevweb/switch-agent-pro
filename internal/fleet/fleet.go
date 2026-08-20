@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
@@ -83,6 +84,23 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 		Msg:    fmt.Sprintf("đã chuẩn bị %d thư mục cấu hình riêng", len(dirs)),
 		Detail: map[string]string{"copies": itoa(len(dirs))},
 	})
+
+	// Bổ sung cờ để lượt chạy này ĐO ĐƯỢC.
+	//
+	// `fleet` truyền args THÔ cho CLI con, khác đường flow (đi qua `argsChoBuoc`
+	// nên có adapter dựng args). Người dùng gõ `-- -p "việc"` là agent chạy được,
+	// nhưng thiếu cờ in bản ghi có cấu trúc thì `DocKetQua` không có gì để đọc và
+	// phiên nào cũng về `lost`. Đo 20/08: 20 phiên liền "chết, chưa rõ vì sao",
+	// tokens và chi phí đều "chưa đo", trong khi flow cùng tài khoản đo được đủ.
+	//
+	// Thêm chứ không chỉ cảnh báo: không thêm thì bốn mặt điều khiển đều mù, mà
+	// mù im lặng là đúng thứ dự án này lập ra để chống. Nhưng thêm thì PHẢI NÓI —
+	// nó đổi định dạng stdout của agent, và người dùng có quyền biết.
+	if them := provider.CoConThieu(a, args); len(them) > 0 {
+		args = append(args, them...)
+		bus.Warnf("Đã thêm %s để lượt chạy này đo được — thiếu nó thì mọi phiên về \"chết, chưa rõ vì sao\".",
+			strings.Join(them, " "))
+	}
 
 	// Nói thẳng hai điều, không giấu — và nói bằng event nên mặt nào cũng thấy.
 	bus.Warnf("%d phiên trên MỘT tài khoản %s — tiêu hạn mức gấp %d lần.", o.Copies, addr, o.Copies)

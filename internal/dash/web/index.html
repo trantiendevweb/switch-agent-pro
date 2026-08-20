@@ -122,6 +122,38 @@
   .ag.chet{opacity:.74}
   .ag.chet .aura{opacity:.35}
   .ag.chet .st i{animation:none}
+
+  /* Khối xác: gọn, đóng sẵn, và KHÔNG tranh chỗ với phiên đang chạy. Viền
+     mảnh đơn sắc theo đúng luật màu — màu chỉ dành cho trạng thái, mà ở đây
+     trạng thái nằm trên từng dòng, không phải trên cái hộp. */
+  .xac{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+  .xac>summary{cursor:pointer;padding:9px 12px;color:var(--mid);font-size:13px;
+    list-style:none;display:flex;align-items:center;gap:8px}
+  .xac>summary::-webkit-details-marker{display:none}
+  /* Mũi tên tự vẽ bằng CSS: design system cấm dùng ký tự làm icon, mà một hộp
+     đóng/mở không có dấu hiệu nào thì không ai biết là bấm được. */
+  .xac>summary::before{content:"";width:0;height:0;flex:none;
+    border-left:5px solid currentColor;border-top:4px solid transparent;
+    border-bottom:4px solid transparent;transition:transform .18s var(--ease)}
+  .xac[open]>summary::before{transform:rotate(90deg)}
+  .xac>summary:hover{color:var(--hi)}
+  .xac>summary:focus-visible{outline:2px solid var(--line-2);outline-offset:-2px}
+  #xac-ds{border-top:1px solid var(--line)}
+  /* Dòng xác: một hàng, đọc theo chiều ngang. Không rail, không aura, không
+     lưới meta ba ô — những thứ đó là để nhìn từ xa một phiên đang chạy. */
+  .ag.gon{display:flex;align-items:center;gap:10px;padding:7px 12px;
+    border-bottom:1px solid var(--line);font-size:12.5px}
+  .ag.gon:last-child{border-bottom:none}
+  .ag.gon .who{flex:none;min-width:132px;font-family:var(--font-mono)}
+  .ag.gon .st{flex:none;display:inline-flex;align-items:center;gap:5px;color:var(--c)}
+  .ag.gon .st i{width:6px;height:6px;border-radius:50%;background:var(--c);flex:none}
+  .ag.gon .txt{flex:1;min-width:0;color:var(--mid);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ag.gon .v{flex:none;color:var(--lo);font-family:var(--font-mono)}
+  @media (max-width:560px){
+    .ag.gon{flex-wrap:wrap;gap:6px 10px}
+    .ag.gon .txt{flex-basis:100%;order:3}
+  }
   .ag .viec{margin-top:9px;display:flex;gap:7px;align-items:baseline;font-size:12.5px}
   .ag .verb{font-family:var(--font-mono);font-size:10px;letter-spacing:.07em;flex:none;
     text-transform:uppercase;color:var(--lo)}
@@ -424,6 +456,16 @@
       <h2>Hạm đội <span class="dem" id="scount">0</span></h2>
       <div id="ham" class="ham"></div>
       <div id="ham-empty" class="card empty">Chưa có phiên nào. Bấm "Bật hạm đội" trên thanh công cụ.</div>
+      <!-- Phiên ĐÃ CHẾT gom vào đây, đóng sẵn.
+           Trước đây xác đi chung lưới với phiên sống: 0 phiên đang chạy mà màn
+           hình vẫn đầy 20 thẻ to bằng nhau, nên nhìn vào không biết hạm đội
+           đang sống hay đã tắt. Vẫn giữ chúng lại (nguyên tắc #3: việc đã xảy
+           ra là dữ liệu thật), chỉ thôi tranh chỗ với thứ đang chạy.
+           <details> là HTML thuần — mở/đóng bằng bàn phím không cần JS. -->
+      <details id="xac" class="xac" hidden>
+        <summary id="xac-tom"></summary>
+        <div id="xac-ds"></div>
+      </details>
     </div>
 
     <div>
@@ -1079,6 +1121,30 @@ function gioPhut(unix){
   const d = new Date(unix*1000);
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
+// dongXac vẽ MỘT phiên đã chết thành một dòng gọn, không phải một thẻ.
+//
+// Vì sao khác hẳn card phiên sống: hai thứ này trả lời hai câu hỏi khác nhau.
+// Phiên sống — "nó đang làm gì, dừng ở đâu"; phiên chết — "nó chết vì sao".
+// Cho cả hai cùng cỡ thẻ thì xác lấn hết chỗ của thứ đang chạy, đúng cảnh 20
+// thẻ "chết, chưa rõ vì sao" phủ kín màn hình trong khi hạm đội đang là 0.
+//
+// Vẫn mang lớp 'ag chet' để không thở và không có nút Dừng — nút dừng một phiên
+// đã chết là nút vô nghĩa.
+function dongXac(s, now){
+  const st = trangThai(s);
+  const h = hang(s.addr), tk = taiKhoan(s.addr);
+  const d = document.createElement('div');
+  d.className = 'ag chet gon';
+  d.style.setProperty('--c', mauPhien(st));
+  d.dataset.state = st;
+  d.innerHTML =
+    `<span class="who">${esc(h)}:<b>${esc(tk)}</b></span>` +
+    `<span class="st"><i></i>${esc(nhanPhien(st))}</span>` +
+    `<span class="txt" title="${esc(s.lyDo||'')}">${esc(s.lyDo || 'không đo được')}</span>` +
+    `<span class="v">${esc(elapsed(s.started, now))}</span>`;
+  return d;
+}
+
 function render(state){
   // `[ui]` áp TRƯỚC khi vẽ: chủ đề đổi giữa chừng thì mắt thấy nháy, còn link
   // mặt 3D bị gỡ sau khi vẽ xong thì nav nhảy một nhịp.
@@ -1086,9 +1152,11 @@ function render(state){
   const now = state.now;
   const ss = state.sessions||[];
 
-  // ---- Hạm đội: lưới card ----
+  // ---- Hạm đội: lưới card cho phiên SỐNG, xác gom xuống dưới ----
   const ham = $('ham'); ham.innerHTML='';
+  const xacDS = $('xac-ds'); xacDS.innerHTML='';
   ss.forEach(s=>{
+    if(!dangSong(s)){ xacDS.appendChild(dongXac(s, now)); return; }
     const st = trangThai(s);
     const song = dangSong(s);
     const h = hang(s.addr), tk = taiKhoan(s.addr);
@@ -1125,9 +1193,16 @@ function render(state){
   });
   // Đếm CHỈ phiên còn sống: "3 phiên" mà hai trong đó đã chết là con số nói dối.
   const nSong = ss.filter(dangSong).length;
+  const nChet = ss.length - nSong;
   $('scount').textContent = nSong;
-  $('ham-empty').style.display = ss.length ? 'none':'block';
+  // Ô "chưa có phiên nào" phải theo số phiên SỐNG, không theo tổng: hạm đội đã
+  // tắt hết mà màn hình không nói gì thì người dùng tưởng nó vẫn đang chạy.
+  $('ham-empty').style.display = nSong ? 'none':'block';
   $('tq-phien').textContent = nSong;
+  const xac = $('xac');
+  xac.hidden = nChet === 0;
+  $('xac-tom').textContent = nChet === 1 ? '1 phiên đã kết thúc'
+                                         : nChet + ' phiên đã kết thúc';
 
   // profiles
   profiles = state.profiles||[];
