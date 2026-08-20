@@ -545,9 +545,24 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 - [x] Trạng thái khi chạy hiện ngay trên node (chấm ✓/●/?/✗).
 *DoD:* flow tạo từ board và flow viết tay chạy y hệt nhau.
 
-**5d · Cấu hình theo project.** `[ui]` trong `.sagent/project.toml` (mặt mặc định,
-cột, flow ghim, bật/tắt 3D) + tầng global.
-*DoD:* hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã.
+**5d · Cấu hình theo project.**  ✅ xong (20/08/2026)
+- [x] Hợp đồng `[ui]`: `default_surface`, `theme`, `columns`, `pinned_flows`,
+  `enable_3d`, trên tầng global + project. Cấu hình sai kêu **lúc đọc file**
+  (theme lạ, tên cột lạ, mâu thuẫn `default_surface="3d"` + `enable_3d=false`),
+  không để mặt web tự đoán rồi vẽ ra trang trống.
+- [x] `config.CotTaiKhoan` là nguồn duy nhất cho tên cột; có test giữ nó không
+  trôi khỏi bảng nhãn bên JavaScript.
+- [x] **Mặt terminal**: gõ `sagent` không tham số ra đúng mặt project khai. Ba mặt
+  web chỉ CHỈ ĐƯỜNG chứ không tự bật server — cấu hình nói họ thích mặt nào,
+  không phải cho phép mở cổng thay họ.
+- [x] **Mặt web**: `[ui]` đi kèm `/api/state` (không làm endpoint riêng — mọi
+  trang đã đọc ảnh chụp này khi kết nối, và endpoint mới kéo theo một action
+  mới trong hợp đồng). `vendor/mat.js` là một luật cho cả bốn trang.
+- [x] `token.css` có bảng sáng. Màu trạng thái đậm hơn bản tối chứ không dùng
+  lại: `#2FE0A0` đọc tốt trên nền `#070810` nhưng trên nền trắng thì mất chữ.
+- [x] `enable_3d = false` **gỡ hẳn** thẻ `<a>` chứ không ẩn bằng CSS — link ẩn vẫn
+  nằm trong thứ tự Tab.
+*DoD:* hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã. ✅
 
 **Bảo mật chung cho mọi mặt web:** chỉ bind loopback mặc định; random auth token;
 Origin validation + CSRF; **không** đưa credential/env/secret-path lên WebSocket;

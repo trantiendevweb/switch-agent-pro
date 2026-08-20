@@ -2104,3 +2104,56 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
 
 
 
+
+## 20/08 — `fleet` mù còn `flow` đo được: hai đường, một CLI
+
+- **Đo lúc nào**: Tối 20/08/2026, sau khi VPS tự khởi động lại lần thứ hai.
+- **Đo bằng cách nào**: đối chiếu hai đường chạy agent trên CÙNG một CLI và CÙNG
+  những tài khoản (`claude:phu`, `claude:tns`):
+  1. `sagent status` — bảng phiên do `fleet` bật.
+  2. `sagent flow tom-tat 47` — lượt chạy flow `doi-4` cùng ngày.
+- **Con số / Bằng chứng**:
+  - Đường `fleet`: **20/20 phiên** ở trạng thái `lost`, hiện ra là *"chết, chưa rõ
+    vì sao"*; cột tokens và cost đều *"chưa đo"*.
+  - Đường `flow` (lượt #47): đo được **99.051 token vào**, **81.492 token ra**,
+    **11,0572 USD**, và đọc được cả lý do hỏng của bước `gop`
+    (*"Failed to authenticate: OAuth session expired and could not be refreshed"*).
+  - Nguyên nhân: `FleetStart` truyền args **THÔ** cho CLI con, còn `flow` đi qua
+    `argsChoBuoc` nên được adapter dựng args. Người dùng gõ `-- -p "việc"` là agent
+    chạy được, nhưng thiếu `--output-format stream-json --verbose` thì
+    `docKetQuaClaude` không có dòng `{"type":"result"}` nào để đọc.
+- **Đã sửa hay chưa**: **ĐÃ SỬA**. `provider.CoConThieu` hỏi CHÍNH ADAPTER xem bộ
+  cờ còn thiếu gì rồi bổ sung, và phát cảnh báo nói rõ đã thêm gì. Không chép cứng
+  tên cờ nào, nên thêm provider mới hay Claude đổi tên cờ thì chỗ đó tự đúng theo.
+  Provider **CHƯA ĐO** `ket-qua-co-cau-truc` thì không thêm gì — cờ khai bừa làm CLI
+  con chết ngay dòng đầu, tức đổi *"không đo được"* thành *"không chạy được"*.
+- **Bài học**: một năng lực đã đo được ở tầng adapter **không tự đến** mọi đường
+  gọi. Bốn mặt điều khiển đọc chung một hợp đồng, nhưng hai đường CHẠY thì không —
+  và đường không hỏi adapter là đường mù. Test ngang quyền không bắt được: nó kiểm
+  mọi action có lệnh CLI, chứ không kiểm lệnh đó chạy ra dữ liệu dùng được.
+
+## 20/08 — Token clone và bản gốc tranh nhau refresh: `claude:phu` mất phiên
+
+- **Đo lúc nào**: 20/08/2026 ~21:00, sau khi bước `gop` của lượt #47 hỏng.
+- **Đo bằng cách nào**: đọc trực tiếp `claudeAiOauth` trong `.credentials.json` của
+  bản gốc và của bản clone, so mốc `expiresAt` / `refreshTokenExpiresAt`.
+- **Con số / Bằng chứng**:
+
+  | Hồ sơ | `expiresAt` | `refreshTokenExpiresAt` |
+  |---|---|---|
+  | `.claude-accounts/phu` (gốc) | 20/08 11:10Z — hết hạn | 16/09 |
+  | `.clones/claude/phu/1` | **không còn trường này** | 16/09 |
+  | `.clones/claude/tns/1` | 20/08 20:44Z — còn hạn | 15/09 |
+
+  Bản clone của `phu` mất hẳn access token, refresh thất bại dù refresh token còn
+  hạn trên giấy. Bản clone của `tns` thì refresh thành công và bản gốc kẹt token cũ.
+- **Đã sửa hay chưa**: **CHƯA** — mới có dấu vết, chưa chứng minh được cơ chế.
+  `internal/profile/clone.go` đã ghi sẵn cảnh báo *"⚠ CHƯA ĐO: token bị chép ra N
+  chỗ thì khi hết hạn, N tiến trình có thể cùng refresh một lúc"*. Số liệu trên là
+  lần đầu tiên chuyện đó **có dấu vết thật**, và nó khớp với giả thuyết xoay vòng
+  refresh token: ai refresh trước thì bản còn lại chết.
+- **Cách chữa tạm**: đăng nhập lại bản gốc (`sagent claude:phu` → `/login`).
+  `FleetStart` gọi `profile.Clone` mỗi lần bật nên clone tự nhận token mới.
+- **Việc còn treo**: đo cho ra cơ chế — chạy hai clone cùng lúc trên một tài khoản
+  vào đúng lúc access token sắp hết hạn, xem có tái hiện được không. Nếu đúng là
+  xoay vòng thì đường clone cần một người giữ token duy nhất, không phải N bản sao.
