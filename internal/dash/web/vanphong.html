@@ -33,6 +33,9 @@
     max-width:calc(100% - 24px)}
   #legend span{display:flex;align-items:center;gap:6px;color:var(--mid)}
   .dot{width:9px;height:9px;border-radius:50%}
+  /* Chú giải đường nối: một đoạn thẳng, cùng token --link với đường vẽ trong
+     cảnh. Chấm tròn dành cho trạng thái, đường thẳng dành cho quan hệ. */
+  .ln{width:18px;height:2px;background:var(--link);border-radius:1px}
 
   /* Nhãn và bóng thoại là HTML overlay, KHÔNG phải 3D text: 3D text nhoè khi
      xoay và không dùng được đúng --font-mono của token. Mỗi frame chiếu toạ độ
@@ -53,6 +56,9 @@
     max-width:280px;padding:8px 11px;border-radius:10px 10px 10px 2px;
     background:rgba(17,20,31,.94);border:1px solid var(--line-2);
     font-size:11px;line-height:1.45;color:var(--hi);font-family:var(--font-mono);
+    /* Output của agent hay là một đường dẫn dài không có dấu cách. Không cho
+       ngắt ở giữa từ thì bóng thoại phình ngang ra khỏi màn hình. */
+    overflow-wrap:anywhere;
     box-shadow:0 8px 18px rgba(0,0,0,.5);transition:opacity .18s var(--ease)}
   .thoai b{display:block;font-size:10px;color:var(--mid);font-weight:600;margin-bottom:3px}
 
@@ -102,6 +108,7 @@
   <span><i class="dot" style="background:var(--done)"></i>xong</span>
   <span><i class="dot" style="background:var(--error)"></i>hỏng</span>
   <span><i class="dot" style="background:var(--idle)"></i>chưa chạy</span>
+  <span><i class="ln"></i>đang giao việc</span>
   <span id="scount" style="color:var(--hi)">0 nhân vật</span>
 </div>
 
@@ -185,13 +192,30 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // "chưa phân vai" chứ không giấu vào một phòng nào đó cho đẹp đội hình.
 const NUA_PHONG = 4.6;   // nửa cạnh một phòng
 const R_SANH    = 5.2;   // bán kính sảnh chung
+const XA_PHONG  = 15;    // từ tâm sảnh ra tâm phòng
+
+// Bốn phòng đặt theo BỐN HƯỚNG CHÍNH, không phải bốn góc chéo như bản đầu.
+// Lý do là nội thất: đặt chéo thì bàn ghế phải xoay 45° bên trong một cái sàn
+// vuông, nhìn phát ra ngay là lệch. Đặt theo trục thì mỗi phòng có đúng MỘT mặt
+// quay ra sảnh — đó là mặt có cửa, và người ngồi bàn nhìn thẳng ra cửa.
+//
+// `kieu` quyết định bản vẽ nội thất: phòng họp có bàn dài, ba phòng còn lại có
+// bàn cá nhân; phòng test thêm hai tủ máy.
 const PHONG = [
-  {khoa:'hop',    ten:'Phòng họp',    mo:'ceo · leader',   x:-12, z:-12, vai:['ceo','leader']},
-  {khoa:'code',   ten:'Phòng code',   mo:'coder',          x: 12, z:-12, vai:['coder']},
-  {khoa:'test',   ten:'Phòng test',   mo:'tester',         x: 12, z: 12, vai:['tester']},
-  {khoa:'review', ten:'Phòng review', mo:'soi',            x:-12, z: 12, vai:['soi']}
+  {khoa:'hop',    ten:'Phòng họp',    mo:'ceo · leader', x:0,          z:-XA_PHONG, vai:['ceo','leader'], kieu:'hop'},
+  {khoa:'code',   ten:'Phòng code',   mo:'coder',        x: XA_PHONG,  z:0,         vai:['coder'],        kieu:'ban'},
+  {khoa:'test',   ten:'Phòng test',   mo:'tester',       x:0,          z: XA_PHONG, vai:['tester'],       kieu:'may'},
+  {khoa:'review', ten:'Phòng review', mo:'soi',          x:-XA_PHONG,  z:0,         vai:['soi'],          kieu:'ban'}
 ];
 const SANH = {khoa:'sanh', ten:'Sảnh chung', mo:'chưa phân vai', x:0, z:0, vai:[]};
+
+// Đổi giữa TOẠ ĐỘ RIÊNG của phòng và toạ độ sân. Trong toạ độ riêng, +z luôn là
+// hướng RA CỬA — nhờ vậy bốn phòng dùng chung một bản vẽ nội thất thay vì chép
+// bốn lần với bốn bộ dấu cộng trừ khác nhau.
+function chuyen(p, x, z){
+  const c = Math.cos(p.goc), s = Math.sin(p.goc);
+  return new THREE.Vector3(p.x + x*c + z*s, 0, p.z - x*s + z*c);
+}
 
 function phongCuaVai(vai){
   for(const p of PHONG){ if(p.vai.indexOf(vai) >= 0) return p; }
@@ -220,15 +244,15 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(MAU_NEN);
-scene.fog = new THREE.FogExp2(MAU_NEN, 0.016);
+scene.fog = new THREE.FogExp2(MAU_NEN, 0.011);
 
 const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 400);
-camera.position.set(0, 20, 30);
+camera.position.set(0, 26, 40);
 
 // Orbit TỰ VIẾT TAY. OrbitControls là addon hiệu ứng bị cấm — và nó cũng không
 // cần thiết: kéo xoay, lăn zoom, clamp polar, damping, tất cả gói trong 30 dòng.
 const controls = (function(){
-  const GAN = 10, XA = 70, POLAR_MAX = Math.PI*0.47, POLAR_MIN = 0.12;
+  const GAN = 8, XA = 95, POLAR_MAX = Math.PI*0.47, POLAR_MIN = 0.12;
   const DAMP = .07, TU_XOAY = RM ? 0 : 2*Math.PI/3600*0.3;
   const target = new THREE.Vector3(0, 1.2, 0);
   const off = camera.position.clone().sub(target);
@@ -274,31 +298,175 @@ const matSan   = new THREE.MeshStandardMaterial({color:MAU_SAN,  roughness:.95, 
 const matSan2  = new THREE.MeshStandardMaterial({color:MAU_SAN2, roughness:.95, metalness:.02});
 const matVach  = new THREE.MeshStandardMaterial({color:MAU_SAN2, roughness:.8,  metalness:.08});
 const matVien  = new THREE.LineBasicMaterial({color:MAU_VACH, transparent:true, opacity:.55});
-const nhanPhong = [];   // {el, pos}
+// Vách SAU cao và TRONG MỜ: phòng cần một mặt phẳng để treo bảng, mà trong mờ
+// thì camera xoay ra sau lưng vẫn nhìn xuyên vào trong được.
+const matVachSau = new THREE.MeshStandardMaterial({color:MAU_SAN2, roughness:.8, metalness:.08,
+                                                   transparent:true, opacity:.42});
+
+// Xám nội thất là NỘI SUY giữa hai token xám sẵn có (--lo và --panel-2), không
+// phải sắc mới: sàn và vách đều là --panel-2, nên bàn ghế phải sáng hơn một bậc
+// mới đọc ra hình khối. Chỉ thêm độ sáng, không thêm sắc — luật "màu chỉ dành
+// cho trạng thái agent" giữ nguyên.
+const xamGiua = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
+const matBan  = new THREE.MeshStandardMaterial({color:MAU_VACH, roughness:.7, metalness:.1});
+const matGhe  = new THREE.MeshStandardMaterial({color:xamGiua(MAU_VACH, MAU_SAN2, .42), roughness:.85});
+const matChan = new THREE.MeshStandardMaterial({color:xamGiua(MAU_VACH, MAU_SAN2, .70), roughness:.4, metalness:.45});
+// Màn hình trên bàn để TỐI HẲN. Cố ý: màn hình duy nhất được sáng trong văn
+// phòng này là màn của máy chấm, vì nó mang màu trạng thái thật. Cho sáu cái màn
+// bàn cùng sáng lên cho đẹp là làm loãng đúng thứ cần nhìn.
+const matMan  = new THREE.MeshBasicMaterial({color:MAU_NEN});
+
+const nhanPhong = [];   // {el, pos, w, h}
+
+// ---- NỘI THẤT ----
+//
+// Bàn ghế KHÔNG phải trang trí. Mỗi bộ bàn–ghế–màn là MỘT CHỖ, và nhân vật thứ i
+// trong phòng đứng đúng chỗ thứ i, quay mặt vào bàn của mình. Nhờ vậy nhìn phát
+// biết phòng còn trống mấy chỗ, và một bước đổi vai là thấy người bỏ bàn cũ sang
+// bàn mới — thay vì một hàng người xếp đều nhau giữa sàn trống như bản trước.
+//
+// Sáu chỗ mỗi phòng: flow nặng nhất đang có (doi-4) dùng năm bước. Đông hơn sáu
+// thì người thứ bảy đứng ở lối đi — chật, nhưng thật.
+
+// Ghế đặt ở (x,z), lưng ở phía SAU người. Nhìn cái lưng ghế là biết người quay
+// mặt hướng nào, kể cả lúc .glb chưa về và chưa có nhân vật nào đứng đó.
+function themGhe(g, x, z, quay){
+  const c = new THREE.Group();
+  const dem = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.09, 0.58), matGhe);
+  dem.position.y = 0.46; c.add(dem);
+  const tua = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.60, 0.08), matGhe);
+  tua.position.set(0, 0.77, -0.27); c.add(tua);
+  const tru = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.22, 0.42, 10), matChan);
+  tru.position.y = 0.22; c.add(tru);
+  c.position.set(x, 0, z); c.rotation.y = quay;
+  g.add(c);
+}
+
+// Bàn cá nhân: mặt bàn + hai tấm hông + màn hình quay về phía người. Hai tấm
+// hông thay bốn chân — nửa số mesh, mà ở cỡ này mắt không phân biệt được.
+function themBanLamViec(g, x, z){
+  const mat = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.08, 0.9), matBan);
+  mat.position.set(x, 0.74, z + 0.85); g.add(mat);
+  [-0.85, 0.85].forEach(dx=>{
+    const h = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.8), matChan);
+    h.position.set(x + dx, 0.37, z + 0.85); g.add(h);
+  });
+  const man = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.52, 0.05), matMan);
+  man.position.set(x, 1.10, z + 1.06); man.rotation.x = -0.10; g.add(man);
+  const vienMan = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.88, 0.52, 0.05)), matVien.clone());
+  vienMan.position.copy(man.position); vienMan.rotation.x = man.rotation.x; g.add(vienMan);
+  const de = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.26, 0.12), matChan);
+  de.position.set(x, 0.90, z + 1.06); g.add(de);
+  // Bàn phím: một tấm mỏng. Nhỏ, nhưng thiếu nó thì mặt bàn trông như cái kệ.
+  const phim = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.03, 0.22), matChan);
+  phim.position.set(x, 0.80, z + 0.62); g.add(phim);
+  themGhe(g, x, z - 0.85, 0);
+}
+
+// Bảng treo vách sau. Đơn sắc, có viền — đủ để phòng có một mặt "chính diện".
+function themBang(g, rong, cao){
+  const z = -NUA_PHONG + 0.10;
+  const b = new THREE.Mesh(new THREE.PlaneGeometry(rong, cao),
+    new THREE.MeshStandardMaterial({color:xamGiua(MAU_VACH, MAU_SAN2, .55), roughness:.95}));
+  b.position.set(0, 1.32, z); g.add(b);
+  const v = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(rong, cao)), matVien.clone());
+  v.position.copy(b.position); g.add(v);
+}
+
+// Tủ hồ sơ dựa vách bên.
+function themTu(g, x){
+  const t = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.55, 0.48), matGhe);
+  t.position.set(x, 0.78, -1.2); g.add(t);
+  const v = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.95, 1.55, 0.48)), matVien.clone());
+  v.position.copy(t.position); g.add(v);
+  [0.35, 0.78, 1.21].forEach(y=>{
+    const ngan = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.03, 0.02), matChan);
+    ngan.position.set(x, y, -0.95); g.add(ngan);
+  });
+}
+
+// Tủ máy chủ — chỉ phòng test có. Khe ngang cho ra dáng rack chứ không phải một
+// cái hộp trơn.
+function themTuMay(g, x){
+  const z = -NUA_PHONG + 0.62;
+  const t = new THREE.Mesh(new THREE.BoxGeometry(0.85, 2.05, 0.72), matChan);
+  t.position.set(x, 1.02, z); g.add(t);
+  const v = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.85, 2.05, 0.72)), matVien.clone());
+  v.position.copy(t.position); g.add(v);
+  for(let i = 0; i < 7; i++){
+    const khe = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.035, 0.02), matGhe);
+    khe.position.set(x, 0.28 + i*0.24, z + 0.37); g.add(khe);
+  }
+}
+
+// Chỗ đứng: hai hàng ba bàn (phòng làm việc) hoặc hai dãy quanh bàn dài (phòng
+// họp). Toạ độ RIÊNG của phòng, +z là hướng ra cửa.
+const CHO_BAN = [[-2.9, 1.0], [0, 1.0], [2.9, 1.0], [-2.9, -2.6], [0, -2.6], [2.9, -2.6]];
+// Phòng họp điền xen kẽ hai bên bàn: hai người thì ngồi đối diện nhau, không
+// phải ngồi cạnh nhau nhìn vào chỗ trống.
+const CHO_HOP = [[0, -2.05, 0], [0, 2.05, Math.PI], [-1.85, -2.05, 0],
+                 [-1.85, 2.05, Math.PI], [1.85, -2.05, 0], [1.85, 2.05, Math.PI]];
 
 function dungPhong(p){
-  const san = new THREE.Mesh(new THREE.BoxGeometry(NUA_PHONG*2, 0.12, NUA_PHONG*2), matSan2);
-  san.position.set(p.x, -0.06, p.z); scene.add(san);
+  // Góc phòng = hướng từ phòng nhìn về sảnh. Cả phòng nằm trong một Group xoay
+  // đúng góc đó, nên bản vẽ bên dưới chỉ cần viết MỘT lần.
+  p.goc = Math.atan2(-p.x, -p.z);
+  const g = new THREE.Group();
+  g.position.set(p.x, 0, p.z);
+  g.rotation.y = p.goc;
+  scene.add(g);
 
-  // Vách THẤP (0.95) chứ không phải tường kín: tường kín thì xoay camera một
-  // vòng là che mất nửa văn phòng, và mất luôn thứ cần nhìn.
+  const san = new THREE.Mesh(new THREE.BoxGeometry(NUA_PHONG*2, 0.12, NUA_PHONG*2), matSan2);
+  san.position.y = -0.06; g.add(san);
+
+  // Vách hai bên THẤP (0.95) chứ không phải tường kín: tường kín thì xoay camera
+  // một vòng là che mất nửa văn phòng, và mất luôn thứ cần nhìn.
   const CAO = 0.95, DAY = 0.16;
-  const canh = [
-    [0, -NUA_PHONG, NUA_PHONG*2, DAY],
-    [0,  NUA_PHONG, NUA_PHONG*2, DAY],
-    [-NUA_PHONG, 0, DAY, NUA_PHONG*2],
-    [ NUA_PHONG, 0, DAY, NUA_PHONG*2]
-  ];
-  canh.forEach(c=>{
+  [[-NUA_PHONG, 0, DAY, NUA_PHONG*2], [NUA_PHONG, 0, DAY, NUA_PHONG*2]].forEach(c=>{
     const m = new THREE.Mesh(new THREE.BoxGeometry(c[2], CAO, c[3]), matVach);
-    m.position.set(p.x + c[0], CAO/2, p.z + c[1]);
-    scene.add(m);
+    m.position.set(c[0], CAO/2, c[1]); g.add(m);
   });
+  // Vách TRƯỚC chừa một khoảng 3.0 ở giữa: đó là CỬA, và nó rộng đúng bằng hành
+  // lang dẫn tới. Bịt kín rồi vẽ hành lang đâm vào tường là vô lý ngay trên hình.
+  const CUA = 3.0, ben = (NUA_PHONG*2 - CUA)/2;
+  [-1, 1].forEach(d=>{
+    const m = new THREE.Mesh(new THREE.BoxGeometry(ben, CAO, DAY), matVach);
+    m.position.set(d*(CUA/2 + ben/2), CAO/2, NUA_PHONG); g.add(m);
+  });
+  const CAO_SAU = 2.35;
+  const sau = new THREE.Mesh(new THREE.BoxGeometry(NUA_PHONG*2, CAO_SAU, DAY), matVachSau);
+  sau.position.set(0, CAO_SAU/2, -NUA_PHONG); g.add(sau);
+
   // Đường viền mảnh trên mép vách: bắt sáng nên mắt đọc ra ranh giới phòng ngay
   // cả khi camera ở xa và sàn chìm vào sương mù.
   const vien = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(NUA_PHONG*2, 0.02, NUA_PHONG*2)), matVien);
-  vien.position.set(p.x, CAO, p.z); scene.add(vien);
+  vien.position.y = CAO; g.add(vien);
+
+  // Nội thất + chỗ đứng. Hai thứ này sinh ra từ CÙNG một mảng toạ độ, nên bàn và
+  // người không bao giờ lệch nhau.
+  const cho = p.kieu === 'hop' ? CHO_HOP : CHO_BAN;
+  if(p.kieu === 'hop'){
+    const ban = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.09, 2.0), matBan);
+    ban.position.y = 0.75; g.add(ban);
+    [-2.2, 2.2].forEach(dx=>{
+      const ch = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 1.7), matChan);
+      ch.position.set(dx, 0.37, 0); g.add(ch);
+    });
+    cho.forEach(c=>{
+      themGhe(g, c[0] - Math.sin(c[2])*0.85, c[1] - Math.cos(c[2])*0.85, c[2]);
+    });
+    themBang(g, 3.8, 1.4);
+  } else {
+    cho.forEach(c => themBanLamViec(g, c[0], c[1]));
+    themBang(g, 3.2, 1.1);
+    if(p.kieu === 'may'){ themTuMay(g, -4.05); themTuMay(g, 4.05); }
+    else themTu(g, -NUA_PHONG + 0.62);
+  }
+  p.cho = cho.map(c => ({v: chuyen(p, c[0], c[1]), quay: p.goc + (c.length > 2 ? c[2] : 0)}));
 
   // Hành lang nối phòng với sảnh: nói rằng nhân vật ĐI ĐƯỢC từ đây sang kia.
   const d = Math.hypot(p.x, p.z);
@@ -307,32 +475,46 @@ function dungPhong(p){
   hl.rotation.y = Math.atan2(p.x, p.z);
   scene.add(hl);
 
+  themNhanPhong(p.ten, p.mo, new THREE.Vector3(
+    p.x * (d + NUA_PHONG*0.8)/d, 4.5, p.z * (d + NUA_PHONG*0.8)/d));
+}
+
+// Nhãn phòng treo CAO HƠN HẲN đầu nhân vật (4.5 so với 2.3). Bản trước để 2.6 —
+// đúng bằng tầm nhãn tên agent, nên trên ảnh chụp "Phòng code" đè thẳng lên
+// "antigravity:may". Đo kích thước ngay lúc tạo để vòng lặp vẽ khỏi phải hỏi
+// layout mỗi khung hình.
+function themNhanPhong(ten, mo, pos){
   const el = document.createElement('div');
   el.className = 'phong-lbl';
-  const t = document.createElement('span'); t.textContent = p.ten;
-  const s = document.createElement('small'); s.textContent = p.mo;
+  const t = document.createElement('span'); t.textContent = ten;
+  const s = document.createElement('small'); s.textContent = mo;
   el.appendChild(t); el.appendChild(s);
   document.body.appendChild(el);
-  nhanPhong.push({el, pos:new THREE.Vector3(p.x*1.14, 2.6, p.z*1.14)});
+  nhanPhong.push({el, pos, w:el.offsetWidth, h:el.offsetHeight});
 }
+
 PHONG.forEach(dungPhong);
 
 // SẢNH CHUNG: tròn, ở giữa, không vách. Ai chưa phân vai thì đứng đây — nhìn
-// phát biết ngay còn bước nào chưa khai vai_tro.
+// phát biết ngay còn bước nào chưa khai vai_tro. Có bàn tròn và ghế đôn: sảnh là
+// chỗ CHỜ, mà chỗ chờ không có chỗ ngồi thì không phải chỗ chờ.
 const sanhSan = new THREE.Mesh(new THREE.CircleGeometry(R_SANH, 64), matSan);
 sanhSan.rotation.x = -Math.PI/2; sanhSan.position.y = -0.02; scene.add(sanhSan);
 const sanhVanh = new THREE.Mesh(new THREE.TorusGeometry(R_SANH, 0.05, 8, 96),
   new THREE.MeshBasicMaterial({color:MAU_VACH, transparent:true, opacity:.5}));
 sanhVanh.rotation.x = Math.PI/2; sanhVanh.position.y = 0.02; scene.add(sanhVanh);
-(function nhanSanh(){
-  const el = document.createElement('div');
-  el.className = 'phong-lbl';
-  const t = document.createElement('span'); t.textContent = SANH.ten;
-  const s = document.createElement('small'); s.textContent = SANH.mo;
-  el.appendChild(t); el.appendChild(s);
-  document.body.appendChild(el);
-  nhanPhong.push({el, pos:new THREE.Vector3(0, 3.2, 0)});
+(function noiThatSanh(){
+  const mat = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.28, 0.09, 32), matBan);
+  mat.position.y = 0.70; scene.add(mat);
+  const tru = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.44, 0.66, 16), matChan);
+  tru.position.y = 0.33; scene.add(tru);
+  for(let i = 0; i < 4; i++){
+    const a = i/4*Math.PI*2 + Math.PI/4;
+    const don = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.33, 0.44, 16), matGhe);
+    don.position.set(Math.cos(a)*2.35, 0.22, Math.sin(a)*2.35); scene.add(don);
+  }
 })();
+themNhanPhong(SANH.ten, SANH.mo, new THREE.Vector3(0, 4.2, 0));
 
 const luoi = new THREE.GridHelper(90, 45, MAU_SAN2, MAU_SAN);
 luoi.material.transparent = true; luoi.material.opacity = .22; luoi.position.y = -0.16;
@@ -435,16 +617,32 @@ function giaoViecCho(st){
   return null;
 }
 
+// Trả CHỖ THỨ i trong phòng: vị trí đứng + hướng quay mặt. Hai thứ đi cùng nhau
+// vì chúng nói cùng một điều — người này thuộc về cái bàn kia.
 function oTrongPhong(p, i, n){
-  const buoc = 2.0;
-  const lech = (i - (n-1)/2) * buoc;
   if(p.khoa === 'sanh'){
-    const goc = n <= 1 ? 0 : (i/n)*Math.PI*2;
-    const r = n <= 1 ? 0 : Math.min(R_SANH - 1.2, 1.1 + n*0.25);
-    return new THREE.Vector3(Math.cos(goc)*r, 0, Math.sin(goc)*r);
+    // Sảnh: đứng vòng quanh bàn tròn, quay mặt vào giữa. Không xếp hàng — sảnh
+    // là chỗ CHƯA phân vai, đứng vòng tròn nói đúng điều đó.
+    const goc = n <= 1 ? -Math.PI/2 : (i/n)*Math.PI*2;
+    const r = 3.45;
+    return {v: new THREE.Vector3(Math.cos(goc)*r, 0, Math.sin(goc)*r),
+            quay: Math.atan2(-Math.cos(goc), -Math.sin(goc))};
   }
-  const gioi = NUA_PHONG - 1.1;
-  return new THREE.Vector3(p.x + Math.max(-gioi, Math.min(gioi, lech)), 0, p.z + 0.4);
+  const cho = p.cho || [];
+  if(i < cho.length) return {v: cho[i].v.clone(), quay: cho[i].quay};
+  // Hết bàn: đứng ở lối đi trước cửa. Chật là thật — nhét người thứ bảy vào một
+  // góc cho gọn đội hình thì mất đúng cái tin "phòng này quá tải".
+  const k = i - cho.length;
+  return {v: chuyen(p, ((k % 5) - 2) * 1.7, 3.5), quay: p.goc};
+}
+
+// Xoay dần về hướng đích theo đường NGẮN NHẤT. Không chuẩn hoá góc thì nhân vật
+// quay từ 179° sang -179° sẽ đi vòng gần trọn một vòng tròn.
+function quayDan(obj, muc, k){
+  let d = muc - obj.rotation.y;
+  while(d >  Math.PI) d -= Math.PI*2;
+  while(d < -Math.PI) d += Math.PI*2;
+  obj.rotation.y += d * k;
 }
 
 function datClip(A, ten, motLan){
@@ -542,6 +740,95 @@ function loiThoai(st){
   return d.length > 110 ? d.slice(0, 110) + '…' : d;
 }
 
+// ---- ĐƯỜNG GIAO VIỆC: nối người với người theo đúng cạnh `needs` ----
+//
+// Vẫy tay chỉ cho thấy MỘT lần giao việc, đúng khoảnh khắc nó xảy ra rồi mất.
+// Đường nối thì giữ nguyên cả sơ đồ: nhìn phát biết ai đang chờ kết quả của ai,
+// kể cả lúc không ai đang vẫy. Đây là cạnh THẬT trong flows.toml — không có cạnh
+// thì không có đường, không nối thêm cho cảnh đỡ trống.
+//
+// Đường SÁNG (--link, đúng token dành cho "đường nối") = đang giao việc thật:
+// bước trên đã xong, bước dưới đang chạy hoặc đang chờ. Đường MỜ = quan hệ có
+// nhưng chưa tới lượt.
+const capNoi = [];
+const matNoiMo   = new THREE.LineBasicMaterial({color:MAU_VACH, transparent:true, opacity:.30, depthTest:false});
+const matNoiSang = new THREE.LineBasicMaterial({color:mauToken('--link'), transparent:true, opacity:.85, depthTest:false});
+const hinhHat    = new THREE.SphereGeometry(0.10, 8, 8);
+const matHat     = new THREE.MeshBasicMaterial({color:mauToken('--link'), depthTest:false});
+const CAO_NOI    = 1.15;   // ngang ngực nhân vật
+
+// Bước nào thuộc về NHÂN VẬT nào. Một tài khoản chạy ba bước thì cả ba quy về
+// một người — nếu không thì sơ đồ sẽ có ba đường đi từ chính mình về chính mình.
+function khoaCuaBuoc(st){
+  if(laMay(st.type)) return 'may:' + st.id;
+  return st.profile ? 'ai:' + st.profile : '';
+}
+
+function xoaCapNoi(){
+  capNoi.forEach(c=>{
+    scene.remove(c.line); c.line.geometry.dispose();
+    if(c.hat) scene.remove(c.hat);
+  });
+  capNoi.length = 0;
+}
+
+function dungCapNoi(){
+  xoaCapNoi();
+  const buoc = {};
+  flowSteps.forEach(s=>{ buoc[s.id] = s; });
+  const daCo = {};
+  flowSteps.forEach(b=>{
+    (b.needs || []).forEach(id=>{
+      const a = buoc[id];
+      if(!a) return;
+      const ka = khoaCuaBuoc(a), kb = khoaCuaBuoc(b);
+      // Tự giao việc cho chính mình thì không phải giao việc. Nhân vật chưa dựng
+      // cũng không vẽ — một đường nối phải có đủ hai đầu.
+      if(!ka || !kb || ka === kb) return;
+      if(!nhanVat[ka] || !nhanVat[kb]) return;
+      const k = ka + '>' + kb;
+      if(daCo[k]) return;
+      daCo[k] = true;
+      const hoat = a.state === 'done' &&
+        (b.state === 'running' || b.state === 'pending' || b.state === 'waiting');
+      const hh = new THREE.BufferGeometry();
+      hh.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const line = new THREE.Line(hh, hoat ? matNoiSang : matNoiMo);
+      // Đường nối chạy xuyên vách và xuyên người, nên vẽ ĐÈ (depthTest:false).
+      // Để nó tranh chiều sâu với vách thì nó chập chờn nửa hiện nửa mất — trông
+      // đúng như một lỗi vẽ, chứ không đọc ra là quan hệ.
+      line.renderOrder = 2;
+      scene.add(line);
+      const c = {a:ka, b:kb, line, t:0};
+      // Hạt chạy dọc đường CHỈ có ở đường đang giao việc: nó là tín hiệu "có thứ
+      // gì đó đang chuyển đi thật", không phải hiệu ứng nền.
+      if(hoat && !RM){
+        c.hat = new THREE.Mesh(hinhHat, matHat);
+        c.hat.renderOrder = 3;
+        scene.add(c.hat);
+      }
+      capNoi.push(c);
+    });
+  });
+}
+
+function capNhatCapNoi(dt){
+  capNoi.forEach(c=>{
+    const A = nhanVat[c.a], B = nhanVat[c.b];
+    if(!A || !B){ c.line.visible = false; if(c.hat) c.hat.visible = false; return; }
+    c.line.visible = true;
+    const pos = c.line.geometry.attributes.position;
+    pos.setXYZ(0, A.pos.x, CAO_NOI, A.pos.z);
+    pos.setXYZ(1, B.pos.x, CAO_NOI, B.pos.z);
+    pos.needsUpdate = true;
+    if(c.hat){
+      c.t = (c.t + dt*0.45) % 1;
+      c.hat.position.set(A.pos.x + (B.pos.x - A.pos.x)*c.t, CAO_NOI,
+                         A.pos.z + (B.pos.z - A.pos.z)*c.t);
+    }
+  });
+}
+
 function capNhat(){
   if(!phoiGLB){ choDung = true; }
   xoaNhan();
@@ -590,16 +877,20 @@ function capNhat(){
     // ĐỔI PHÒNG = bước chuyển sang loại việc khác. Đây là lúc DUY NHẤT nhân vật
     // đi lại: đi mà không đổi việc thì chuyển động không nói gì.
     if(phongCu && phongCu !== d.phong.khoa){
-      A.dich.copy(cho);
+      A.dich.copy(cho.v);
       A.dangDi = !RM;
-      if(RM) A.pos.copy(cho);
+      if(RM) A.pos.copy(cho.v);
     } else if(!phongCu){
-      A.pos.copy(cho); A.dich.copy(cho); A.dangDi = false;
+      A.pos.copy(cho.v); A.dich.copy(cho.v); A.dangDi = false;
     } else {
-      A.dich.copy(cho);
-      if(A.pos.distanceTo(cho) > 0.05 && !RM) A.dangDi = true; else A.pos.copy(cho);
+      A.dich.copy(cho.v);
+      if(A.pos.distanceTo(cho.v) > 0.05 && !RM) A.dangDi = true; else A.pos.copy(cho.v);
     }
     A.phongKhoa = d.phong.khoa;
+    // Hướng quay mặt = hướng của cái bàn được xếp cho người này. Giảm chuyển
+    // động thì đặt thẳng, không lerp — lerp cần vòng lặp chạy, mà nó đang đứng.
+    A.huong = cho.quay;
+    if(RM && A.obj) A.obj.rotation.y = cho.quay;
 
     // Điệu MỘT LẦN gắn với một SỰ KIỆN, không phải một trạng thái: xong thì giơ
     // ngón cái một lần rồi thôi. Lặp mãi là chuyển động rỗng — màu vòng dưới
@@ -646,7 +937,9 @@ function capNhat(){
     if(tt) phu.style.color = chuoiMau(mau);
     el.appendChild(ten); el.appendChild(phu);
     document.body.appendChild(el);
-    nhanKhac.push({el, khoa:d.khoa, cao:(A.cao || 1.8) + 0.5});
+    // Đo kích thước NGAY tại đây, một lần cho mỗi lần cập nhật. Hỏi offsetWidth
+    // trong vòng lặp vẽ là ép trình duyệt tính lại layout 60 lần mỗi giây.
+    nhanKhac.push({el, khoa:d.khoa, cao:(A.cao || 1.8) + 0.5, w:el.offsetWidth, h:el.offsetHeight});
 
     const chu = loiThoai(st);
     if(chu){
@@ -658,10 +951,12 @@ function capNhat(){
       noi.textContent = chu;
       b.appendChild(ai); b.appendChild(noi);
       document.body.appendChild(b);
-      bongThoai.push({el:b, khoa:d.khoa, cao:(A.cao || 1.8) + 1.15});
+      bongThoai.push({el:b, khoa:d.khoa, cao:(A.cao || 1.8) + 1.15, w:b.offsetWidth, h:b.offsetHeight});
     }
   });
 
+  // Dựng SAU cùng: dungCapNoi chỉ nối những nhân vật đã có mặt trong nhanVat.
+  dungCapNoi();
   $('flowname').textContent = flowName ? ('flow: ' + flowName) : 'chưa có lượt chạy nào';
 }
 
@@ -699,23 +994,81 @@ function connect(){
 }
 
 // ---- vòng lặp ----
+// Chiếu một điểm world sang toạ độ màn hình.
+function diemManHinh(p){
+  const v = p.clone().project(camera);
+  return {hien: v.z < 1, x: (v.x*.5+.5)*innerWidth, y: (-v.y*.5+.5)*innerHeight};
+}
+
+// Đẩy một ô LÊN cho tới khi nó không đè ô nào đã đặt. Trả về số pixel đã đẩy.
+//
+// VÌ SAO CẦN: trên ảnh người dùng gửi, "Phòng code" đè thẳng lên tên agent, và
+// hai bóng thoại của phòng test chồng nhau tới mức mất cả dòng chữ. Chiếu toạ độ
+// 3D sang màn hình thì chuyện đè là chắc chắn xảy ra — không có lượt tách thì
+// chỉ còn cách hy vọng camera đứng đúng góc.
+function dayLen(daDat, o){
+  const KHE = 6;
+  let day = 0;
+  for(let lap = 0; lap < 40; lap++){
+    let cham = null;
+    for(const h of daDat){
+      if(o.r <= h.l + 2 || o.l >= h.r - 2) continue;
+      if(o.d - day <= h.t + 2 || o.t - day >= h.d - 2) continue;
+      cham = h; break;
+    }
+    if(!cham) break;
+    const can = (o.d - cham.t) + KHE;
+    if(can <= day) break;          // không tiến thêm được thì dừng, đừng quay vòng
+    day = can;
+  }
+  return day;
+}
+
+// Đặt một lớp nhãn: chiếu, xếp theo thứ tự GẦN CAMERA TRƯỚC, rồi đẩy lên cho
+// khỏi đè. Gần trước vì người đứng gần thì nhãn nên nằm sát người nhất; người ở
+// xa chịu bị đẩy cao hơn — đó cũng đúng chiều sâu mắt đang đọc.
+//
+// `neo` = phần chiều cao nằm TRÊN điểm neo: 1 cho bóng thoại (CSS neo ở đáy),
+// 0.5 cho nhãn tên và tên phòng (neo ở tâm).
+function datLopNhan(danh, daDat, neo, diem){
+  const ds = [];
+  danh.forEach(l=>{
+    const p = diem(l);
+    if(!p){ l.el.style.display = 'none'; return; }
+    const s = diemManHinh(p);
+    l.el.style.display = s.hien ? 'block' : 'none';
+    if(s.hien) ds.push({l, s});
+  });
+  ds.sort((a, b) => b.s.y - a.s.y);
+  ds.forEach(({l, s})=>{
+    const o = {l:s.x - l.w/2, r:s.x + l.w/2, t:s.y - l.h*neo, d:s.y + l.h*(1-neo)};
+    const day = dayLen(daDat, o);
+    l.el.style.left = s.x + 'px';
+    l.el.style.top  = (s.y - day) + 'px';
+    daDat.push({l:o.l, r:o.r, t:o.t - day, d:o.d - day});
+  });
+}
+
 function chieu(){
-  nhanPhong.forEach(l=>{
-    const v = l.pos.clone().project(camera);
-    l.el.style.display = v.z < 1 ? 'block' : 'none';
-    l.el.style.left = ((v.x*.5+.5)*innerWidth) + 'px';
-    l.el.style.top  = ((-v.y*.5+.5)*innerHeight) + 'px';
-  });
-  const dat = (danh)=> danh.forEach(l=>{
+  const daDat = [];
+  const oNguoi = (cao) => (l)=>{
     const A = nhanVat[l.khoa];
-    if(!A){ l.el.style.display = 'none'; return; }
-    const p = new THREE.Vector3(A.pos.x, l.cao, A.pos.z);
-    const v = p.project(camera);
-    l.el.style.display = v.z < 1 ? 'block' : 'none';
-    l.el.style.left = ((v.x*.5+.5)*innerWidth) + 'px';
-    l.el.style.top  = ((-v.y*.5+.5)*innerHeight) + 'px';
-  });
-  dat(nhanKhac); dat(bongThoai);
+    return A ? new THREE.Vector3(A.pos.x, l.cao, A.pos.z) : null;
+  };
+
+  // Thứ tự nhường nhau: nhãn TÊN trước (nó là danh tính, phải sát người nhất),
+  // rồi BÓNG THOẠI, cuối cùng mới tới TÊN PHÒNG.
+  //
+  // Nhãn tên CŨNG bị đẩy, và chỉ đẩy theo TRỤC DỌC. Bản trước tôi để nó đứng im
+  // với lý do "xê đi là chỉ nhầm người" — lý do ấy sai ở chỗ: hai người ngồi hai
+  // bàn cạnh nhau chỉ cách 2.9 đơn vị, mà nhãn `antigravity:may` rộng gần bằng
+  // khoảng đó chiếu lên màn hình. Đứng im thì chúng đè nhau vĩnh viễn. Đẩy dọc
+  // thì nhãn vẫn nằm đúng trên đầu chủ của nó, không hề trượt sang người bên
+  // cạnh — chỉ dịch NGANG mới gây nhầm người.
+  datLopNhan(nhanKhac, daDat, 0.5, oNguoi());
+  datLopNhan(bongThoai, daDat, 1,   oNguoi());
+  // Tên phòng nhường cuối: nó là nhãn của KHUNG, hai lớp trên là dữ liệu.
+  datLopNhan(nhanPhong, daDat, 0.5, l => l.pos);
 }
 
 const dongHo = new THREE.Clock();
@@ -743,17 +1096,23 @@ function tick(){
         // Vẫy tay thì phải vẫy VỀ PHÍA người nhận, nếu không thì nó chỉ là một
         // cái vẫy vào không khí.
         const B = nhanVat[A.huongKhoa];
-        const m = Math.atan2(B.pos.x - A.pos.x, B.pos.z - A.pos.z);
-        A.obj.rotation.y += (m - A.obj.rotation.y) * 0.1;
-      } else if(A.may && A.obj.userData.man){
-        // Máy chấm chỉ nhấp nháy khi ĐANG chạy — nhịp này mã hoá đúng một thông
-        // tin, không phải trang trí.
+        quayDan(A.obj, Math.atan2(B.pos.x - A.pos.x, B.pos.z - A.pos.z), 0.1);
+      } else if(A.huong !== undefined){
+        // Đứng yên thì quay mặt vào BÀN CỦA MÌNH. Đây là chỗ bàn ghế có nghĩa
+        // thật: nhân vật không đứng quay lưng vào cái bàn được xếp cho nó.
+        quayDan(A.obj, A.huong, 0.10);
+      }
+      // Máy chấm chỉ nhấp nháy khi ĐANG chạy — nhịp này mã hoá đúng một thông
+      // tin, không phải trang trí. Để RIÊNG chứ không nối vào chuỗi else-if ở
+      // trên: máy vẫn phải nháy trong lúc nó đang đi đổi phòng.
+      if(A.may && A.obj.userData.man){
         const o = A.tt === 'running' ? 0.55 + 0.45*Math.abs(Math.sin(dongHo.elapsedTime*4)) : 1;
         A.obj.userData.man.opacity = o;
         A.obj.userData.man.transparent = true;
       }
     }
   }
+  capNhatCapNoi(dt);
   controls.update();
   chieu();
   renderer.render(scene, camera);
