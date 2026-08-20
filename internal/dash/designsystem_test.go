@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Bon trang cua dashboard truoc day moi trang tu khai mot bang mau.
+// Cac trang cua dashboard truoc day moi trang tu khai mot bang mau.
 //
 // Do ngay 19/08 truoc khi sua: index/flow/hoi-thoai dung bo
 // --bg:#0F172A --run:#22C55E --warn:#F59E0B --limit:#EF4444 --api:#4285F4,
@@ -25,9 +25,13 @@ import (
 // giu dung dieu do — va chung phai do ngay khi ai do tra mot khai bao rieng ve
 // bat ky trang nao.
 
-// bonTrang: bon mat cua dashboard. Co dinh danh sach, khong quet thu muc: them
+// cacTrang: MOI mat cua dashboard. Co dinh danh sach, khong quet thu muc: them
 // trang moi thi phai them vao day, va viec do dang de nguoi ta doc lai luat mau.
-var bonTrang = []string{"index.html", "flow.html", "hoi-thoai.html", "3d.html"}
+//
+// Ngay 20/08 them mat thu nam — vanphong.html. Truoc do bien nay ten `bonTrang`
+// va co dung bon phan tu; giu ten cu thi cai ten se noi doi ve so trang, dung
+// kieu lech im lang ma ca file nay sinh ra de chan.
+var cacTrang = []string{"index.html", "flow.html", "hoi-thoai.html", "3d.html", "vanphong.html"}
 
 // tokenStatus: nam bien TRANG THAI — cai duy nhat trong bo token duoc phep co
 // mau. Chung phai co dung MOT nguon.
@@ -35,8 +39,8 @@ var tokenStatus = []string{"--run", "--pending", "--done", "--idle", "--error"}
 
 const duongToken = "vendor/token.css"
 
-func TestBonTrangDungChungMotBoToken(t *testing.T) {
-	for _, ten := range bonTrang {
+func TestCacTrangDungChungMotBoToken(t *testing.T) {
+	for _, ten := range cacTrang {
 		b, err := os.ReadFile(filepath.Join("web", ten))
 		if err != nil {
 			t.Fatalf("%s: %v", ten, err)
@@ -65,7 +69,7 @@ func TestBonTrangDungChungMotBoToken(t *testing.T) {
 // Khai lai mot token trang thai o cap trang la cach lech quay tro lai: trang do
 // van chay, van dep, chi la no khong con noi cung ngon ngu voi ba trang kia.
 func TestKhongTrangNaoKhaiLaiTokenTrangThai(t *testing.T) {
-	for _, ten := range bonTrang {
+	for _, ten := range cacTrang {
 		b, err := os.ReadFile(filepath.Join("web", ten))
 		if err != nil {
 			t.Fatalf("%s: %v", ten, err)
