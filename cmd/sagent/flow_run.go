@@ -120,6 +120,12 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 			if b.Model != "" {
 				dong += " · model " + b.Model
 			}
+			// Vai trò đứng cạnh tài khoản và model: ba thứ này cùng trả lời một
+			// câu hỏi — "ai làm bước này, với tư cách gì, bằng model nào". Bước
+			// chưa phân vai thì im lặng, KHÔNG in "vai ?" hay đoán hộ.
+			if b.VaiTro != "" {
+				dong += " · vai " + b.VaiTro
+			}
 			if b.SoAgent > 0 {
 				dong += fmt.Sprintf(" · %d agent", b.SoAgent)
 			}

@@ -56,6 +56,40 @@ const (
 	OnFailFallback = "fallback" // chạy bước fallback đã khai báo
 )
 
+// Vai trò của một bước — LOẠI VIỆC bước đó đại diện, không phải tài khoản chạy
+// nó (tài khoản là `profile`).
+//
+// Vì sao là DỮ LIỆU chứ không phải mã: đổi `vai_tro` trong flows.toml thì cả
+// mặt 2D lẫn mặt 3D đổi theo mà không ai phải sửa một dòng Go nào.
+const (
+	VaiCEO    = "ceo"    // quyết định cuối, gộp và chịu trách nhiệm báo cáo
+	VaiLeader = "leader" // chia việc, điều phối — không tự làm
+	VaiCoder  = "coder"  // viết mã hoặc viết tài liệu
+	VaiTester = "tester" // chạy máy chấm, kiểm lại thứ người khác làm
+	VaiSoi    = "soi"    // soi độc lập, chỉ đọc
+)
+
+// VaiTroHopLe là năm vai hợp lệ, theo thứ tự cố định để thông điệp lỗi và mặt
+// web luôn liệt kê giống nhau (map của Go trả ra ngẫu nhiên).
+func VaiTroHopLe() []string {
+	return []string{VaiCEO, VaiLeader, VaiCoder, VaiTester, VaiSoi}
+}
+
+// LaVaiTro cho biết v có phải một trong năm vai hợp lệ không.
+//
+// RỖNG là KHÔNG hợp lệ ở đây theo nghĩa "không nằm trong danh sách", nhưng chỗ
+// gọi phải tự bỏ qua giá trị rỗng: rỗng nghĩa là CHƯA PHÂN VAI, và đó là trạng
+// thái hợp lệ. Không suy đoán vai từ tên bước hay từ sơ đồ — thà thấy rõ chỗ
+// chưa khai còn hơn để máy đoán hộ rồi hiện sai.
+func LaVaiTro(v string) bool {
+	for _, x := range VaiTroHopLe() {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
 // Step là một node trong DAG.
 //
 // Có CẢ thẻ toml lẫn json: toml cho file người dùng sửa tay, json cho bảng vẽ
@@ -65,6 +99,14 @@ type Step struct {
 	ID    string   `toml:"id" json:"id"`
 	Type  string   `toml:"type" json:"type"`
 	Needs []string `toml:"needs,omitempty" json:"needs"` // các bước phải xong trước
+
+	// VaiTro là LOẠI VIỆC bước này đại diện: ceo | leader | coder | tester | soi.
+	// Xem các hằng Vai* ở trên.
+	//
+	// RỖNG = CHƯA PHÂN VAI, và đó là giá trị hợp lệ: bước không khai thì hiện ở
+	// phòng chung. Cố ý không có giá trị mặc định và không suy từ `type` hay từ
+	// sơ đồ — máy đoán hộ rồi hiện sai còn tệ hơn để trống thấy rõ.
+	VaiTro string `toml:"vai_tro,omitempty" json:"vaiTro,omitempty"`
 
 	// agent / review
 	Profile string `toml:"profile,omitempty" json:"profile,omitempty"` // "claude:phu"; rỗng = mặc định lúc chạy
@@ -230,6 +272,14 @@ func Validate(f Flow) []Problem {
 	}
 
 	for _, s := range f.Steps {
+		// Vai lạ chỉ là CẢNH BÁO, không chặn: người dùng phải đặt được vai mới
+		// (ví dụ "designer") trước khi công cụ hỗ trợ nó, chứ không phải chờ
+		// bản mới. Kiểm trước phần `type` để bước thiếu type vẫn được soi vai.
+		if s.VaiTro != "" && !LaVaiTro(s.VaiTro) {
+			warn(s.ID, fmt.Sprintf("vai_tro = %q không nằm trong danh sách; năm vai hợp lệ: %s (để RỖNG = chưa phân vai)",
+				s.VaiTro, strings.Join(VaiTroHopLe(), ", ")))
+		}
+
 		if s.Type == "" {
 			add(s.ID, "thiếu type")
 			continue

@@ -31,7 +31,12 @@ type BuocKho struct {
 	// mà model chính là thứ quyết định tiêu bao nhiêu. Không hiện thì người dùng
 	// khai `model = "sonnet"` để tiết kiệm rồi vẫn phải chạy thật mới biết nó có
 	// vào hay không — đúng kiểu "làm rồi mà không kiểm được".
-	Model    string `json:"model,omitempty"`
+	Model string `json:"model,omitempty"`
+	// VaiTro là LOẠI VIỆC bước này đại diện (ceo/leader/coder/tester/soi), lấy
+	// nguyên từ flows.toml. Đọc kế hoạch chạy khan là lúc người ta hỏi "ai làm
+	// gì" — tài khoản trả lời "bằng nick nào", vai trò trả lời "với tư cách gì".
+	// Bước không khai thì RỖNG: không đoán hộ.
+	VaiTro   string `json:"vaiTro,omitempty"`
 	SoAgent  int    `json:"soAgent,omitempty"`
 	Worktree bool   `json:"worktree,omitempty"`
 	// TuDuyetQuyen phải hiện ở đây: đọc kế hoạch đúng là lúc người ta quyết định
@@ -163,8 +168,10 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 
 // buocKho mô tả một bước, cộng dồn số agent vào tong.
 func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int) BuocKho {
+	// VaiTro gán cho MỌI loại bước, không riêng bước agent: `kiem-1` là bước
+	// shell nhưng vẫn là việc của tester.
 	b := BuocKho{ID: s.ID, Type: s.Type, Needs: s.Needs, Worktree: s.Worktree,
-		TuDuyetQuyen: s.TuDuyetQuyen, Lap: s.ForEach}
+		TuDuyetQuyen: s.TuDuyetQuyen, Lap: s.ForEach, VaiTro: s.VaiTro}
 	if b.Needs == nil {
 		b.Needs = []string{}
 	}

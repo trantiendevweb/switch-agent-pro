@@ -668,6 +668,7 @@ GIAM CHAN: <hai nhánh có sửa cùng file không>"""
 
     [[flow.doi-4.step]]
       id = "ke-hoach"
+      vai_tro = "leader"
       type = "agent"
       profile = "claude:phu"
       # Chia việc: đọc nhiều, quyết định ít. Sonnet đủ.
@@ -690,6 +691,7 @@ PHAN 2: <mô tả> | file: <danh sách>"""
 
     [[flow.doi-4.step]]
       id = "code-go"
+      vai_tro = "coder"
       type = "agent"
       profile = "claude:tns"
       # Việc NẶNG NHẤT của cả lượt — giữ model mạnh. Lượt #34 bước này tốn
@@ -717,6 +719,7 @@ Bắt buộc:
 
     [[flow.doi-4.step]]
       id = "code-doc"
+      vai_tro = "coder"
       type = "agent"
       profile = "antigravity:may"
       needs = ["ke-hoach"]
@@ -739,6 +742,7 @@ Trả lời: NHANH, COMMIT, FILE, CHUA LAM."""
 
     [[flow.doi-4.step]]
       id = "kiem-1"
+      vai_tro = "tester"
       type = "shell"
       needs = ["code-go"]
       run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
@@ -747,6 +751,7 @@ Trả lời: NHANH, COMMIT, FILE, CHUA LAM."""
 
     [[flow.doi-4.step]]
       id = "sua"
+      vai_tro = "coder"
       type = "agent"
       profile = "claude:tns"
       # Sửa cho xanh: đã có output máy chấm chỉ thẳng chỗ hỏng, không phải
@@ -776,6 +781,7 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
 
     [[flow.doi-4.step]]
       id = "kiem-2"
+      vai_tro = "tester"
       type = "shell"
       needs = ["sua"]
       run = ["go", "test", "-C", "{{wt_tns}}", "./..."]
@@ -784,6 +790,7 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
 
     [[flow.doi-4.step]]
       id = "soi"
+      vai_tro = "soi"
       type = "agent"
       profile = "grok:api"
       needs = ["kiem-2", "code-doc"]
@@ -815,6 +822,7 @@ GIAM CHAN: <hai nhánh có sửa cùng file không>"""
 
     [[flow.doi-4.step]]
       id = "gop"
+      vai_tro = "ceo"
       type = "agent"
       profile = "claude:phu"
       # Gộp: chạy git đếm commit rồi đối chiếu. Việc máy móc, không cần model mạnh.
