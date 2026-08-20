@@ -794,6 +794,13 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
       type = "agent"
       profile = "grok:api"
       needs = ["kiem-2", "code-doc"]
+      # Người soi CHỈ được đọc kết quả máy chấm, không được đọc lời hai người
+      # thợ tự khai (code-go, code-doc, sua). Soi mà đọc lời tự khai thì nó bị
+      # mồi — nhắc lại lập luận của người làm thay vì tự đi tìm. Muốn biết hai
+      # nhánh có gì thì phải tự chạy bốn lệnh git bên dưới, đó mới là bằng
+      # chứng. `needs` vẫn giữ code-doc: phải CHỜ nó xong rồi mới soi được
+      # nhánh của nó, chỉ là không đọc lời nó kể.
+      doc_duoc = ["kiem-2"]
       timeout_sec = 900
       on_failure = "continue"
       prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm.

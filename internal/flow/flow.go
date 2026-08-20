@@ -143,6 +143,15 @@ type Step struct {
 	// Không thoả thì bước bị BỎ QUA (skipped), và bước sau vẫn chạy tiếp.
 	When string `toml:"when,omitempty" json:"when,omitempty"`
 
+	// DocDuoc giới hạn bước này được đọc kết quả của ĐÚNG những bước nào:
+	//
+	//	doc_duoc = ["kiem-2"]
+	//
+	// KHÔNG khai (nil) = đọc được MỌI bước đã xong trước nó — hành vi mặc định
+	// từ đầu, giữ nguyên. Khai rồi thì bước ngoài danh sách bị thay bằng một câu
+	// nói rõ là đã bị chặn, chứ không phải chuỗi rỗng. Xem doc_duoc.go.
+	DocDuoc []string `toml:"doc_duoc,omitempty" json:"docDuoc,omitempty"`
+
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
 	Retry      int    `toml:"retry,omitempty" json:"retry,omitempty"`
@@ -366,6 +375,10 @@ func Validate(f Flow) []Problem {
 				"Nó sẽ dừng luồng nhưng các bước khác VẪN CHẠY song song với nó.")
 		}
 	}
+
+	// `doc_duoc` khai hỏng chỉ CẢNH BÁO — xem doc_duoc.go. Đặt cuối cùng vì nó
+	// cần thứ tự đợt, mà thứ tự đợt chỉ có nghĩa khi phần `needs` đã được soi.
+	ps = append(ps, VanDeDocDuoc(f)...)
 
 	return ps
 }

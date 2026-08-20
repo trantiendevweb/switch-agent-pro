@@ -196,6 +196,63 @@ func TestChayKhoKhongGhiSoKhongGoiAgent(t *testing.T) {
 	}
 }
 
+// Chạy khan phải nói QUYỀN ĐỌC của từng bước — bước nào đọc được bước nào.
+//
+// Đây là chỗ duy nhất thấy được điều đó trước khi tiêu tiền: `doc_duoc` quyết
+// định bước sau nuốt bao nhiêu output của bước trước, tức quyết định thẳng số
+// token vào. Lượt #34, bước gộp nhận 10.998 token vào phần lớn là output bước
+// khác — không có dòng này thì phải chạy thật mới biết.
+//
+// Và prompt in ra phải ĐI QUA đúng bộ lọc mà bộ thực thi dùng: chạy khan mà bỏ
+// qua bộ lọc thì nó in một prompt khác prompt sẽ gửi đi, đúng thứ tính năng
+// chạy khan sinh ra để chống.
+func TestChayKhoNoiQuyenDocTungBuoc(t *testing.T) {
+	khoTam(t)
+	dir := t.TempDir()
+	f := flow.Flow{Name: "quyen", Steps: []flow.Step{
+		{ID: "a", Type: flow.TypeNotify, Message: "KET-QUA-CUA-A"},
+		{ID: "b", Type: flow.TypeNotify, Message: "KET-QUA-CUA-B"},
+		{ID: "mo", Type: flow.TypeNotify, Needs: []string{"a", "b"},
+			Message: "A={{steps.a.output}} B={{steps.b.output}}"},
+		{ID: "hep", Type: flow.TypeNotify, Needs: []string{"a", "b"}, DocDuoc: []string{"a"},
+			Message: "A={{steps.a.output}} B={{steps.b.output}}"},
+	}}
+	if _, err := flow.Save(dir, f); err != nil {
+		t.Fatal(err)
+	}
+	kh, err := (&API{}).FlowChayKho(dir, "quyen", nil, Addr{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	buoc := map[string]BuocKho{}
+	for _, d := range kh.Dot {
+		for _, b := range d.Buoc {
+			buoc[b.ID] = b
+		}
+	}
+	if buoc["mo"].DocDuoc != "mọi bước trước" {
+		t.Fatalf("bước chưa khai doc_duoc phải hiện là `mọi bước trước`, được %q", buoc["mo"].DocDuoc)
+	}
+	if buoc["hep"].DocDuoc != "a" {
+		t.Fatalf("bước khai doc_duoc = [\"a\"] phải hiện đúng danh sách, được %q", buoc["hep"].DocDuoc)
+	}
+	// Prompt của bước bị siết phải nói ra chỗ bị chặn, và KHÔNG được vờ như
+	// bước `b` không để lại kết quả — nó có kết quả, chỉ là không được đọc.
+	if !strings.Contains(buoc["hep"].Prompt, "không được phép đọc kết quả bước \"b\"") {
+		t.Fatalf("chạy khan phải in ra chỗ bị chặn y như lúc chạy thật: %q", buoc["hep"].Prompt)
+	}
+	if strings.Contains(buoc["hep"].Prompt, "{{steps.b.output}}") {
+		t.Fatalf("chỗ bị chặn còn nguyên chữ sống trong kế hoạch: %q", buoc["hep"].Prompt)
+	}
+	// Bước không khai gì thì kế hoạch phải y như trước — không lây cái chặn.
+	if strings.Contains(buoc["mo"].Prompt, "không được phép đọc") {
+		t.Fatalf("bước không khai doc_duoc mà bị chặn trong kế hoạch: %q", buoc["mo"].Prompt)
+	}
+	if !strings.Contains(buoc["mo"].Prompt, "kết quả bước \"b\"") {
+		t.Fatalf("bước không khai doc_duoc phải đọc được `b` như cũ: %q", buoc["mo"].Prompt)
+	}
+}
+
 // Chạy khan một flow không có thì phải nói thẳng, đừng trả kế hoạch rỗng trông
 // như "flow này chẳng làm gì cả".
 func TestChayKhoBaoFlowKhongCo(t *testing.T) {
