@@ -65,8 +65,13 @@ aside{border-right:1px solid var(--line-2);overflow-y:auto;background:var(--pane
 .msg.running{border-color:var(--run)}
 .msg.failed{border-color:var(--error)}
 
+/* --panel-2 chứ không phải rgba(255,255,255,.02): một lớp trắng mờ chỉ "nâng"
+   được trên nền tối. Ở bảng sáng --panel là #FFFFFF, phủ thêm trắng lên trắng
+   thì hàng đầu mất hẳn ranh giới với thân bài. --panel-2 là token dựng sẵn cho
+   đúng việc này và nó đổi theo chủ đề: tối thì #11141F (sáng hơn panel), sáng
+   thì #F6F7FB (tối hơn panel) — cùng một dòng CSS, nổi lên ở cả hai bảng. */
 .msg-top{display:flex;align-items:center;gap:10px;padding:10px 14px;
-  border-bottom:1px solid var(--line-2);background:rgba(255,255,255,.02)}
+  border-bottom:1px solid var(--line-2);background:var(--panel-2)}
 .who{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
 .badge{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
   font-size:11px;font-weight:700;color:var(--void);flex:none;font-family:var(--font-mono)}
@@ -89,7 +94,19 @@ button.more{margin-top:7px;background:var(--panel-2);border:1px solid var(--line
   color:var(--mid);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:12px}
 button.more:hover{color:var(--hi)}
 
-.err{color:var(--error);font-size:12.5px;padding:9px 14px;background:rgba(255,93,121,.08);
+/* rgba(255,93,121,.08) CHÍNH LÀ --error của bảng tối (#FF5D79) chép tay vào
+   trang. Nó lọt qua designsystem_test.go vì test đó bắt việc khai lại cái TÊN
+   trong trang, không bắt cái GIÁ TRỊ đi lậu — mà hậu quả thì y hệt: bật
+   `ui.theme="light"` thì --error đổi sang #C42B48 trong khi hai dải này vẫn
+   hồng của bảng tối, tức là chữ một sắc đỏ, nền một sắc đỏ khác.
+
+   color-mix pha thẳng từ token nên nó tự đi theo chủ đề. Dòng --panel-2 đứng
+   trước là bậc lùi: trình duyệt không hiểu color-mix sẽ bỏ qua dòng sau và giữ
+   một nền xám nhạt — nhạt hơn ý muốn, nhưng chữ --error và viền vẫn đọc được,
+   không bao giờ ra nền trong suốt. */
+.err{color:var(--error);font-size:12.5px;padding:9px 14px;
+  background:var(--panel-2);
+  background:color-mix(in srgb, var(--error) 8%, transparent);
   border-top:1px solid var(--line)}
 .tra-loi-ai{color:var(--mid);font-size:12px;padding:7px 14px;border-top:1px solid var(--line-2)}
 .tra-loi-ai b{color:var(--hi);font-weight:600;font-family:var(--font-mono)}
@@ -106,7 +123,9 @@ button.tom-tat:hover,button.tom-tat[aria-expanded="true"]{color:var(--hi);border
 .tt-dau{padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:11px;
   letter-spacing:.7px;text-transform:uppercase;color:var(--mid);font-weight:650}
 .tt-lech{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);
-  background:rgba(255,93,121,.08);color:var(--error);font-size:12.5px}
+  background:var(--panel-2);
+  background:color-mix(in srgb, var(--error) 8%, transparent);
+  color:var(--error);font-size:12.5px}
 .tt-lech .rail{width:2px;border-radius:2px;background:var(--error);flex:none}
 .tt-khop{padding:10px 14px;border-bottom:1px solid var(--line);color:var(--done);font-size:12.5px}
 #tom-tat pre{padding:12px 14px}
@@ -177,11 +196,28 @@ header nav a:focus-visible{
 <body>
 <header>
   <h1>Hội thoại giữa các agent</h1>
+  <!-- Thứ tự VÀ tên link phải trùng ba mặt kia (index/flow/trung-tam), vì đây là
+       cùng một thanh điều hướng nhìn từ bốn chỗ. Trước lượt này mặt Hội thoại gọi
+       index là "Bảng điều khiển" và flow là "Luồng" — hai cái tên không mặt nào
+       khác dùng, nên đi vòng bốn tab là đọc bốn tên cho hai đích. Design system,
+       mục Voice: "Một hành động giữ một tên xuyên suốt".
+
+       Và nó THIẾU hẳn hai link cuối: /docs/ (Plan) và /logout (Thoát) có ở cả ba
+       mặt kia. Thiếu "Thoát" là mất chức năng thật, không phải mất thẩm mỹ: đang
+       đọc lại một lượt chạy thì không có cách nào bỏ phiên đăng nhập, phải rời
+       sang mặt khác trước — trên một máy đang bị dò mật khẩu thì đó là chỗ không
+       nên có ma sát.
+
+       Đường dẫn để TƯƠNG ĐỐI như ba mặt kia (`./`, `flow.html`), không phải
+       `/flow.html`: Mat.anLoiVao3D khớp link bằng hậu tố nên cả hai dạng đều gỡ
+       được, nhưng bốn mặt viết một kiểu thì so sánh mới ra ngay chỗ lệch. -->
   <nav>
-    <a href="/index.html">Bảng điều khiển</a>
-    <a href="/flow.html">Luồng</a>
-    <a href="/hoi-thoai.html" aria-current="page">Hội thoại</a>
-    <a href="/trung-tam.html">Trung tâm</a>
+    <a href="./">2D</a>
+    <a href="trung-tam.html">Trung tâm</a>
+    <a href="flow.html">Workflow</a>
+    <a href="hoi-thoai.html" aria-current="page">Hội thoại</a>
+    <a href="/docs/">Plan</a>
+    <a href="/logout">Thoát</a>
   </nav>
 </header>
 
@@ -371,7 +407,11 @@ function veMot(b){
   if (b.attempt > 1) meta.push(`lần thử ${b.attempt}`);
   if (b.tokensIn || b.tokensOut) meta.push(`${b.tokensIn}&#8594;${b.tokensOut} tok`);
   if (b.costUsd > 0) meta.push(`${b.costUsd.toFixed(4)} USD`);
-  meta.push(NHAN[b.state] || b.state || "chưa chạy");
+  // esc() ở đây vì `meta` được nối thẳng vào HTML bên dưới. Ba chỗ khác trong
+  // file này đã bọc esc() quanh đúng biểu thức này (cột trái, đầu luồng, class
+  // của chấm) — sót một chỗ thì cùng một giá trị đi hai đường khác nhau, và
+  // đường không bọc là đường không ai để ý cho tới lúc `state` mang thứ lạ.
+  meta.push(esc(NHAN[b.state] || b.state || "chưa chạy"));
 
   const nguon = (b.needs && b.needs.length)
     ? `<div class="tra-loi-ai">nối tiếp <b>${b.needs.map(esc).join("</b>, <b>")}</b></div>` : "";
