@@ -362,6 +362,23 @@ setTimeout(() => {
   banRa(kho['ct-dong'], 'click', {});
   if (!bang.hidden) { console.error('  HONG: bam dong ma bang van hien'); hong++; }
 
+  // 5) KHO DIEN THOAI. Man hep thi nhan chen nhau nang hon han, va luot tach de
+  //    chi biet day LEN — day mai thi nhan bay len khoi mep tren, tuc la mat
+  //    han. O 1600px chuyen do khong xay ra nen khong the thay bang mat thuong.
+  ctx.innerWidth = 390; ctx.innerHeight = 844;
+  soDo.forEach(e => { e.style.left = undefined; e.style.top = undefined; });
+  for (let i = 0; i < 5; i++) khung();
+  const om = soDo.map(oCuaNhan).filter(Boolean);
+  let deM = 0, bayM = 0;
+  for (let i = 0; i < om.length; i++) {
+    // Thanh tren cao ~50px; nhan bi day len tren no la coi nhu mat.
+    if (om[i].t < 4) bayM++;
+    for (let j = i + 1; j < om.length; j++) if (deNhau(om[i], om[j])) deM++;
+  }
+  console.log('  kho 390x844: ' + om.length + ' nhan, ' + deM + ' cho de, ' + bayM + ' nhan bay khoi man');
+  if (deM) { console.error('  HONG: o kho dien thoai con ' + deM + ' cho de nhau'); hong++; }
+  if (bayM) { console.error('  HONG: ' + bayM + ' nhan bi day len khoi mep tren man hinh'); hong++; }
+
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');
   process.exit(hong ? 1 : 0);
 }, 400);

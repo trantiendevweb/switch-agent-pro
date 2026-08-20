@@ -1183,22 +1183,47 @@ function diemManHinh(p){
 // hai bóng thoại của phòng test chồng nhau tới mức mất cả dòng chữ. Chiếu toạ độ
 // 3D sang màn hình thì chuyện đè là chắc chắn xảy ra — không có lượt tách thì
 // chỉ còn cách hy vọng camera đứng đúng góc.
+// Trần an toàn: dưới thanh công cụ. Nhãn bị đẩy lên trên mốc này coi như MẤT.
+const TRAN_NHAN = 58;
+
+function chamNhau(daDat, o, day){
+  for(const h of daDat){
+    if(o.r <= h.l + 2 || o.l >= h.r - 2) continue;
+    if(o.d - day <= h.t + 2 || o.t - day >= h.d - 2) continue;
+    return h;
+  }
+  return null;
+}
+
+// Trả số pixel phải dịch: dương = lên, âm = xuống.
+//
+// Chỉ đẩy LÊN là chưa đủ, và đây là chỗ tôi làm sai ở bản trước. Bài đo ở khổ
+// 390×844 bắt được: 10 trong 19 nhãn bị đẩy chồng lên nhau tới mức vượt khỏi mép
+// trên màn hình — tức là mất hẳn, mà ở khổ 1600 thì không đời nào thấy được.
+// Nên khi đẩy lên sẽ vượt trần thì QUAY XUỐNG đẩy ngược lại.
 function dayLen(daDat, o){
   const KHE = 6;
   let day = 0;
   for(let lap = 0; lap < 40; lap++){
-    let cham = null;
-    for(const h of daDat){
-      if(o.r <= h.l + 2 || o.l >= h.r - 2) continue;
-      if(o.d - day <= h.t + 2 || o.t - day >= h.d - 2) continue;
-      cham = h; break;
-    }
+    const cham = chamNhau(daDat, o, day);
     if(!cham) break;
     const can = (o.d - cham.t) + KHE;
     if(can <= day) break;          // không tiến thêm được thì dừng, đừng quay vòng
     day = can;
   }
-  return day;
+  if(o.t - day >= TRAN_NHAN) return day;
+
+  // Đẩy lên thì mất nhãn. Thử đẩy XUỐNG — dưới màn hình còn chỗ, và nhãn nằm
+  // thấp hơn chủ của nó vẫn đọc được, còn nhãn bay khỏi màn thì không.
+  let xuong = 0;
+  for(let lap = 0; lap < 40; lap++){
+    const cham = chamNhau(daDat, o, -xuong);
+    if(!cham) break;
+    const can = (cham.d - o.t) + KHE;
+    if(can <= xuong) break;
+    xuong = can;
+  }
+  return -xuong;
 }
 
 // Đặt một lớp nhãn: chiếu, xếp theo thứ tự GẦN CAMERA TRƯỚC, rồi đẩy lên cho
@@ -1243,7 +1268,12 @@ function chieu(){
   // thì nhãn vẫn nằm đúng trên đầu chủ của nó, không hề trượt sang người bên
   // cạnh — chỉ dịch NGANG mới gây nhầm người.
   datLopNhan(nhanKhac, daDat, 0.5, oNguoi());
-  datLopNhan(bongThoai, daDat, 1,   oNguoi());
+  // BÓNG THOẠI TẮT Ở KHỔ ĐIỆN THOẠI. Một bóng rộng 200px trên màn 390px là che
+  // gần hết cảnh, mà sáu cái thì không còn gì để nhìn. Chỗ đọc câu đầy đủ giờ là
+  // bảng chi tiết — chạm vào người là ra, và ra nguyên văn chứ không cắt 110 ký
+  // tự. Tắt hẳn còn hơn bày ra rồi chồng lên nhau.
+  if(innerWidth >= 720) datLopNhan(bongThoai, daDat, 1, oNguoi());
+  else bongThoai.forEach(b => { b.el.style.display = 'none'; });
   // Tên phòng nhường cuối: nó là nhãn của KHUNG, hai lớp trên là dữ liệu.
   datLopNhan(nhanPhong, daDat, 0.5, l => l.pos);
 }
