@@ -436,6 +436,9 @@
           </div>
           <div class="warnbox">Mỗi bước chạy bằng một tài khoản riêng, trong worktree riêng.
             Tiến độ hiện ở khối <b>Tiến độ lượt chạy</b> ngoài màn chính.</div>
+          <!-- Xem trước đứng TRƯỚC nút chạy: đọc kế hoạch rồi mới quyết là thứ
+               tự đúng, và nó là nút KHÔNG tốn gì nên để tay chạm vào trước. -->
+          <button id="wf-kho" class="btn" type="button">Xem trước — không tốn gì</button>
           <button id="wf-chay" class="go" type="submit">Chạy workflow</button>
         </form>
         <div id="wf-ket" class="empty" style="padding:0 14px 14px;font-size:12px"></div>
@@ -987,6 +990,52 @@ $('wfform').onsubmit = async ev=>{
   }catch(e){ showErr(e.message); $('wf-ket').textContent=''; }
   b.disabled = false; b.textContent = 'Chạy workflow';
 };
+
+// Chạy khan: hỏi "bấm chạy thì chuyện gì xảy ra" mà không tiêu một đồng nào.
+//
+// Có nút này ở mặt 2D vì đây mới là chỗ người ta bấm chạy. Để tính năng chỉ nằm
+// ở dòng lệnh thì người điều khiển từ điện thoại không dùng được — mà đó chính
+// là người dễ bấm nhầm nhất, vì họ không thấy cổng kiểm nói gì.
+$('wf-kho').onclick = async ()=>{
+  const ten = $('wf-ten').value;
+  if(!ten){ showErr('chưa chọn quy trình'); return; }
+  const b = $('wf-kho'); b.disabled = true; b.textContent = 'đang xem…';
+  try{
+    const viec = $('wf-viec').value.trim();
+    const d = await api('/api/flow/kho', {method:'POST', headers:H,
+      body: JSON.stringify({name:ten, vars: viec ? {viec} : {}})});
+    $('wf-ket').innerHTML = veKeHoachKhan(d);
+  }catch(e){ showErr(e.message); $('wf-ket').textContent=''; }
+  b.disabled = false; b.textContent = 'Xem trước — không tốn gì';
+};
+
+// veKeHoachKhan vẽ kế hoạch chạy khan: bước nào chạy đợt nào, bằng tài khoản và
+// model nào. Model phải hiện — nó là thứ quyết định lượt chạy tốn bao nhiêu.
+function veKeHoachKhan(d){
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  let h = '';
+  if((d.taiKhoanHong||[]).length){
+    h += '<div class="warnbox" style="margin:0 0 10px">Tài khoản dùng không được:<br>' +
+      d.taiKhoanHong.map(t => '<b>'+esc(t.addr)+'</b> — '+esc(t.lyDo)+
+        ' <span class="mid">(kéo theo: '+esc((t.buoc||[]).join(', '))+')</span>').join('<br>') +
+      '</div>';
+  }
+  (d.dot||[]).forEach((dot,i)=>{
+    h += '<div style="margin-top:8px"><b>Đợt '+(i+1)+'</b>' +
+      ((dot.buoc||[]).length>1 ? ' <span class="mid">— '+dot.buoc.length+' bước song song</span>' : '') + '</div>';
+    (dot.buoc||[]).forEach(b=>{
+      const phu = [b.taiKhoan, b.model && ('model '+b.model),
+                   b.worktree && 'worktree riêng',
+                   b.tuDuyetQuyen && 'TỰ DUYỆT MỌI QUYỀN'].filter(Boolean).map(esc).join(' · ');
+      h += '<div class="mono" style="font-size:12px;padding:2px 0 2px 10px">· '+
+        esc(b.id)+' <span class="mid">['+esc(b.type)+']</span>'+
+        (phu ? ' <span class="mid">'+phu+'</span>' : '')+'</div>';
+    });
+  });
+  h += '<div class="mid" style="margin-top:10px;font-size:12px">Chưa tiêu gì cả — '+
+       'không lượt chạy nào được ghi, không worktree nào được tạo.</div>';
+  return h;
+}
 
 async function refresh(){
   try{ render(await api('/api/state')); }catch(e){ showErr(e.message); }
