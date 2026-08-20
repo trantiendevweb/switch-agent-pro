@@ -503,8 +503,13 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - ✅ **Generic OpenAI-compatible qua API**: `internal/aiapi` + `sagent api <route>`.
     Custom base URL/model, key tham chiếu bằng `key_id`, lỗi giữ nguyên văn (còn
     request id), trả `usage`. Đo thật trên `modelapi.vn`: 1195 token / 11,8s.
-  - ⬜ **Chưa có streaming.** Cố ý dừng: làm nửa vời thì mất `usage`, mà `usage` mới là
-    thứ đáng giá nhất của đường API.
+  - ✅ **Streaming: XONG ở lõi và CLI** (21/08/2026) — `aiapi.GoiStream` +
+    `sagent api <route> --stream`. Nỗi lo cũ có thật: endpoint tương thích OpenAI
+    KHÔNG gửi `usage` khi stream trừ khi hỏi bằng `stream_options.include_usage`.
+    Đã hỏi, và đo được usage đầy đủ: deepseek 389 token/3,6s, grok 1926 token/31s.
+    Nhà cung cấp nào không trả thì `ThieuUsage` bật và nói rõ là CHƯA ĐO chứ không
+    phải miễn phí. Đi chung đường với lời gọi thường nên cùng sổ, cùng luật
+    fallback. ⬜ Còn lại: mặt web chưa có nút stream.
   - ✅ **Fallback route**: chỉ chuyển tiếp một lần sang route dự phòng; không fallback khi
     lỗi do người dùng (401/403/sai key/prompt rỗng); kết quả mang lỗi gốc nguyên văn +
     request id, ghi rõ tên hai route (đã thử và đã dùng), cùng usage của route thành công
