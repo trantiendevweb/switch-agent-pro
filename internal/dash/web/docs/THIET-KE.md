@@ -869,5 +869,117 @@ Toàn bộ tài nguyên 3D mới được nhúng trực tiếp vào file thực 
 > - **Đã kiểm:** Khả năng tải về thành công của cả 2 file asset từ nguồn Three.js r128 (HTTP 200), kiểm tra dung lượng chính xác từng byte, đo kích thước file thực thi `.exe` trước và sau khi build Go embed, kiểm tra hiển thị font và cấu trúc 4 phòng + sảnh chung trên Windows PowerShell.
 > - **Chưa kiểm:** Tốc độ khung hình (FPS) của hoạt ảnh 13 clip chuyển động khi chạy đồng thời trên các máy tính cấu hình văn phòng không có card đồ hoạ rời (GPU yếu).
 
+---
+
+## 17. Context riêng cho từng bước (Quyền đọc kết quả — `doc_duoc`)
+
+Để tối ưu chi phí token, giảm hiện tượng phân tâm của mô hình AI và bảo đảm tính độc lập khách quan khi phân vai công việc, mỗi bước (`step`) trong luồng (`flow`) có thể giới hạn danh sách các bước đi trước mà nó được phép đọc kết quả thông qua thuộc tính **`doc_duoc`**.
+
+---
+
+### 1. Vấn đề bùng nổ Token và vì sao cần chia Context riêng?
+
+Theo cơ chế truyền dữ liệu ban đầu của hệ thống, một bước chạy sau mặc định sẽ **đọc được kết quả của TẤT CẢ các bước chạy trước đó** (toàn bộ nội dung đầu ra `output` của các bước trước được nạp vào biến môi trường và ngữ cảnh prompt).
+
+- **Sự tiện lợi ban đầu:** Cơ chế này rất tiện cho các quy trình ngắn, đơn giản vì người viết flow không cần phải bận tâm việc cấu hình chia sẻ dữ liệu giữa các bước.
+- **Hiện tượng bùng nổ Token:** Khi quy trình mở rộng với nhiều bước thực thi dài (chứa mã nguồn lớn, tài liệu hướng dẫn chi tiết, nhật ký kiểm thử), lượng token đầu vào (input tokens) tăng vọt theo cấp số nhân ở các bước cuối luồng.
+- **Số đo thực tế từ Lượt #34:** Tại bước gộp (`gop`) của luồng `doi-4`, mô hình AI đã phải nhận tới **10.998 token vào**, trong đó phần lớn dung lượng là toàn bộ nội dung output dài dằng dặc của các bước thợ code và tài liệu trước đó dồn lại, mặc dù bước gộp chỉ thực sự cần một vài thông tin trọng tâm.
+
+Việc dồn toàn bộ dữ liệu thừa không chỉ gây lãng phí ngân sách API mà còn làm loãng ngữ cảnh (context bloat), khiến mô hình AI dễ bị xao nhãng khỏi chỉ dẫn cốt lõi của bước hiện tại.
+
+---
+
+### 2. Vì sao mặc định VẪN MỞ (Đọc mọi bước trước)?
+
+Mặc dù việc giới hạn ngữ cảnh mang lại nhiều lợi ích, hệ thống quy định: **Nếu bước KHÔNG khai báo `doc_duoc`, mặc định vẫn cho phép đọc kết quả của MỌI bước chạy trước.**
+
+- **Bảo vệ tính tương thích ngược (Backward Compatibility):** Nếu đổi mặc định thành cấm toàn bộ (hoặc chỉ cho đọc danh sách rỗng), tất cả các workflow sẵn có đang chạy ổn định từ trước đến nay sẽ lập tức bị hỏng hóc hoặc không nhận được dữ liệu mong muốn.
+- **Triết lý thiết kế:** Công cụ chỉ thắt chặt khi người dùng chủ động yêu cầu. Người dùng có toàn quyền khai báo `doc_duoc` cho những bước cần tối ưu ngữ cảnh mà không làm ảnh hưởng đến các luồng làm việc đơn giản khác.
+
+---
+
+### 3. Vì sao khi chặn phải NÓI RA thay vì cắt im lặng thành chuỗi rỗng?
+
+Khi một bước có khai báo `doc_duoc` và cố tình truy cập vào kết quả của một bước nằm ngoài danh sách được phép, hệ thống sẽ thay thế giá trị đó bằng đúng câu thông báo:
+
+```
+(không được phép đọc kết quả bước "x" — thêm x vào doc_duoc nếu cần)
+```
+
+chứ **TUYỆT ĐỐI KHÔNG âm thầm cắt thành chuỗi rỗng (`""`)**.
+
+**Lý do cốt lõi:**
+1. **Chống lỗi "im lặng cắt dữ liệu":** Bài học xương máu từ **lượt #29** cho thấy việc âm thầm nuốt dữ liệu hoặc giấu lỗi sẽ khiến người vận hành và AI rơi vào tình trạng "mù thông tin", không thể phân biệt được đâu là bước chưa chạy, đâu là bước trả về kết quả rỗng thật sự, và đâu là do bị chặn quyền truy cập.
+2. **Minh bạch và có khả năng tự sửa lỗi (Actionable Feedback):** Khi nhìn thấy câu thông báo rõ ràng, cả người vận hành lẫn mô hình AI đều hiểu ngay lập tức lý do dữ liệu bị ẩn và biết chính xác giải pháp cần làm: nếu thực sự cần đọc dữ liệu bước đó, chỉ cần thêm `x` vào mảng `doc_duoc` trong file cấu hình.
+
+---
+
+### 4. Vì sao người soi trong `doi-4` bị cắt quyền đọc `code-go` / `code-doc` và chỉ còn `kiem-2`?
+
+Trong quy trình phối hợp 4 agent (`doi-4`), bước soi (`soi`) chịu trách nhiệm thẩm định chất lượng độc lập. Bước này được cấu hình thắt chặt quyền đọc: **chỉ giữ lại `doc_duoc = ["kiem-2"]` và cắt toàn bộ quyền đọc kết quả của `code-go` lẫn `code-doc`.**
+
+**Lý do nghiệp vụ:**
+- **Tránh hiện tượng bị "mồi" tâm lý (Priming / Bias):** Nếu người soi đọc toàn bộ lời tự giải thích, tự khai báo của hai người thợ lập trình (`code-go` và `code-doc`), người soi sẽ dễ bị dẫn dắt bởi các lập luận chủ quan và niềm tin của người viết mã ("tôi đã làm xong hết", "code hoàn hảo không có lỗi").
+- **Bắt buộc tự đối chiếu sự thật qua Git:** Người soi là vị trí kiểm tra chéo độc lập (thường dùng AI của hãng khác). Người soi không cần nghe thợ "kể chuyện", mà chỉ cần xem máy chấm tự động nói gì (`kiem-2`) và **tự mình chạy lệnh Git (`git log`, `git diff`) để soi trực tiếp vào mã nguồn thật**. Đây là cách duy nhất để đảm bảo kết quả đánh giá luôn khách quan, trung thực và không bị thiên lệch.
+
+---
+
+### 5. Cấu hình `doc_duoc` trong `flows.toml` và xem trước với `--kho` trên Windows PowerShell
+
+#### Cấu hình mẫu trong `.sagent/flows.toml`
+
+```toml
+# Ví dụ 1: Bước "soi" giới hạn quyền đọc duy nhất bước kiểm thử kiem-2
+[[flow.doi-4.step]]
+  id = "soi"
+  vai_tro = "soi"
+  type = "agent"
+  profile = "grok:api"
+  needs = ["kiem-2", "code-doc"]
+  doc_duoc = ["kiem-2"]        # Chỉ cho phép đọc kết quả của kiem-2
+  prompt = """Bạn là người soi độc lập...
+Kết quả máy chấm:
+{{steps.kiem-2.output}}"""
+
+# Ví dụ 2: Bước không khai báo doc_duoc -> mặc định đọc mọi bước trước
+[[flow.doi-4.step]]
+  id = "sua"
+  vai_tro = "coder"
+  type = "agent"
+  profile = "claude:tns"
+  needs = ["kiem-1"]
+  # Không khai doc_duoc -> đọc được mọi bước chạy trước nó
+```
+
+#### Xem trước trên Windows PowerShell với cờ `--kho`
+
+Để kiểm tra danh sách quyền đọc của từng bước mà không tốn chi phí gọi AI, bạn mở **Windows PowerShell** và chạy lệnh:
+
+```powershell
+sagent flow run doi-4 --kho
+```
+
+Lệnh chạy thử (dry-run) sẽ in ra thông tin quyền đọc chi tiết cho từng bước:
+- Đối với bước **đã khai `doc_duoc`**: in rõ `đọc được: kiem-2` (hoặc danh sách các bước tương ứng `đọc được: a, b`).
+- Đối với bước **chưa khai `doc_duoc`**: in rõ `đọc được: mọi bước trước`.
+
+---
+
+### 6. Cơ chế kiểm tra hợp lệ (Validate)
+
+Khi hệ thống kiểm tra cấu hình luồng công việc (`flow.Validate`), trường `doc_duoc` được xác thực nghiêm ngặt để phát hiện sớm các lỗi cấu hình:
+
+1. **Trỏ vào bước không tồn tại:** Nếu `doc_duoc` chứa tên một bước không hề có trong workflow, hệ thống sẽ đưa ra **CẢNH BÁO** (`Warn: true`) chỉ rõ định danh bước không hợp lệ.
+2. **Trỏ vào bước chạy sau:** Nếu `doc_duoc` trỏ vào một bước thuộc đợt thực thi phía sau (dựa trên thuật toán xác định thứ tự chạy Dot/Order), hệ thống sẽ đưa ra **CẢNH BÁO** để nhắc nhở người dùng rằng bước đó chưa kịp hoàn thành nên không thể có dữ liệu để đọc.
+3. **Cảnh báo chứ không chặn cứng:** Tương tự như cơ chế kiểm tra vai trò, hệ thống cảnh báo rõ ràng để bạn dễ dàng sửa lỗi mà không làm dừng đột ngột luồng công việc đang thử nghiệm.
+
+---
+
+> [!NOTE]
+> **Thứ đã kiểm và chưa kiểm:**
+> - **Đã kiểm:** Soạn thảo đầy đủ mục 17 vào cả hai file tài liệu `docs/THIET-KE.md` và `internal/dash/web/docs/THIET-KE.md`, giải thích cặn kẽ nguyên lý `doc_duoc`, bài học số liệu token lượt #34, lỗi im lặng cắt dữ liệu lượt #29, và kiểm tra đối chiếu byte-for-byte đảm bảo 2 file mirror giống hệt nhau 100%.
+> - **Chưa kiểm:** Chạy thử nghiệm thực tế tính năng `doc_duoc` và cờ `--kho` trên binary `sagent.exe` mới, do phần mã nguồn Go đang được lập trình viên khác thực hiện song song.
+
+
 
 
