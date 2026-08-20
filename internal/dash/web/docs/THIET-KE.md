@@ -311,47 +311,141 @@ Ba font chữ được vendor offline trong `internal/dash/web/vendor/` dưới 
   2. *Một nguồn sự thật (Single Source of Truth):* Toàn bộ token màu sắc, typography và `@font-face` nằm gọn trong `vendor/token.css`. Mọi trang (`index.html`, `flow.html`, `hoi-thoai.html`, `3d.html`) chỉ cần `<link>` vào là dùng được ngay.
   3. *Tương thích nhúng offline:* Không cần build tool hay preprocessor, phục vụ trực tiếp từ Go `embed` tĩnh.
 
-#### 5. Mặt 2D (Bố cục Bento & Giải phẫu thẻ Agent)
+#### 5. Mặt 2D (Bố cục Bento, Ngăn kéo điều hành & Hợp đồng dữ liệu)
 
-Mặt 2D (`index.html`) là bảng điều khiển phẳng, tập trung cao độ vào khả năng quan sát nhanh (*glanceable* — nhìn phát hiểu ngay) và thao tác điều hành tức thì cho người dùng. Dù không rành kỹ thuật hay dòng lệnh, người vận hành chỉ cần mở dashboard lên là nắm bắt được hạm đội agent đang làm gì, tiêu tốn bao nhiêu tài nguyên và can thiệp dừng phiên khi cần thiết.
+Mặt 2D (`index.html`) là bảng điều khiển phẳng, tập trung cao độ vào khả năng quan sát nhanh (*glanceable* — nhìn phát hiểu ngay) và điều hành tức thì cho người dùng. Dù không rành kỹ thuật hay dòng lệnh, người vận hành chỉ cần mở dashboard lên là nắm bắt trọn vẹn tình trạng hạm đội agent, tiến độ từng luồng công việc, mức tiêu thụ tài nguyên và can thiệp kịp thời khi có sự cố.
 
-Thiết kế của mặt 2D được định hình bởi bốn quyết định cốt lõi:
+Thiết kế của mặt 2D được định hình bởi năm quyết định cốt lõi:
 
-- **Quyết định 1: Bố cục Bento chia khu vực khoa học thay cho bảng danh sách phẳng truyền thống**
-  - *Vấn đề của bảng phẳng (Table list):* Kiểu hiển thị hàng ngang truyền thống buộc mắt người vận hành phải lia ngang liên tục qua các cột trống trải, khó nhận diện ưu tiên khi chạy cùng lúc nhiều agent, và hoàn toàn không truyền tải được "nhịp thở" hay trạng thái trực quan của từng phiên. Khi thu nhỏ cửa sổ hoặc xem trên màn hình hẹp, bảng bị tràn ngang gây vỡ bố cục.
-  - *Giải pháp bố cục Bento (Hộp chia ngăn hiện đại):* Màn hình được phân bổ thành 3 khu vực chức năng rõ ràng:
-    1. *Lưới Hạm đội (Fleet Grid - trung tâm):* Xếp các card agent theo lưới tự động co giãn `grid-template-columns: repeat(auto-fill, minmax(238px, 1fr))`. Mỗi agent là một tấm thẻ độc lập, tự động dàn trải vừa vặn với mọi độ phân giải màn hình mà không bao giờ bị tràn thanh cuộn ngang.
-    2. *Cột Tổng quan (Overview Panel - bên phải):* Tập trung các đồng hồ đo (meter) tiến độ, tổng chi phí và tổng token tiêu thụ, có hiệu ứng thanh tiến trình chuyển động mượt mà (`transition: width 0.3s ease`).
-    3. *Nhật ký sự kiện (Event Log - dưới cùng):* Băng nhật ký toàn chiều rộng (full-width), font chữ kỹ thuật monospace, giới hạn cố định ~60 dòng mới nhất để tránh nặng trình duyệt, tự động cuộn theo dòng mới và phân loại màu sắc theo hành vi (`edit` chỉnh sửa, `review` soát mã, `queued` vào hàng chờ, `done` hoàn thành, `error` sự cố, `dispatch` giao việc), dòng mới xuất hiện với hiệu ứng mờ dần hiện rõ (fade-in).
-    - *Tương thích màn hình nhỏ:* Tự động thích ứng co thành 1 cột duy nhất trên màn hình di động hoặc cửa sổ hẹp (< 720px) mà người dùng không cần vuốt ngang.
+- **Quyết định 1: Màn hình chính dành trọn cho thứ cần nhìn liên tục — Không cuộn trang trên màn hình 1080p**
+  - *Nguyên tắc cốt lõi:* Khi mở dashboard trên một màn hình tiêu chuẩn (Full HD 1080p), toàn bộ thông tin quan trọng nhất phải hiện ra trọn vẹn trong một tầm nhìn mà không bắt người vận hành phải lăn chuột cuộn trang (*no-scroll dashboard*).
+  - *Ba khu vực chức năng trên màn hình chính:*
+    1. *Lưới Hạm đội (Fleet Grid - trung tâm):* Xếp các thẻ agent theo lưới tự động co giãn `grid-template-columns: repeat(auto-fill, minmax(238px, 1fr))`. Mỗi agent là một tấm thẻ trực quan độc lập, tự động dàn trải vừa vặn với mọi kích thước cửa sổ mà không bị tràn thanh cuộn ngang.
+    2. *Tiến độ lượt chạy (Run Progress - bên phải):* Khối theo dõi thời gian thực cho lượt chạy quy trình (workflow run) đang diễn ra hoặc gần nhất, chỉ rõ tiến trình từng bước, bước lỗi và chi phí đã tiêu thụ.
+    3. *Nhật ký sự kiện (Event Log - dưới cùng):* Băng nhật ký toàn chiều rộng (full-width), font chữ kỹ thuật monospace, giới hạn cố định 60 dòng mới nhất (`LOG_CAP = 60`) để tránh nặng trình duyệt, chèn ở cuối và tự động cuộn xuống theo dòng mới nhất (`scrollTop = scrollHeight`), phân loại màu sắc theo hành vi (`dispatch` giao việc, `queued` vào hàng chờ, `done` hoàn thành, `error` sự cố, `warn` cảnh báo) với hiệu ứng fade-in mượt mà.
+  - *Tương thích màn hình nhỏ:* Tự động co thành 1 cột duy nhất trên màn hình di động hoặc cửa sổ hẹp (< 720px) qua `@media (max-width: 720px)` mà người dùng không cần vuốt ngang.
 
-- **Quyết định 2: Giải phẫu thẻ Agent (Card Anatomy) nhiều tầng thông tin trực quan**
-  Mỗi thẻ agent trong hạm đội là một cấu trúc hoàn chỉnh được thiết kế từng lớp từ ngoài vào trong:
-  - *Thanh ray chỉ báo (Status Rail) & Quầng Aura:* Đường viền 2px nằm sát cạnh trái thẻ mang màu sắc của trạng thái (`--run`, `--pending`, `--done`, `--idle`, `--error`) kết hợp cùng quầng sáng mờ tỏa nhẹ ở góc trên, giúp nhận diện trạng thái của phiên ngay từ tầm nhìn ngoại vi mà chưa cần đọc chữ.
-  - *Hàng tiêu đề (Header):*
-    - Biểu tượng nhận diện hãng AI (Glyph: Claude, Codex, Gemini, Cursor...).
-    - Định danh tài khoản `provider:account` bằng font `JetBrains Mono`, trong đó phần tên tài khoản được tô màu trạng thái nổi bật.
-    - Huy hiệu trạng thái (Status Pill) chứa chấm đèn nhịp tim phát sáng.
-  - *Dòng công việc (Task Row):* Thể hiện hành động hiện tại với động từ thao tác viết hoa (Verb mono: `EDIT`, `READ`, `TEST`, `WAIT`) kèm câu tóm tắt nội dung bước làm ngắn gọn.
-  - *Sóng xung nhịp (Sparkline Pulse):* Đường sóng tín hiệu hoạt động, chỉ dao động nhấp nháy khi phiên thực sự đang chạy.
-  - *Cụm 3 ô thông số (Meta Row):* Ba ô dữ liệu căn đều hiển thị `tokens` (lượng token), `cost` (chi phí USD) và `elapsed` (thời gian đã chạy) bằng font monospace thẳng hàng, dễ đọc số liệu trong tích tắc.
-  - *Nút "Dừng" (Stop Button):* Được ẩn khéo léo để giữ giao diện tinh gọn, chỉ hiện lên khi di chuột (hover) vào thẻ và **chỉ hiển thị đối với phiên đang chạy (`run`) hoặc đang chờ (`pending`)** để người vận hành bấm dừng khẩn cấp một phiên duy nhất.
+- **Quyết định 2: Ngăn kéo trượt từ phải (Drawer) thay vì bày sáu form cùng lúc**
+  - *Vấn đề của bản cũ:* Bố cục trước đây nhét liền 6 khối form dọc ở cột phải (Bật hạm đội `#fleet`, Chạy workflow `#wfform`, Hỏi AI API `#aiform`, Báo tin Telegram `#tele`, Quét máy & dọn dẹp `#quet`/`#dbinfo`, Tổng quan). Việc này khiến màn hình tràn ngập các ô nhập liệu tĩnh, làm giao diện chật chội và đẩy các khối thông tin theo dõi xuống sâu.
+  - *Lý do chuyển sang ngăn kéo:*
+    - *Màn hình là nơi để nhìn liên tục, thao tác là việc thỉnh thoảng:* Người vận hành mở dashboard chủ yếu để theo dõi trạng thái hạm đội và tiến độ công việc từng giây từng phút. Việc cấu hình tài khoản, khởi chạy workflow hay gửi tin nhắn Telegram chỉ diễn ra thỉnh thoảng (vài phút hoặc vài tiếng một lần).
+    - *Đổi lấy một cú bấm:* Gom toàn bộ 6 khối form vào **ngăn kéo trượt từ cạnh phải (Drawer / Offcanvas)**. Trên thanh công cụ (topbar), mỗi form được đại diện bởi một nút bấm rõ ràng. Khi cần thao tác, người dùng chỉ tốn thêm đúng 1 cú click để mở form tương ứng; khi đóng lại, màn hình trở về trạng thái sạch sẽ, thoáng đãng 100%.
+  - *Tiêu chuẩn tương tác & Trợ năng (Accessibility - a11y):*
+    - *Đóng linh hoạt:* Đóng ngăn kéo tức thì bằng phím `Esc`, bấm nút đóng `✕`, hoặc bấm vào lớp màn mờ (backdrop).
+    - *Bẫy tiêu điểm (Focus Trap):* Khi ngăn kéo mở, phím `Tab` được giữ luân chuyển bên trong form, không nhảy lọt ra ngoài các phần tử nền.
+    - *Trả tiêu điểm (Return Focus):* Khi đóng ngăn kéo, tiêu điểm bàn phím tự động trả về đúng nút bấm trên thanh công cụ đã kích hoạt nó, đảm bảo trải nghiệm liền mạch cho người dùng thao tác phím.
+    - *Toàn màn hình trên di động:* Khi xem trên màn hình hẹp (< 720px), ngăn kéo tự động mở rộng 100% chiều rộng để nhập liệu thuận tiện.
 
-- **Quyết định 3: Nhịp tim (Pulse) chỉ dành riêng cho thực thể đang sống**
-  - *Nguyên tắc "Đang chạy mới thở":* Hiệu ứng chuyển động nhấp nháy (pulse animation) chỉ được kích hoạt trên các phiên có tiến trình thực thi thực sự:
-    - Trạng thái `run` (đang chạy tác vụ): Chấm trạng thái và thanh ray chớp nháy nhịp nhanh (~1.05s) biểu thị đang tính toán tích cực.
-    - Trạng thái `pending` (đang chờ trong hàng đợi): Chớp nháy nhịp chậm rãi (~1.7s) biểu thị đang giữ chỗ chờ lượt.
-    - Các trạng thái tĩnh (`done` đã xong, `idle` rảnh rỗi, `error` dừng do lỗi): Chấm đèn và viền **đứng yên hoàn toàn, không nhấp nháy**.
-  - *Chống nhiễu thị giác:* Tuyệt đối không cho tất cả các thẻ cùng nhấp nháy bừa bãi. Việc tập trung chuyển động vào đúng đối tượng đang hoạt động giúp mắt người điều hành phát hiện tức thì điểm bất thường (ví dụ một tác vụ bị đứng im không chạy) mà không bị phân tâm.
-  - *Tôn trọng trợ năng (`prefers-reduced-motion`):* Khi người dùng kích hoạt tính năng giảm chuyển động trong hệ điều hành hoặc trên máy tính cấu hình thấp, toàn bộ nhịp pulse, thanh trượt chuyển động và hiệu ứng fade-in sẽ tự động tắt, đảm bảo giao diện tĩnh nhưng đầy đủ 100% dữ liệu.
+- **Quyết định 3: Tiến độ lượt chạy (Run Progress) bắt buộc phải nằm ở màn chính**
+  - *Lý do sống còn:* Khi chạy một workflow tự động nhiều bước (ví dụ: luồng phối hợp 4 agent `doi-4`), câu hỏi quan trọng nhất mà người vận hành cần biết ngay trong 1 giây là: *"Đang chạy tới bước thứ mấy trên tổng số bước? Bước nào đã xong, bước nào đang chạy, và bước nào bị hỏng vì sao?"*
+  - *Loại bỏ sự phụ thuộc vào log:* Nếu không có khối tiến độ ở màn chính, người dùng rơi vào tình trạng "mù quy trình", buộc phải mở terminal gõ lệnh hoặc lội từng dòng nhật ký sự kiện dài dằng dặc để suy đoán thủ công.
+  - *Các thành phần hiển thị của khối Tiến độ:*
+    - *Định danh:* Tên workflow và mã lượt chạy (ví dụ `Lượt chạy #4 · doi-4`), trạng thái tổng thể (`running`, `completed`, `failed`).
+    - *Mạch tiến độ:* Hiển thị rõ tỷ lệ bước (ví dụ `Bước 2/4`) kèm thanh tiến độ hoặc chuỗi bước trực quan: bước hoàn thành (`--done` xanh dịu), bước đang chạy (`--run` xanh ngọc nhấp nháy nhịp thở), bước chờ (`--pending` cam hổ phách), bước bị hỏng (`--error` đỏ san hô).
+    - *Bắt lỗi trực tiếp:* Khi có bước hỏng, tên bước và thông điệp lỗi (`msg`) được đưa thẳng lên màn hình chính, giúp người vận hành biết ngay nguyên nhân sự cố để xử lý mà không cần mở log.
+    - *Chi phí & Token thật:* Hiển thị tổng chi phí USD và lượng token thực tế đã tiêu thụ của toàn bộ lượt chạy (cộng dồn từ từng bước qua `/api/flow/detail`).
 
-- **Quyết định 4: Minh bạch dữ liệu — Ghi rõ "chưa đo" thay vì bịa số lấp chỗ trống**
-  - *Nguyên tắc "Đã đo — không suy luận":* Thà để trống thông tin chưa có còn hơn hiển thị số liệu giả mạo khiến người vận hành đánh giá sai chi phí và tải hệ thống.
-  - *Hiện trạng dữ liệu DTO:* Cổng giao tiếp dữ liệu trạng thái hiện tại (`/api/state`) của các phiên CLI chỉ mới quản lý định danh và tiến trình (`id`, `addr`, `pid`, `worktree`, `log`, `started`) — **chưa có thông tin đo lường token tiêu thụ và chi phí USD ở cấp độ phiên CLI**.
-  - *Phạm vi dữ liệu thực tế:* Số liệu token và chi phí thật hiện nay chỉ xuất hiện ở các luồng flow run (`/api/flow/detail` chứa `cost.usd`, `tokens_in`, `tokens_out`) và cuộc gọi AI trực tiếp (`/api/ai` chứa `usage`).
-  - *Cách ứng xử trên giao diện 2D:*
-    - Trên các thẻ phiên CLI chưa có dữ liệu đo lường, ô `tokens` và `cost` hiển thị rõ ký hiệu để trống hoặc dòng chữ `"chưa đo"` (`--`), tuyệt đối không dùng hàm ngẫu nhiên sinh số giả lập.
-    - Thanh đo tổng quan (Meter) ở cột phải chỉ tính toán và tăng giảm dựa trên các con số thật thu thập được từ luồng flow run và cuộc gọi AI, giữ sự tin cậy tuyệt đối cho dashboard.
+- **Quyết định 4: Giải phẫu thẻ Agent (Card Anatomy) & Nhịp tim chỉ cho thực thể sống**
+  - *Cấu trúc thẻ nhiều tầng:*
+    - *Thanh ray chỉ báo (Status Rail) & Quầng Aura:* Viền 2px bên trái (`.rail`) mang màu trạng thái (`--run`, `--pending`, `--done`, `--idle`, `--error`) cùng quầng sáng mờ góc trên (`.aura`), nhận diện trạng thái từ xa.
+    - *Biểu tượng hãng (Glyph):* Logo hãng AI (`.glyph`) mang sắc màu nhận diện thương hiệu (`--prov-*`).
+    - *Định danh `provider:account`:* Font `JetBrains Mono` (`.who`), phần tên tài khoản tô màu trạng thái.
+    - *Huy hiệu trạng thái (Status Pill):* Nằm ở góc phải thẻ (`.st`), chứa chấm đèn nhịp tim.
+    - *Dòng công việc (Task Row):* Động từ thao tác viết hoa font mono (`.verb`: `EDIT`, `READ`, `TEST`, `WAIT`) kèm câu tóm tắt nội dung bước làm ngắn gọn.
+    - *Cụm 3 ô thông số (Meta Row):* Hiển thị `tokens`, `cost` và `elapsed` (thời gian chạy) bằng font monospace thẳng hàng, dễ đọc số liệu.
+    - *Nút "Dừng" (Stop Button):* Ẩn gọn gàng, chỉ hiện khi di chuột (`:hover`) trên các thẻ đang chạy (`run`) hoặc đang chờ (`pending`) để dừng khẩn cấp đúng phiên đó.
+  - *Nguyên tắc "Đang chạy mới thở" (Pulse Animation):*
+    - Trạng thái `run`: Chấm trạng thái và thanh ray chớp nháy nhịp nhanh (~1.05s) biểu thị đang xử lý tích cực.
+    - Trạng thái `pending`: Chớp nháy nhịp chậm rãi (~1.7s) biểu thị đang giữ chỗ hàng đợi.
+    - Các trạng thái tĩnh (`done`, `idle`, `error`): Đứng yên hoàn toàn, không nhấp nháy, chống gây nhiễu thị giác.
+    - *Tôn trọng trợ năng (`prefers-reduced-motion`):* Tắt toàn bộ nhịp pulse, thanh trượt chuyển động và fade-in khi hệ điều hành yêu cầu giảm chuyển động.
+
+- **Quyết định 5: Hợp đồng dữ liệu (Data Contract) `/api/state` + `/api/flow/detail` & Minh bạch dữ liệu**
+  - *Nguyên tắc "Đã đo — không suy luận":* Mọi con số trên dashboard phải đến từ dữ liệu đo lường thực tế. Phiên CLI chưa có cơ chế đo token/cost thì hiển thị rõ `--` hoặc `"chưa đo"`, tuyệt đối không dùng hàm ngẫu nhiên sinh số giả lấp chỗ trống. Đồng hồ đo (Meter) ở cột Tổng quan chỉ tính toán dựa trên số thật từ workflow run và cuộc gọi AI trực tiếp.
+  - *Hợp đồng dữ liệu 1: `GET /api/state` (Ảnh chụp trạng thái hệ thống theo thời gian thực)*
+    - Cung cấp danh sách hồ sơ tài khoản (`profiles`), phiên CLI đang chạy (`sessions`), 20 lượt chạy workflow gần nhất (`runs`), mốc thời gian Unix (`now`) và phiên bản API (`apiVersion`).
+    - Cấu trúc dữ liệu JSON:
+      ```json
+      {
+        "apiVersion": 1,
+        "profiles": [
+          {
+            "addr": "claude:phu",
+            "provider": "claude",
+            "account": "phu",
+            "identity": "ban@gmail.com",
+            "hasToken": true,
+            "hetHan": false,
+            "active": true
+          }
+        ],
+        "sessions": [
+          {
+            "id": 1,
+            "addr": "claude:phu",
+            "pid": 12480,
+            "worktree": "C:\\repo\\.worktrees\\may-1",
+            "log": "C:\\Users\\...\\claude-phu.log",
+            "started": 1771470000
+          }
+        ],
+        "runs": [
+          {
+            "id": 4,
+            "flow": "doi-4",
+            "state": "running",
+            "started": 1771470100
+          }
+        ],
+        "now": 1771470120
+      }
+      ```
+  - *Hợp đồng dữ liệu 2: `GET /api/flow/detail?id=N` (Chi tiết đầy đủ một lượt chạy workflow)*
+    - Đây là **nguồn sự thật duy nhất** chứa danh sách các bước theo thứ tự định nghĩa (`steps`), kèm câu hỏi (`prompt`), câu trả lời (`output`), thông điệp trạng thái (`msg`), chi phí USD thật (`costUsd`), và lượng token thật (`tokensIn`, `tokensOut`).
+    - Cấu trúc dữ liệu JSON:
+      ```json
+      {
+        "id": 4,
+        "flow": "doi-4",
+        "state": "running",
+        "dir": "C:\\repo",
+        "started": 1771470100,
+        "steps": [
+          {
+            "id": "ke-hoach",
+            "type": "agent",
+            "profile": "claude:leader",
+            "needs": [],
+            "state": "done",
+            "msg": "Lập kế hoạch thành công",
+            "prompt": "Soạn kế hoạch chi tiết...",
+            "output": "1. Sửa file...",
+            "attempt": 1,
+            "costUsd": 0.0125,
+            "tokensIn": 1200,
+            "tokensOut": 450
+          },
+          {
+            "id": "code-go",
+            "type": "agent",
+            "profile": "claude:coder",
+            "needs": ["ke-hoach"],
+            "state": "running",
+            "msg": "Đang viết mã nguồn...",
+            "prompt": "Viết mã nguồn theo kế hoạch...",
+            "output": "",
+            "attempt": 1,
+            "costUsd": 0.0,
+            "tokensIn": 0,
+            "tokensOut": 0
+          }
+        ]
+      }
+      ```
+  - *Cơ chế phối hợp dữ liệu trên mặt 2D:*
+    - Khi khởi động hoặc nhận sự kiện từ SSE `/api/events`, dashboard gọi `GET /api/state` để cập nhật danh sách hạm đội phiên (`sessions`).
+    - Nếu mảng `runs` có lượt chạy đang hoạt động (`state == "running"`) hoặc lượt chạy mới nhất, dashboard tự động gọi tiếp `GET /api/flow/detail?id=<id>` để lấy toàn bộ danh sách `steps`, tính toán bước hiện tại / tổng số bước (ví dụ: `Bước 2/4`), kiểm tra bước hỏng, và cộng dồn chi phí `costUsd` + token vào khối Tiến độ và Meter Tổng quan.
+
 
 #### 6. Mặt 3D (Kiến trúc không gian & Ba quyết định cốt lõi)
 
