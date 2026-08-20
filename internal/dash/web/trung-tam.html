@@ -373,7 +373,8 @@ function capLai(unix){
 // nhân vật; vòng dưới chân mới mang màu trạng thái.
 const TINT = {claude:mauToken('--prov-claude'), codex:mauToken('--prov-codex'),
               gemini:mauToken('--prov-gemini'), cursor:mauToken('--prov-cursor'),
-              antigravity:mauToken('--prov-antigravity'), grok:mauToken('--prov-grok')};
+              antigravity:mauToken('--prov-antigravity'), grok:mauToken('--prov-grok'),
+              deepseek:mauToken('--prov-deepseek')};
 const MAU_LO   = mauToken('--prov-may');   // hãng lạ: xám, không bịa màu mới
 const MAU_NEN  = mauToken('--void');
 const MAU_SAN  = mauToken('--panel');
@@ -428,6 +429,11 @@ function phongCuaVai(vai){
 // Trộn hai thứ vào một hình là nói dối về ai đã làm việc đó.
 const LOAI_MAY = ['test', 'lint', 'shell', 'merge'];
 const laMay = typ => LOAI_MAY.indexOf(typ) >= 0;
+
+// Node `model` KHÔNG phải bước máy: có một AI thật làm việc đó, chỉ là nó đi
+// thẳng API thay vì qua CLI. Vẽ nó thành máy chấm là nói dối theo hướng ngược
+// lại với `laMay` — bảo rằng không ai làm, trong khi có hẳn một nhà cung cấp.
+const laModel = typ => typ === 'model';
 
 // ---- three.js: cảnh, đèn, camera ----
 const canvas = $('scene');
@@ -1222,6 +1228,25 @@ function capNhat(){
       dan.push({khoa:'may:'+st.id, prof:st.id, may:true, st});
       return;
     }
+    // Node `model` đi THẲNG API, không qua CLI, nên nó không có `profile` —
+    // và bản cũ `return` ngay ở đây, tức là nó không có ai đại diện. Hệ quả đo
+    // được 20/08: bước `soi` của lượt #47 chạy xong mà Phòng review trống trơn,
+    // nhìn vào tưởng chưa ai soi.
+    //
+    // Người đại diện của node `model` là ROUTE. Mỗi route trong danh sách sẽ
+    // thử là MỘT nhân vật: route đầu là người soi chính, các route sau là người
+    // chờ thay khi nhà cung cấp kia sập. Vẽ cả hai vì đó đúng là những ai có
+    // thể làm bước này — giấu người dự phòng đi thì lúc route chính sập, tự
+    // nhiên có một nhân vật lạ xuất hiện mà không ai hiểu ở đâu ra.
+    if(laModel(st.type)){
+      (st.route && st.route.length ? st.route : ['(chưa khai route)']).forEach((r,i)=>{
+        const khoa = 'route:'+r;
+        if(daCo[khoa]) return;
+        daCo[khoa] = true;
+        dan.push({khoa, prof:r, may:false, st, route:true, duPhong:i>0});
+      });
+      return;
+    }
     if(!st.profile) return;
     if(daCo[st.profile]) return;
     daCo[st.profile] = true;
@@ -1311,9 +1336,15 @@ function capNhat(){
     const el = document.createElement('div');
     el.className = 'lbl';
     const ten = document.createElement('span');
-    ten.textContent = d.may ? ('máy chấm · ' + d.prof) : d.prof;
+    // Người đại diện của node `model` là một ROUTE, không phải tài khoản — nói
+    // rõ ra, vì "deepseek" đứng một mình đọc như tên một tài khoản đã đăng nhập.
+    ten.textContent = d.may ? ('máy chấm · ' + d.prof)
+                    : d.route ? ('route · ' + d.prof)
+                    : d.prof;
     const phu = document.createElement('small');
-    const vaiChu = d.vai ? d.vai : 'chưa phân vai';
+    // Người chờ thay phải NÓI RÕ là chờ thay: hai nhân vật cùng đứng trong một
+    // phòng mà không phân biệt thì đọc như hai người đang cùng làm.
+    const vaiChu = (d.vai ? d.vai : 'chưa phân vai') + (d.duPhong ? ' · dự phòng' : '');
     phu.textContent = st ? (vaiChu + ' · ' + st.id + ' ' + (tt || 'chờ')) : vaiChu;
     if(tt) phu.style.color = chuoiMau(mau);
     el.appendChild(ten); el.appendChild(phu);

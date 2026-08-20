@@ -690,6 +690,31 @@ func (a *API) AIRoutes() []aiapi.Route {
 	return out
 }
 
+// ThuTuRoute trả về danh sách route sẽ được thử, theo đúng thứ tự.
+//
+// Route rỗng = `default_route` rồi tới các route dự phòng; gọi đích danh thì
+// chỉ có đúng route đó (người dùng chọn nhà cung cấp là có lý do — giá, dữ
+// liệu, hợp đồng). Cắt ở HAI vì bộ gọi chỉ chuyển tiếp đúng một lần.
+//
+// Tách ra khỏi AICall để mặt web hỏi được câu "bước này sẽ chạy bằng route
+// nào" mà KHÔNG phải chạy thử. Mặt Trung tâm cần đúng câu đó để vẽ người soi:
+// trước đây nó bỏ qua mọi bước không có `profile`, nên node `model` không có
+// ai đại diện và Phòng review trống trơn dù bước đã chạy xong.
+func (a *API) ThuTuRoute(route string) []string {
+	var thuTu []string
+	if route != "" {
+		thuTu = []string{route}
+	} else {
+		if a.cfg.AI.DefaultRoute != "" {
+			thuTu = append(thuTu, a.cfg.AI.DefaultRoute)
+		}
+		thuTu = append(thuTu, a.cfg.AI.FallbackRoutes...)
+	}
+	if len(thuTu) > 2 {
+		thuTu = thuTu[:2]
+	}
+	return thuTu
+}
 // AICall — action "api.call". Gọi thẳng AI API theo route, chuyển sang route dự
 // phòng ĐÚNG MỘT LẦN nếu route chính hỏng.
 //
@@ -726,24 +751,13 @@ func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, e
 		return aiapi.Route{}, false
 	}
 
-	var thuTu []string
-	if route != "" {
-		thuTu = []string{route}
-	} else {
-		if a.cfg.AI.DefaultRoute != "" {
-			thuTu = append(thuTu, a.cfg.AI.DefaultRoute)
-		}
-		thuTu = append(thuTu, a.cfg.AI.FallbackRoutes...)
-	}
+	thuTu := a.ThuTuRoute(route)
 	if len(thuTu) == 0 {
 		return aiapi.KetQua{}, fmt.Errorf("chưa cấu hình route nào — xem: sagent api ds")
 	}
-	// Cắt ở hai: route chính + đúng một route dự phòng (luật 1 ở trên). Cắt tại
-	// đây chứ không `break` trong vòng lặp, để `thuTu` cũng chính là danh sách
-	// "đã thử" trả về cho người gọi.
-	if len(thuTu) > 2 {
-		thuTu = thuTu[:2]
-	}
+	// `ThuTuRoute` đã cắt ở hai: route chính + đúng một route dự phòng (luật 1 ở
+	// trên). Cắt ở đó chứ không `break` trong vòng lặp, để `thuTu` cũng chính là
+	// danh sách "đã thử" trả về cho người gọi.
 
 	var loi []error
 	for i, ten := range thuTu {

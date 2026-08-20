@@ -222,10 +222,19 @@ func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
 		CostUSD   float64  `json:"costUsd"`
 		TokensIn  int      `json:"tokensIn"`
 		TokensOut int      `json:"tokensOut"`
+		// Route: node `model` KHÔNG có `profile` — nó đi thẳng API, không qua CLI.
+		// Thiếu trường này thì mặt web không biết ai đứng sau bước đó, và mặt
+		// Trung tâm bỏ qua luôn: Phòng review trống trơn dù bước `soi` đã chạy
+		// xong (đo 20/08, lượt #47).
+		//
+		// Server GIẢI SẴN: `route` rỗng trong flows.toml nghĩa là default_route
+		// rồi tới dự phòng, mà luật đó nằm ở `api.ThuTuRoute`. Bắt mỗi mặt web tự
+		// suy lại là cách để bốn mặt nói bốn kiểu về cùng một bước.
+		Route []string `json:"route,omitempty"`
 	}
 	ds := make([]buocDTO, 0, len(def.Steps))
 	daCo := map[string]bool{}
-	them := func(id, typ, prof, vai string, needs []string, st store.StepRun) {
+	themR := func(id, typ, prof, vai string, needs []string, st store.StepRun, route []string) {
 		daCo[id] = true
 		if needs == nil {
 			needs = []string{}
@@ -235,11 +244,20 @@ func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
 			State: st.State, Msg: st.Msg, Prompt: st.Prompt, Output: st.Output,
 			Attempt: st.Attempt, CostUSD: st.CostUSD,
 			TokensIn: st.TokensIn, TokensOut: st.TokensOut,
+			Route: route,
 		})
+	}
+	// them là lối gọi gọn cho bước KHÔNG phải node `model` — chúng không có route.
+	them := func(id, typ, prof, vai string, needs []string, st store.StepRun) {
+		themR(id, typ, prof, vai, needs, st, nil)
 	}
 	for i := range def.Steps {
 		d := def.Steps[i]
-		them(d.ID, d.Type, d.Profile, d.VaiTro, d.Needs, steps[d.ID])
+		var route []string
+		if d.Type == flow.TypeModel {
+			route = s.api.ThuTuRoute(d.Route)
+		}
+		themR(d.ID, d.Type, d.Profile, d.VaiTro, d.Needs, steps[d.ID], route)
 	}
 	// Bước có trong sổ nhưng flows.toml đã bỏ (flow sửa sau khi chạy) vẫn phải
 	// hiện — giấu đi thì người đọc tưởng lượt chạy ít bước hơn thực tế.

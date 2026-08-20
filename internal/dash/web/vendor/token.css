@@ -63,6 +63,7 @@
   --prov-gemini:#4285F4;
   --prov-antigravity:#4285F4;
   --prov-grok:#C7CBD6;
+  --prov-deepseek:#7C6BFF;
   --prov-may:#5A6273;
 
   /* Ba vai chữ. Display có cá tính nên dùng tiết chế; mono cho MỌI dữ liệu máy. */
@@ -114,6 +115,7 @@
   --prov-gemini:#2A64C8;
   --prov-antigravity:#2A64C8;
   --prov-grok:#5A6070;
+  --prov-deepseek:#5442C9;
   --prov-may:#798194;
 }
 
