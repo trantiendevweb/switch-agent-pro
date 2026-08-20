@@ -88,6 +88,15 @@ func TestAssetVendorCoThat(t *testing.T) {
 		"inter-variable.woff2":          "wOF2",
 		"space-grotesk-variable.woff2":  "wOF2",
 		"jetbrains-mono-variable.woff2": "wOF2",
+		// Hai asset cua mat van phong (them 20/08). Dau nhan phai la thu CHI
+		// file that moi co, o trong 4096 byte dau:
+		//   - GLTFLoader.js mo bang `class GLTFLoader extends THREE.Loader`;
+		//     lay dau "THREE" thi mot ban chep three.min.js dat nham ten cung
+		//     lot, nen lay ten lop.
+		//   - .glb la dinh dang nhi phan, bon byte dau LA magic "glTF". Mot file
+		//     rong hoac mot trang 404 luu nham ten .glb deu khong co no.
+		"GLTFLoader.js":       "class GLTFLoader",
+		"RobotExpressive.glb": "glTF",
 	}
 	for f, dau := range can {
 		p := filepath.Join("web", "vendor", f)
@@ -195,6 +204,8 @@ func TestVendorPhucVuCongKhai(t *testing.T) {
 		"/vendor/inter-variable.woff2",
 		"/vendor/space-grotesk-variable.woff2",
 		"/vendor/jetbrains-mono-variable.woff2",
+		"/vendor/GLTFLoader.js",
+		"/vendor/RobotExpressive.glb",
 	} {
 		w := httptest.NewRecorder()
 		s.ServeHTTP(w, req("GET", d))
