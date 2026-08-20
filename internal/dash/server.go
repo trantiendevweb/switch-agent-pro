@@ -53,7 +53,10 @@ type Server struct {
 func New(a *api.API) *Server {
 	s := &Server{api: a, auth: LoadAuth(), sess: newSessions()}
 	sub, _ := fs.Sub(webFS, "web")
-	files := http.FileServer(http.FS(sub))
+	// KHÔNG phục vụ thẳng bằng http.FileServer: embed.FS không có mốc thời gian
+	// nên nó không phát ra van xác thực nào, và trình duyệt giữ bản cũ vô hạn.
+	// Xem đầu cache.go — chuyện này đã ăn mất trọn một ngày sửa giao diện.
+	files := tepNhung(sub, http.FileServer(http.FS(sub)))
 
 	m := http.NewServeMux()
 	m.HandleFunc("/api/state", s.guard(s.handleState))
