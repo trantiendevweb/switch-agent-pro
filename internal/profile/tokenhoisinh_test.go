@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,5 +112,104 @@ func TestKhongDongBoNguocKhiKhongCoGiMoi(t *testing.T) {
 	}
 	if bak > 0 {
 		t.Errorf("đồng bộ ngược vô cớ: đẻ ra %d file .bak, mỗi file là một bản sao token", bak)
+	}
+}
+
+// adapterDocThat kiểm token bằng cách ĐỌC FILE THẬT, không trả một cờ cứng.
+//
+// Cần bản này vì hai lỗi dưới đây chỉ lộ ra khi `HasToken` phân biệt được "thư
+// mục có token dùng được" với "thư mục có file token rỗng" — mà `fakeAdapter`
+// thì trả `hasToken` cố định cho mọi thư mục.
+type adapterDocThat struct{ fakeAdapter }
+
+func (adapterDocThat) HasToken(dir string) bool {
+	b, err := os.ReadFile(filepath.Join(dir, ".credentials.json"))
+	if err != nil {
+		return false
+	}
+	var f struct {
+		Oauth struct {
+			RefreshToken string `json:"refreshToken"`
+		} `json:"claudeAiOauth"`
+	}
+	return json.Unmarshal(b, &f) == nil && f.Oauth.RefreshToken != ""
+}
+
+func ghiToken(t *testing.T, p, refresh string) {
+	t.Helper()
+	than := `{"claudeAiOauth":{"refreshToken":"` + refresh + `"}}`
+	if refresh == "" {
+		than = `{"claudeAiOauth":{}}` // đúng cái CLI để lại sau refresh thất bại
+	}
+	if err := os.WriteFile(p, []byte(than), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// LỖI THẬT, đo 21/08/2026 trên `claude:tns`: sau một lần refresh THẤT BẠI, CLI
+// ghi đè file token của hồ sơ gốc thành bản RỖNG (không còn refreshToken) —
+// trong khi bản clone vẫn giữ token còn hạn.
+//
+// Hai chỗ hỏng cùng lúc, và phải sửa cả hai mới cứu được:
+//
+//  1. `Clone` kiểm "đã đăng nhập chưa" TRƯỚC khi đồng bộ ngược, nên nó từ chối
+//     ngay với câu "chạy /login" — bắt người dùng đăng nhập lại trong khi một
+//     token còn sống nằm ngay trong bản clone bên cạnh.
+//  2. `SyncBackTokens` chọn bản theo mtime. Việc ghi đè làm mtime của GỐC thành
+//     mới nhất, nên clone bị coi là "cũ hơn" và bị bỏ qua. mtime chỉ nói "file
+//     vừa bị ghi", KHÔNG nói "nội dung còn dùng được".
+func TestCuuDuocKhiGocMatTokenMaCloneConToken(t *testing.T) {
+	_, fakeBase := fakeHome(t)
+	a := adapterDocThat{fakeAdapter{base: fakeBase, hasToken: true}}
+	home := homeCuaTest(t)
+	gocTok := filepath.Join(home, ".ai-accounts", "fake", "phu", ".credentials.json")
+
+	ghiToken(t, gocTok, "token-goc")
+	dirs, err := Clone(a, "phu", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloneTok := filepath.Join(dirs[0], ".credentials.json")
+
+	// Clone tự refresh (token mới), rồi hồ sơ gốc bị ghi đè thành RỖNG — và ghi
+	// SAU, nên mtime của gốc mới hơn clone. Đây đúng thứ tự đã xảy ra thật.
+	ghiToken(t, cloneTok, "token-moi-con-song")
+	ghiToken(t, gocTok, "")
+	sau := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(gocTok, sau, sau); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Clone(a, "phu", 1); err != nil {
+		t.Fatalf("từ chối trong khi clone còn token dùng được: %v", err)
+	}
+	got, err := os.ReadFile(gocTok)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "token-moi-con-song") {
+		t.Errorf("không cứu được token từ clone về hồ sơ gốc.\n được: %s", got)
+	}
+}
+
+// Ngược lại: gốc VÀ clone đều rỗng thì vẫn phải từ chối, và nói đúng câu cũ.
+// Không có gì để cứu mà vẫn chạy tiếp thì agent bật lên rồi đăng nhập hụt.
+func TestVanTuChoiKhiKhongConBanNaoCoToken(t *testing.T) {
+	_, fakeBase := fakeHome(t)
+	a := adapterDocThat{fakeAdapter{base: fakeBase, hasToken: true}}
+	gocTok := filepath.Join(homeCuaTest(t), ".ai-accounts", "fake", "phu", ".credentials.json")
+
+	ghiToken(t, gocTok, "token-goc")
+	dirs, err := Clone(a, "phu", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ghiToken(t, filepath.Join(dirs[0], ".credentials.json"), "")
+	ghiToken(t, gocTok, "")
+
+	if _, err := Clone(a, "phu", 1); err == nil {
+		t.Error("không bản nào còn token mà vẫn chạy tiếp")
+	} else if !strings.Contains(err.Error(), "chưa đăng nhập") {
+		t.Errorf("thông điệp không chỉ ra việc phải làm: %v", err)
 	}
 }

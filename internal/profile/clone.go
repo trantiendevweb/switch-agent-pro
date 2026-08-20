@@ -52,11 +52,6 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 		return nil, fmt.Errorf("không có %s:%s — tạo trước bằng: sagent them %s:%s",
 			a.Name(), account, a.Name(), account)
 	}
-	if !a.HasToken(base) {
-		return nil, fmt.Errorf("%s:%s chưa đăng nhập — chạy `sagent %s:%s` rồi /login trước",
-			a.Name(), account, a.Name(), account)
-	}
-
 	// MANG TOKEN MỚI VỀ TRƯỚC KHI CHÉP ĐÈ.
 	//
 	// LỖI THẬT, đo 20/08/2026: `claude:phu` mất phiên giữa lượt chạy #47 với
@@ -78,6 +73,18 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 	// hành vi cũ, còn chặn `fleet` vì một phép dọn dẹp thì tệ hơn hẳn.
 	if name, err := SyncBackTokens(a, account); err == nil && name != "" {
 		_ = name // bên gọi (fleet/api) là chỗ có bus để báo; ở đây chỉ làm việc
+	}
+
+	// Kiểm "đã đăng nhập chưa" SAU khi đồng bộ, không phải trước.
+	//
+	// Đo 21/08: hồ sơ gốc `claude:tns` bị CLI xoá sạch refreshToken sau một lần
+	// refresh thất bại, trong khi bản clone vẫn giữ token còn hạn. Kiểm trước thì
+	// `Clone` từ chối ngay với câu "chưa đăng nhập — chạy /login", tức là bắt
+	// người dùng đăng nhập lại TRONG KHI một token còn sống nằm ngay trong bản
+	// clone bên cạnh. Đồng bộ trước thì cứu được.
+	if !a.HasToken(base) {
+		return nil, fmt.Errorf("%s:%s chưa đăng nhập — chạy `sagent %s:%s` rồi /login trước",
+			a.Name(), account, a.Name(), account)
 	}
 
 	var dirs []string
@@ -164,14 +171,34 @@ func SyncBackTokens(a provider.Adapter, account string) (string, error) {
 		baseTime = st.ModTime()
 	}
 
+	// Hồ sơ gốc còn token dùng được không? Câu này quyết định cách chọn bên dưới.
+	//
+	// Đo 21/08: sau một lần refresh THẤT BẠI, CLI ghi đè file token của hồ sơ gốc
+	// `claude:tns` thành bản RỖNG (không còn refreshToken). Ghi đè nghĩa là mtime
+	// của gốc thành MỚI NHẤT — nên phép so "clone có mới hơn gốc không" trả lời
+	// KHÔNG, và bản clone đang giữ token còn hạn bị bỏ qua. Người dùng nhận câu
+	// "chưa đăng nhập, chạy /login" trong khi một token còn sống nằm ngay bên cạnh.
+	//
+	// mtime chỉ nói "file vừa bị ghi", KHÔNG nói "nội dung còn dùng được". Khi gốc
+	// đã mất token thì mọi clone CÒN token đều đáng mang về, bất kể mtime.
+	gocCoToken := a.HasToken(base)
+
 	newest, newestTime := "", baseTime
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
-		p := filepath.Join(root, e.Name(), name)
+		thuMuc := filepath.Join(root, e.Name())
+		p := filepath.Join(thuMuc, name)
 		st, err := os.Stat(p)
 		if err != nil {
+			continue
+		}
+		if !gocCoToken {
+			// Gốc rỗng: chọn clone CÒN TOKEN, mới nhất trong số đó.
+			if a.HasToken(thuMuc) && (newest == "" || st.ModTime().After(newestTime)) {
+				newest, newestTime = p, st.ModTime()
+			}
 			continue
 		}
 		if st.ModTime().After(newestTime) {
