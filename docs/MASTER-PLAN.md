@@ -522,7 +522,7 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 - [x] Điều khiển: bật hạm đội + dừng phiên qua POST; đã chạy thật.
 - [x] **Bảo mật**: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
   · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.
-- [ ] Trạng thái phiên chi tiết (queued/blocked/rate_limited…) — hiện mới running/stopped/lost.
+- [x] **Trạng thái phiên chi tiết (3 trạng thái đo được)**: phân loại chính xác các phiên gặp sự cố sang `rate_limited` (chạm trần hạn mức, có mốc thời gian mở lại), `blocked` (bị chặn quyền thao tác), và `failed` (lỗi từ phía API nhà cung cấp) dựa trên dữ liệu có cấu trúc từ kết quả phiên (`provider.KetQua`, hiện đo được đầy đủ trên Claude; các adapter chưa đo vẫn giữ `lost`). Riêng trạng thái `queued` (xếp hàng chờ) **CHƯA đo được** và chưa thêm vì hệ thống chưa có cơ chế hàng đợi trong mã nguồn (`FleetStart` từ chối thẳng khi chạm trần `max_parallel_sessions`).
 - [ ] Approval gate (chờ Pha 3 flow).
 *DoD:* mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.
 
