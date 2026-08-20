@@ -141,6 +141,7 @@
   <span><i class="dot" style="background:var(--idle)"></i>chưa chạy</span>
   <span><i class="ln"></i>đang giao việc</span>
   <span id="scount" style="color:var(--hi)">0 nhân vật</span>
+  <span style="color:var(--lo)">chạm vào người để xem chi tiết · ← → đổi người · Esc đóng</span>
 </div>
 
 <!-- Bảng chi tiết: hiện khi bấm vào một nhân vật. Luật ngang quyền đòi mặt nào
@@ -1010,6 +1011,9 @@ function capNhat(){
     }
   });
 
+  // Thứ tự để mũi tên bàn phím đi vòng — đúng thứ tự đang xếp trong `dan`.
+  thuTuChon = dan.map(d => d.khoa);
+
   // Dựng SAU cùng: dungCapNoi chỉ nối những nhân vật đã có mặt trong nhanVat.
   dungCapNoi();
   // Bảng chi tiết phải theo dữ liệu mới. Để nó đứng im trong khi bước đã đổi
@@ -1152,7 +1156,30 @@ function veChiTiet(){
 }
 
 $('ct-dong').addEventListener('click', dongChiTiet);
-addEventListener('keydown', e=>{ if(e.key === 'Escape') dongChiTiet(); });
+
+// BÀN PHÍM. Sàn chất lượng của dự án đòi thao tác được bằng bàn phím, mà một
+// raycaster thì chỉ có chuột — thêm cú bấm vào cảnh 3D xong là tôi vừa dựng một
+// tính năng không ai dùng bàn phím tới được.
+//
+// Mũi tên trái/phải đi vòng qua dàn nhân vật theo ĐÚNG thứ tự đang xếp, Esc
+// đóng. Danh sách lấy từ `dan` của lần cập nhật gần nhất chứ không phải
+// Object.keys(nhanVat) — thứ tự khoá trong object là thứ tự chèn, tức là thứ tự
+// nhân vật XUẤT HIỆN, không phải thứ tự người ta nhìn thấy trên màn hình.
+let thuTuChon = [];
+addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){ dongChiTiet(); return; }
+  if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  // Đang gõ trong ô nhập thì mũi tên là để di con trỏ, không phải để đổi người.
+  const o = document.activeElement;
+  if(o && (o.tagName === 'INPUT' || o.tagName === 'TEXTAREA' || o.isContentEditable)) return;
+  if(!thuTuChon.length) return;
+  e.preventDefault();
+  const i = thuTuChon.indexOf(chonKhoa);
+  const b = e.key === 'ArrowRight' ? 1 : -1;
+  const j = i < 0 ? (b > 0 ? 0 : thuTuChon.length - 1)
+                  : (i + b + thuTuChon.length) % thuTuChon.length;
+  moChiTiet(thuTuChon[j]);
+});
 $('ct-huy').addEventListener('click', async ()=>{
   if(!flowRunID) return;
   const bao = $('ct-bao');

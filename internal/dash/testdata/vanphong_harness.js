@@ -121,6 +121,10 @@ const THREE = {
   sRGBEncoding: 1, ACESFilmicToneMapping: 2, LoopOnce: 3, LoopRepeat: 4
 };
 
+// Su kien gan len chinh cua so (keydown chang han) — de mo phong go phim that.
+const phimCua = {};
+function banRaCuaSo(loai, ev) { (phimCua[loai] || []).forEach(f => f(ev)); }
+
 // Ban mot su kien vao phan tu — de mo phong cu bam that.
 function banRa(el, loai, ev) {
   (el._h[loai] || []).forEach(f => f(ev));
@@ -182,11 +186,17 @@ let khung = null;
 const ctx = {
   THREE, console, Math, JSON, Promise, Error, Float32Array, Array, Object,
   String, Number, Boolean, Date, Set, Map,
-  document: { getElementById: id => kho[id] || null, createElement: elMoi, body: { appendChild(c) { return c; } } },
+  document: {
+    getElementById: id => kho[id] || null, createElement: elMoi,
+    body: { appendChild(c) { return c; } },
+    // Ma that hoi activeElement de biet nguoi dung co dang go trong o nhap khong.
+    activeElement: null
+  },
   matchMedia: () => ({ matches: RM_GIA }),
   getComputedStyle: () => ({ getPropertyValue: n => (n === '--link' ? '#39D9E0' : '#123456') }),
   innerWidth: 1600, innerHeight: 900, devicePixelRatio: 1,
-  addEventListener() {}, setInterval() {}, setTimeout() {},
+  addEventListener(t, f) { (phimCua[t] = phimCua[t] || []).push(f); },
+  setInterval() {}, setTimeout() {},
   requestAnimationFrame(f) { khung = f; },
   EventSource: class {},
   fetch: async (u) => {
@@ -381,6 +391,39 @@ setTimeout(() => {
   // (c) Bam nut dong -> bang phai an.
   banRa(kho['ct-dong'], 'click', {});
   if (!bang.hidden) { console.error('  HONG: bam dong ma bang van hien'); hong++; }
+
+  // (d) BAN PHIM. San chat luong doi thao tac duoc bang ban phim, ma raycaster
+  //     thi chi co chuot. Mui ten phai di duoc vong qua ca dan, Esc phai dong.
+  const ngan = () => {};
+  banRaCuaSo('keydown', { key: 'ArrowRight', preventDefault: ngan });
+  if (bang.hidden) { console.error('  HONG: mui ten phai khong chon duoc ai'); hong++; }
+  const dau = kho['ct-ten'].textContent;
+  const tham = new Set([dau]);
+  for (let i = 0; i < 8; i++) {
+    banRaCuaSo('keydown', { key: 'ArrowRight', preventDefault: ngan });
+    tham.add(kho['ct-ten'].textContent);
+  }
+  console.log('  ban phim: di qua ' + tham.size + '/6 nhan vat, bat dau tu ' + JSON.stringify(dau));
+  if (tham.size !== 6) {
+    console.error('  HONG: mui ten khong di het dan — chi toi duoc ' + tham.size + '/6'); hong++;
+  }
+  // Mui ten trai phai quay NGUOC lai, khong phai cung mot huong.
+  const truoc = kho['ct-ten'].textContent;
+  banRaCuaSo('keydown', { key: 'ArrowLeft', preventDefault: ngan });
+  banRaCuaSo('keydown', { key: 'ArrowRight', preventDefault: ngan });
+  if (kho['ct-ten'].textContent !== truoc) {
+    console.error('  HONG: trai roi phai khong quay ve cho cu — hai mui ten cung mot huong'); hong++;
+  }
+  // Dang go trong o nhap thi mui ten la de di con tro, khong phai doi nguoi.
+  ctx.document.activeElement = { tagName: 'INPUT' };
+  const giu = kho['ct-ten'].textContent;
+  banRaCuaSo('keydown', { key: 'ArrowRight', preventDefault: ngan });
+  if (kho['ct-ten'].textContent !== giu) {
+    console.error('  HONG: dang go trong o nhap ma mui ten van doi nguoi'); hong++;
+  }
+  ctx.document.activeElement = null;
+  banRaCuaSo('keydown', { key: 'Escape', preventDefault: ngan });
+  if (!bang.hidden) { console.error('  HONG: Esc khong dong duoc bang'); hong++; }
 
   // 5) KHO DIEN THOAI. Man hep thi nhan chen nhau nang hon han, va luot tach de
   //    chi biet day LEN — day mai thi nhan bay len khoi mep tren, tuc la mat
