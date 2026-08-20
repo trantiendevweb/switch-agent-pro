@@ -45,7 +45,8 @@ func TestDangNhapDoDangKhongDuocTinhLaCoToken(t *testing.T) {
 // Doi chung: tai khoan gocDANG CHAY DUOC luon co expiresAt khac 0.
 func TestTokenThatThiCoExpiresAtKhac0(t *testing.T) {
 	con := time.Now().Add(3 * time.Hour).UnixMilli()
-	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":`+itoa64(con)+`,"refreshTokenExpiresAt":1789617873859}}`)
+	ref := time.Now().Add(720 * time.Hour).UnixMilli()
+	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":`+itoa64(con)+`,"refreshTokenExpiresAt":`+itoa64(ref)+`}}`)
 
 	if !(claude{}).HasToken(dir) {
 		t.Fatal("token that ma bao la khong co")
@@ -56,6 +57,43 @@ func TestTokenThatThiCoExpiresAtKhac0(t *testing.T) {
 	}
 	if time.Now().After(exp) {
 		t.Fatalf("han %s bi coi la da qua — kiem lai don vi mili-giay", exp)
+	}
+}
+
+// CA DA TRA GIA (20/08): access token het han nhung REFRESH con — tai khoan van
+// dung duoc, vi Claude Code tu doi access token moi luc khoi dong.
+//
+// Truoc ban va, TokenExpiry tra expiresAt nen ds in "HET HAN — dang nhap lai" va
+// cong kiem CHAN luot chay #39. Do luc 08:30: mo Claude Code len thi ca tns lan
+// phu deu co access token moi, refresh con toi 16/09 va 17/09. Nguoi dung bi bao
+// di dang nhap lai HAI LAN trong khi khong can.
+func TestAccessHetHanNhungRefreshCon_VanDungDuoc(t *testing.T) {
+	qua := time.Now().Add(-3 * time.Hour).UnixMilli()  // access da het
+	ref := time.Now().Add(600 * time.Hour).UnixMilli() // refresh con ~25 ngay
+	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":`+itoa64(qua)+`,"refreshTokenExpiresAt":`+itoa64(ref)+`}}`)
+
+	exp, ok := (claude{}).TokenExpiry(dir)
+	if !ok {
+		t.Fatal("phai doc duoc han dung duoc")
+	}
+	if time.Now().After(exp) {
+		t.Fatalf("access het han nhung refresh con — tai khoan VAN dung duoc, "+
+			"khong duoc bao het han (moc tra ve: %s)", exp)
+	}
+}
+
+// Refresh HET HAN moi la luc that su phai dang nhap lai.
+func TestRefreshHetHanThiMoiPhaiDangNhapLai(t *testing.T) {
+	qua := time.Now().Add(-3 * time.Hour).UnixMilli()
+	refQua := time.Now().Add(-48 * time.Hour).UnixMilli()
+	dir := ghiCred(t, `{"claudeAiOauth":{"expiresAt":`+itoa64(qua)+`,"refreshTokenExpiresAt":`+itoa64(refQua)+`}}`)
+
+	exp, ok := (claude{}).TokenExpiry(dir)
+	if !ok {
+		t.Fatal("phai doc duoc han")
+	}
+	if !time.Now().After(exp) {
+		t.Fatal("refresh da het han ma khong bao het")
 	}
 }
 

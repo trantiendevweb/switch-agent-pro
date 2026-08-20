@@ -102,8 +102,8 @@ func (claude) IdentitySource() string {
 // "OAuth session expired and could not be refreshed". Đúng cái bệnh mà
 // Profile.HetHan sinh ra để chữa, chỉ là lọt qua bằng một cửa khác.
 func (claude) HasToken(dir string) bool {
-	ms, err := hanTokenClaude(dir)
-	return err == nil && ms != 0
+	acc, _, err := hanTokenClaude(dir)
+	return err == nil && acc != 0
 }
 
 func (claude) Identity(dir string) string {
@@ -133,31 +133,62 @@ func (c claude) Verify() []Check {
 	return out
 }
 
-// TokenExpiry đọc claudeAiOauth.expiresAt (mili-giây từ epoch).
-// Đã đo 2026-08-17: cửa sổ khoảng 7,5 giờ.
+// TokenExpiry trả mốc tài khoản THÔI DÙNG ĐƯỢC — tức hạn của REFRESH token,
+// không phải hạn của access token.
+//
+// SAI LẦM ĐÃ TRẢ GIÁ (20/08): trước đây hàm này trả expiresAt, tức hạn của
+// access token — khoảng 8 tiếng. Hết 8 tiếng là `sagent ds` in "HẾT HẠN — đăng
+// nhập lại" và cổng kiểm chặn lượt chạy. Nhưng Claude Code TỰ ĐỔI access token
+// mới bằng refresh token khi khởi động, nên tài khoản vẫn dùng được bình thường.
+//
+// Giá phải trả: lượt chạy #39 bị chặn oan, phiên làm việc đêm bị dừng sớm hơn
+// cần thiết, và chủ dự án được bảo đi đăng nhập lại hai lần trong khi không cần.
+// Đo được lúc 08:30 ngày 20/08: mở Claude Code lên thì cả tns lẫn phu đều có
+// access token mới (18:39 và 18:10 cùng ngày), refresh còn tới 16/09 và 17/09.
+//
+// Câu hỏi người dùng cần trả lời là "tài khoản này còn chạy được không", và câu
+// trả lời nằm ở REFRESH token. Access token còn mấy phút là chuyện nội bộ của
+// CLI, không phải chuyện của người vận hành.
+//
+// Vì sao vẫn đòi expiresAt khác 0: một lần đăng nhập DỞ DANG ghi ra file đủ mọi
+// trường — kể cả refreshTokenExpiresAt của tháng sau — chỉ khác đúng chỗ
+// expiresAt = 0, và `claude auth status` trên hồ sơ đó trả loggedIn:false.
+// Hai ca này phân biệt được bằng đúng dấu hiệu đó (đo 19/08 19:30).
 func (claude) TokenExpiry(dir string) (time.Time, bool) {
-	ms, err := hanTokenClaude(dir)
-	if err != nil || ms == 0 {
+	acc, ref, err := hanTokenClaude(dir)
+	if err != nil || acc == 0 {
+		// acc == 0: đăng nhập dở dang. Không đọc được hạn dùng được.
 		return time.Time{}, false
 	}
-	return time.UnixMilli(ms), true
+	if ref != 0 {
+		return time.UnixMilli(ref), true
+	}
+	// Không có refresh: mốc duy nhất biết được là hạn access token.
+	return time.UnixMilli(acc), true
 }
 
-// hanTokenClaude đọc claudeAiOauth.expiresAt (mili-giây). 0 = không có mốc.
-func hanTokenClaude(dir string) (int64, error) {
+// hanTokenClaude đọc CẢ HAI mốc trong claudeAiOauth (mili-giây), 0 = không có.
+//
+//	acc — expiresAt: hạn của access token hiện tại, khoảng 8 tiếng.
+//	ref — refreshTokenExpiresAt: hạn của refresh token, khoảng một tháng.
+//
+// Phải trả cả hai vì hai câu hỏi khác nhau cần hai mốc khác nhau: "đã đăng nhập
+// tử tế chưa" đọc acc, "còn dùng được tới bao giờ" đọc ref.
+func hanTokenClaude(dir string) (acc, ref int64, err error) {
 	data, err := os.ReadFile(filepath.Join(dir, ".credentials.json"))
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	var f struct {
 		ClaudeAiOauth struct {
-			ExpiresAt int64 `json:"expiresAt"`
+			ExpiresAt        int64 `json:"expiresAt"`
+			RefreshExpiresAt int64 `json:"refreshTokenExpiresAt"`
 		} `json:"claudeAiOauth"`
 	}
 	if err := json.Unmarshal(data, &f); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return f.ClaudeAiOauth.ExpiresAt, nil
+	return f.ClaudeAiOauth.ExpiresAt, f.ClaudeAiOauth.RefreshExpiresAt, nil
 }
 
 func (claude) SharedKeys() []string { return claudeSharedKeys }
