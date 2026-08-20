@@ -486,10 +486,13 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     request id), trả `usage`. Đo thật trên `modelapi.vn`: 1195 token / 11,8s.
   - ⬜ **Chưa có streaming.** Cố ý dừng: làm nửa vời thì mất `usage`, mà `usage` mới là
     thứ đáng giá nhất của đường API.
-  - ⬜ **Chưa có fallback route.** `default_route` đọc được nhưng chưa dùng để chuyển
-    tiếp khi route chính hỏng. DoD đòi "fallback không mất correlation ID/usage/error
-    gốc" — chưa làm thì chưa nhận.
-  - ⬜ Chưa ghi lịch sử lời gọi API vào `state.db`.
+  - ✅ **Fallback route**: chỉ chuyển tiếp một lần sang route dự phòng; không fallback khi
+    lỗi do người dùng (401/403/sai key/prompt rỗng); kết quả mang lỗi gốc nguyên văn +
+    request id, ghi rõ tên hai route (đã thử và đã dùng), cùng usage của route thành công
+    (nếu cả hai route hỏng thì trả cả hai lỗi).
+  - ✅ **Lịch sử lời gọi API**: lưu vào bảng `api_calls` ở migration v7 trong `state.db`
+    (thời điểm, route, model, token vào-ra, chi phí, thành-bại, lý do hỏng); không lưu
+    prompt và câu trả lời để bảo đảm riêng tư.
   - ⬜ DeepSeek/OpenRouter/Ollama: chưa đo. Cấu trúc đã generic nên nhiều khả năng chỉ
     là thêm route, nhưng **chưa đo thì chưa nói là chạy được**.
 
