@@ -18,3 +18,32 @@ default_surface = "tui"       # tui | dashboard | workflow | 3d
 theme           = "dark"
 
 # LƯU Ý: file này KHÔNG được chứa API key hay token. Chỉ tham chiếu bằng ID.
+
+# ---- Đường AI API ----
+# Chỉ tham chiếu key bằng ID (tên file trong ~/.ai-accounts/api-keys/), KHÔNG
+# bao giờ để key thật ở đây — file này nằm trong repo.
+[ai]
+default_route = "deepseek"
+# Danh sách dự phòng PHẢI khai riêng — khai thêm một [[ai.route]] thôi thì chưa
+# đủ để nó được dùng làm dự phòng. Bộ gọi chỉ chuyển tiếp ĐÚNG MỘT LẦN nên chỉ
+# mục đầu của danh sách này có tác dụng.
+fallback_routes = ["grok"]
+
+  [[ai.route]]
+  ten      = "deepseek"
+  # ĐO ĐƯỢC 20/08: key này KHÔNG dùng được ở api.deepseek.com (401
+  # "Authentication Fails"), nhưng dùng được ở modelapi.vn — cùng nhà bán lại
+  # với grok. Model hợp lệ chỉ có hai: deepseek-v4-flash và deepseek-v4-pro,
+  # KHÔNG có deepseek-chat. Liệt kê bằng GET /v1/models, không đoán.
+  base_url = "https://modelapi.vn/v1"
+  model    = "deepseek-v4-flash"
+  key_id   = "deepseek"
+
+  # Route dự phòng. Bộ chuyển route chỉ nhảy sang đây khi route chính hỏng vì
+  # PHÍA NÓ (5xx, timeout, mất mạng) — sai key hay prompt rỗng thì không nhảy,
+  # vì nhảy chỉ lặp lại đúng cái sai đó ở nhà cung cấp thứ hai.
+  [[ai.route]]
+  ten      = "grok"
+  base_url = "https://modelapi.vn/v1"
+  model    = "grok-4.5"
+  key_id   = "grok"

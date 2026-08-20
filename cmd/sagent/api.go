@@ -31,8 +31,40 @@ func cmdAPI(args []string) {
 	case "--lich-su", "lich-su", "--history":
 		apiLichSu(rest(args))
 	default:
-		apiGoi(args[0], rest(args))
+		ten, hoi := tachRouteVaPrompt(args)
+		apiGoi(ten, hoi)
 	}
+}
+
+// tachRouteVaPrompt quyết định tham số đầu là TÊN ROUTE hay đã là câu hỏi.
+//
+// VÌ SAO CẦN: `sagent api <route> "câu hỏi"` luôn coi tham số đầu là tên route,
+// nên KHÔNG có cách nào truyền route rỗng — mà route rỗng mới là đường đi qua
+// `default_route` và bộ chuyển route dự phòng. Tức là cả tính năng fallback của
+// Pha 4 có mã, có test, có đường web, mà từ terminal không ai với tới được.
+//
+// Đo được 20/08: route `deepseek` trả HTTP 503 (hỏng phía nhà cung cấp — đúng
+// loại đáng chuyển tiếp), nhưng `sagent api deepseek "..."` vẫn chỉ báo lỗi rồi
+// dừng, vì gọi đích danh thì cố ý không chuyển route. Không có lối nào khác.
+//
+// Cách phân biệt: tham số đầu KHỚP tên một route đã khai thì nó là route. Không
+// khớp thì cả dãy là câu hỏi, và lượt gọi đi đường mặc định + dự phòng. Tên
+// route là định danh ngắn không dấu cách, còn câu hỏi thì hầu như luôn có dấu
+// cách — nên hai thứ này không đụng nhau trong thực tế.
+//
+// Gõ nhầm tên route thì sao? Thì câu đó thành prompt và vẫn được trả lời, kèm
+// dòng "route · model" in ra ngay dưới — nhìn là biết mình vừa hỏi đường nào.
+// Thà vậy còn hơn chặn người dùng lại vì một cái tên họ không định gõ.
+func tachRouteVaPrompt(args []string) (string, []string) {
+	a, done := open()
+	routes := a.AIRoutes()
+	done()
+	for _, r := range routes {
+		if r.Ten == args[0] {
+			return args[0], rest(args)
+		}
+	}
+	return "", args
 }
 
 // apiLichSu in sổ lời gọi API — action "api.history".
@@ -141,6 +173,10 @@ func apiDs() {
 		fmt.Println()
 		fmt.Println("    [ai]")
 		fmt.Println(`    default_route = "grok"`)
+		// PHẢI in dòng này. Khai hai [[ai.route]] rồi tưởng là có dự phòng là
+		// hiểu sai — danh sách dự phòng khai RIÊNG, và không khai thì route
+		// chính hỏng là dừng luôn. Đã mất một lúc đi tìm chính vì chỗ này.
+		fmt.Println(`    fallback_routes = ["deepseek"]   # route chính hỏng thì nhảy sang đây`)
 		fmt.Println()
 		fmt.Println("      [[ai.route]]")
 		fmt.Println(`      ten = "grok"`)
@@ -149,6 +185,9 @@ func apiDs() {
 		fmt.Println(`      key_id = "grok"        # tên file, KHÔNG phải key`)
 		fmt.Println()
 		fmt.Println("  Rồi đặt key: sagent api key grok")
+		fmt.Println()
+		fmt.Println(`  Gọi:  sagent api "câu hỏi"        → default_route, hỏng thì nhảy dự phòng`)
+		fmt.Println(`        sagent api grok "câu hỏi"   → ĐÍCH DANH, cố ý không nhảy đi đâu`)
 		fmt.Println()
 		return
 	}
