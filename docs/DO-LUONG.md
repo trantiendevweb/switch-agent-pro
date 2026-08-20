@@ -2318,3 +2318,39 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   bẫy đang mở. Giữa "biết là có thể hỏng" và "biết hỏng thế nào" là khoảng cách
   của một tài khoản bị mất đăng nhập giữa lượt chạy. Chỗ nào trong mã còn chữ
   CHƯA ĐO thì chỗ đó là một cái bẫy đang chờ, không phải một ghi chú lịch sự.
+
+## 21/08 — Streaming đường API: giữ được `usage`, đóng ô ⬜ cuối của Pha 4
+
+- **Đo lúc nào**: rạng sáng 21/08/2026.
+- **Vì sao mãi mới làm**: kế hoạch Pha 4 **cố ý dừng**, ghi rõ *"làm nửa vời thì
+  mất `usage`, mà `usage` mới là thứ đáng giá nhất của đường API"*.
+- **Nỗi lo đó có thật**: ở chế độ stream, endpoint tương thích OpenAI **không**
+  gửi `usage` trừ khi được hỏi bằng `stream_options.include_usage`. Bỏ qua dòng
+  đó thì stream chạy đẹp và bảng `api_calls` (migration v7) ghi 0 — kiểu hỏng im
+  lặng tệ nhất, vì mọi thứ trông vẫn ổn.
+- **Con số / Bằng chứng** — chạy thật qua `modelapi.vn`:
+
+  | Route | Model | Vào | Ra | Tổng | Thời gian | `usage` giữ được? |
+  |---|---|---|---|---|---|---|
+  | `deepseek` | `deepseek-v4-flash` | 96 | 293 | **389** | 3,6s | ✅ |
+  | `grok` | `grok-4.5` | 219 | 1707 | **1926** | **31,0s** | ✅ |
+
+  31 giây của grok chính là lý do tính năng này đáng có: không streaming thì
+  người dùng nhìn màn hình đứng im nửa phút, không phân biệt được "đang nghĩ"
+  với "đã treo".
+- **Đã sửa hay chưa**: **XONG ở lõi và CLI.** `aiapi.GoiStream` + `sagent api
+  <route> --stream`. Streaming đi **cùng đường** với lời gọi thường
+  (`API.aiCall`): cùng sổ route, cùng sổ chi phí, cùng luật chuyển route dự phòng
+  đúng một lần, cùng cách phân biệt lỗi người dùng với lỗi nhà cung cấp. Viết
+  vòng lặp thứ hai cho streaming là cách để hai đường trôi khỏi nhau.
+- **Không im lặng nuốt usage**: nhà cung cấp nào không trả thì `KetQua.ThieuUsage`
+  bật và CLI in cảnh báo nói rõ đây là **CHƯA ĐO chứ không phải miễn phí**. Cờ
+  riêng chứ không suy từ `Usage.Tong == 0` — một lượt thật cũng có thể tốn 0
+  token nếu hỏng sớm, gộp lại thì sổ mất khả năng phân biệt.
+- **Còn treo**: mặt web chưa có nút stream (`/api/ai` vẫn gọi đường thường).
+  Không phải action mới nên test ngang quyền không đỏ — nhưng đó là một mặt còn
+  thiếu, ghi ra đây để không quên.
+- **Chi tiết dễ đánh rơi, đã có test giữ**: `bufio.Scanner` mặc định bỏ cuộc ở
+  dòng 64KB — gặp mẩu dài là stream *lặng lẽ* kết thúc sớm, mất cả phần đuôi lẫn
+  usage. Đã nới lên 4MB. Mẩu SSE hỏng không được giết cả lượt. Stream đứt giữa
+  chừng thì trả **phần đã nhận kèm lỗi**, vì phần đó đã tốn tiền rồi.

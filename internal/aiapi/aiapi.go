@@ -57,6 +57,15 @@ type KetQua struct {
 	Usage   Usage // usage của route THẬT SỰ trả lời, không phải của route hỏng
 	Mat     time.Duration
 
+	// DaStreaming: lượt này đi đường stream. ThieuUsage: nhà cung cấp KHÔNG trả
+	// `usage`, nên Usage ở trên là số 0 vì CHƯA ĐO chứ không phải vì miễn phí.
+	//
+	// Phải có cờ riêng chứ không suy từ `Usage.Tong == 0`: một lượt thật cũng có
+	// thể tốn 0 token nếu hỏng sớm, và gộp hai chuyện đó lại thì sổ chi phí mất
+	// khả năng phân biệt "không tốn gì" với "không đếm được".
+	DaStreaming bool
+	ThieuUsage  bool
+
 	// Route là tên route đã trả lời câu này.
 	Route string
 	// DaThu là tên mọi route đã gọi, theo thứ tự, kể cả route hỏng.

@@ -205,6 +205,12 @@ func apiDs() {
 }
 
 func apiGoi(ten string, args []string) {
+	// `--stream`: in chữ ra NGAY khi nhận được thay vì đợi cả câu.
+	//
+	// Đo được: một lượt grok-4.5 mất 13,6 giây (docs/DO-LUONG.md). Không có cờ
+	// này thì người dùng nhìn màn hình đứng im 13 giây — không phân biệt được
+	// "đang nghĩ" với "đã treo".
+	stream, args := boolFlag(args, "--stream")
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu prompt: sagent api %s \"câu hỏi\"", ten))
 	}
@@ -213,14 +219,30 @@ func apiGoi(ten string, args []string) {
 
 	// Gọi qua api.AICall chứ không tự tìm route: chỗ đó mới biết default_route và
 	// fallback_routes. Tự dựng Route ở đây là bỏ qua fallback mà không ai thấy.
-	kq, err := a.AICall(context.Background(), ten, strings.Join(args, " "))
+	var kq aiapi.KetQua
+	var err error
+	if stream {
+		fmt.Println()
+		kq, err = a.AICallStream(context.Background(), ten, strings.Join(args, " "),
+			func(s string) { fmt.Print(s) })
+		fmt.Println()
+	} else {
+		kq, err = a.AICall(context.Background(), ten, strings.Join(args, " "))
+	}
 	done()
 	if err != nil {
 		fail(err)
 	}
+	if !stream {
+		fmt.Println()
+		fmt.Println(kq.NoiDung)
+	}
 	fmt.Println()
-	fmt.Println(kq.NoiDung)
-	fmt.Println()
+	// Nhà cung cấp không trả usage ở chế độ stream thì NÓI RA. Im lặng ghi 0 là
+	// biến "chưa đo" thành "miễn phí" ngay trước mắt người trả tiền.
+	if canh := aiapi.CanhBaoThieuUsage(kq); canh != "" {
+		fmt.Printf("  ⚠ %s\n", canh)
+	}
 	// Đường API tiêu TIỀN theo token, khác đường CLI tiêu hạn mức. Không in ra
 	// thì người dùng không biết mình vừa tiêu gì.
 	fmt.Printf("  %s · %s · vào %d, ra %d, tổng %d token · %.1fs\n",

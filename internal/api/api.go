@@ -741,6 +741,25 @@ func (a *API) ThuTuRoute(route string) []string {
 //
 // Mọi lời gọi thật, THÀNH hay BẠI, đều được ghi vào sổ api_calls (schema v7).
 func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, error) {
+	return a.aiCall(ctx, route, prompt, nil)
+}
+
+// AICallStream giống AICall nhưng gọi `nhan` mỗi khi có thêm chữ.
+//
+// Dùng CHUNG toàn bộ logic của AICall — sổ route, sổ chi phí, chuyển route dự
+// phòng đúng một lần, phân biệt lỗi người dùng với lỗi nhà cung cấp. Viết một
+// vòng lặp thứ hai cho streaming là cách để hai đường trôi khỏi nhau: sửa luật
+// fallback ở một chỗ, chỗ kia giữ nguyên luật cũ mà không ai báo.
+func (a *API) AICallStream(ctx context.Context, route, prompt string, nhan func(string)) (aiapi.KetQua, error) {
+	if nhan == nil {
+		// Gọi stream mà không nhận gì thì chẳng khác gì gọi thường, lại còn mất
+		// usage ở những nhà cung cấp không hỗ trợ include_usage. Về đường cũ.
+		return a.aiCall(ctx, route, prompt, nil)
+	}
+	return a.aiCall(ctx, route, prompt, nhan)
+}
+
+func (a *API) aiCall(ctx context.Context, route, prompt string, nhan func(string)) (aiapi.KetQua, error) {
 	routes := a.AIRoutes()
 	tim := func(ten string) (aiapi.Route, bool) {
 		for _, r := range routes {
@@ -778,7 +797,14 @@ func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, e
 		}); err != nil {
 			a.bus.Warnf("không ghi được route %q vào sổ đăng ký: %v", r.Ten, err)
 		}
-		kq, err := aiapi.Goi(ctx, r, prompt)
+		// Streaming đi cùng đường: cùng sổ, cùng luật chuyển route dự phòng.
+		var kq aiapi.KetQua
+		var err error
+		if nhan != nil {
+			kq, err = aiapi.GoiStream(ctx, r, prompt, nhan)
+		} else {
+			kq, err = aiapi.Goi(ctx, r, prompt)
+		}
 		a.ghiSoAPI(ten, kq, err)
 		if err == nil {
 			kq.Route, kq.DaThu = ten, append([]string(nil), thuTu[:i+1]...)
