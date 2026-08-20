@@ -16,7 +16,7 @@ __pycache__/
 /dist/
 
 # log của remote-control server chạy tại chỗ
-.rc-server.log
+.rc-server.log*
 
 # Trạng thái do chính công cụ sinh ra khi chạy thử trong repo. `.grok/` do Grok CLI
 # tạo ở THƯ MỤC LÀM VIỆC — kiểm rồi, bản này không chứa key, nhưng cấu hình của
