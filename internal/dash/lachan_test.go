@@ -160,6 +160,7 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"api.history":   "/api/ai/lich-su",
 		"profile.so":    "/api/so/ho-so",
 		"route.list":    "/api/so/route",
+		"route.kiem":    "/api/route/kiem",
 		"tele.notify":   "/api/tele",
 		// Bảng năng lực: mặt web hỏi được "provider nào làm được gì" mà không
 		// phải mở terminal — nó chỉ đọc chữ viết sẵn trong mã, không chạm hồ sơ.

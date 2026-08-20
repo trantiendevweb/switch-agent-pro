@@ -72,6 +72,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/ai/lich-su", s.guard(s.handleAILichSu))
 	m.HandleFunc("/api/so/ho-so", s.guard(s.handleSoHoSo))
 	m.HandleFunc("/api/so/route", s.guard(s.handleSoRoute))
+	m.HandleFunc("/api/route/kiem", s.guard(s.handleRouteKiem))
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 	m.HandleFunc("/api/nang-luc", s.guard(s.handleNangLuc))
 
@@ -885,6 +886,37 @@ func (s *Server) handleSoHoSo(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, map[string]any{"muc": out, "so_lech": lech})
 }
+
+// handleRouteKiem — action "route.kiem". Hỏi từng route CÓ DÙNG ĐƯỢC KHÔNG.
+//
+// Chạm mạng thật (GET /models ở nhà cung cấp) nhưng KHÔNG tốn token. Vì nó gọi
+// ra ngoài nên đặt sau `guard` như mọi endpoint khác — một đường không cần đăng
+// nhập mà gọi được ra Internet là một cái máy dò cổng miễn phí cho người lạ.
+//
+// DTO không mang key, chỉ key_id — y như `/api/so/route`.
+func (s *Server) handleRouteKiem(w http.ResponseWriter, r *http.Request) {
+	ds := s.api.RouteKiem(r.Context())
+	type dto struct {
+		Ten     string   `json:"ten"`
+		Dung    bool     `json:"dung"`
+		Song    bool     `json:"song"`
+		Status  int      `json:"status,omitempty"`
+		MatMs   int64    `json:"matMs"`
+		Model   string   `json:"model,omitempty"`
+		CoModel bool     `json:"coModel"`
+		SoModel int      `json:"soModel,omitempty"`
+		KhongRo bool     `json:"khongRo,omitempty"`
+		Gan     []string `json:"gan,omitempty"`
+		Loi     string   `json:"loi,omitempty"`
+	}
+	out := make([]dto, 0, len(ds))
+	for _, k := range ds {
+		out = append(out, dto{k.Ten, k.Dung(), k.Song, k.Status, k.Mat.Milliseconds(),
+			k.Model, k.CoModel, k.SoModel, k.KhongRo, k.Gan, k.Loi})
+	}
+	writeJSON(w, map[string]any{"muc": out})
+}
+
 
 // handleSoRoute — action "route.list". Sổ route ↔ cấu hình, chỉ đọc.
 //
