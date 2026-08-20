@@ -79,6 +79,7 @@ func init() {
 		"__fdel":  {"flow.delete", "xoa flow khoi flows.toml", nil},
 		"__fapp":  {"flow.approve", "duyệt/từ chối bước đang chờ", nil},
 		"__fhuy":  {"flow.cancel", "huỷ một lượt chạy dở dang", nil},
+		"__ftt":   {"flow.tom-tat", "tóm tắt lượt chạy, đối chiếu lời agent với git", nil},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},
 	}
@@ -672,6 +673,11 @@ func cmdHelp() {
                                 không tốn hạn mức. Muốn xem cổng kiểm nói gì thì
                                 dùng cái này, đừng chạy thật.
     sagent flow runs            lịch sử các lần chạy
+    sagent flow runs <#>        đổ nguyên văn từng bước của một lượt chạy
+    sagent flow tom-tat <#>     TÓM TẮT một lượt: ai làm gì, ai chưa làm, bước
+                                nào hỏng vì sao, việc gì treo — rồi TỰ ĐẾM commit
+                                trên các nhánh sagent/* và đối chiếu với lời agent
+                                khai. Lệch thì nói thẳng và TIN GIT.
     sagent flow approve <#> <bước>   duyệt để chạy tiếp
     sagent flow reject  <#> <bước>   từ chối, huỷ lần chạy
     sagent flow resume  <#>     chạy tiếp sau khi máy khởi động lại

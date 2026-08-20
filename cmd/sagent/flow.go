@@ -36,6 +36,11 @@ func cmdFlow(args []string) {
 		} else {
 			flowRuns()
 		}
+	case "tom-tat", "tomtat":
+		if len(args) < 2 {
+			fail(fmt.Errorf("thiếu số lần chạy. Ví dụ: sagent flow tom-tat 38"))
+		}
+		flowTomTat(args[1])
 	case "approve", "duyet":
 		flowDecide(args[1:], true)
 	case "reject", "tu-choi":
@@ -51,7 +56,7 @@ func cmdFlow(args []string) {
 		}
 		flowResume(args[1])
 	default:
-		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | approve | reject | resume | huy", sub))
+		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | tom-tat | approve | reject | resume | huy", sub))
 	}
 }
 

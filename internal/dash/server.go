@@ -71,6 +71,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/flow/kho", s.guard(s.handleFlowKho))
 	m.HandleFunc("/api/flow/decide", s.guard(s.handleFlowDecide))
 	m.HandleFunc("/api/flow/detail", s.guard(s.handleFlowDetail))
+	m.HandleFunc("/api/flow/tom-tat", s.guard(s.handleFlowTomTat))
 	m.HandleFunc("/api/flow/cancel", s.guard(s.handleFlowCancel))
 	m.HandleFunc("/api/flow/save", s.guard(s.handleFlowSave))
 	m.HandleFunc("/api/flow/delete", s.guard(s.handleFlowDelete))

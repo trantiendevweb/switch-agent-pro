@@ -90,6 +90,23 @@ button.more:hover{color:var(--hi)}
 .tra-loi-ai{color:var(--mid);font-size:12px;padding:7px 14px;border-top:1px solid var(--line-2)}
 .tra-loi-ai b{color:var(--hi);font-weight:600;font-family:var(--font-mono)}
 
+/* ---------- bản tóm tắt ----------
+   Panel này KHÔNG kể lại lời agent: nó là kết luận, kèm số commit máy tự đếm.
+   Chỗ lệch tô bằng --error vì đó đúng là trạng thái lỗi của dữ liệu, không phải
+   trang trí — xem internal/api/tomtat.go. */
+button.tom-tat{background:var(--panel-2);border:1px solid var(--line-2);color:var(--mid);
+  padding:5px 12px;border-radius:7px;cursor:pointer;font-size:12.5px;font-family:inherit}
+button.tom-tat:hover,button.tom-tat[aria-expanded="true"]{color:var(--hi);border-color:var(--core)}
+#tom-tat{margin:0 0 18px;border:1px solid var(--line-2);border-radius:11px;
+  background:var(--panel);overflow:hidden}
+.tt-dau{padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:11px;
+  letter-spacing:.7px;text-transform:uppercase;color:var(--mid);font-weight:650}
+.tt-lech{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);
+  background:rgba(255,93,121,.08);color:var(--error);font-size:12.5px}
+.tt-lech .rail{width:2px;border-radius:2px;background:var(--error);flex:none}
+.tt-khop{padding:10px 14px;border-bottom:1px solid var(--line);color:var(--done);font-size:12.5px}
+#tom-tat pre{padding:12px 14px}
+
 .empty{color:var(--mid);padding:60px 20px;text-align:center}
 #live{position:fixed;right:18px;bottom:16px;display:flex;align-items:center;gap:8px;
   background:var(--panel);border:1px solid var(--line-2);border-radius:20px;
@@ -148,7 +165,8 @@ button.more:hover{color:var(--hi)}
 }
 
 /* Thao tác được bằng bàn phím — sàn chất lượng của skill. */
-.run:focus-visible,button.more:focus-visible,header nav a:focus-visible{
+.run:focus-visible,button.more:focus-visible,button.tom-tat:focus-visible,
+header nav a:focus-visible{
   outline:2px solid var(--core);outline-offset:2px}
 </style>
 </head>
@@ -191,6 +209,8 @@ const NHAN = {running:"đang chạy", done:"xong", completed:"xong", failed:"h�
 
 let runHienTai = null;
 let dangMo = new Set();   // bước nào người dùng đã bấm "xem đủ"
+let tomTat = null;        // bản tóm tắt đã tải của lượt đang mở
+let moTomTat = false;     // người dùng có đang mở nó không
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? "" : s)
@@ -249,6 +269,7 @@ async function napDanhSach(){
 // ---------------------------------------------------------------- luồng chat
 async function moLuot(id){
   runHienTai = id;
+  tomTat = null; moTomTat = false;   // tóm tắt là của MỘT lượt, không mang sang lượt khác
   for (const el of document.querySelectorAll(".run")){
     const chon = Number(el.dataset.id) === id;
     el.setAttribute("aria-selected", String(chon));
@@ -276,11 +297,15 @@ async function veLuot(){
         <span>bắt đầu <b>${new Date(d.started*1000).toLocaleString("vi-VN")}</b></span>
         <span>token <b>${tin.toLocaleString("vi-VN")}</b> vào / <b>${tout.toLocaleString("vi-VN")}</b> ra</span>
         ${tien > 0 ? `<span>chi phí <b>${tien.toFixed(4)} USD</b></span>` : ""}
+        <button class="tom-tat" id="nut-tom-tat" aria-expanded="${moTomTat}" aria-controls="tom-tat"
+          >${moTomTat ? "đóng tóm tắt" : "Tóm tắt + đối chiếu git"}</button>
       </div>
     </div>`;
 
-  $("#thread").innerHTML = dau + d.steps.map(veMot).join("") ;
+  $("#thread").innerHTML = dau + veTomTat() + d.steps.map(veMot).join("") ;
 
+  const nut = $("#nut-tom-tat");
+  if (nut) nut.onclick = bamTomTat;
   for (const el of document.querySelectorAll("button.more")){
     el.onclick = () => {
       const k = el.dataset.k;
@@ -288,6 +313,35 @@ async function veLuot(){
       veLuot();
     };
   }
+}
+
+// ------------------------------------------------------------- bản tóm tắt
+// Cả màn này đang bày NGUYÊN LIỆU: agent nói gì thì hiện y như vậy. Đọc hết một
+// lượt bốn bước rồi tự kết luận là việc người dùng phải làm bằng tay — và bốn
+// lần trong lịch sử dự án (lượt #21, #29, #31, #34) kết luận rút từ lời agent đã
+// sai. Nút này hỏi máy: nó tự đếm commit trên các nhánh sagent/* rồi đối chiếu.
+async function bamTomTat(){
+  moTomTat = !moTomTat;
+  if (moTomTat && !tomTat){
+    try { tomTat = await api("/api/flow/tom-tat?id=" + runHienTai); }
+    catch (e) { tomTat = {loi: "không đọc được bản tóm tắt: " + e.message}; }
+  }
+  veLuot();
+}
+
+function veTomTat(){
+  if (!moTomTat) return "";
+  const dau = `<div class="tt-dau">Tóm tắt lượt chạy — máy tự đếm commit, không tin lời agent</div>`;
+  if (!tomTat) return `<div id="tom-tat">${dau}<pre>đang đọc…</pre></div>`;
+  if (tomTat.loi) return `<div id="tom-tat">${dau}<pre>${esc(tomTat.loi)}</pre></div>`;
+
+  const lech = (tomTat.mauThuan || [])
+    .map(m => `<div class="tt-lech"><span class="rail"></span><span>${esc(m.noi)}</span></div>`)
+    .join("");
+  const soKhai = (tomTat.khai || []).length;
+  const khop = (!lech && soKhai > 0)
+    ? `<div class="tt-khop">${soKhai} lời khai về nhánh, không lời nào chọi với git</div>` : "";
+  return `<div id="tom-tat">${dau}${lech}${khop}<pre>${esc(tomTat.vanBan || "")}</pre></div>`;
 }
 
 function veKhoi(nhan, chu, khoa, lop){
