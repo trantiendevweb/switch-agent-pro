@@ -117,6 +117,16 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 		bus.Warnf("Token được chép ra %d chỗ. Nhà cung cấp XOAY VÒNG refresh token "+
 			"(đo 20/08), nên bản nào refresh trước thì các bản kia chết — công cụ tự "+
 			"mang bản mới nhất về hồ sơ gốc trước mỗi lần chép.", o.Copies)
+		// Đồng bộ ngược chỉ cứu được GIỮA CÁC LƯỢT, không cứu được TRONG LÚC CHẠY:
+		// hai bản đang chạy cùng lúc, một bản tới mốc refresh và xoay token đi, thì
+		// bản kia cầm token đã chết ngay giữa việc — không có chỗ nào để chen vào
+		// mà đồng bộ. Nói thẳng chuyện đó, vì nó quyết định cách chia việc.
+		if o.Copies > 1 {
+			bus.Warnf("%d bản CÙNG CHẠY trên một tài khoản: bản nào tới mốc refresh trước "+
+				"sẽ giết token của các bản kia GIỮA CHỪNG, và đồng bộ ngược không chen vào "+
+				"được lúc đó. Lượt chạy dài thì nên chia cho NHIỀU TÀI KHOẢN thay vì nhiều "+
+				"bản của một tài khoản.", o.Copies)
+		}
 	}
 	if o.Worktree {
 		bus.Infof("Mỗi phiên một git worktree riêng từ %s", repoRoot)

@@ -337,7 +337,16 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] `clone` — chép credential ra N config dir riêng (mỗi bản `.claude.json`
   riêng nên **không đua ghi**); `fleet` — bật N phiên nền, log ra file;
   `status`; `stop <số|all>`; `clean` — xoá clone **an toàn** (không xuyên junction).
-- [x] Cảnh báo thẳng: tiêu hạn mức gấp N, và **concurrent refresh chưa đo**.
+- [x] Cảnh báo thẳng: tiêu hạn mức gấp N, và hậu quả của việc chép token ra N chỗ.
+- [x] **Xoay vòng refresh token: ĐÃ ĐO (20/08/2026)** — mỗi lần refresh cấp token
+  mới và **giết token cũ ngay**. Nên chép token ra N chỗ **không cần** N tiến trình
+  đua nhau mới hỏng: MỘT bản refresh là N−1 bản còn lại chết, hồ sơ gốc cũng nằm
+  trong số đó. Chuỗi này đã làm mất phiên `claude:phu` giữa lượt chạy #47.
+  **Đã bịt:** `profile.Clone` đồng bộ ngược trước khi chép đè (kiểm trên máy thật).
+  **Còn lại một cách hỏng KHÔNG bịt được bằng đồng bộ:** hai bản đang chạy cùng
+  lúc, một bản tới mốc refresh thì bản kia chết GIỮA CHỪNG — không có chỗ chen vào
+  mà đồng bộ. `fleet` nói thẳng điều đó khi `--copies > 1` và khuyên chia việc cho
+  nhiều TÀI KHOẢN thay vì nhiều bản của một tài khoản. Xem `docs/DO-LUONG.md`.
 - [x] **Cảnh báo token sắp hết hạn** trước khi bật hạm đội — đã đo được Claude
   hết hạn sau ~7,5 giờ (Codex ~6,5 ngày), nên đội chạy dài chắc chắn vượt mốc.
   `TokenExpiry()` vào interface adapter, CHỈ đọc dấu thời gian.

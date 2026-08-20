@@ -302,3 +302,45 @@ func (fakeAgent) NangLuc() []provider.NangLuc {
 	}
 	return out
 }
+
+// Chạy nhiều bản trên MỘT tài khoản có một cách hỏng mà đồng bộ ngược không
+// cứu được: hai bản đang chạy, một bản tới mốc refresh và xoay token đi, bản
+// kia chết GIỮA CHỪNG. Không có chỗ nào để chen vào mà đồng bộ.
+//
+// Đo 20/08 (xem docs/DO-LUONG.md): nhà cung cấp xoay vòng refresh token thật.
+// Người vận hành phải biết chuyện này TRƯỚC khi chia việc, không phải sau khi
+// một lượt chạy dài chết ở giữa.
+func TestCanhBaoKhiNhieuBanCungChayMotTaiKhoan(t *testing.T) {
+	db, bus, a := setup(t)
+	ch, huy := bus.Subscribe(256)
+	defer huy()
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 2}, []string{"-test.run=TestHelperProcess"}); err != nil {
+		t.Fatal(err)
+	}
+	var coCanhBao bool
+	for _, e := range gomEvent(ch) {
+		if strings.Contains(e.Msg, "GIỮA CHỪNG") && strings.Contains(e.Msg, "NHIỀU TÀI KHOẢN") {
+			coCanhBao = true
+		}
+	}
+	if !coCanhBao {
+		t.Error("chạy 2 bản trên một tài khoản mà không cảnh báo chuyện token bị xoay giữa chừng")
+	}
+}
+
+// Và chạy MỘT bản thì KHÔNG được cảnh báo — câu đó chỉ đúng khi có nhiều bản
+// cùng chạy. Cảnh báo thừa lặp lại mỗi lần sẽ bị đọc lướt, rồi tới lúc nó đúng
+// thì không ai còn đọc nữa.
+func TestKhongCanhBaoThuaKhiChiMotBan(t *testing.T) {
+	db, bus, a := setup(t)
+	ch, huy := bus.Subscribe(256)
+	defer huy()
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 1}, []string{"-test.run=TestHelperProcess"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range gomEvent(ch) {
+		if strings.Contains(e.Msg, "GIỮA CHỪNG") {
+			t.Errorf("một bản mà vẫn cảnh báo chuyện nhiều bản: %q", e.Msg)
+		}
+	}
+}
