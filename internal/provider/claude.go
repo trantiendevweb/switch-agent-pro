@@ -41,7 +41,7 @@ func (claude) Command() (string, error) {
 	return "", errors.New("không tìm thấy lệnh claude — cài Claude Code trước")
 }
 
-// Version: đã đo trên máy dev -> "2.1.229 (Claude Code)".
+// Version: đã đo trên máy dev -> "2.1.234 (Claude Code)" (đo lại 20/08/2026).
 func (c claude) Version() (string, error) {
 	p, err := c.Command()
 	if err != nil {
@@ -61,7 +61,7 @@ func (claude) HeadlessArgs(prompt string) []string {
 	return []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
 }
 
-// ModelArgs: đã đo `claude --model <tên>` (bản 2.1.229). Tên nhận cả bí danh
+// ModelArgs: đã đo `claude --model <tên>` (bản 2.1.234). Tên nhận cả bí danh
 // ngắn (sonnet, opus, haiku) lẫn id đầy đủ.
 //
 // VÌ SAO ĐÁNG CÓ, có số đo: lượt chạy #34 bước `code-go` tốn 8,18 USD vì mọi
@@ -269,8 +269,10 @@ func timClaudeExe() string {
 func (claude) NangLuc() []NangLuc {
 	return []NangLuc{
 		Duoc(NLHeadless, "`claude -p` chạy không tương tác; thêm --output-format stream-json "+
-			"--verbose thì dòng cuối {\"type\":\"result\"} mang is_error/stop_reason/usage (đo 18/08)"),
-		Duoc(NLChonModel, "`claude --model <tên>` trên bản 2.1.229, nhận cả bí danh ngắn "+
+			"--verbose thì dòng cuối {\"type\":\"result\"} mang is_error/stop_reason/usage. "+
+			"Đo lại 20/08 trên 2.1.234 bằng một lượt chạy thật: subtype=success, "+
+			"stop_reason=end_turn, usage.input_tokens=2, total_cost_usd=0.096977"),
+		Duoc(NLChonModel, "`claude --model <tên>` trên bản 2.1.234, nhận cả bí danh ngắn "+
 			"(sonnet/opus/haiku) lẫn id đầy đủ"),
 		Duoc(NLTuDuyetQuyen, "`claude --help`: --dangerously-skip-permissions "+
 			"\"Bypass all permission checks\""),

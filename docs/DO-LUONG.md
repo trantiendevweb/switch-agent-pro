@@ -2157,3 +2157,30 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
 - **Việc còn treo**: đo cho ra cơ chế — chạy hai clone cùng lúc trên một tài khoản
   vào đúng lúc access token sắp hết hạn, xem có tái hiện được không. Nếu đúng là
   xoay vòng thì đường clone cần một người giữ token duy nhất, không phải N bản sao.
+
+## 20/08 — Đo lại Claude CLI sau provider drift: 2.1.229 → 2.1.234
+
+- **Đo lúc nào**: 20/08/2026, sau khi `sagent verify claude` báo drift (mốc cũ ghi
+  17/08/2026 gắn với bản `2.1.229`).
+- **Đo bằng cách nào**: chạy `claude --help` trên bản mới và đối chiếu **từng cờ**
+  mà `internal/provider/claude.go` đang khai; đọc thẳng hai file hồ sơ cho hai năng
+  lực không nằm trong `--help`; và chạy **một lượt thật** để kiểm bản ghi có cấu trúc.
+- **Con số / Bằng chứng**:
+  - `claude --version` → `2.1.234 (Claude Code)`.
+  - Cờ còn nguyên trên bản mới: `-p, --print`, `--output-format`, `stream-json`,
+    `--verbose`, `--model`, `--dangerously-skip-permissions`, `--add-dir` — **7/7 còn**.
+  - `ket-qua-co-cau-truc` — chạy thật `claude -p "…" --output-format stream-json
+    --verbose` với `CLAUDE_CONFIG_DIR` trỏ vào hồ sơ `phu`. Dòng cuối:
+    `type=result`, `subtype=success`, `is_error=false`, `stop_reason=end_turn`,
+    `usage.input_tokens=2`, `usage.output_tokens=4`, `total_cost_usd=0.096977`.
+  - `tach-nhieu-tai-khoan` — chính lượt chạy trên là bằng chứng: đặt
+    `CLAUDE_CONFIG_DIR` vào thư mục hồ sơ riêng thì CLI dùng đúng danh tính đó.
+  - `danh-tinh` — khoá `oauthAccount.emailAddress` còn trong `.claude.json`.
+  - `han-token` — khoá `claudeAiOauth.refreshTokenExpiresAt` còn trong `.credentials.json`.
+- **Đã sửa hay chưa**: **ĐÃ ĐO LẠI VÀ CHẤP NHẬN**. Bằng chứng trong bảng năng lực
+  của `internal/provider/claude.go` cập nhật sang `2.1.234`, rồi mới chạy
+  `sagent verify --chap-nhan`.
+- **Bài học**: chấp nhận drift **trước khi** đo lại là đúng thứ cơ chế này lập ra
+  để chặn — nó biến một cảnh báo có ích thành một nút bấm cho im. Giá của việc đo
+  thật ở đây là **0,096977 USD** và khoảng một phút; giá của việc bấm cho im là cả
+  bảng năng lực nói về một phiên bản không còn tồn tại trên máy.
