@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/aiapi"
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
@@ -780,9 +781,20 @@ func (s *Server) handleAI(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Route  string `json:"route"`
 		Prompt string `json:"prompt"`
+		// Stream: trả lời dần bằng SSE thay vì một cục JSON.
+		//
+		// Dùng CHUNG endpoint chứ không mở `/api/ai/stream` riêng: đây vẫn là
+		// action `api.call`, chỉ khác cách gửi về. Thêm endpoint là thêm một
+		// hành động vào hợp đồng và một lệnh CLI phải có tương ứng — trả giá đó
+		// cho một chi tiết truyền tải là sai chỗ.
+		Stream bool `json:"stream"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, err)
+		return
+	}
+	if req.Stream {
+		s.aiStream(w, r, req.Route, req.Prompt)
 		return
 	}
 	kq, err := s.api.AICall(r.Context(), req.Route, req.Prompt)
@@ -804,6 +816,66 @@ func (s *Server) handleAI(w http.ResponseWriter, r *http.Request) {
 		"da_thu":      kq.DaThu,
 		"route_chinh": kq.RouteChinh,
 		"loi_chinh":   kq.LoiChinh,
+	})
+}
+
+// aiStream trả lời dần bằng SSE.
+//
+// Đo được: một lượt `grok-4.5` mất 31 giây (docs/DO-LUONG.md). Không streaming
+// thì người bấm nút nhìn màn hình đứng im nửa phút — không phân biệt được "đang
+// nghĩ" với "đã treo", và cách duy nhất họ có là bấm lại, tức là trả tiền hai lần.
+//
+// Khuôn sự kiện CỐ Ý giống /api/events: `data:` một dòng JSON. Mặt web đã biết
+// đọc kiểu đó rồi, không phải học thêm định dạng thứ hai.
+func (s *Server) aiStream(w http.ResponseWriter, r *http.Request, route, prompt string) {
+	fl, ok := w.(http.Flusher)
+	if !ok {
+		writeErr(w, fmt.Errorf("server không hỗ trợ streaming"))
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	// Proxy đệm lại thì streaming thành ra không streaming, mà không ai báo lỗi.
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	fl.Flush()
+
+	gui := func(v any) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return
+		}
+		fmt.Fprintf(w, "data: %s\n\n", b)
+		fl.Flush()
+	}
+
+	kq, err := s.api.AICallStream(r.Context(), route, prompt, func(chu string) {
+		gui(map[string]any{"chu": chu})
+	})
+	if err != nil {
+		// Lỗi đi trong LUỒNG, không phải mã HTTP: header 200 đã gửi từ trước khi
+		// biết kết quả. Đóng ngang mà không nói gì thì trình duyệt chỉ thấy kết
+		// nối đứt và sẽ tự thử lại — trả tiền lần nữa cho cùng một câu hỏi.
+		gui(map[string]any{"loi": err.Error(), "xong": true})
+		return
+	}
+	gui(map[string]any{
+		"xong":     true,
+		"noi_dung": kq.NoiDung,
+		"model":    kq.Model,
+		"usage": map[string]int{
+			"vao": kq.Usage.Vao, "ra": kq.Usage.Ra, "tong": kq.Usage.Tong,
+		},
+		"giay":        kq.Mat.Seconds(),
+		"route":       kq.Route,
+		"da_thu":      kq.DaThu,
+		"route_chinh": kq.RouteChinh,
+		"loi_chinh":   kq.LoiChinh,
+		// Nhà cung cấp không trả usage thì NÓI RA, y như CLI. Im lặng ghi 0 là
+		// biến "chưa đo" thành "miễn phí" ngay trước mắt người trả tiền.
+		"thieu_usage":  kq.ThieuUsage,
+		"canh_bao":     aiapi.CanhBaoThieuUsage(kq),
+		"da_streaming": kq.DaStreaming,
 	})
 }
 

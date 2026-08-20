@@ -966,23 +966,69 @@ $('aiform').onsubmit = async ev => {
   ev.preventDefault();
   const out = $('ai-out'); out.className=''; out.style.padding='13px'; out.textContent = 'đang hỏi…';
   try{
-    const d = await api('/api/ai', {method:'POST', body: JSON.stringify({
-      route: $('ai-route').value, prompt: $('ai-prompt').value })});
+    // Hỏi bằng STREAM: đo được một lượt grok-4.5 mất 31 giây. Không streaming
+    // thì người bấm nút nhìn ô trống nửa phút, không phân biệt được "đang nghĩ"
+    // với "đã treo" — và cách duy nhất họ có là bấm lại, tức trả tiền hai lần.
     out.style.whiteSpace = 'pre-wrap';
+    const d = await hoiAIStream($('ai-route').value, $('ai-prompt').value, out);
     let chan = '\n\n— ' + (d.route ? d.route + ' · ' : '') + d.model + ' · vào ' + d.usage.vao +
       ', ra ' + d.usage.ra + ', tổng ' + d.usage.tong + ' token · ' + d.giay.toFixed(1) + 's';
+    // Nhà cung cấp không trả usage ở chế độ stream thì NÓI RA — y như CLI. Im
+    // lặng ghi 0 là biến "chưa đo" thành "miễn phí" trước mắt người trả tiền.
+    if(d.canh_bao) chan += '\nLƯU Ý: ' + d.canh_bao;
     // ĐÃ CHUYỂN ROUTE thì phải nói ra, kèm lỗi NGUYÊN VĂN của route chính. Đổi
     // nhà cung cấp trong im lặng nghĩa là người dùng không biết câu trả lời này
     // đến từ đâu và vừa tiêu tiền của ai.
     if(d.route_chinh){
       chan += '\nĐã chuyển route: "' + d.route_chinh + '" hỏng, câu trên do "' + d.route + '" trả lời.\n' + d.loi_chinh;
     }
-    out.textContent = d.noi_dung + chan;
+    out.textContent = (d.noi_dung || out.textContent) + chan;
     aiDo.vao += d.usage.vao||0; aiDo.ra += d.usage.ra||0;
     veTongQuan();
     napAILichSu();
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
+
+// hoiAIStream gửi câu hỏi rồi VẼ DẦN câu trả lời, trả về mẩu tổng kết cuối.
+//
+// Không dùng EventSource được: nó chỉ biết GET, mà câu hỏi phải đi bằng POST
+// (prompt dài, và không nên nằm trong URL — URL rơi vào log proxy và lịch sử
+// trình duyệt). Nên đọc thẳng thân phản hồi, tự tách theo khuôn SSE.
+async function hoiAIStream(route, prompt, out){
+  const r = await fetch('/api/ai', {method:'POST', headers:H,
+    body: JSON.stringify({route, prompt, stream:true})});
+  if(!r.ok){
+    const b = await r.json().catch(()=>({error:r.statusText}));
+    throw new Error(b.error||('HTTP '+r.status));
+  }
+  const doc = r.body.getReader();
+  const giaiMa = new TextDecoder();
+  let dem = '', chu = '', cuoi = null;
+  out.textContent = '';
+  for(;;){
+    const {value, done} = await doc.read();
+    if(done) break;
+    dem += giaiMa.decode(value, {stream:true});
+    // Mẩu SSE ngăn nhau bằng dòng trống. Phần dư giữ lại — một mẩu có thể bị
+    // cắt đôi giữa hai lần đọc, ghép thiếu là mất chữ giữa câu.
+    const phan = dem.split('\n\n');
+    dem = phan.pop();
+    for(const m of phan){
+      const dong = m.split('\n').find(x => x.startsWith('data:'));
+      if(!dong) continue;
+      let d;
+      try{ d = JSON.parse(dong.slice(5).trim()); }catch(_){ continue; }
+      if(d.loi) throw new Error(d.loi);
+      if(d.chu){ chu += d.chu; out.textContent = chu; }
+      if(d.xong) cuoi = d;
+    }
+  }
+  if(!cuoi) throw new Error('luồng kết thúc mà không có mẩu tổng kết');
+  // Lấy nội dung từ mẩu cuối chứ không từ phần đã ghép: server mới là nơi biết
+  // câu trả lời đầy đủ, còn phần ghép ở đây có thể thiếu nếu luồng đứt.
+  out.textContent = cuoi.noi_dung || chu;
+  return cuoi;
+}
 
 async function api(path, opts){
   const r = await fetch(path, Object.assign({ headers: H }, opts||{}));

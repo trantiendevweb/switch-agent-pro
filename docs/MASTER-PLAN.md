@@ -487,7 +487,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - **DoD:** thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
   đang chạy tiếp tục sau restart; test chứng minh **approval không thể bị bỏ qua**.
 
-### Pha 4 — Mở rộng harness + AI API  🟡 một phần
+### Pha 4 — Mở rộng harness + AI API  ✅ xong (trừ OpenRouter/Ollama: chưa có key)
 - Subscription: **Gemini CLI, Cursor**, OpenCode (nếu đo được).
 - API: **Google Gemini, xAI/Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI**,
   generic OpenAI-compatible; Azure/Bedrock/Vertex ở lớp plugin/enterprise nếu cần.
@@ -509,7 +509,11 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     Đã hỏi, và đo được usage đầy đủ: deepseek 389 token/3,6s, grok 1926 token/31s.
     Nhà cung cấp nào không trả thì `ThieuUsage` bật và nói rõ là CHƯA ĐO chứ không
     phải miễn phí. Đi chung đường với lời gọi thường nên cùng sổ, cùng luật
-    fallback. ⬜ Còn lại: mặt web chưa có nút stream.
+    fallback. **Mặt web cũng xong** (21/08): `/api/ai` nhận cờ `stream` và trả SSE
+    trên CHÍNH endpoint đó — không mở đường riêng, vì đây vẫn là action `api.call`,
+    chỉ khác cách gửi về. Lỗi đi TRONG luồng chứ không bằng mã HTTP (header 200 đã
+    gửi trước khi biết kết quả; đóng ngang thì trình duyệt tự thử lại và trả tiền
+    lần nữa). **Pha 4 xong.**
   - ✅ **Fallback route**: chỉ chuyển tiếp một lần sang route dự phòng; không fallback khi
     lỗi do người dùng (401/403/sai key/prompt rỗng); kết quả mang lỗi gốc nguyên văn +
     request id, ghi rõ tên hai route (đã thử và đã dùng), cùng usage của route thành công
