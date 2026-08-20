@@ -26,6 +26,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/dash"
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
+	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
 // command là một lệnh CLI, gắn với đúng một hành động trong api.Actions.
@@ -51,7 +52,7 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"ds":      {"profile.list", "liệt kê tài khoản", func(a []string) { cmdList() }},
+		"ds":      {"profile.list", "liệt kê tài khoản", cmdList},
 		"them":    {"profile.create", "tạo tài khoản mới", cmdAdd},
 		"xoa":     {"profile.remove", "xoá tài khoản (an toàn)", cmdRemove},
 		"dong-bo": {"profile.sync", "đồng bộ cấu hình dùng chung", cmdSync},
@@ -67,6 +68,10 @@ func init() {
 		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
 		"db":      {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
 		"api":     {"api.call", "gọi thẳng AI API (đường thứ hai)", cmdAPI},
+		"route":   {"route.list", "sổ route: cấu hình khai gì, đã gọi thật qua đâu", cmdRoute},
+		// `sagent ds --so` — một CỜ của `ds`, không phải tên lệnh riêng, nhưng
+		// vẫn phải khai ở đây để test ngang quyền thấy nó (giống `__apils`).
+		"__soHS": {"profile.so", "đối chiếu sổ đăng ký với đĩa (sagent ds --so)", nil},
 		// `sagent api --lich-su` — không có tên lệnh cấp một riêng, vì nó là một
 		// cờ của `api`. Vẫn phải khai ở đây để test ngang quyền thấy nó.
 		"__apils": {"api.history", "lịch sử lời gọi API (tiêu bao nhiêu, ở đâu)", nil},
@@ -103,7 +108,7 @@ func main() {
 		cmdHelp()
 		return
 	case "list":
-		cmdList()
+		cmdList(rest(args))
 		return
 	case "add":
 		cmdAdd(rest(args))
@@ -186,7 +191,11 @@ func printEvents(bus *events.Bus) func() {
 
 // ---------------------------- hồ sơ ----------------------------
 
-func cmdList() {
+func cmdList(args []string) {
+	if xemSo, _ := boolFlag(args, "--so"); xemSo {
+		cmdHoSoSo()
+		return
+	}
 	a, done := open()
 	defer done()
 	list, err := a.ProfileList()
@@ -215,6 +224,60 @@ func cmdList() {
 	}
 	if len(list) == 0 {
 		fmt.Println("  Chưa có tài khoản nào. Thêm: sagent them claude:phu1")
+	}
+	fmt.Println()
+}
+
+// cmdHoSoSo in bảng đối chiếu SỔ ĐĂNG KÝ ↔ ĐĨA — action "profile.so".
+//
+// Tách khỏi `ds` thường vì hai bảng trả lời hai câu khác nhau: `ds` hỏi "tài
+// khoản nào dùng được", bảng này hỏi "cái gì trên đĩa là do sagent tạo ra". Câu
+// thứ hai mới là câu quyết định `xoa` có chạy hay không.
+func cmdHoSoSo() {
+	a, done := open()
+	defer done()
+	ds, err := a.ProfileSo()
+	done()
+	if err != nil {
+		fail(err)
+	}
+	fmt.Println()
+	fmt.Println("  Sổ đăng ký ↔ đĩa")
+	fmt.Println()
+	if len(ds) == 0 {
+		fmt.Println("  Sổ trống và trên đĩa cũng chưa có hồ sơ nào.")
+		fmt.Println()
+		return
+	}
+	lech := 0
+	for _, m := range ds {
+		dau, soHuu := "·", "sổ KHÔNG sở hữu"
+		if m.Lech() {
+			dau, lech = "!", lech+1
+		}
+		if m.SoTaoRa {
+			soHuu = "sagent tạo ra"
+		}
+		duong := m.DuongDia
+		if duong == "" {
+			duong = m.DuongSo
+		}
+		fmt.Printf("  %s %-7s %-12s %-20s %-16s %s\n",
+			dau, m.Provider, m.Account, m.TrangThai, soHuu, duong)
+		// Lệch đường dẫn là ca duy nhất mà một dòng không đủ chỗ nói: phải thấy
+		// CẢ HAI đường dẫn mới biết bên nào sai.
+		if m.TrangThai == store.SoLechDuong {
+			fmt.Printf("      sổ ghi: %s\n", m.DuongSo)
+		}
+	}
+	fmt.Println()
+	if lech == 0 {
+		fmt.Printf("  %d hồ sơ, sổ và đĩa khớp nhau.\n", len(ds))
+	} else {
+		// KHÔNG tự sửa. Lệch là dữ kiện, và một lệnh liệt kê mà lặng lẽ vá sổ
+		// thì lần nhìn đầu tiên đã xoá sạch bằng chứng.
+		fmt.Printf("  %d hồ sơ, %d chỗ lệch. Sổ chỉ được sửa bởi `them`/`xoa`, xem không sửa gì.\n",
+			len(ds), lech)
 	}
 	fmt.Println()
 }
@@ -639,6 +702,8 @@ func cmdHelp() {
     sagent goc                  chạy bằng tài khoản gốc
     sagent them <provider:tên>  tạo tài khoản mới
     sagent ds                   liệt kê
+    sagent ds --so              đối chiếu SỔ ĐĂNG KÝ với đĩa: cái gì trên đĩa là
+                                do sagent tạo ra (chỉ thứ đó mới xoá được)
     sagent dong-bo [--dry-run]  đồng bộ cấu hình dùng chung
     sagent xoa <provider:tên>   xoá tài khoản (an toàn)
     sagent verify [provider]    chạy bộ "đã đo"
@@ -692,6 +757,10 @@ func cmdHelp() {
                                 lưu bot + nơi nhận vào ~/.ai-accounts/telegram.json
                                 (NGOÀI repo). Chưa đặt thì máy im lặng.
     sagent tele --thu           gửi một tin thử để biết đường báo tin đã thông
+
+  Route API:
+
+    sagent route                sổ route: cấu hình khai gì, đã gọi thật qua đâu
 
   Dashboard:
 

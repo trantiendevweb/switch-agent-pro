@@ -158,6 +158,8 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"config.show":   "/api/state",
 		"api.call":      "/api/ai",
 		"api.history":   "/api/ai/lich-su",
+		"profile.so":    "/api/so/ho-so",
+		"route.list":    "/api/so/route",
 		"tele.notify":   "/api/tele",
 	}
 	// Miễn trừ CÓ LÝ DO — không phải danh sách để nhét cho qua test.

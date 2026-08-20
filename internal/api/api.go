@@ -50,6 +50,11 @@ var Actions = []string{
 	"profile.run",
 	"profile.sync",
 	"profile.verify",
+	// SỔ ĐĂNG KÝ (schema v8) đối chiếu với đĩa. Nằm trong hợp đồng chứ không phải
+	// một mẹo đọc DB: đây là câu trả lời cho "cái gì trên đĩa là do sagent tạo
+	// ra" — thứ quyết định `xoa` có được phép chạy hay không. Mặt nào cũng phải
+	// nhìn được nó, nếu không thì lời từ chối xoá sẽ là một lỗi khó hiểu.
+	"profile.so",
 	"session.list",
 	"session.stop",
 	"fleet.start",
@@ -70,6 +75,9 @@ var Actions = []string{
 	// chứ không phải một mẹo đọc DB: nếu chỉ CLI xem được thì mặt web vẫn để
 	// người dùng bấm gọi mà không cho họ thấy đã tiêu bao nhiêu.
 	"api.history",
+	// Sổ route: cấu hình KHAI gì, và sổ ghi đã THẬT SỰ gọi qua đâu. Hai chiều
+	// lệch nhau nói hai chuyện khác nhau — xem store.MucRoute.
+	"route.list",
 	// Quét tiến trình mồ côi: phiên tự chết thì `session.list` không còn thấy nó,
 	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
 	// động này thì không mặt nào nhìn ra chúng.
@@ -249,6 +257,20 @@ func (a *API) ProfileCreate(addr Addr) (linked, seeded int, err error) {
 	}
 	linked, seeded, err = profile.Create(ad, addr.Account)
 	if err == nil {
+		// Ghi vào SỔ ngay tại đây, không ở chỗ nào khác: đây là điểm duy nhất
+		// trong cả dự án mà câu "sagent tạo ra thư mục này" là một SỰ THẬT vừa
+		// xảy ra chứ không phải một suy đoán từ dấu vết trên đĩa. Mọi chỗ khác
+		// chỉ còn cách nhìn cấu trúc mà đoán (xem profile.SagentQuan).
+		//
+		// Ghi sổ hỏng KHÔNG được làm hỏng lệnh: hồ sơ đã nằm trên đĩa rồi, báo
+		// lỗi lúc này để lại đúng thứ tệ nhất — người dùng tưởng chưa tạo được
+		// và gõ lại. Cảnh báo lên bus; lần `xoa` sau sẽ tự nhận nó vào sổ.
+		if err := a.db.GhiHoSo(store.HoSo{
+			Provider: addr.Provider, Account: addr.Account,
+			Dir: profile.Dir(addr.Provider, addr.Account), SoTaoRa: true,
+		}); err != nil {
+			a.bus.Warnf("không ghi được %s vào sổ đăng ký: %v", addr, err)
+		}
 		a.bus.Publish(events.Event{
 			Type: events.ProfileCreated, Addr: addr.String(),
 			Msg: fmt.Sprintf("nối %d mục dùng chung, gieo %d khoá", linked, seeded),
@@ -266,11 +288,60 @@ func (a *API) ProfileRemove(addr Addr) error {
 	if !ok {
 		return fmt.Errorf("không có %s", addr)
 	}
-	if err := profile.Remove(dir); err != nil {
+	// Sổ chưa biết hồ sơ này thì NHẬN nó vào theo bằng chứng trên đĩa, rồi mới
+	// hỏi. Sổ chỉ có từ schema v8, nên mọi hồ sơ tạo trước đó (và mọi hồ sơ di
+	// trú từ v1) đều chưa có dòng nào — không nhận thì `xoa` gãy đúng cho những
+	// người dùng lâu năm nhất.
+	//
+	// `NhanHoSo` cố ý KHÔNG đè dòng đã có: dòng đã có là tiếng nói cuối cùng, kể
+	// cả khi nó nói "không sở hữu".
+	if _, err := a.db.NhanHoSo(store.HoSo{
+		Provider: addr.Provider, Account: addr.Account,
+		Dir: dir, SoTaoRa: profile.SagentQuan(dir),
+	}); err != nil {
+		a.bus.Warnf("không nhận được %s vào sổ đăng ký: %v", addr, err)
+	}
+	if err := profile.RemoveTheoSo(dir, a.db); err != nil {
 		return err
+	}
+	// Thư mục đã đi thật thì dòng sổ mới được đi. Ngược lại (xoá sổ trước) mà
+	// `RemoveTheoSo` hỏng giữa chừng thì còn tệ hơn không có sổ: thư mục vẫn nằm
+	// đó nhưng không ai nhận nó nữa, và lần sau không xoá nổi.
+	if err := a.db.XoaHoSoKhoiSo(addr.Provider, addr.Account); err != nil {
+		a.bus.Warnf("đã xoá %s nhưng không gỡ được dòng trong sổ: %v", addr, err)
 	}
 	a.bus.Publish(events.Event{Type: events.ProfileRemoved, Addr: addr.String(), Msg: "đã xoá tài khoản và token"})
 	return nil
+}
+
+// ProfileSo — action "profile.so". Đối chiếu HAI CHIỀU sổ đăng ký ↔ đĩa.
+//
+// CHỈ ĐỌC, cố ý: hàm này không "sửa cho khớp". Một hàm đối chiếu mà tự vá thì
+// lần nhìn đầu tiên đã xoá sạch bằng chứng lệch — xem ghi chú đầu
+// internal/store/registry.go.
+func (a *API) ProfileSo() ([]store.MucHoSo, error) {
+	accs, err := profile.List()
+	if err != nil {
+		return nil, err
+	}
+	dia := make([]store.TrenDia, 0, len(accs))
+	for _, acc := range accs {
+		dia = append(dia, store.TrenDia{Provider: acc.Provider, Account: acc.Name, Dir: acc.Dir})
+	}
+	return a.db.DoiChieuHoSo(dia)
+}
+
+// RouteList — action "route.list". Đối chiếu sổ route ↔ route khai trong cấu hình.
+//
+// KHÔNG kèm key, y như AIRoutes: sổ chỉ giữ key_id (tên file).
+func (a *API) RouteList() ([]store.MucRoute, error) {
+	cauHinh := make([]store.Route, 0, len(a.cfg.AI.Routes))
+	for _, r := range a.AIRoutes() {
+		cauHinh = append(cauHinh, store.Route{
+			Ten: r.Ten, BaseURL: r.BaseURL, Model: r.Model, KeyID: r.KeyID,
+		})
+	}
+	return a.db.DoiChieuRoute(cauHinh)
 }
 
 // ProfileRun — action "profile.run". Chạy CLI tương tác, CHIẾM terminal cho tới
@@ -555,6 +626,18 @@ func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, e
 		if !ok {
 			loi = append(loi, fmt.Errorf("%s: không có route này — xem: sagent api ds", ten))
 			continue
+		}
+		// Sổ route ghi route ĐÃ THẬT SỰ ĐƯỢC GỌI, chứ không chép lại cấu hình.
+		// Nhờ vậy `sagent route` trả lời được hai câu mà cấu hình một mình không
+		// trả lời được: route nào khai rồi mà chưa gọi bao giờ, và route nào đã
+		// tiêu tiền rồi mà nay không còn trong cấu hình.
+		//
+		// Ghi TRƯỚC khi gọi, không phải sau: lời gọi hỏng cũng là đã gọi, và
+		// route hay hỏng chính là route đáng nhìn nhất trong sổ.
+		if err := a.db.GhiRoute(store.Route{
+			Ten: r.Ten, BaseURL: r.BaseURL, Model: r.Model, KeyID: r.KeyID,
+		}); err != nil {
+			a.bus.Warnf("không ghi được route %q vào sổ đăng ký: %v", r.Ten, err)
 		}
 		kq, err := aiapi.Goi(ctx, r, prompt)
 		a.ghiSoAPI(ten, kq, err)

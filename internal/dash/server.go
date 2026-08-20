@@ -64,6 +64,8 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/db", s.guard(s.handleDB))
 	m.HandleFunc("/api/ai", s.guard(s.handleAI))
 	m.HandleFunc("/api/ai/lich-su", s.guard(s.handleAILichSu))
+	m.HandleFunc("/api/so/ho-so", s.guard(s.handleSoHoSo))
+	m.HandleFunc("/api/so/route", s.guard(s.handleSoRoute))
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
@@ -776,6 +778,61 @@ func (s *Server) handleAILichSu(w http.ResponseWriter, r *http.Request) {
 		"so_hong":   hong,
 		"khong_luu": "sổ này không lưu câu hỏi và câu trả lời",
 	})
+}
+
+// handleSoHoSo — action "profile.so". Đối chiếu SỔ ĐĂNG KÝ ↔ đĩa, chỉ đọc.
+//
+// Mặt web cố ý KHÔNG có nút xoá hồ sơ (xem danh sách miễn trừ trong
+// lachan_test.go), nhưng nó vẫn phải NHÌN được cái sổ: khi terminal từ chối xoá
+// vì "sổ không nhận sở hữu", đây là chỗ trả lời câu "vì sao". Một lời từ chối
+// không giải thích được thì người dùng sẽ đi xoá tay — tức là mất luôn lá chắn.
+func (s *Server) handleSoHoSo(w http.ResponseWriter, r *http.Request) {
+	ds, err := s.api.ProfileSo()
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	type dto struct {
+		Provider  string `json:"provider"`
+		Account   string `json:"account"`
+		DuongSo   string `json:"duong_so,omitempty"`
+		DuongDia  string `json:"duong_dia,omitempty"`
+		SoTaoRa   bool   `json:"sagent_tao_ra"`
+		TrangThai string `json:"trang_thai"`
+	}
+	out := make([]dto, 0, len(ds))
+	lech := 0
+	for _, m := range ds {
+		if m.Lech() {
+			lech++
+		}
+		out = append(out, dto{m.Provider, m.Account, m.DuongSo, m.DuongDia, m.SoTaoRa, m.TrangThai})
+	}
+	writeJSON(w, map[string]any{"muc": out, "so_lech": lech})
+}
+
+// handleSoRoute — action "route.list". Sổ route ↔ cấu hình, chỉ đọc.
+//
+// KHÔNG kèm key, chỉ key_id — sổ cũng chỉ giữ đúng chừng đó (migration v8).
+func (s *Server) handleSoRoute(w http.ResponseWriter, r *http.Request) {
+	ds, err := s.api.RouteList()
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	type dto struct {
+		Ten            string `json:"ten"`
+		BaseURLSo      string `json:"base_url_so,omitempty"`
+		BaseURLCauHinh string `json:"base_url_cau_hinh,omitempty"`
+		Model          string `json:"model,omitempty"`
+		KeyID          string `json:"key_id,omitempty"`
+		TrangThai      string `json:"trang_thai"`
+	}
+	out := make([]dto, 0, len(ds))
+	for _, m := range ds {
+		out = append(out, dto{m.Ten, m.BaseURLSo, m.BaseURLCauHinh, m.Model, m.KeyID, m.TrangThai})
+	}
+	writeJSON(w, map[string]any{"muc": out})
 }
 
 // handleDB — action "db.admin", CHỈ phần đọc.
