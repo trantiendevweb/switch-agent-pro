@@ -37,6 +37,12 @@ func TestTrangKeHoachKhopBanSinh(t *testing.T) {
 	if bytes.Equal(co, muon) {
 		return
 	}
+	// Repo bật core.autocrlf=true. Nếu file trên đĩa bị đổi sang CRLF thì MỌI
+	// dòng lệch, và thông báo "dòng 1 khác nhau" sẽ dẫn người ta đi sai đường.
+	if bytes.Equal(bytes.ReplaceAll(co, []byte("\r\n"), []byte("\n")), muon) {
+		t.Fatalf("%s chỉ lệch ở ký tự xuống dòng (CRLF thay vì LF) — kiểm "+
+			"web/docs/.gitattributes còn ghim `master-plan.html text eol=lf` không.", dich)
+	}
 
 	a := strings.Split(string(co), "\n")
 	b := strings.Split(string(muon), "\n")
