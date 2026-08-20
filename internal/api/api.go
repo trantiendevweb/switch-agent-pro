@@ -65,6 +65,11 @@ var Actions = []string{
 	// chất với `profile.run` — đường kia tiêu hạn mức thuê bao, đường này tiêu
 	// tiền theo token.
 	"api.call",
+	// Sổ lời gọi API. Đường này tiêu TIỀN theo token, khác đường CLI tiêu hạn mức
+	// thuê bao — mà tiền thì phải đối chiếu được với hoá đơn. Nằm trong hợp đồng
+	// chứ không phải một mẹo đọc DB: nếu chỉ CLI xem được thì mặt web vẫn để
+	// người dùng bấm gọi mà không cho họ thấy đã tiêu bao nhiêu.
+	"api.history",
 	// Quét tiến trình mồ côi: phiên tự chết thì `session.list` không còn thấy nó,
 	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
 	// động này thì không mặt nào nhìn ra chúng.
@@ -489,15 +494,31 @@ func (a *API) AIRoutes() []aiapi.Route {
 	return out
 }
 
-// AICall — action "api.call". Gọi thẳng AI API theo route, tự chuyển sang route
-// dự phòng nếu route chính hỏng.
+// AICall — action "api.call". Gọi thẳng AI API theo route, chuyển sang route dự
+// phòng ĐÚNG MỘT LẦN nếu route chính hỏng.
 //
-// route rỗng = dùng `default_route`, rồi tới `fallback_routes` theo thứ tự.
+// route rỗng = dùng `default_route`, rồi tới route dự phòng ĐẦU TIÊN. Gọi đích
+// danh một route thì không chuyển đi đâu cả — người dùng chọn nhà cung cấp là có
+// lý do (giá, dữ liệu, hợp đồng).
 //
-// Điều kiện khó nhất của DoD Pha 4: "fallback KHÔNG mất correlation ID / usage /
-// error gốc". Nên khi mọi route đều hỏng, lỗi trả về mang NGUYÊN VĂN lỗi của
-// từng route — kể cả request id của nhà cung cấp. Gộp thành "tất cả đều hỏng" là
-// vứt đúng thứ cần để đi hỏi họ.
+// Ba luật ở đây, mỗi luật vì một cách hỏng cụ thể:
+//
+//  1. ĐÚNG MỘT LẦN CHUYỂN. Trước đây vòng lặp chạy hết `fallback_routes`. Khai
+//     bốn route thì một prompt hỏng ở nhà cung cấp đầu có thể thành bốn lời gọi
+//     thật, mỗi lời gọi chờ tới 120 giây — người dùng ngồi nhìn tám phút rồi mới
+//     nhận lỗi. Một lần chuyển là đủ để đi tiếp khi một nhà cung cấp sập; nhiều
+//     hơn thế là đốt tiền theo cấp số.
+//
+//  2. KHÔNG CHUYỂN KHI LỖI DO NGƯỜI DÙNG (401/403, không đọc được key, prompt
+//     rỗng). Xem aiapi.LoiNguoiDung: route thứ hai chỉ lặp lại đúng cái sai đó.
+//
+//  3. KHÔNG MẤT GÌ KHI CHUYỂN. Điều kiện khó nhất của DoD Pha 4. `KetQua` mang
+//     về tên route đã dùng, tên các route đã thử, và lỗi NGUYÊN VĂN của route
+//     chính kèm request id. Trước đây chuyện đó chỉ được `bus.Warnf` — CLI và
+//     mặt web không nghe bus, nên với họ việc đổi nhà cung cấp là im lặng.
+//     Khi cả hai route đều hỏng thì lỗi trả về mang NGUYÊN VĂN của cả hai.
+//
+// Mọi lời gọi thật, THÀNH hay BẠI, đều được ghi vào sổ api_calls (schema v7).
 func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, error) {
 	routes := a.AIRoutes()
 	tim := func(ten string) (aiapi.Route, bool) {
@@ -521,30 +542,90 @@ func (a *API) AICall(ctx context.Context, route, prompt string) (aiapi.KetQua, e
 	if len(thuTu) == 0 {
 		return aiapi.KetQua{}, fmt.Errorf("chưa cấu hình route nào — xem: sagent api ds")
 	}
+	// Cắt ở hai: route chính + đúng một route dự phòng (luật 1 ở trên). Cắt tại
+	// đây chứ không `break` trong vòng lặp, để `thuTu` cũng chính là danh sách
+	// "đã thử" trả về cho người gọi.
+	if len(thuTu) > 2 {
+		thuTu = thuTu[:2]
+	}
 
-	var loi []string
+	var loi []error
 	for i, ten := range thuTu {
 		r, ok := tim(ten)
 		if !ok {
-			loi = append(loi, fmt.Sprintf("%s: không có route này", ten))
+			loi = append(loi, fmt.Errorf("%s: không có route này — xem: sagent api ds", ten))
 			continue
 		}
 		kq, err := aiapi.Goi(ctx, r, prompt)
+		a.ghiSoAPI(ten, kq, err)
 		if err == nil {
+			kq.Route, kq.DaThu = ten, append([]string(nil), thuTu[:i+1]...)
 			if i > 0 {
-				// Nói ra là đã chuyển route. Im lặng đổi nhà cung cấp nghĩa là
-				// người dùng không biết câu trả lời đến từ đâu và tốn tiền của ai.
-				a.bus.Warnf("route %q hỏng, đã chuyển sang %q", thuTu[0], ten)
+				kq.RouteChinh = thuTu[0]
+				kq.LoiChinh = gopLoi(loi)
+				// Vẫn báo lên bus cho mặt nào đang nghe, NHƯNG bus không còn là
+				// nơi duy nhất giữ tin này — nó đã nằm trong KetQua ở trên.
+				a.bus.Warnf("route %q hỏng, đã chuyển sang %q: %s", kq.RouteChinh, ten, kq.LoiChinh)
 			}
 			return kq, nil
 		}
-		loi = append(loi, err.Error())
+		loi = append(loi, err)
+		// Lỗi của người dùng: dừng hẳn (luật 2). Trả về đúng lỗi đó, không ghép
+		// thêm gì — nguyên nhân thật phải là dòng đầu tiên họ đọc.
+		if aiapi.LoiNguoiDung(err) {
+			break
+		}
 		// Ngữ cảnh bị huỷ thì dừng hẳn — thử tiếp chỉ tốn thêm tiền.
 		if ctx.Err() != nil {
 			break
 		}
 	}
-	return aiapi.KetQua{}, fmt.Errorf("mọi route đều hỏng:\n     - %s", strings.Join(loi, "\n     - "))
+	// Một lỗi thì trả NGUYÊN nó, giữ cả kiểu *aiapi.LoiAPI cho người gọi soi
+	// tiếp. Bọc thêm một lớp "mọi route đều hỏng" quanh đúng một route là nói sai
+	// chuyện đã xảy ra.
+	if len(loi) == 1 {
+		return aiapi.KetQua{}, loi[0]
+	}
+	return aiapi.KetQua{}, fmt.Errorf("cả %s đều hỏng:\n     - %s",
+		strings.Join(thuTu, " lẫn "), gopLoi(loi))
+}
+
+func gopLoi(loi []error) string {
+	s := make([]string, 0, len(loi))
+	for _, e := range loi {
+		s = append(s, e.Error())
+	}
+	return strings.Join(s, "\n     - ")
+}
+
+// ghiSoAPI ghi một lời gọi API vào sổ api_calls.
+//
+// Ghi hỏng KHÔNG được làm hỏng lời gọi: người dùng vừa trả tiền cho câu trả lời
+// đó, không thể vì sổ khoá mà vứt nó đi. Cảnh báo lên bus rồi đi tiếp — cùng lựa
+// chọn với SessionList khi không đánh dấu nổi phiên đã chết.
+func (a *API) ghiSoAPI(ten string, kq aiapi.KetQua, loi error) {
+	g := store.GoiAPI{
+		Route: ten,
+		Model: kq.Model,
+		OK:    loi == nil,
+		Mili:  int(kq.Mat.Milliseconds()),
+	}
+	if loi != nil {
+		g.LyDo = loi.Error()
+	} else {
+		g.TokensIn, g.TokensOut = kq.Usage.Vao, kq.Usage.Ra
+	}
+	if _, err := a.db.AddAPICall(g); err != nil {
+		a.bus.Warnf("không ghi được lịch sử lời gọi API: %v", err)
+	}
+}
+
+// AIHistory — action "api.history". Sổ lời gọi API, mới nhất trước.
+//
+// KHÔNG có prompt và câu trả lời trong đó, cố ý — xem ghi chú migration v7 ở
+// internal/store.
+func (a *API) AIHistory(limit int) ([]store.GoiAPI, error) {
+	return a.db.APICalls(limit)
 }
 
 // DBInfo — phần ĐỌC của action "db.admin": schema hiện tại, schema mà bản binary

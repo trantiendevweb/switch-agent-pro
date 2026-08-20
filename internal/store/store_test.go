@@ -3,7 +3,9 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func open(t *testing.T) *DB {
@@ -117,5 +119,133 @@ func TestSessionAddr(t *testing.T) {
 	}
 	if got := (Session{Provider: "claude", Account: "phu", Clone: 12}).Addr(); got != "claude:phu#12" {
 		t.Fatalf("Addr() = %s", got)
+	}
+}
+
+// ---------------------------- sổ lời gọi API (v7) ----------------------------
+
+// Bảng api_calls (v7) phải ghi đủ: thời điểm, route, model, token vào/ra, chi
+// phí, thành-bại, lý do hỏng. Ghi cả lần THÀNH lẫn lần BẠI — "route chính hỏng
+// bao nhiêu lần tuần này" chỉ trả lời được khi lần bại cũng có dòng.
+func TestAPICallsGhiDuVaTraMoiNhatTruoc(t *testing.T) {
+	db := open(t)
+	luc := time.Date(2026, 8, 20, 9, 30, 0, 0, time.UTC)
+	if _, err := db.AddAPICall(GoiAPI{
+		Luc: luc, Route: "chinh", Model: "grok-4.5",
+		TokensIn: 120, TokensOut: 45, CostUSD: 0, OK: true, Mili: 1500,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.AddAPICall(GoiAPI{
+		Luc: luc.Add(time.Minute), Route: "phu", OK: false,
+		LyDo: "phu trả HTTP 429: rate limit (request id: RID-7)",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ds, err := db.APICalls(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds) != 2 {
+		t.Fatalf("sổ có %d dòng, muốn 2", len(ds))
+	}
+	// Mới nhất trước — cùng quy ước với ListRuns.
+	if ds[0].Route != "phu" || ds[1].Route != "chinh" {
+		t.Fatalf("thứ tự sai, muốn mới nhất trước: %+v", ds)
+	}
+	if ds[0].OK {
+		t.Error("dòng hỏng bị ghi thành chạy được")
+	}
+	// Lý do hỏng phải NGUYÊN VĂN, kèm request id — đó là thứ duy nhất dùng được
+	// khi phải đi hỏi nhà cung cấp.
+	if !strings.Contains(ds[0].LyDo, "RID-7") {
+		t.Errorf("mất request id trong lý do hỏng: %q", ds[0].LyDo)
+	}
+	g := ds[1]
+	if !g.OK || g.Model != "grok-4.5" || g.TokensIn != 120 || g.TokensOut != 45 || g.Mili != 1500 {
+		t.Errorf("dòng thành công mất dữ liệu: %+v", g)
+	}
+	if !g.Luc.Equal(luc) {
+		t.Errorf("thời điểm = %v, muốn %v", g.Luc, luc)
+	}
+}
+
+// Lý do hỏng phải bị cắt: thân lỗi là nguyên văn của nhà cung cấp, và họ có thể
+// trả về cả trang HTML khi hạ tầng của họ sập. Không cắt thì một sự cố bên kia
+// làm phình state.db bên này.
+func TestAPICallsCatLyDoQuaDai(t *testing.T) {
+	db := open(t)
+	dai := strings.Repeat("x", MaxLyDoAPI*2)
+	if _, err := db.AddAPICall(GoiAPI{Route: "r", LyDo: dai}); err != nil {
+		t.Fatal(err)
+	}
+	ds, err := db.APICalls(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds[0].LyDo) > MaxLyDoAPI+32 {
+		t.Errorf("lý do dài %d ký tự, không bị cắt ở trần %d", len(ds[0].LyDo), MaxLyDoAPI)
+	}
+	// Cắt phần ĐUÔI, giữ phần ĐẦU: ở lỗi HTTP thì mã và request id nằm ngay đầu.
+	if !strings.HasPrefix(ds[0].LyDo, "xxxx") {
+		t.Errorf("cắt nhầm đầu — mã lỗi và request id nằm ở đầu: %.40q", ds[0].LyDo)
+	}
+}
+
+// Bảng api_calls CỐ Ý không có cột prompt và cột câu trả lời.
+//
+// Khác flow_steps (lưu cả hai, xem migration v4 và v6): ở đó agent chạy trên máy
+// người dùng với dữ liệu của chính họ. Ở đây người ta dán mã, khoá và dữ liệu
+// khách vào prompt gửi cho nhà cung cấp bên ngoài — ghi thêm một bản sao vĩnh
+// viễn xuống đĩa là tự tạo kho bí mật thứ hai mà không ai xin.
+//
+// Test soi thẳng SCHEMA chứ không soi dữ liệu: thêm cột rồi để trống thì nó vẫn
+// phải đỏ, vì cột trống hôm nay là cột được điền vào bản sau.
+func TestLichSuAPIKhongLuuPromptVaCauTraLoi(t *testing.T) {
+	db := open(t)
+	rows, err := db.db.Query(`PRAGMA table_info(api_calls)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var cot []string
+	for rows.Next() {
+		var cid int
+		var ten, kieu string
+		var notnull int
+		var mac any
+		var pk int
+		if err := rows.Scan(&cid, &ten, &kieu, &notnull, &mac, &pk); err != nil {
+			t.Fatal(err)
+		}
+		cot = append(cot, ten)
+	}
+	if len(cot) == 0 {
+		t.Fatal("không có bảng api_calls — migration v7 chưa chạy")
+	}
+	cam := []string{"prompt", "cau_hoi", "cauhoi", "noi_dung", "noidung",
+		"tra_loi", "traloi", "answer", "content", "message", "response", "body"}
+	for _, c := range cot {
+		l := strings.ToLower(c)
+		for _, x := range cam {
+			if strings.Contains(l, x) {
+				t.Errorf("api_calls có cột %q — sổ này chỉ được ghi tiền và token, "+
+					"không được ghi nội dung hội thoại (xem ghi chú migration v7)", c)
+			}
+		}
+	}
+	// Và phải có đủ những cột nó CÓ nhiệm vụ ghi.
+	for _, phai := range []string{"luc", "route", "model", "tokens_in", "tokens_out",
+		"cost_usd", "ok", "ly_do"} {
+		co := false
+		for _, c := range cot {
+			if c == phai {
+				co = true
+			}
+		}
+		if !co {
+			t.Errorf("api_calls thiếu cột %q — thấy %v", phai, cot)
+		}
 	}
 }

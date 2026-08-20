@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,11 +45,63 @@ type Usage struct {
 }
 
 // KetQua là kết quả một lời gọi.
+//
+// Bốn trường cuối nói về CHUYỆN ĐÃ XẢY RA trên đường đi, không phải nội dung câu
+// trả lời. Có chúng vì khi tầng trên tự chuyển sang route dự phòng, người gọi
+// phải biết: câu này ai trả lời, route chính hỏng vì gì, và request id của lần
+// hỏng đó là bao nhiêu. Trước đây những thứ đó chỉ được `bus.Warnf` — ai gọi qua
+// web hay CLI mà không nghe bus thì mất sạch.
 type KetQua struct {
 	NoiDung string
 	Model   string
-	Usage   Usage
+	Usage   Usage // usage của route THẬT SỰ trả lời, không phải của route hỏng
 	Mat     time.Duration
+
+	// Route là tên route đã trả lời câu này.
+	Route string
+	// DaThu là tên mọi route đã gọi, theo thứ tự, kể cả route hỏng.
+	DaThu []string
+	// RouteChinh là route đã hỏng khiến phải chuyển. Rỗng nếu không chuyển.
+	RouteChinh string
+	// LoiChinh là lỗi NGUYÊN VĂN của route chính, kèm request id của nhà cung
+	// cấp. Rỗng nếu không chuyển route.
+	LoiChinh string
+}
+
+// DaChuyenRoute cho biết câu trả lời này đến từ route dự phòng.
+func (k KetQua) DaChuyenRoute() bool { return k.RouteChinh != "" }
+
+// LoiAPI là lỗi của một lời gọi, giữ đủ thứ cần để tầng trên QUYẾT ĐỊNH có nên
+// chuyển route hay không — chứ không chỉ một chuỗi để in ra.
+//
+// `Chi` là nguyên văn (đã kèm tên route và mã HTTP), theo luật 2 ở đầu file.
+type LoiAPI struct {
+	Route  string // route đã gọi
+	Status int    // mã HTTP; 0 khi hỏng trước lúc có phản hồi
+	Chi    string // nguyên văn
+	Nguoi  bool   // lỗi từ phía người dùng
+}
+
+func (e *LoiAPI) Error() string { return e.Chi }
+
+// LoiNguoiDung cho biết lỗi này do phía NGƯỜI DÙNG: key sai hoặc hết quyền
+// (401/403), không đọc được key, prompt rỗng.
+//
+// Vì sao phải phân biệt: chuyển sang route dự phòng chỉ lặp lại đúng cái sai đó
+// ở nhà cung cấp thứ hai. Nó không cứu được gì, mà tốn thêm một lượt gọi, nhân
+// đôi thời gian chờ, và làm lỗi trả về dài gấp đôi trong khi nguyên nhân thật
+// vẫn là câu đầu tiên.
+func LoiNguoiDung(err error) bool {
+	var l *LoiAPI
+	return errors.As(err, &l) && l.Nguoi
+}
+
+// loiNguoi/loiMay dựng LoiAPI cho hai nhánh.
+func loiNguoi(route string, status int, dinh string, a ...any) *LoiAPI {
+	return &LoiAPI{Route: route, Status: status, Chi: fmt.Sprintf(dinh, a...), Nguoi: true}
+}
+func loiMay(route string, status int, dinh string, a ...any) *LoiAPI {
+	return &LoiAPI{Route: route, Status: status, Chi: fmt.Sprintf(dinh, a...)}
 }
 
 // KeysDir là nơi giữ API key — trong kho đã siết ACL, NGOÀI repo.
@@ -100,24 +153,36 @@ type phanHoi struct {
 //
 // Không streaming ở bản này — streaming là việc riêng, và làm nửa vời thì mất
 // usage. Đo trước, thêm sau.
+//
+// Mọi lỗi trả về đều là *LoiAPI, để tầng trên phân biệt được "thử route khác có
+// thể cứu" với "thử route khác chỉ tốn thêm tiền" — xem LoiNguoiDung.
 func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 	var kq KetQua
+	// Prompt rỗng chặn TRƯỚC khi chạm mạng: nhà cung cấp sẽ trả 400, và một lượt
+	// gọi hỏng vẫn có thể bị tính tiền. Đây cũng là lỗi của người dùng, nên route
+	// dự phòng không cứu được.
+	if strings.TrimSpace(prompt) == "" {
+		return kq, loiNguoi(r.Ten, 0, "prompt rỗng — không gửi gì cho %s", r.Ten)
+	}
 	key, err := docKey(r.KeyID)
 	if err != nil {
-		return kq, err
+		return kq, loiNguoi(r.Ten, 0, "%s: %s", r.Ten, err.Error())
 	}
+	// Route khai thiếu là lỗi CẤU HÌNH CỦA RIÊNG ROUTE ĐÓ — route dự phòng khai
+	// đủ thì vẫn chạy được. Nên đây KHÔNG phải lỗi người dùng theo nghĩa chặn
+	// fallback.
 	if r.BaseURL == "" || r.Model == "" {
-		return kq, fmt.Errorf("route %q thiếu base_url hoặc model", r.Ten)
+		return kq, loiMay(r.Ten, 0, "route %q thiếu base_url hoặc model", r.Ten)
 	}
 
 	body, err := json.Marshal(yeuCau{Model: r.Model, Messages: []tinNhan{{Role: "user", Content: prompt}}})
 	if err != nil {
-		return kq, err
+		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())
 	}
 	url := strings.TrimRight(r.BaseURL, "/") + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return kq, err
+		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+key)
@@ -125,7 +190,7 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 	bat := time.Now()
 	resp, err := (&http.Client{Timeout: 120 * time.Second}).Do(req)
 	if err != nil {
-		return kq, fmt.Errorf("gọi %s hỏng: %w", url, err)
+		return kq, loiMay(r.Ten, 0, "gọi %s hỏng: %s", url, err.Error())
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
@@ -134,20 +199,29 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 		// GIỮ NGUYÊN VĂN thân lỗi. Nhà cung cấp trả kèm request id trong đó, và
 		// đó là thứ duy nhất dùng được khi phải hỏi lại họ. Rút gọn thành "lỗi
 		// 400" là vứt mất nó.
-		return kq, fmt.Errorf("%s trả HTTP %d: %s", r.Ten, resp.StatusCode, strings.TrimSpace(string(raw)))
+		e := loiMay(r.Ten, resp.StatusCode, "%s trả HTTP %d: %s",
+			r.Ten, resp.StatusCode, strings.TrimSpace(string(raw)))
+		// 401/403 = key sai hoặc hết quyền. Route dự phòng dùng key KHÁC nhưng
+		// cái sai ở đây là key của route NÀY: nếu người dùng gõ nhầm key thì họ
+		// cần thấy đúng câu đó, không phải một câu ghép hai lỗi của hai nhà cung
+		// cấp mà nguyên nhân thật bị chôn ở dòng đầu.
+		e.Nguoi = resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden
+		return kq, e
 	}
 	var ph phanHoi
 	if err := json.Unmarshal(raw, &ph); err != nil {
-		return kq, fmt.Errorf("%s trả JSON không đọc được: %w", r.Ten, err)
+		return kq, loiMay(r.Ten, resp.StatusCode, "%s trả JSON không đọc được: %s", r.Ten, err.Error())
 	}
 	if len(ph.Choices) == 0 {
-		return kq, fmt.Errorf("%s trả về 0 lựa chọn", r.Ten)
+		return kq, loiMay(r.Ten, resp.StatusCode, "%s trả về 0 lựa chọn", r.Ten)
 	}
 	kq = KetQua{
 		NoiDung: ph.Choices[0].Message.Content,
 		Model:   ph.Model,
 		Usage:   ph.Usage,
 		Mat:     time.Since(bat),
+		Route:   r.Ten,
+		DaThu:   []string{r.Ten},
 	}
 	return kq, nil
 }

@@ -298,14 +298,15 @@ func TestReducedMotionTatNhipThoMeterVaFade(t *testing.T) {
 func TestGiuNguyenMoiDuongAPI(t *testing.T) {
 	ma := boComment(doc2D(t))
 	for _, d := range []string{"/api/state", "/api/events", "/api/fleet", "/api/stop",
-		"/api/quet", "/api/ai", "/api/db", "/api/flow/run", "/api/flows", "/api/tele"} {
+		"/api/quet", "/api/ai", "/api/ai/lich-su", "/api/db", "/api/flow/run", "/api/flows",
+		"/api/tele"} {
 		if !strings.Contains(ma, `'`+d) {
 			t.Errorf("index.html: mat duong %s", d)
 		}
 	}
 	// napFlow() dinh nghia ma khong goi = o chon quy trinh rong tron, va trang
 	// van ve day du nen khong ai bao loi. Dung kieu hong du an nay so nhat.
-	for _, ham := range []string{"napFlow()", "napRoute()", "napDB()", "napTele()", "connect()"} {
+	for _, ham := range []string{"napFlow()", "napRoute()", "napAILichSu()", "napDB()", "napTele()", "connect()"} {
 		if !regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(ham) + `\s*;`).MatchString(ma) {
 			t.Errorf("index.html: %s duoc dinh nghia nhung khong duoc goi o cap cao nhat", ham)
 		}
