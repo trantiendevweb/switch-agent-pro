@@ -678,3 +678,107 @@ Khi xây dựng bộ dò đối chiếu giữa lời văn bản của agent và 
    - *Hiện tượng:* Khi một nhánh rỗng chưa hề có commit mới (`goc..HEAD` bằng 0), nếu gọi lệnh `git log -1` thì Git sẽ in ra commit mới nhất của nhánh cha (`main`). Điều này khiến hệ thống lầm tưởng nhánh con đã làm việc và có commit.
    - *Cách xử lý:* Luôn đếm số lượng commit trước qua `git rev-list --count goc..HEAD`. Nếu bằng 0, phải khẳng định thẳng là **"nhánh rỗng / KHÔNG có commit nào"** và tuyệt đối không chạy `git log -1`.
 
+---
+
+## 15. Vai trò (Role)
+
+Để hỗ trợ việc hiển thị trực quan quy trình làm việc trên cả bảng điều khiển 2D lẫn không gian văn phòng ảo 3D, mỗi bước (`step`) trong luồng công việc (`flow`) có thể được gán một **vai trò** cụ thể.
+
+---
+
+### 1. Năm vai trò chuẩn và loại việc đại diện
+
+Hệ thống định nghĩa sẵn 5 vai trò chuẩn tương ứng với các vị trí công việc quen thuộc trong một đội ngũ phát triển:
+
+| Vai trò (`vai_tro`) | Tên gọi | Loại việc đại diện |
+|---|---|---|
+| `ceo` | Giám đốc / Tổng tài | Ra quyết định cao nhất: tổng hợp toàn bộ kết quả, đối chiếu bằng chứng thực tế từ Git, duyệt hoặc từ chối trộn nhánh mã nguồn. |
+| `leader` | Trưởng nhóm / Điều phối | Lập kế hoạch: đọc bài toán tổng thể, phân rã công việc thành các phần độc lập và giao việc cho từng thành viên. |
+| `coder` | Lập trình viên / Thợ code | Trực tiếp tạo sản phẩm: viết mã nguồn, sửa lỗi, hoàn thiện logic hoặc soạn thảo tài liệu kỹ thuật. |
+| `tester` | Kiểm thử viên / Thẩm định | Đảm bảo chất lượng: thực thi các bài kiểm tra tự động (như chạy `go test`) để xác nhận mã nguồn chạy đúng chuẩn. |
+| `soi` | Người soi / Đánh giá độc lập | Kiểm tra chéo khách quan: chỉ đọc mã nguồn hoặc bản thảo (thường dùng AI của hãng khác) để tìm lỗi và phát hiện sai sót mà không sửa trực tiếp vào file. |
+
+---
+
+### 2. Vì sao để RỖNG là hợp lệ?
+
+Trong định nghĩa bước, trường `vai_tro` hoàn toàn có thể để **rỗng** (không khai báo):
+
+- **Ý nghĩa của giá trị rỗng:** Rỗng nghĩa là bước này **"chưa phân vai"** (hoặc là bước phụ trợ như gửi tin nhắn thông báo).
+- **Vị trí hiển thị:** Trong văn phòng 3D, các agent chưa phân vai sẽ đứng tại **phòng chung** (sảnh chính ở giữa), không thuộc riêng về phòng ban nào.
+- **Triết lý thiết kế:** **"Thà thấy rõ chỗ chưa khai còn hơn để máy tự đoán hộ rồi hiển thị sai."** Nếu phần mềm cố tình suy đoán vai trò, người vận hành có thể bị hiểu lầm là luồng đã được phân công hoàn chỉnh. Để rỗng giúp người dùng nhìn phát biết ngay bước nào chưa được gán vai trò để bổ sung khi cần.
+
+---
+
+### 3. Vì sao khai trong `flows.toml` thay vì để máy suy từ sơ đồ?
+
+- **Vai trò là DỮ LIỆU cấu hình tĩnh:** Vai trò được khai báo tường minh trong file `.sagent/flows.toml`. Khi bạn đổi giá trị `vai_tro` trong file cấu hình, cả màn hình 2D lẫn văn phòng 3D sẽ tự động cập nhật vị trí và cách hiển thị theo vai mới mà **không cần sửa hay biên dịch lại bất kỳ dòng mã nguồn nào**.
+- **Bài học kiến trúc:** Thiết kế này trả lời trực tiếp câu hỏi *"Vai trò là dữ liệu hay chỉ là quy ước?"* được rút ra từ dự án tham khảo Gas Town (trong `docs/DU-AN-THAM-KHAO.md`). Việc tách định nghĩa vai trò thành dữ liệu cấu hình tĩnh giúp hệ thống minh bạch, không bị phụ thuộc vào việc suy diễn ngầm từ các mối liên kết mũi tên (`needs`) trong sơ đồ.
+
+---
+
+### 4. Ví dụ cấu hình TOML
+
+Dưới đây là ví dụ khai báo bước trong file cấu hình `.sagent/flows.toml`:
+
+```toml
+# Ví dụ 1: Bước có khai báo vai trò rõ ràng
+[[flow.doi-4.step]]
+  id = "code-go"
+  type = "agent"
+  profile = "claude:tns"
+  vai_tro = "coder"            # Gán vai trò lập trình viên (vào phòng code)
+  prompt = "Viết mã nguồn Go theo kế hoạch..."
+
+# Ví dụ 2: Bước để rỗng (không khai vai_tro)
+[[flow.doi-4.step]]
+  id = "bao"
+  type = "notify"
+  needs = ["gop"]
+  # Không khai vai_tro -> hệ thống hiểu là chưa phân vai (ở phòng chung)
+  message = "Đội 4 đã hoàn thành toàn bộ công việc!"
+```
+
+---
+
+### 5. Bảng vai trò của flow `doi-4`
+
+Quy trình phối hợp 4 tài khoản (`doi-4`) được phân vai chuẩn xác theo bảng sau:
+
+| Bước (`id`) | Loại bước (`type`) | Tài khoản (`profile`) | Vai trò (`vai_tro`) | Vị trí & Trách nhiệm |
+|---|---|---|---|---|
+| `ke-hoach` | `agent` | `claude:phu` | `leader` | Trưởng nhóm lập kế hoạch và phân chia phần việc |
+| `code-go` | `agent` | `claude:tns` | `coder` | Lập trình viên viết mã nguồn Go |
+| `code-doc` | `agent` | `antigravity:may` | `coder` | Lập trình viên / soạn thảo tài liệu hướng dẫn |
+| `kiem-1` | `shell` | — | `tester` | Máy chấm chạy kiểm thử tự động lần 1 |
+| `sua` | `agent` | `claude:tns` | `coder` | Lập trình viên sửa mã nguồn nếu kiểm thử báo lỗi |
+| `kiem-2` | `shell` | — | `tester` | Máy chấm chạy kiểm thử tự động lần 2 |
+| `soi` | `agent` | `grok:api` | `soi` | Người soi độc lập rà soát thay đổi qua Git diff |
+| `gop` | `agent` | `claude:phu` | `ceo` | Giám đốc kiểm tra Git, duyệt kết quả và gộp báo cáo |
+| `bao` | `notify` | — | *(Rỗng)* | Thông báo hoàn thành lượt chạy (ở phòng chung) |
+
+---
+
+### 6. Cơ chế kiểm tra hợp lệ (Validate) & Khả năng mở rộng
+
+- **Cảnh báo chứ không chặn:** Khi bạn chạy kiểm tra quy trình hoặc khởi chạy luồng, nếu hệ thống phát hiện một giá trị `vai_tro` lạ (không nằm trong 5 vai chuẩn `ceo`, `leader`, `coder`, `tester`, `soi`), hàm kiểm tra (`flow.Validate`) sẽ chỉ đưa ra **CẢNH BÁO** (`Warn: true`) nêu rõ giá trị chưa chuẩn cùng danh sách 5 vai hợp lệ, chứ **tuyệt đối không chặn đứng** luồng làm việc.
+- **Mục đích:** Giúp bạn có thể tự do thử nghiệm các vai trò mới theo nhu cầu quản trị riêng trước khi phần mềm chính thức bổ sung hoạt cảnh hoặc phòng ban tương ứng.
+
+---
+
+### 7. Cách xem trước vai trò trên Windows PowerShell
+
+Để xem trước toàn bộ danh sách các bước, vai trò đã phân, tài khoản và mô hình AI tương ứng mà không thực sự tốn chi phí chạy luồng, bạn mở **Windows PowerShell** và gõ lệnh:
+
+```powershell
+sagent flow run doi-4 --kho
+```
+
+Lệnh này sẽ in ra bảng kế hoạch tĩnh (dry-run) hiển thị cột vai trò cạnh tài khoản và model để bạn kiểm tra trước.
+
+> [!NOTE]
+> **Thứ đã kiểm và chưa kiểm:**
+> - **Đã kiểm:** Cấu hình 5 vai chuẩn (`ceo`, `leader`, `coder`, `tester`, `soi`) trên flow `doi-4`, hiển thị vai trò trong lệnh `--kho` và cảnh báo khi nhập vai trò lạ.
+> - **Chưa kiểm:** Hoạt ảnh di chuyển 3D riêng biệt cho các vai trò tuỳ biến do người dùng tự đặt thêm ngoài 5 vai chuẩn trên.
+
+
