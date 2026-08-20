@@ -38,8 +38,17 @@ func TestVanPhongChayThatVoiDomGia(t *testing.T) {
 			"la bo rut nham, khong phai trang bi rong", len(ma))
 	}
 
+	// vendor/mat.js la MA CUA DU AN, khong phai thu vien ben thu ba nhu three:
+	// nap file THAT vao truoc script trang, thay vi gia lap mot `Mat` trong
+	// harness. Gia lap thi bai kiem van xanh khi mat.js hong, ma trang that thi
+	// chet ngay dong dau — dung kieu hong bai nay lap ra de bat.
+	matJS, err := os.ReadFile(filepath.Join("web", "vendor", "mat.js"))
+	if err != nil {
+		t.Fatalf("khong doc duoc web/vendor/mat.js: %v", err)
+	}
+
 	tam := filepath.Join(t.TempDir(), "vanphong.js")
-	if err := os.WriteFile(tam, []byte(ma), 0o600); err != nil {
+	if err := os.WriteFile(tam, append(append(matJS, '\n'), ma...), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

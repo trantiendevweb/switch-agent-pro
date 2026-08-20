@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
+	"github.com/trantiendevweb/switch-agent-pro/internal/config"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
@@ -540,6 +541,41 @@ type sessionDTO struct {
 	HanMucDenLai int64  `json:"hanMucDenLai,omitempty"` // unix giây, 0 = không rõ
 }
 
+// uiDTO là phần `[ui]` của cấu hình, đưa ra cho mọi mặt web đọc chung.
+//
+// Vì sao đi kèm /api/state chứ không phải một endpoint riêng: mọi trang đã đọc
+// ảnh chụp này ngay khi kết nối, nên thêm vào đây thì không trang nào phải nhớ
+// fetch thêm một chỗ — trang nào quên sẽ lặng lẽ vẽ bằng bố cục mặc định mà
+// không ai báo lỗi. Thêm endpoint mới còn kéo theo một action mới trong hợp
+// đồng và một lệnh CLI tương ứng (test ngang quyền), trong khi `sagent config`
+// đã trả lời đúng câu hỏi đó ở terminal rồi.
+type uiDTO struct {
+	DefaultSurface string   `json:"defaultSurface"`
+	Theme          string   `json:"theme"`
+	Columns        []string `json:"columns"`
+	PinnedFlows    []string `json:"pinnedFlows"`
+	Enable3D       bool     `json:"enable3d"`
+}
+
+// uiCuaCauHinh dựng uiDTO, và ĐÃ GIẢI SẴN giá trị mặc định.
+//
+// Cố ý giải ở server: nếu trả `columns: []` rồi để mỗi trang tự biết "rỗng thì
+// dùng bốn cột kia", thì bộ mặc định bị chép làm nhiều bản trong JavaScript và
+// sẽ trôi khỏi nhau. Một luật, một chỗ — trang chỉ việc vẽ đúng thứ nhận được.
+func uiCuaCauHinh(c config.Config) uiDTO {
+	cot := c.UI.Columns
+	if len(cot) == 0 {
+		cot = config.CotMacDinh
+	}
+	return uiDTO{
+		DefaultSurface: c.UI.DefaultSurface,
+		Theme:          c.UI.Theme,
+		Columns:        cot,
+		PinnedFlows:    c.UI.PinnedFlows,
+		Enable3D:       c.UI.Enable3D,
+	}
+}
+
 func phienDTO(s store.Session) sessionDTO {
 	return sessionDTO{s.ID, s.Addr(), s.PID, s.Worktree, s.Log, s.Started.Unix(),
 		s.State, s.StateLyDo, s.HanMucDenLai}
@@ -598,6 +634,7 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		"profiles":   ps,
 		"sessions":   ss,
 		"runs":       rs,
+		"ui":         uiCuaCauHinh(s.api.Config()),
 		"now":        time.Now().Unix(),
 	})
 }

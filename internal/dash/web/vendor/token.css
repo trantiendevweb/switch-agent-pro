@@ -73,6 +73,50 @@
   --ease:cubic-bezier(0.16,1,0.3,1);
 }
 
+/* BẢNG SÁNG — bật bằng `ui.theme = "light"` trong .sagent/project.toml.
+ *
+ * Chỉ khai lại GIÁ TRỊ, không thêm tên biến nào: trang vẫn viết var(--run) như
+ * cũ, nên không trang nào phải biết đang ở bảng nào. Đó là lý do đổi chủ đề
+ * không cần sửa một dòng HTML.
+ *
+ * Màu trạng thái ĐẬM HƠN bản tối chứ không dùng lại: #2FE0A0 đọc tốt trên nền
+ * #070810 nhưng trên nền trắng thì nhạt tới mức mất chữ — cùng một token, hai
+ * nền, phải là hai giá trị. Sắc hãng cũng vậy.
+ *
+ * Vai trò giữ nguyên thứ tự "sâu → nổi": --void là nền xa nhất, --panel là mặt
+ * phẳng nổi lên trên nó. Ở bảng sáng thì "nổi lên" nghĩa là TRẮNG HƠN, nên
+ * --panel sáng hơn --void chứ không tối đi. Đảo vai ở đây là thứ khiến giao
+ * diện sáng nhìn như bị lỗi. */
+:root[data-theme="light"]{
+  --void:#EEF0F6;
+  --panel:#FFFFFF;
+  --panel-2:#F6F7FB;
+
+  --line:rgba(12,16,32,.10);
+  --line-2:rgba(12,16,32,.20);
+
+  --hi:#11141E;
+  --mid:#4A5266;
+  --lo:#798194;
+
+  --run:#0B8F63;
+  --pending:#9A6410;
+  --done:#3450C4;
+  --idle:#798194;
+  --error:#C42B48;
+
+  --core:#3450C4;
+  --link:#0A7C84;
+
+  --prov-claude:#B4522F;
+  --prov-codex:#0A7A5C;
+  --prov-cursor:#6733C6;
+  --prov-gemini:#2A64C8;
+  --prov-antigravity:#2A64C8;
+  --prov-grok:#5A6070;
+  --prov-may:#798194;
+}
+
 /* Ba lớp vai chữ — dán lớp là đúng vai, khỏi mỗi trang tự chế font-family. */
 .t-display{font-family:var(--font-display);letter-spacing:-.01em}
 .t-body{font-family:var(--font-body)}

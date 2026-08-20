@@ -7,6 +7,11 @@
 <!-- Màu và font khai MỘT chỗ: vendor/token.css. Trang không được tự khai lại
      các biến trạng thái — có test giữ (designsystem_test.go). -->
 <link rel="stylesheet" href="vendor/token.css" />
+<!-- mat.js nạp trong <head> và chạy themeSom() NGAY, trước khi thân trang được
+     vẽ: đặt chủ đề sau đó thì người dùng bảng sáng thấy một nhịp tối rồi mới
+     lật, mỗi lần mở trang. Lời cuối vẫn là /api/state, đây chỉ là đệm. -->
+<script src="vendor/mat.js"></script>
+<script>Mat.themeSom();</script>
 <style>
   :root{
     --safe-b:env(safe-area-inset-bottom,0px);
@@ -585,7 +590,9 @@
       <h2 style="margin-top:18px">Tài khoản</h2>
       <div class="card" style="margin-top:0">
         <table>
-          <thead><tr><th></th><th>Provider</th><th>Tài khoản</th><th>Danh tính</th><th>Trạng thái</th></tr></thead>
+          <!-- Đầu bảng dựng lúc chạy theo `ui.columns`; HTML không biết trước
+               project khai cột nào. Ô đầu để trống là chấm "đang chạy". -->
+          <thead id="profiles-head"><tr><th></th></tr></thead>
           <tbody id="profiles"></tbody>
         </table>
       </div>
@@ -1023,7 +1030,59 @@ function capLai(unix, now){
 }
 
 let profiles=[];
+
+// veDauBang dựng lại <thead> cho đúng bộ cột đang bật. Ô đầu luôn trống — đó là
+// chấm "đang chạy", không phải một cột người dùng chọn được.
+let cotDangVe='';
+function veDauBang(cot){
+  const khoa = cot.join('|');
+  if(khoa===cotDangVe) return;   // không dựng lại mỗi nhịp cập nhật
+  cotDangVe = khoa;
+  $('profiles-head').innerHTML = '<tr><th></th>' +
+    cot.map(c=>`<th>${esc(Mat.nhanCot(c))}</th>`).join('') + '</tr>';
+}
+
+// oCot vẽ MỘT ô. Tách ra vì bảng giờ không còn cột cố định: thêm cột mới là
+// thêm đúng một nhánh ở đây, không phải sửa chuỗi HTML dài.
+//
+// `phien` là phiên đang chạy của tài khoản đó, hoặc undefined khi nó đang rỗi —
+// ba cột phiên phải để TRỐNG lúc đó, không được lấp bằng số 0 hay "—" giả.
+function oCot(c,p,phien){
+  switch(c){
+    case 'provider':  return `<td class="may">${esc(p.provider)}</td>`;
+    case 'tai_khoan': return `<td class="may">${esc(p.account)}</td>`;
+    case 'danh_tinh': return `<td class="may" style="color:var(--mid)">${esc(p.identity||'—')}</td>`;
+    case 'trang_thai':
+      // Ba trạng thái KHÁC NHAU, gộp lại là nói dối: ngày 18/08 bảng hiện
+      // claude:phu "sẵn sàng" trong khi chạy thật trả "OAuth session expired".
+      // hasToken chỉ kiểm file token có tồn tại, không kiểm nó còn dùng được.
+      return '<td>' + (p.hetHan ? '<span class="pill warn">hết hạn — đăng nhập lại</span>'
+                     : p.hasToken ? '<span class="pill ok">sẵn sàng</span>'
+                     : '<span class="pill off">chưa đăng nhập</span>') + '</td>';
+    case 'pid':     return `<td class="may" style="color:var(--mid)">${phien?esc(String(phien.pid)):''}</td>`;
+    case 'nhanh':   return `<td class="may" style="color:var(--mid)">${phien?esc(tenNhanh(phien.worktree)):''}</td>`;
+    case 'bat_dau': return `<td class="may" style="color:var(--mid)">${phien?esc(gioPhut(phien.started)):''}</td>`;
+    default:        return '<td></td>';
+  }
+}
+
+// tenNhanh rút gọn đường dẫn worktree thành phần cuối — cột hẹp mà in nguyên
+// "C:\Users\...\.worktrees\switch-agent-pro-b2d22420\phu-1" thì bảng vỡ.
+function tenNhanh(duong){
+  if(!duong) return '';
+  const phan = duong.split(/[\\/]/).filter(Boolean);
+  return phan.length ? phan[phan.length-1] : '';
+}
+
+function gioPhut(unix){
+  if(!unix) return '';
+  const d = new Date(unix*1000);
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
 function render(state){
+  // `[ui]` áp TRƯỚC khi vẽ: chủ đề đổi giữa chừng thì mắt thấy nháy, còn link
+  // mặt 3D bị gỡ sau khi vẽ xong thì nav nhảy một nhịp.
+  Mat.apDungUI(state.ui);
   const now = state.now;
   const ss = state.sessions||[];
 
@@ -1072,17 +1131,17 @@ function render(state){
 
   // profiles
   profiles = state.profiles||[];
+  const cot = Mat.cotHopLe((state.ui&&state.ui.columns) || []);
+  veDauBang(cot);
+  // Ba cột pid/nhanh/bat_dau nói về PHIÊN tài khoản đó đang chạy. Dựng sẵn bảng
+  // tra addr → phiên sống, để mỗi hàng khỏi quét lại cả mảng.
+  const phienTheoAddr = {};
+  (state.sessions||[]).forEach(s=>{ if(s.state==='running' && !phienTheoAddr[s.addr]) phienTheoAddr[s.addr]=s; });
   const pb=$('profiles'); pb.innerHTML='';
   profiles.forEach(p=>{
-    // Ba trạng thái KHÁC NHAU, gộp lại là nói dối: ngày 18/08 bảng hiện claude:phu
-    // "sẵn sàng" trong khi chạy thật trả "OAuth session expired". hasToken chỉ kiểm
-    // file token có tồn tại, không kiểm nó còn dùng được.
-    const tok = p.hetHan ? '<span class="pill warn">hết hạn — đăng nhập lại</span>'
-              : p.hasToken ? '<span class="pill ok">sẵn sàng</span>'
-              : '<span class="pill off">chưa đăng nhập</span>';
-    const act = p.active ? '<span class="dot" style="background:var(--run)"></span>' : '';
     const tr=document.createElement('tr');
-    tr.innerHTML = `<td>${act}</td><td class="may">${esc(p.provider)}</td><td class="may">${esc(p.account)}</td><td class="may" style="color:var(--mid)">${esc(p.identity||'—')}</td><td>${tok}</td>`;
+    const act = p.active ? '<span class="dot" style="background:var(--run)"></span>' : '';
+    tr.innerHTML = `<td>${act}</td>` + cot.map(c=>oCot(c,p,phienTheoAddr[p.addr])).join('');
     pb.appendChild(tr);
   });
   // fleet dropdown

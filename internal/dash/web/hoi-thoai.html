@@ -7,6 +7,10 @@
 <!-- Màu và font khai MỘT chỗ: vendor/token.css. Trang không được tự khai lại
      --run/--pending/--done/--idle/--error — có test giữ (designsystem_test.go). -->
 <link rel="stylesheet" href="vendor/token.css" />
+<!-- mat.js: chủ đề + ẩn lối vào mặt 3D theo `[ui]` của project.toml. Nạp
+     trong <head> và chạy themeSom() NGAY để không nháy từ tối sang sáng. -->
+<script src="vendor/mat.js"></script>
+<script>Mat.themeSom();</script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:var(--void);color:var(--hi);
@@ -239,6 +243,7 @@ async function napDanhSach(){
   let st;
   try { st = await api("/api/state"); }
   catch (e) { $("#runs").innerHTML = '<div class="empty">không đọc được</div>'; return; }
+  Mat.apDungUI(st.ui);
 
   const runs = st.runs || [];
   if (!runs.length){ $("#runs").innerHTML = '<div class="empty">chưa có lượt nào</div>'; return; }

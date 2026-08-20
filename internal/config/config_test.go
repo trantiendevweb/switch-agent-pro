@@ -168,7 +168,7 @@ func TestUICotDungThiQua(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Giữ ĐÚNG THỨ TỰ người dùng khai, không tự sắp lại theo CotPhien.
+	// Giữ ĐÚNG THỨ TỰ người dùng khai, không tự sắp lại theo CotTaiKhoan.
 	if len(c.UI.Columns) != 2 || c.UI.Columns[0] != "trang_thai" {
 		t.Errorf("phải giữ nguyên thứ tự khai: %v", c.UI.Columns)
 	}
@@ -181,12 +181,12 @@ func TestUIMatMacDinh3DMaTat3D(t *testing.T) {
 	}
 }
 
-func TestCotMacDinhNamTrongCotPhien(t *testing.T) {
+func TestCotMacDinhNamTrongCotTaiKhoan(t *testing.T) {
 	// Hai danh sách phải không được trôi khỏi nhau: mặc định mà chứa tên không
 	// vẽ được thì bảng phiên rỗng ngay cả khi người dùng không khai gì.
 	for _, c := range CotMacDinh {
 		if !CotHopLe(c) {
-			t.Errorf("CotMacDinh có %q không nằm trong CotPhien", c)
+			t.Errorf("CotMacDinh có %q không nằm trong CotTaiKhoan", c)
 		}
 	}
 }

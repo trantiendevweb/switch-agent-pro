@@ -21,21 +21,26 @@ import (
 // ProjectDirName là thư mục cấu hình nằm trong repo của người dùng.
 const ProjectDirName = ".sagent"
 
-// CotPhien liệt kê MỌI cột mà bảng phiên của mặt 2D vẽ được, và là nguồn duy
-// nhất để `ui.columns` được kiểm.
+// CotTaiKhoan liệt kê MỌI cột mà bảng "Tài khoản" của mặt 2D vẽ được, và là
+// nguồn duy nhất để `ui.columns` được kiểm.
+//
+// Mỗi hàng là một TÀI KHOẢN. Ba cột `pid`, `nhanh`, `bat_dau` nói về phiên tài
+// khoản đó ĐANG chạy — tài khoản rỗi thì ba ô đó trống, chứ không phải bảng
+// đổi nghĩa. Người vận hành hỏi "con này đang chạy ở nhánh nào" mà phải mở
+// sang panel khác để tra thì bảng chưa làm xong việc của nó.
 //
 // Khai ở tầng config chứ không ở tầng dash, vì `sagent config` phải báo được
 // tên cột sai NGAY LÚC ĐỌC FILE — bắt lỗi lúc mở trình duyệt thì đã muộn, và
 // mặt web nào cũng phải đọc chung một danh sách này chứ không tự chế bản riêng.
-var CotPhien = []string{"provider", "tai_khoan", "danh_tinh", "trang_thai", "pid", "nhanh", "bat_dau"}
+var CotTaiKhoan = []string{"provider", "tai_khoan", "danh_tinh", "trang_thai", "pid", "nhanh", "bat_dau"}
 
-// CotMacDinh là bộ cột dùng khi `ui.columns` không khai — đúng bốn cột mà bảng
-// phiên đang vẽ từ trước, nên không khai gì thì giao diện KHÔNG đổi.
+// CotMacDinh là bộ cột dùng khi `ui.columns` không khai — đúng bốn cột bảng
+// này đang vẽ từ trước, nên không khai gì thì giao diện KHÔNG đổi.
 var CotMacDinh = []string{"provider", "tai_khoan", "danh_tinh", "trang_thai"}
 
 // CotHopLe cho biết tên cột có vẽ được không.
 func CotHopLe(ten string) bool {
-	for _, c := range CotPhien {
+	for _, c := range CotTaiKhoan {
 		if c == ten {
 			return true
 		}
@@ -191,7 +196,7 @@ func (c Config) validate() error {
 	}
 	for _, cot := range c.UI.Columns {
 		if !CotHopLe(cot) {
-			return fmt.Errorf("ui.columns có %q — chỉ nhận %s", cot, strings.Join(CotPhien, "|"))
+			return fmt.Errorf("ui.columns có %q — chỉ nhận %s", cot, strings.Join(CotTaiKhoan, "|"))
 		}
 	}
 	// Bắt mâu thuẫn NGAY Ở ĐÂY thay vì để mặt web tự xử: khai mặt mặc định là

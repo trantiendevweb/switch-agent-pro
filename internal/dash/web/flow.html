@@ -7,6 +7,10 @@
 <!-- Màu và font khai MỘT chỗ: vendor/token.css. Trang không được tự khai lại
      --run/--pending/--done/--idle/--error — có test giữ (designsystem_test.go). -->
 <link rel="stylesheet" href="vendor/token.css" />
+<!-- mat.js: chủ đề + ẩn lối vào mặt 3D theo `[ui]` của project.toml. Nạp
+     trong <head> và chạy themeSom() NGAY để không nháy từ tối sang sáng. -->
+<script src="vendor/mat.js"></script>
+<script>Mat.themeSom();</script>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--hi);
@@ -726,15 +730,42 @@ function inspector(){
 // ---- nạp / lưu ----
 async function loadList(){
   try{
+    // `[ui]` đi kèm /api/state. Hỏng thì bỏ qua: mất phần ghim và chủ đề, chứ
+    // bảng vẽ vẫn phải mở được — đây là trang làm việc, không phải trang trang trí.
+    let ui=null;
+    try{ ui=(await call('/api/state')).ui; }catch(_){}
+    Mat.apDungUI(ui);
+
     const d=await call('/api/flows');
+    // Flow ghim lên đầu, giữ đúng thứ tự khai trong project.toml. Tên không có
+    // thật thì ghimLenDau bỏ qua, nên xoá flow khỏi flows.toml mà quên gỡ ghim
+    // cũng không sinh ra mục ma trong ô chọn.
+    const ds=Mat.ghimLenDau(d.flows||[], ui&&ui.pinnedFlows, f=>f.name);
+    const nGhim=(ui&&ui.pinnedFlows||[]).filter(g=>ds.some(f=>f.name===g)).length;
+
     const sel=$('#pick'); const cur=sel.value;
     sel.innerHTML='';
-    (d.flows||[]).forEach(f=>{
+    // Tách phần ghim bằng <optgroup> chứ không bằng một ký tự đánh dấu trước
+    // tên: thứ tự lạ mà không giải thích thì đọc như lỗi sắp xếp, còn dán một
+    // hình sao vào tên thì vừa trái design system (icon phải là SVG) vừa bắt
+    // trình đọc màn hình đọc thừa một từ trước mỗi tên flow. Nhãn nhóm nói
+    // thẳng ra lý do, và đọc được.
+    const nhom = nGhim ? document.createElement('optgroup') : null;
+    if(nhom){ nhom.label='Ghim trong project.toml'; sel.appendChild(nhom); }
+    let nhomConLai = null;
+    ds.forEach((f,i)=>{
       const o=document.createElement('option'); o.value=f.name;
-      o.textContent=f.name+' ('+f.steps+' bước)'; sel.appendChild(o);
+      o.textContent=f.name+' ('+f.steps+' bước)';
+      if(i<nGhim){ nhom.appendChild(o); return; }
+      if(nhom && !nhomConLai){
+        nhomConLai=document.createElement('optgroup');
+        nhomConLai.label='Còn lại';
+        sel.appendChild(nhomConLai);
+      }
+      (nhomConLai||sel).appendChild(o);
     });
-    if(cur && (d.flows||[]).some(f=>f.name===cur)) sel.value=cur;
-    else if(!flowName && d.flows && d.flows.length){ sel.value=d.flows[0].name; loadFlow(d.flows[0].name); }
+    if(cur && ds.some(f=>f.name===cur)) sel.value=cur;
+    else if(!flowName && ds.length){ sel.value=ds[0].name; loadFlow(ds[0].name); }
   }catch(e){ toast(e.message,'err'); }
 }
 async function loadFlow(name){

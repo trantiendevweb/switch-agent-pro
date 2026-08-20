@@ -8,6 +8,10 @@
      mặt kia. Trang này KHÔNG được tự khai --run/--pending/--done/--idle/--error
      (designsystem_test.go giữ điều đó) — một mặt tự khai màu là bắt đầu lệch. -->
 <link rel="stylesheet" href="vendor/token.css" />
+<!-- mat.js: chủ đề + ẩn lối vào mặt 3D theo `[ui]` của project.toml. Nạp
+     trong <head> và chạy themeSom() NGAY để không nháy từ tối sang sáng. -->
+<script src="vendor/mat.js"></script>
+<script>Mat.themeSom();</script>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--void);color:var(--hi);
@@ -1354,7 +1358,7 @@ async function refresh(){
     // vẽ. Hỏng thì bỏ qua, vì phần văn phòng bên dưới không phụ thuộc nó.
     try{
       const sr = await fetch('/api/state', {headers:H});
-      if(sr.ok) hamDoi = await sr.json();
+      if(sr.ok){ hamDoi = await sr.json(); Mat.apDungUI(hamDoi.ui); }
     }catch(_){}
     const fr = await fetch('/api/flows', {headers:H});
     if(!fr.ok) return;
