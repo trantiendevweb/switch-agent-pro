@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
@@ -86,6 +87,11 @@ var Actions = []string{
 	// Sổ route: cấu hình KHAI gì, và sổ ghi đã THẬT SỰ gọi qua đâu. Hai chiều
 	// lệch nhau nói hai chuyện khác nhau — xem store.MucRoute.
 	"route.list",
+	// Hỏi route CÓ DÙNG ĐƯỢC KHÔNG trước khi chạy — khác `route.list` (chỉ đối
+	// chiếu giấy tờ: cấu hình khai gì, sổ ghi gì). Nằm trong hợp đồng vì đây là
+	// câu hỏi người vận hành hỏi TRƯỚC khi bấm một lượt flow dài: route chập chờn
+	// mà không hỏi được thì cách duy nhất để biết là chạy tới giữa chừng rồi hỏng.
+	"route.kiem",
 	// Quét tiến trình mồ côi: phiên tự chết thì `session.list` không còn thấy nó,
 	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
 	// động này thì không mặt nào nhìn ra chúng.
@@ -356,6 +362,30 @@ func (a *API) RouteList() ([]store.MucRoute, error) {
 	}
 	return a.db.DoiChieuRoute(cauHinh)
 }
+
+// RouteKiem — action "route.kiem". Hỏi từng route còn sống không, và model khai
+// trong cấu hình có thật không.
+//
+// Đi bằng `GET /models` nên KHÔNG tốn token: một phép kiểm có tính tiền thì
+// người ta sẽ thôi chạy nó, và một health check không ai chạy thì bằng không có.
+//
+// Kiểm SONG SONG: bốn route mà hỏi lần lượt, mỗi route chờ tối đa 15 giây, thì
+// người dùng ngồi nhìn màn hình gần một phút chỉ để biết có nên bấm chạy không.
+func (a *API) RouteKiem(ctx context.Context) []aiapi.SucKhoe {
+	ds := a.AIRoutes()
+	ra := make([]aiapi.SucKhoe, len(ds))
+	var wg sync.WaitGroup
+	for i, r := range ds {
+		wg.Add(1)
+		go func(i int, r aiapi.Route) {
+			defer wg.Done()
+			ra[i] = aiapi.Kiem(ctx, r)
+		}(i, r)
+	}
+	wg.Wait()
+	return ra
+}
+
 
 // ProfileRun — action "profile.run". Chạy CLI tương tác, CHIẾM terminal cho tới
 // khi người dùng thoát. Chỉ mặt terminal gọi được; các mặt khác dùng fleet.

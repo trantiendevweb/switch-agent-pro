@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
@@ -25,8 +27,11 @@ func cmdRoute(args []string) {
 	if len(args) > 0 {
 		switch args[0] {
 		case "ds", "list":
+		case "kiem", "--kiem":
+			routeKiem()
+			return
 		default:
-			fail(fmt.Errorf("chưa có `route %s`. Hiện chỉ có: sagent route [ds]", args[0]))
+			fail(fmt.Errorf("chưa có `route %s`. Hiện chỉ có: sagent route [ds|kiem]", args[0]))
 		}
 	}
 	a, done := open()
@@ -78,4 +83,64 @@ func nhan(t string) string {
 	default:
 		return t
 	}
+}
+
+// `sagent route kiem` — action "route.kiem". Hỏi từng route CÓ DÙNG ĐƯỢC KHÔNG.
+//
+// Khác `sagent route` ở chỗ nó chạm mạng thật: bảng kia đối chiếu giấy tờ (cấu
+// hình khai gì, sổ ghi đã gọi qua đâu), còn bảng này đi hỏi nhà cung cấp. Đo
+// được 20/08: route `deepseek` trả HTTP 503 ba lần lúc 16:54–16:56 rồi tự hồi
+// phục — và cách duy nhất để biết, khi chưa có lệnh này, là gọi thật rồi hỏng.
+//
+// KHÔNG tốn token: đi bằng `GET /models`. Một phép kiểm có tính tiền thì người
+// ta sẽ thôi chạy nó, và health check không ai chạy thì bằng không có.
+func routeKiem() {
+	a, done := open()
+	ds := a.RouteKiem(context.Background())
+	done()
+
+	fmt.Println()
+	if len(ds) == 0 {
+		fmt.Println("  Chưa khai route nào trong .sagent/project.toml.")
+		fmt.Println()
+		return
+	}
+	fmt.Println("  Kiểm route (GET /models — không tốn token)")
+	fmt.Println()
+	for _, s := range ds {
+		dau, nhan := "✗", "không dùng được"
+		switch {
+		case s.Dung():
+			dau, nhan = "✓", "dùng được"
+		case s.Song:
+			// Nhà cung cấp còn đó nhưng model khai không có thật. Đây KHÁC hẳn
+			// route chết, và cách sửa cũng khác: sửa cấu hình, không phải đợi.
+			dau, nhan = "!", "sống, nhưng model khai không có"
+		}
+		fmt.Printf("  %s %-12s %-32s %s\n", dau, s.Ten, nhan, s.Mat.Round(time.Millisecond))
+
+		if s.Song && s.SoModel > 0 {
+			fmt.Printf("      model %q · nhà cung cấp liệt kê %d model\n", s.Model, s.SoModel)
+		}
+		if s.KhongRo {
+			// Im lặng KHÁC phủ nhận: endpoint không cài /models thì không được
+			// kết luận model khai sai.
+			fmt.Println("      endpoint không liệt kê model — không kiểm được tên model, chỉ biết là route sống")
+		}
+		for _, g := range s.Gan {
+			fmt.Printf("      có thể bạn muốn: %s\n", g)
+		}
+		if s.Loi != "" {
+			// Nguyên văn, giữ cả request id — đó là thứ duy nhất dùng được khi
+			// phải hỏi lại nhà cung cấp.
+			ma := ""
+			if s.Status > 0 {
+				ma = fmt.Sprintf("HTTP %d: ", s.Status)
+			}
+			fmt.Printf("      %s%s\n", ma, s.Loi)
+		}
+	}
+	fmt.Println()
+	fmt.Println("  Lưu ý: phép kiểm này KHÔNG biết hạn mức còn hay hết — cái đó chỉ lộ ra khi gọi thật.")
+	fmt.Println()
 }

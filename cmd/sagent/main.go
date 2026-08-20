@@ -79,6 +79,9 @@ func init() {
 		"db":       {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
 		"api":      {"api.call", "gọi thẳng AI API (đường thứ hai)", cmdAPI},
 		"route":    {"route.list", "sổ route: cấu hình khai gì, đã gọi thật qua đâu", cmdRoute},
+		// `sagent route kiem` — lệnh con của `route`, không phải tên lệnh cấp một,
+		// nhưng vẫn phải khai ở đây để test ngang quyền thấy nó.
+		"__rkiem": {"route.kiem", "kiểm route còn sống không (không tốn token)", nil},
 		// `sagent ds --so` — một CỜ của `ds`, không phải tên lệnh riêng, nhưng
 		// vẫn phải khai ở đây để test ngang quyền thấy nó (giống `__apils`).
 		"__soHS": {"profile.so", "đối chiếu sổ đăng ký với đĩa (sagent ds --so)", nil},
