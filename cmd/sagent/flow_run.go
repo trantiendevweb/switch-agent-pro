@@ -136,6 +136,11 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 				dong += " · ⚠ TỰ DUYỆT MỌI QUYỀN"
 			}
 			fmt.Println(dong)
+			// Quyền đọc in cho MỌI bước, kể cả bước chưa khai `doc_duoc`. In
+			// riêng bước có khai thì im lặng lại thành "mặc định là gì" — mà
+			// mặc định ở đây là MỞ HẾT, đúng thứ người đọc kế hoạch cần biết
+			// trước khi tiêu tiền: bước này sẽ nuốt output của những ai.
+			fmt.Printf("       đọc được: %s\n", b.DocDuoc)
 			if b.Lap != "" {
 				fmt.Printf("       lặp trên %s — mỗi mục thêm một lượt agent, dài bao nhiêu thì lúc chạy mới biết\n", b.Lap)
 			}

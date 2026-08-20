@@ -54,6 +54,14 @@ type BuocKho struct {
 	// gọn gàng mà sai.
 	Lap string `json:"lap,omitempty"`
 
+	// DocDuoc là câu mô tả quyền đọc kết quả của bước này: "mọi bước trước" khi
+	// nó chưa khai `doc_duoc`, hoặc danh sách bước nó được đọc.
+	//
+	// Là CÂU chứ không phải danh sách, vì ba trạng thái (chưa khai / khai rỗng /
+	// khai danh sách) phải phân biệt được, mà một mảng JSON rỗng thì không nói
+	// được nó là "chưa khai" hay "cấm hết".
+	DocDuoc string `json:"docDuoc,omitempty"`
+
 	// ConSot là id bước mà prompt này đang chờ kết quả NHƯNG bước đó không chạy
 	// xong trước nó (chạy sau, chạy cùng đợt, hoặc không hề tồn tại). Rỗng =
 	// không có chỗ nào hụt.
@@ -143,16 +151,19 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 		return kh, err
 	}
 
-	// env lớn dần theo từng đợt: bước ở đợt sau đọc được kết quả của MỌI bước
+	// `xong` lớn dần theo từng đợt: bước ở đợt sau đọc được kết quả của MỌI bước
 	// đợt trước, và KHÔNG đọc được bước cùng đợt (chúng chạy song song, chưa
 	// bước nào xong). Nhờ vậy BuocConSot bắt đúng chỗ hụt thật.
-	env := map[string]string{}
-	for k, v := range bien {
-		env[k] = v
-	}
+	//
+	// Giữ nguyên dạng `id -> kết quả` chứ không dựng thẳng khoá
+	// `steps.<id>.output`, để còn chạy qua ĐÚNG bộ lọc quyền đọc mà bộ thực thi
+	// dùng (flow.LocDocDuoc). Chạy khan mà bỏ qua bộ lọc thì prompt in ra khác
+	// prompt gửi đi — đúng thứ tính năng này sinh ra để chống.
+	xong := map[string]string{}
 	for _, d := range dots {
 		dk := DotKho{So: d.So, ChoDuyet: d.ChoDuyet}
 		for _, s := range d.Buoc {
+			env := flow.WithOutputs(bien, flow.LocDocDuoc(s, xong))
 			dk.Buoc = append(dk.Buoc, a.buocKho(s, env, defaultProfile, &kh.SoAgent))
 			if s.ForEach != "" {
 				kh.CoLap = true
@@ -160,7 +171,7 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 		}
 		kh.Dot = append(kh.Dot, dk)
 		for _, s := range d.Buoc {
-			env["steps."+s.ID+".output"] = fmt.Sprintf("(kết quả bước %q)", s.ID)
+			xong[s.ID] = fmt.Sprintf("(kết quả bước %q)", s.ID)
 		}
 	}
 	return kh, nil
@@ -171,7 +182,8 @@ func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int) B
 	// VaiTro gán cho MỌI loại bước, không riêng bước agent: `kiem-1` là bước
 	// shell nhưng vẫn là việc của tester.
 	b := BuocKho{ID: s.ID, Type: s.Type, Needs: s.Needs, Worktree: s.Worktree,
-		TuDuyetQuyen: s.TuDuyetQuyen, Lap: s.ForEach, VaiTro: s.VaiTro}
+		TuDuyetQuyen: s.TuDuyetQuyen, Lap: s.ForEach, VaiTro: s.VaiTro,
+		DocDuoc: flow.MoTaDocDuoc(s)}
 	if b.Needs == nil {
 		b.Needs = []string{}
 	}

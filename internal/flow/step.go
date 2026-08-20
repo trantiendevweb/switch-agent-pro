@@ -47,6 +47,11 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 
 			// Điều kiện `when`: không thoả thì bỏ qua, bước sau vẫn chạy.
 			states, outs := st.snapshot()
+			// Lọc quyền đọc NGAY ở đây, một chỗ duy nhất: `when`, `foreach` và
+			// runStep đều lấy env từ chính `outs` này, nên lọc sau đó là để hở
+			// ba đường mà chỉ vá một. Bước không khai `doc_duoc` thì LocDocDuoc
+			// trả về nguyên map cũ — không đổi một byte nào.
+			outs = LocDocDuoc(s, outs)
 			if s.When != "" {
 				ok, err := Eval(s.When, Ctx{Vars: vars, States: states, Outputs: outs})
 				if err != nil {
