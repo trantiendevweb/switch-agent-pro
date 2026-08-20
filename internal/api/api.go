@@ -947,8 +947,10 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 			return fleet.Result{}, fmt.Errorf("đã đạt trần %d phiên đang chạy — dừng bớt rồi thử lại (sagent stop all)", m)
 		}
 	}
-	// Cảnh báo nếu token sắp hết hạn: hạm đội chạy dài sẽ vượt mốc refresh, mà
-	// hành vi khi nhiều bản clone cùng refresh thì CHƯA ĐO (docs/DO-LUONG.md).
+	// Cảnh báo nếu token sắp hết hạn: hạm đội chạy dài sẽ vượt mốc refresh, và
+	// mỗi lần refresh là nhà cung cấp XOAY VÒNG token (đo 20/08) — bản nào refresh
+	// trước thì các bản kia chết. `profile.Clone` tự mang bản mới nhất về hồ sơ
+	// gốc trước mỗi lần chép, nhưng người vận hành vẫn nên biết là sắp tới mốc đó.
 	if dir, ok := profile.ResolveDir(req.Addr.Provider, req.Addr.Account); ok {
 		if exp, ok := ad.TokenExpiry(dir); ok {
 			left := time.Until(exp)
@@ -957,7 +959,7 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 				a.bus.Warnf("token của %s ĐÃ HẾT HẠN — chạy `sagent %s` một lần để làm mới trước.", req.Addr, req.Addr)
 			case left < 2*time.Hour:
 				a.bus.Warnf("token của %s còn %s. Hạm đội chạy lâu hơn thế sẽ phải refresh, "+
-					"mà hành vi khi nhiều bản clone cùng refresh CHƯA ĐO.", req.Addr, left.Truncate(time.Minute))
+					"Qua mốc đó là token bị xoay vòng, mọi bản sao cũ chết.", req.Addr, left.Truncate(time.Minute))
 			}
 		}
 	}

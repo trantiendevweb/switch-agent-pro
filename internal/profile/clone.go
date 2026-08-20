@@ -30,13 +30,22 @@ func CloneDir(prov, account string, n int) string {
 // .claude.json và làm hỏng file (trust dialog nằm trong đó). Mỗi bản clone có
 // file riêng nên không giẫm chân nhau.
 //
-// ⚠ CHƯA ĐO: token bị chép ra N chỗ thì khi hết hạn, N tiến trình có thể cùng
-// refresh một lúc. Hành vi đó chưa được đo (xem docs/DO-LUONG.md), nên `fleet`
-// in cảnh báo chứ không hứa là an toàn.
+// ⚠ ĐÃ ĐO (20/08/2026) — và kết quả tệ hơn phỏng đoán cũ.
 //
-// ĐÃ ĐO một nửa (20/08/2026): chưa biết N clone cùng refresh thì sao, nhưng ĐÃ
-// biết chắc một đường hỏng khác và đã bịt — xem khối đồng bộ ngược bên dưới.
-// Nó KHÔNG cần nhiều clone: một clone và bản gốc là đủ hỏng.
+// Nhà cung cấp XOAY VÒNG refresh token: mỗi lần refresh là một token mới, và
+// token cũ CHẾT NGAY. Đo trên máy thật, hai bước:
+//
+//  1. Ép bản clone refresh → refresh token đổi (5d708911 → 1aa28b8c), hồ sơ
+//     gốc vẫn giữ bản cũ.
+//  2. Dựng một thư mục config tạm mang bản CŨ rồi chạy thử → nhận đúng câu đã
+//     làm hỏng lượt #47: "Failed to authenticate: OAuth session expired and
+//     could not be refreshed".
+//
+// Nghĩa là chép token ra N chỗ KHÔNG cần N tiến trình đua nhau mới hỏng: MỘT
+// bản refresh là N-1 bản còn lại chết. Bản gốc cũng là một trong số đó.
+//
+// Đó là lý do khối đồng bộ ngược bên dưới không phải chuyện dọn dẹp cho gọn —
+// nó là thứ giữ cho tài khoản còn đăng nhập được.
 func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 	base, ok := ResolveDir(a.Name(), account)
 	if !ok {
@@ -124,9 +133,11 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 // phỏng đoán về nhà cung cấp mà là hệ quả thẳng của thiết kế.
 //
 // Cách xử lý: tìm bản clone có file token MỚI NHẤT; nếu mới hơn bản ở hồ sơ gốc
-// thì chép ngược về (có sao lưu). Nhiều clone cùng refresh thì lấy bản mới nhất
-// — đó là phỏng đoán tốt nhất có thể khi chưa đo được nhà cung cấp có xoay
-// refresh token hay không.
+// thì chép ngược về (có sao lưu).
+//
+// ĐÃ ĐO 20/08: nhà cung cấp CÓ xoay vòng refresh token. Vậy nên "lấy bản mới
+// nhất" không còn là phỏng đoán — bản mới nhất đúng là bản duy nhất còn sống,
+// mọi bản cũ hơn đã bị vô hiệu từ lúc nó được cấp.
 //
 // Trả về tên file đã mang về (rỗng nếu không có gì mới).
 func SyncBackTokens(a provider.Adapter, account string) (string, error) {

@@ -114,7 +114,9 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 	if len(a.PrivateFiles()) == 0 {
 		bus.Warnf("Token của %s nằm ở kho dùng chung toàn máy, không chép đi đâu; mọi phiên dùng chung một danh tính.", a.Name())
 	} else {
-		bus.Warnf("Token được chép ra %d chỗ; hành vi khi nhiều phiên cùng refresh CHƯA ĐO.", o.Copies)
+		bus.Warnf("Token được chép ra %d chỗ. Nhà cung cấp XOAY VÒNG refresh token "+
+			"(đo 20/08), nên bản nào refresh trước thì các bản kia chết — công cụ tự "+
+			"mang bản mới nhất về hồ sơ gốc trước mỗi lần chép.", o.Copies)
 	}
 	if o.Worktree {
 		bus.Infof("Mỗi phiên một git worktree riêng từ %s", repoRoot)

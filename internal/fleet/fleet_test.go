@@ -276,14 +276,20 @@ func TestFanOutVanCanhBaoChepTokenKhiAdapterCoFileRieng(t *testing.T) {
 	if !coCauChepRa(evs) {
 		t.Fatalf("adapter có file riêng mà mất cảnh báo token bị chép ra: %v", evs)
 	}
-	var coChuaDo bool
+	// Cảnh báo phải nói ĐÚNG SỐ BẢN và nói ra HẬU QUẢ đã đo được.
+	//
+	// Bản cũ của bài này đòi giữ chữ "CHƯA ĐO" — đúng vào lúc đó. Ngày 20/08 thì
+	// đo được rồi: nhà cung cấp XOAY VÒNG refresh token, nên một bản refresh là
+	// các bản còn lại chết ngay. Giữ chữ "chưa đo" sau khi đã đo là nói dối theo
+	// hướng khiêm tốn, mà người vận hành thì mất đúng thông tin cần biết.
+	var noiDuHau bool
 	for _, e := range evs {
-		if strings.Contains(e.Msg, "chép ra 2 chỗ") && strings.Contains(e.Msg, "CHƯA ĐO") {
-			coChuaDo = true
+		if strings.Contains(e.Msg, "chép ra 2 chỗ") && strings.Contains(e.Msg, "XOAY VÒNG") {
+			noiDuHau = true
 		}
 	}
-	if !coChuaDo {
-		t.Fatalf("cảnh báo phải nói đúng số bản và giữ chữ CHƯA ĐO: %v", evs)
+	if !noiDuHau {
+		t.Fatalf("cảnh báo phải nói đúng số bản và nói ra hậu quả của việc xoay vòng token: %v", evs)
 	}
 }
 

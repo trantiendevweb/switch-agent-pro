@@ -2265,3 +2265,56 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
 - **Còn treo**: vẫn **CHƯA ĐO** chuyện nhà cung cấp có xoay vòng refresh token
   hay không, và N clone cùng refresh thì sao. Bản sửa này đúng bất kể câu trả lời
   đó — nó chỉ đảm bảo công refresh không bị đánh rơi.
+
+## 20/08 — ĐÃ ĐO: nhà cung cấp XOAY VÒNG refresh token (đóng một ô "CHƯA ĐO" từ Pha 2)
+
+- **Đo lúc nào**: khuya 20/08/2026.
+- **Câu hỏi**: `internal/profile/clone.go` mang cảnh báo *"⚠ CHƯA ĐO: token bị chép
+  ra N chỗ thì khi hết hạn, N tiến trình có thể cùng refresh một lúc"* từ Pha 2.
+  Cùng ngày, `claude:phu` mất phiên giữa lượt chạy #47. Có liên quan không?
+- **Đo bằng cách nào** — thiết kế để **không mất gì**, vì phép đo này chạm vào
+  đăng nhập thật:
+  1. Sao lưu `.credentials.json` của hồ sơ gốc và của bản clone; ghi vân tay
+     SHA-256 (8 ký tự đầu) thay vì in token ra.
+  2. Ép `expiresAt` của **bản clone** về quá khứ rồi chạy một lượt `claude -p`
+     ngắn → buộc CLI refresh.
+  3. So vân tay refresh token trước/sau.
+  4. Dựng một thư mục config **tạm** mang bản token CŨ rồi chạy thử ở đó — token
+     thật vẫn nằm nguyên chỗ của nó.
+  5. Chạy `sagent clone` để bản sửa mang token mới về hồ sơ gốc; xoá thư mục tạm.
+- **Con số / Bằng chứng**:
+
+  | Mốc | refresh token | access token |
+  |---|---|---|
+  | Trước (gốc và clone giống hệt nhau) | `5d708911` | `1a0b9b6c` |
+  | Sau khi clone refresh — **clone** | **`1aa28b8c`** | `a2ae3dfd` |
+  | Sau khi clone refresh — **gốc** | `5d708911` (không đổi) | `1a0b9b6c` |
+
+  Thử bản CŨ `5d708911` trong thư mục tạm:
+
+  ```
+  Failed to authenticate: OAuth session expired and could not be refreshed
+  ```
+
+  **Đúng nguyên văn câu đã làm hỏng bước `gop` của lượt #47.**
+- **Kết luận**: nhà cung cấp **xoay vòng** refresh token — mỗi lần refresh cấp một
+  token mới và **giết token cũ ngay**. Hệ quả nặng hơn phỏng đoán cũ: chép token
+  ra N chỗ **không cần N tiến trình đua nhau** mới hỏng. **MỘT** bản refresh là
+  N−1 bản còn lại chết, và hồ sơ gốc cũng là một trong số đó.
+- **Đã sửa hay chưa**: **ĐÃ SỬA và ĐÃ KIỂM TRÊN MÁY THẬT.** `profile.Clone` gọi
+  `SyncBackTokens` trước khi chép đè. Đối chứng ngay sau phép đo, khi hồ sơ gốc
+  đang cầm token đã chết:
+
+  ```
+  TRƯỚC:  gốc refresh=5d708911   (đã chết)
+  $ sagent clone claude:phu --copies 1
+  SAU:    gốc refresh=1aa28b8c   clone refresh=1aa28b8c   (đều sống)
+  ```
+
+  Không có bản sửa, chính lệnh đó sẽ chép token chết đè lên bản còn sống — đúng
+  chuỗi đã làm mất phiên `claude:phu`.
+- **Bài học**: cảnh báo "CHƯA ĐO" nằm trong mã từ Pha 2 và **đã mô tả đúng vùng
+  nguy hiểm**, nhưng vì chưa ai đo nên nó chỉ là một dòng chữ đứng cạnh một cái
+  bẫy đang mở. Giữa "biết là có thể hỏng" và "biết hỏng thế nào" là khoảng cách
+  của một tài khoản bị mất đăng nhập giữa lượt chạy. Chỗ nào trong mã còn chữ
+  CHƯA ĐO thì chỗ đó là một cái bẫy đang chờ, không phải một ghi chú lịch sự.
