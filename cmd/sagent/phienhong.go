@@ -32,6 +32,11 @@ func nhanTrangThai(state string) string {
 		return "lỗi nhà cung cấp"
 	case store.StateLost:
 		return "chết, chưa rõ vì sao"
+	case store.StateXong:
+		// KHÔNG phải một kiểu chết — lượt chạy kết thúc bình thường. Trước
+		// 20/08 nó không có tên riêng nên đọc ra "chết, chưa rõ vì sao", lẫn
+		// vào đám phiên chết thật.
+		return "xong"
 	case store.StateStopped:
 		return "đã dừng"
 	case store.StateRunning:

@@ -12,6 +12,11 @@ const (
 	ChetChanQuyen = "blocked"
 	// ChetLoiAPI: nhà cung cấp trả về mã lỗi (api_error_status).
 	ChetLoiAPI = "failed"
+
+	// Xong KHÔNG phải một kiểu chết — nó là lượt chạy kết thúc bình thường.
+	// Để chung khối này vì cùng đi qua một điểm quyết định (PhanLoaiChet), và
+	// chuỗi phải TRÙNG store.StateXong.
+	Xong = "done"
 )
 
 // PhanLoaiChet nói một phiên vừa được phát hiện CHẾT nên mang trạng thái nào.
@@ -42,7 +47,15 @@ func PhanLoaiChet(k KetQua, docDuoc bool) (trangThai, lyDo string, hanMucDenLai 
 	// hai chỗ không thể nói ngược nhau.
 	ly := k.Hong()
 	if ly == "" {
-		return "", "", 0
+		// Đọc được kết quả VÀ không hỏng gì = lượt chạy XONG XUÔI. Trước đây chỗ
+		// này trả rỗng, tức phiên thành công ở lại `lost` và bảng hiện "chết, chưa
+		// rõ vì sao" — đo được 20/08 với phiên #157: agent trả lời đúng, NDJSON có
+		// dòng result, không lỗi nào, mà vẫn bị xếp chung sọt với phiên chết bí ẩn.
+		//
+		// Đây KHÔNG phải suy đoán: chỉ nói "xong" khi ĐỌC ĐƯỢC bản ghi kết quả.
+		// Provider chưa đo được kết quả có cấu trúc vẫn rơi về nhánh `!docDuoc` ở
+		// trên và ở lại `lost`, đúng như cũ.
+		return Xong, "", 0
 	}
 	switch {
 	// HẠN MỨC xét TRƯỚC vì nó là chẩn đoán CỤ THỂ NHẤT và là chẩn đoán duy nhất

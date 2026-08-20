@@ -33,6 +33,10 @@ func CloneDir(prov, account string, n int) string {
 // ⚠ CHƯA ĐO: token bị chép ra N chỗ thì khi hết hạn, N tiến trình có thể cùng
 // refresh một lúc. Hành vi đó chưa được đo (xem docs/DO-LUONG.md), nên `fleet`
 // in cảnh báo chứ không hứa là an toàn.
+//
+// ĐÃ ĐO một nửa (20/08/2026): chưa biết N clone cùng refresh thì sao, nhưng ĐÃ
+// biết chắc một đường hỏng khác và đã bịt — xem khối đồng bộ ngược bên dưới.
+// Nó KHÔNG cần nhiều clone: một clone và bản gốc là đủ hỏng.
 func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 	base, ok := ResolveDir(a.Name(), account)
 	if !ok {
@@ -42,6 +46,29 @@ func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
 	if !a.HasToken(base) {
 		return nil, fmt.Errorf("%s:%s chưa đăng nhập — chạy `sagent %s:%s` rồi /login trước",
 			a.Name(), account, a.Name(), account)
+	}
+
+	// MANG TOKEN MỚI VỀ TRƯỚC KHI CHÉP ĐÈ.
+	//
+	// LỖI THẬT, đo 20/08/2026: `claude:phu` mất phiên giữa lượt chạy #47 với
+	// "OAuth session expired and could not be refreshed", và người dùng phải
+	// đăng nhập lại. Chuỗi sự kiện:
+	//
+	//  1. Lượt trước, bản clone tự refresh. Token mới nằm trong clone; hồ sơ gốc
+	//     giữ token cũ — mà nhà cung cấp đã vô hiệu nó khi cấp token mới.
+	//  2. `SyncBackTokens` CHỈ được gọi trong `ClonesClean`, tức chỉ khi người
+	//     dùng chạy `sagent clean`. Không ai chạy, nên token mới nằm im.
+	//  3. Lượt sau, `Clone` chép token GỐC (đã chết) đè lên clone (đang sống).
+	//  4. Clone refresh bằng token đã bị vô hiệu → thất bại → mất phiên.
+	//
+	// Bước 3 mới là chỗ hỏng: `Clone` hồi sinh một token đã chết, đè lên đúng
+	// bản còn dùng được. Gọi đồng bộ ngược ở đây thì token mới lan ra mọi bản
+	// thay vì bị token cũ nuốt mất.
+	//
+	// Lỗi ở đây KHÔNG chặn việc chạy: đồng bộ hụt thì tệ nhất là quay về đúng
+	// hành vi cũ, còn chặn `fleet` vì một phép dọn dẹp thì tệ hơn hẳn.
+	if name, err := SyncBackTokens(a, account); err == nil && name != "" {
+		_ = name // bên gọi (fleet/api) là chỗ có bus để báo; ở đây chỉ làm việc
 	}
 
 	var dirs []string

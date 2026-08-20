@@ -272,7 +272,7 @@ func TestKhongDoDuocThiPhienOLaiLost(t *testing.T) {
 // tiến trình con của nó tiêu hạn mức mà không ai nhìn thấy.
 func TestLostLayCaBaTrangThaiMoi(t *testing.T) {
 	db := open(t)
-	for _, st := range ChetBatThuong() {
+	for _, st := range TuKetThuc() {
 		id, err := db.AddSession(Session{Provider: "claude", Account: "a" + st, PID: os.Getpid(), Dir: "d"})
 		if err != nil {
 			t.Fatal(err)
@@ -291,11 +291,11 @@ func TestLostLayCaBaTrangThaiMoi(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lost) != len(ChetBatThuong()) {
-		t.Fatalf("Lost() trả %d phiên, muốn %d (%v)", len(lost), len(ChetBatThuong()), ChetBatThuong())
+	if len(lost) != len(TuKetThuc()) {
+		t.Fatalf("Lost() trả %d phiên, muốn %d (%v)", len(lost), len(TuKetThuc()), TuKetThuc())
 	}
 	for _, s := range lost {
-		if !LaChetBatThuong(s.State) {
+		if !LaTuKetThuc(s.State) {
 			t.Errorf("Lost() trả về phiên %q — không phải chết bất thường", s.State)
 		}
 	}

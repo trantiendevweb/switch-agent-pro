@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -34,6 +35,19 @@ const (
 	StateStopped = "stopped"
 	StateLost    = "lost" // tiến trình biến mất mà không qua `stop`
 
+	// StateXong: lượt chạy KẾT THÚC BÌNH THƯỜNG và đọc được kết quả.
+	//
+	// Thiếu tên này là một lỗ hổng đo được ngày 20/08/2026: bảng `sagent status`
+	// hiện 20 phiên liền "chết, chưa rõ vì sao", và ít nhất một trong số đó
+	// (#157) đã chạy XONG XUÔI — agent trả lời đúng, NDJSON có dòng result,
+	// không lỗi gì. `PhanLoaiChet` chỉ đặt tên cho các kiểu HỎNG, nên lượt chạy
+	// thành công rơi vào cùng một sọt với phiên chết bí ẩn.
+	//
+	// Hậu quả không chỉ là chữ xấu: người vận hành nhìn bảng toàn "chưa rõ vì
+	// sao" thì hoặc là hoảng vô cớ, hoặc quen mắt rồi thôi đọc — và lần có phiên
+	// chết thật thì nó lẫn vào đám đông.
+	StateXong = "done"
+
 	// Ba chuỗi này phải TRÙNG provider.ChetHanMuc/ChetChanQuyen/ChetLoiAPI —
 	// có test ghim, xem internal/api/phientrangthai_test.go.
 	StateHanMuc = "rate_limited" // hết hạn mức; han_muc_den_lai nói lúc nào cấp lại
@@ -41,17 +55,25 @@ const (
 	StateHong   = "failed"       // nhà cung cấp trả mã lỗi (api_error_status)
 )
 
-// ChetBatThuong liệt kê mọi trạng thái nghĩa là "tiến trình biến mất mà không
-// qua `stop`". Dùng ở đúng những chỗ trước đây so bằng với StateLost — thêm
-// trạng thái mới mà quên chỗ nào thì phiên đó tàng hình khỏi `session.sweep`,
-// tức đám tiến trình con của nó tiêu hạn mức mà không ai nhìn thấy.
-func ChetBatThuong() []string {
-	return []string{StateLost, StateHanMuc, StateChan, StateHong}
+// TuKetThuc liệt kê mọi trạng thái nghĩa là "tiến trình tự kết thúc, không qua
+// `stop`" — kể cả kết thúc TỐT ĐẸP.
+//
+// Dùng ở đúng những chỗ trước đây so bằng với StateLost. Thêm trạng thái mới mà
+// quên chỗ nào thì phiên đó tàng hình khỏi `session.sweep`, tức đám tiến trình
+// con của nó tiêu hạn mức mà không ai nhìn thấy.
+//
+// `done` NẰM TRONG danh sách này, dù nó không phải một kiểu chết: một lượt chạy
+// xong xuôi vẫn có thể để lại tiến trình con, và con của phiên thành công tiêu
+// hạn mức y hệt con của phiên hỏng. Đây là lý do hàm đổi tên từ
+// `ChetBatThuong` — cái tên cũ sẽ khiến người đọc sau này tưởng bỏ `done` ra là
+// đúng, rồi lặng lẽ mất một đường quét.
+func TuKetThuc() []string {
+	return []string{StateLost, StateHanMuc, StateChan, StateHong, StateXong}
 }
 
-// LaChetBatThuong: state có phải một kiểu chết-không-qua-stop không.
-func LaChetBatThuong(state string) bool {
-	for _, s := range ChetBatThuong() {
+// LaTuKetThuc: state có phải một kiểu tự-kết-thúc-không-qua-stop không.
+func LaTuKetThuc(state string) bool {
+	for _, s := range TuKetThuc() {
 		if s == state {
 			return true
 		}
@@ -622,7 +644,7 @@ func (d *DB) AddSession(s Session) (int64, error) {
 // sao, ba tên kia là ĐÃ BIẾT. Hàm này lấy CẢ BỐN — biết vì sao nó chết không
 // làm cho đám tiến trình con của nó bớt tiêu hạn mức.
 func (d *DB) Lost() ([]Session, error) {
-	return d.locPhien(`state IN (?,?,?,?) ORDER BY id`, dsChet()...)
+	return d.locPhien(`state IN (`+dauHoi(len(TuKetThuc()))+`) ORDER BY id`, dsChet()...)
 }
 
 // PhienChet trả về các phiên đã kết thúc bất thường, MỚI NHẤT TRƯỚC, có trần.
@@ -634,15 +656,26 @@ func (d *DB) PhienChet(limit int) ([]Session, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	return d.locPhien(`state IN (?,?,?,?) ORDER BY id DESC LIMIT ?`,
+	return d.locPhien(`state IN (`+dauHoi(len(TuKetThuc()))+`) ORDER BY id DESC LIMIT ?`,
 		append(dsChet(), limit)...)
 }
 
-// dsChet là ChetBatThuong() đóng gói làm tham số cho câu SQL `IN (?,?,?,?)`.
-// Sửa danh sách trạng thái mà quên chỗ này thì câu SQL sai số dấu hỏi và lỗi
-// ngay — không lệch im lặng.
+// dauHoi sinh đúng số dấu hỏi cho câu SQL `IN (...)`.
+//
+// Trước đây chuỗi `(?,?,?,?)` chép cứng ở hai câu SQL, kèm bình luận rằng thêm
+// trạng thái sẽ "lỗi ngay, không lệch im lặng". Đúng — nhưng lỗi lúc CHẠY, và
+// chỉ ở đường nào có người gọi tới. Sinh theo độ dài danh sách thì không còn
+// chỗ nào để lệch.
+func dauHoi(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}
+
+// dsChet là TuKetThuc() đóng gói làm tham số cho câu SQL `IN (...)`.
 func dsChet() []any {
-	ds := ChetBatThuong()
+	ds := TuKetThuc()
 	out := make([]any, 0, len(ds))
 	for _, s := range ds {
 		out = append(out, s)

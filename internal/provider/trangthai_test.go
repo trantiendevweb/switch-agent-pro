@@ -93,11 +93,22 @@ func TestThieuDuLieuThiKhongSuy(t *testing.T) {
 	}
 }
 
-// Lượt chạy XONG XUÔI không được mang một trong ba trạng thái hỏng. Tiến trình
-// thoát rồi thì phiên vẫn rời sổ "đang chạy", nhưng gán cho nó `failed` là vu oan.
-func TestChayXongXuoiKhongBiGanTrangThaiHong(t *testing.T) {
-	if tt, _, _ := phanLoaiTuLog(t, logXongXuoi); tt != "" {
-		t.Fatalf("lượt chạy thành công bị gán %q", tt)
+// Lượt chạy XONG XUÔI không được mang một trong ba trạng thái hỏng — gán cho nó
+// `failed` là vu oan.
+//
+// Nhưng nó cũng KHÔNG được ở lại `lost`. Bản cũ của bài này chỉ đòi "khác ba
+// trạng thái hỏng", và cách thoả mãn rẻ nhất là trả rỗng — nên phiên thành công
+// rơi vào cùng một sọt với phiên chết bí ẩn. Đo được 20/08 với phiên #157: agent
+// trả lời đúng, NDJSON có dòng result, không lỗi nào, mà bảng vẫn hiện "chết,
+// chưa rõ vì sao". Ý định cũ đúng; hệ quả của nó thì không.
+func TestChayXongXuoiDuocGanLaXong(t *testing.T) {
+	tt, ly, han := phanLoaiTuLog(t, logXongXuoi)
+	if tt != Xong {
+		t.Fatalf("lượt chạy thành công phải là %q, được %q", Xong, tt)
+	}
+	// Xong thì KHÔNG có gì để than: lý do rỗng, không có mốc hạn mức.
+	if ly != "" || han != 0 {
+		t.Errorf("lượt chạy xong xuôi mà vẫn ghi (%q,%d)", ly, han)
 	}
 }
 

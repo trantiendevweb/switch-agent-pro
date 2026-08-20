@@ -157,9 +157,12 @@ func TestPhienThieuDuLieuOLaiLost(t *testing.T) {
 	}
 }
 
-// Lượt chạy XONG XUÔI rồi tiến trình thoát: vẫn rời sổ "đang chạy", nhưng không
-// được mang một trong ba trạng thái hỏng.
-func TestPhienChayXongKhongBiGanTrangThaiHong(t *testing.T) {
+// Lượt chạy XONG XUÔI rồi tiến trình thoát: vẫn rời sổ "đang chạy", không được
+// mang một trong ba trạng thái hỏng, VÀ không được ở lại `lost`.
+//
+// Bản cũ của bài này đòi đúng `StateLost` — tức là ghim luôn cái lỗ hổng: phiên
+// thành công đọc ra "chết, chưa rõ vì sao", lẫn vào đám phiên chết thật.
+func TestPhienChayXongDuocGanLaXong(t *testing.T) {
 	a := moAPI(t)
 	themPhienChet(t, a, "claude", "xong", `{"type":"result","subtype":"success","is_error":false,`+
 		`"result":"Đã sửa và chạy test: PASS","num_turns":5}`)
@@ -173,8 +176,13 @@ func TestPhienChayXongKhongBiGanTrangThaiHong(t *testing.T) {
 	if len(hong) != 1 {
 		t.Fatalf("muốn 1, được %d", len(hong))
 	}
-	if hong[0].State != store.StateLost {
-		t.Fatalf("lượt chạy THÀNH CÔNG bị gán %q", hong[0].State)
+	if hong[0].State != store.StateXong {
+		t.Fatalf("lượt chạy THÀNH CÔNG phải là %q, được %q", store.StateXong, hong[0].State)
+	}
+	for _, x := range []string{store.StateHanMuc, store.StateChan, store.StateHong} {
+		if hong[0].State == x {
+			t.Fatalf("lượt chạy THÀNH CÔNG bị vu oan là %q", x)
+		}
 	}
 }
 

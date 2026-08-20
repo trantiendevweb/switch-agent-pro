@@ -2208,3 +2208,60 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   rồi tự hồi phục. Cách duy nhất để biết điều đó là **gọi thật rồi hỏng** — route
   engine chưa có `health`. Một lượt flow dài chọn nhầm route đúng lúc nhà cung cấp
   chập chờn thì hỏng ở giữa chừng, chứ không hỏng lúc còn kịp đổi.
+
+## 20/08 — Phiên chạy XONG XUÔI bị đọc thành "chết, chưa rõ vì sao"
+
+- **Đo lúc nào**: 20/08/2026, đêm, khi bật lại hạm đội bằng cờ `--tu-duyet-quyen` mới.
+- **Đo bằng cách nào**: bật một phiên `claude:phu` làm một việc CHỈ ĐỌC, đợi xong,
+  rồi đọc **cả hai**: bảng `sagent status` và file `fleet.log` của bản clone.
+- **Con số / Bằng chứng**:
+  - `sagent status` → phiên **#157: "chết, chưa rõ vì sao"**.
+  - `fleet.log` cùng phiên → agent **trả lời đúng** câu hỏi, NDJSON có dòng
+    `{"type":"result","subtype":"success",...}`, không lỗi nào.
+  - Tức là: lượt chạy **thành công** đọc ra y hệt một phiên chết bí ẩn.
+  - Nguyên nhân: `provider.PhanLoaiChet` chỉ đặt tên cho các kiểu **HỎNG**
+    (`rate_limited` / `blocked` / `failed`). Lượt chạy không hỏng → trả chuỗi rỗng
+    → phiên ở lại `lost`. Hệ trạng thái **không có tên cho "đã hoàn thành"**.
+  - Điều này giải thích phần lớn 20 thẻ "chưa rõ vì sao" trong ảnh chụp cùng ngày:
+    một số trong đó nhiều khả năng đã chạy xong tốt đẹp.
+- **Đã sửa hay chưa**: **ĐÃ SỬA**. Thêm `store.StateXong` / `provider.Xong`
+  (`"done"`). Chỉ nói "xong" khi **ĐỌC ĐƯỢC** bản ghi kết quả — provider chưa đo
+  được kết quả có cấu trúc vẫn rơi về `lost`, đúng như cũ.
+  Đối chứng trên cùng một bảng sau khi sửa:
+
+  ```
+  #158 claude:phu#1   xong
+  #157 claude:phu#1   chết, chưa rõ vì sao
+  ```
+
+  `ChetBatThuong()` đổi tên thành `TuKetThuc()` và **có** `done` — một lượt chạy
+  xong xuôi vẫn có thể để lại tiến trình con, và con của phiên thành công tiêu hạn
+  mức y hệt con của phiên hỏng. Câu SQL `IN (?,?,?,?)` chép cứng chuyển sang sinh
+  dấu hỏi theo độ dài danh sách.
+- **Bài học**: hai test cũ (`TestChayXongXuoiKhongBiGanTrangThaiHong`,
+  `TestPhienChayXongKhongBiGanTrangThaiHong`) **ghim chính cái lỗ hổng này**. Ý
+  định của chúng đúng — "đừng vu oan lượt chạy thành công là `failed`" — nhưng
+  cách thoả mãn rẻ nhất là trả rỗng, và bài kiểm cũ chấp nhận điều đó. Một phép
+  kiểm chỉ nói "không được là A, B, C" mà không nói "phải là D" thì để ngỏ đúng
+  một chỗ cho câu trả lời tệ nhất: không là gì cả.
+
+## 20/08 — `Clone` hồi sinh token đã chết, đè lên bản còn dùng được
+
+- **Đo lúc nào**: 20/08/2026, sau khi `claude:phu` mất phiên ở lượt chạy #47.
+- **Đo bằng cách nào**: đọc mã — `grep` mọi chỗ gọi `SyncBackTokens`.
+- **Con số / Bằng chứng**:
+  - `SyncBackTokens` được gọi ở **đúng một chỗ**: `ClonesClean`, tức chỉ khi
+    người dùng chạy `sagent clean`.
+  - `profile.Clone` chép `PrivateFiles()` từ hồ sơ gốc **đè lên clone**, và
+    `FleetStart` gọi `Clone` **mỗi lần** bật hạm đội.
+  - Chuỗi hỏng: clone refresh → token mới nằm trong clone, gốc giữ token cũ đã bị
+    nhà cung cấp vô hiệu → không ai chạy `clean` → lượt sau `Clone` chép token
+    **đã chết** đè lên token **đang sống** → refresh thất bại → mất phiên.
+  - Khớp dấu vết đã đo: clone của `phu` mất hẳn `expiresAt`, còn clone của `tns`
+    (chưa qua chu kỳ đó) vẫn có `expiresAt` mới.
+- **Đã sửa hay chưa**: **ĐÃ SỬA**. `Clone` gọi `SyncBackTokens` **trước khi** chép
+  đè, nên token mới lan ra mọi bản thay vì bị token cũ nuốt mất. Lỗi ở bước đồng
+  bộ không chặn việc chạy — tệ nhất là quay về hành vi cũ.
+- **Còn treo**: vẫn **CHƯA ĐO** chuyện nhà cung cấp có xoay vòng refresh token
+  hay không, và N clone cùng refresh thì sao. Bản sửa này đúng bất kể câu trả lời
+  đó — nó chỉ đảm bảo công refresh không bị đánh rơi.

@@ -353,7 +353,7 @@ const MAU_PHIEN = {running:mauToken('--run'), pending:mauToken('--pending'),
 const NHAN_PHIEN = {running:'đang chạy', pending:'đang mở',
                     rate_limited:'hết hạn mức', blocked:'bị chặn quyền',
                     failed:'lỗi nhà cung cấp', lost:'chết, chưa rõ vì sao',
-                    stopped:'đã dừng'};
+                    done:'xong', stopped:'đã dừng'};
 // Đọc LẠI state của DTO. Đường lui chỉ dùng khi server cũ không gửi `state`.
 function ttPhien(s){ return s.state || (s.pid > 0 ? 'running' : 'pending'); }
 function mauPhien(tt){ return MAU_PHIEN[tt] !== undefined ? MAU_PHIEN[tt] : MAU_PHIEN.lost; }
