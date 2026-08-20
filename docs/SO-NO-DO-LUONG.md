@@ -41,7 +41,15 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 # 🔴 MỨC ĐỎ — đoán sai là mất tài khoản hoặc thủng an ninh
 
-## Đ1. Codex khai "LÀM ĐƯỢC" cờ tự-duyệt-quyền nhưng CHƯA CHẠY THẬT
+## ~~Đ1~~ ✅ ĐÃ ĐÓNG 21/08 — Codex cờ tự-duyệt-quyền: ĐÃ CHẠY THẬT
+
+> **Kết quả**: nấc hẹp nhất đủ dùng là `--approve-for-me`, KHÔNG phải
+> `--dangerously-bypass-approvals-and-sandbox`. `--sandbox workspace-write` một
+> mình không đủ, và `codex exec` không có `--ask-for-approval`. Đã đổi mã.
+> Xem `docs/DO-LUONG.md`, mục 21/08.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/provider/codex.go:213-219` (`ArgsTuDuyetQuyen`),
   `internal/provider/codex.go:244` (dòng `Duoc(NLTuDuyetQuyen, ...)`),
@@ -73,7 +81,15 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   `--sandbox workspace-write --ask-for-approval never` **trước**, chỉ tụt xuống
   `--dangerously-bypass-...` nếu nấc trên không đủ.
 
-## Đ2. Codex khai "LÀM ĐƯỢC" cờ thư mục nhưng CHƯA CHẠY THẬT
+</details>
+
+## ~~Đ2~~ ✅ ĐÃ ĐÓNG 21/08 — Codex cờ thư mục: ĐÃ CHẠY THẬT
+
+> **Kết quả**: `-C, --cd <DIR>` có tác dụng thật — chạy trong thư mục tạm rồi
+> bảo agent đọc một file chỉ có ở đó, nó đọc đúng.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/provider/codex.go:221-222`, `internal/provider/codex.go:246`.
 - **Nó nói gì**: `codex --help` có `-C, --cd <DIR>`. Nguyên văn: *"CHƯA chạy thật"*.
@@ -84,6 +100,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   ta mất **2/3 số lượt** — và mất theo kiểu agent trả lời trôi chảy về một repo
   khác, chứ không phải theo kiểu báo lỗi.
 - Cùng lý do với Đ1: khai `LamDuoc` nên không có chốt nào chặn.
+
+</details>
 
 ## Đ3. Cursor CHƯA ĐO cờ tự-duyệt-quyền
 

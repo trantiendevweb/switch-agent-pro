@@ -210,15 +210,37 @@ func (c codex) Verify() []Check {
 // Token là file trong thư mục config, tách bằng CODEX_HOME — đã đo.
 func (codex) TachDuocTaiKhoan() bool { return true }
 
-// ArgsTuDuyetQuyen: đo `codex --help`. Codex CÓ nấc trung gian mà provider khác không có:
-// `--sandbox read-only|workspace-write|danger-full-access` và
-// `--ask-for-approval untrusted|on-request|never`. CHƯA chạy thật được để xác
-// nhận hành vi (hết hạn mức tới 20/08) — xem docs/DO-LUONG.md
+// ArgsTuDuyetQuyen: `--approve-for-me` — ĐÃ CHẠY THẬT 21/08/2026, và đây là nấc
+// HẸP NHẤT làm được việc, giống cách Cursor cố ý chọn `--trust` thay vì `--yolo`.
+//
+// Ba nấc đã thử, theo đúng thứ tự hẹp → rộng:
+//
+//  1. `--sandbox workspace-write` một mình: KHÔNG ĐỦ. Agent đọc được file nhưng
+//     ghi thì bị chặn — nguyên văn: "patch rejected: writing is blocked by
+//     read-only sandbox; rejected by user approval settings". Và `codex exec`
+//     KHÔNG có cờ `--ask-for-approval` (chỉ chế độ tương tác mới có), nên không
+//     có cách nào nâng nấc approval từ dòng lệnh.
+//  2. `--approve-for-me`: ĐỦ. Help nói nó "route approval requests through
+//     automatic review using the workspace-write sandbox" — tự duyệt NHƯNG VẪN
+//     TRONG SANDBOX. Chạy thật: agent tạo được file trong worktree, 9.402 token.
+//  3. `--dangerously-bypass-approvals-and-sandbox`: không cần tới.
+//
+// VÌ SAO ĐÁNG ĐỔI: bản cũ khai nấc 3 cho MỌI lượt Codex. Cờ đó bỏ CẢ approval
+// LẪN sandbox — `adapter.go` nói thẳng cái giá: "agent duyệt cả xoá file và chạy
+// lệnh tuỳ ý trong worktree của repo thật". Nấc 2 giữ lại sandbox, tức vẫn giới
+// hạn được vùng ghi. Rộng hơn cần thiết trên mọi lượt là một khoản nợ an ninh
+// không ai đòi, cho tới ngày có người đòi.
 func (codex) ArgsTuDuyetQuyen() ([]string, bool) {
-	return []string{"--dangerously-bypass-approvals-and-sandbox"}, true
+	return []string{"--approve-for-me"}, true
 }
 
-// ArgsThuMuc: đo `codex --help`: "-C, --cd <DIR>". CHƯA chạy thật (hết hạn mức tới 20/08)
+// ArgsThuMuc: `-C, --cd <DIR>` — ĐÃ CHẠY THẬT 21/08/2026. Chạy `codex exec -C
+// <thư mục tạm>` rồi bảo agent đọc một file chỉ có ở đó: nó đọc đúng, in ra đúng
+// nội dung. Trước đó dòng này chỉ đo bằng `--help`.
+//
+// Con số để so là của Antigravity: KHÔNG có cờ thì 1/3 lượt đúng, hai lượt kia
+// báo "chưa có repository nào được mở". Cờ này mà hụt thì mất 2/3 số lượt — và
+// mất theo kiểu agent trả lời trôi chảy về một repo KHÁC, không phải báo lỗi.
 func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
 
 func (codex) ArgsHoSo(string) []string { return nil }
@@ -231,19 +253,21 @@ func (codex) ModelArgs(string) []string { return nil }
 
 func (codex) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
 
-// NangLuc — bảng khai báo cho Codex. Hai dòng "làm được" của nhóm cờ mới chỉ đo
-// bằng `--help` chứ CHƯA chạy thật (hết hạn mức tới 20/08) — bằng chứng nói
-// thẳng điều đó thay vì để người đọc tưởng đã chạy qua.
+// NangLuc — bảng khai báo cho Codex. Hai dòng cờ quyền và cờ thư mục ĐÃ CHẠY
+// THẬT ngày 21/08/2026; trước đó chúng chỉ được đo bằng `--help`, và sổ nợ đo
+// lường xếp chúng vào mức ĐỎ đúng vì lý do đó — xem docs/DO-LUONG.md.
 func (codex) NangLuc() []NangLuc {
 	return []NangLuc{
 		Duoc(NLHeadless, "`codex exec \"<prompt>\"` = \"Run Codex non-interactively\" (0.147.0) — "+
 			"lệnh con, KHÁC hẳn cờ -p của Claude"),
 		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh; nil ở ModelArgs nghĩa là chưa "+
 			"biết, không phải \"không có model\""),
-		Duoc(NLTuDuyetQuyen, "`codex --help`: --dangerously-bypass-approvals-and-sandbox. Codex "+
-			"còn có nấc trung gian --sandbox/--ask-for-approval mà provider khác không có. "+
-			"CHƯA chạy thật để xác nhận hành vi"),
-		Duoc(NLThuMuc, "`codex --help`: -C, --cd <DIR>. CHƯA chạy thật"),
+		Duoc(NLTuDuyetQuyen, "`--approve-for-me` (đo 21/08, CHẠY THẬT): tự duyệt nhưng VẪN "+
+			"trong sandbox workspace-write. `--sandbox workspace-write` một mình KHÔNG đủ — "+
+			"\"writing is blocked by read-only sandbox; rejected by user approval settings\", "+
+			"và `codex exec` không có --ask-for-approval. Không cần tới cờ dangerously-bypass"),
+		Duoc(NLThuMuc, "`-C, --cd <DIR>` (đo 21/08, CHẠY THẬT): chạy trong thư mục tạm rồi bảo "+
+			"agent đọc một file chỉ có ở đó — nó đọc đúng"),
 		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong ~/.codex phải chuyển thành cờ"),
 		Chua(NLKetQuaCoCauTruc, "CHƯA ĐO cách đọc dữ liệu có cấu trúc; phiên Codex chết vì lý do "+
 			"gì thì sổ để nguyên `lost` chứ không đoán"),

@@ -2354,3 +2354,40 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   dòng 64KB — gặp mẩu dài là stream *lặng lẽ* kết thúc sớm, mất cả phần đuôi lẫn
   usage. Đã nới lên 4MB. Mẩu SSE hỏng không được giết cả lượt. Stream đứt giữa
   chừng thì trả **phần đã nhận kèm lỗi**, vì phần đó đã tốn tiền rồi.
+
+## 21/08 — Đ1+Đ2: Codex ĐÃ CHẠY THẬT. Nấc hẹp nhất KHÔNG phải cờ `dangerously`
+
+- **Đo lúc nào**: 21/08/2026, ô ĐỎ số 1 và 2 của `docs/SO-NO-DO-LUONG.md`.
+- **Vì sao xếp ĐỎ**: hai dòng này khai `LamDuoc`, tức `daDo = true`, nên **cả hai
+  chốt chặn** (`api.go` cho `fleet --tu-duyet-quyen` và cho bước flow xin
+  `tu_duyet_quyen`) đều cho qua — trong khi bằng chứng chỉ là `--help`, chưa ai
+  chạy thật. Khai `ChuaDo` thì đã bị chặn; khai `LamDuoc` sai thì đi thẳng.
+- **Đo bằng cách nào**: dựng một git repo **vứt đi** trong thư mục tạm, đặt sẵn
+  `MOC.txt`, rồi bảo Codex đọc file đó và **ghi** một file mới. Một lượt kiểm
+  được cả hai ô: đọc đúng file ⇒ `-C` có tác dụng; ghi được ⇒ cờ quyền đủ mạnh.
+  Thử theo đúng thứ tự **hẹp → rộng**, không bắt đầu từ cờ mạnh nhất.
+- **Con số / Bằng chứng**:
+
+  | Nấc | Kết quả |
+  |---|---|
+  | `--sandbox workspace-write` một mình | Đọc ✅ · **Ghi ✗** — *"patch rejected: writing is blocked by read-only sandbox; rejected by user approval settings"* (10.240 token) |
+  | `--approve-for-me` | Đọc ✅ · **Ghi ✅** — file tạo đúng nội dung (9.402 token) |
+  | `--dangerously-bypass-approvals-and-sandbox` | **không cần thử tới** |
+
+  Phát hiện phụ, quan trọng: **`codex exec` KHÔNG có `--ask-for-approval`** — cờ
+  đó chỉ tồn tại ở chế độ tương tác. Nên ở headless không có cách nào nâng nấc
+  approval từ dòng lệnh, và `--sandbox` một mình là ngõ cụt. Bảng năng lực cũ
+  nhắc tới `--ask-for-approval` như một lựa chọn có thật cho headless — sai.
+- **Đã sửa hay chưa**: **ĐÃ SỬA.** `codex.ArgsTuDuyetQuyen` đổi từ
+  `--dangerously-bypass-approvals-and-sandbox` sang **`--approve-for-me`**.
+  Help mô tả nó: *"route approval requests through automatic review using the
+  workspace-write sandbox"* — tự duyệt **nhưng vẫn trong sandbox**.
+- **Vì sao đáng đổi**: bản cũ dùng nấc mạnh nhất cho **mọi** lượt Codex. Cờ đó bỏ
+  **cả** approval **lẫn** sandbox; `adapter.go` nói thẳng cái giá: *"agent duyệt
+  cả xoá file và chạy lệnh tuỳ ý trong worktree của repo thật"*. Nay giữ lại
+  sandbox, tức vẫn giới hạn được vùng ghi.
+- **Bài học**: `LamDuoc` với bằng chứng `--help` **nguy hiểm hơn** `ChuaDo`. Cả
+  hai đều là "chưa biết", nhưng một cái mở khoá mọi chốt chặn còn cái kia đóng
+  chúng lại. Ba trạng thái năng lực của dự án đúng ở chỗ tách "đo rồi, không có"
+  khỏi "chưa ai đo" — nhưng nó không tách được "đo bằng đọc help" khỏi "đo bằng
+  chạy thật", mà khoảng cách đó vừa đủ để nuốt một lỗ hổng quyền.
