@@ -136,6 +136,11 @@ func New(dir string) (*API, error) {
 		return nil, fmt.Errorf("không mở được sổ trạng thái (%s): %w", store.Path(), err)
 	}
 	a := &API{db: db, bus: events.NewBus(), cfg: cfg}
+	// Cắm bộ phân loại phiên chết vào sổ. Đây là chỗ DUY NHẤT làm việc đó: sổ
+	// tự nó không đọc nổi bản ghi của agent, còn bốn mặt điều khiển thì chỉ đọc
+	// lại `Session.State`. Bỏ dòng này đi thì mọi phiên tự chết quay về `lost`
+	// — không mặt nào phải sửa, và không mặt nào nói sai.
+	db.DungPhanLoaiChet(phanLoaiPhienChet)
 	// Cắm bộ báo Telegram vào ĐÚNG luồng event mà bốn mặt kia đang nghe, ngay
 	// tại hợp đồng — không phải trong CLI. Nếu gắn ở CLI thì flow chạy từ
 	// dashboard sẽ hỏng trong im lặng, mà đó mới là lúc người dùng không ngồi
@@ -527,6 +532,50 @@ func (a *API) SessionList() ([]store.Session, error) {
 		a.bus.Warnf("không cập nhật được trạng thái phiên đã chết: %v", err)
 	}
 	return list, nil
+}
+
+// SessionHong — nửa còn lại của action "session.list": những phiên đã kết thúc
+// BẤT THƯỜNG, mới nhất trước.
+//
+// Vì sao không gộp vào SessionList: hai câu hỏi khác nhau. "Cái gì đang chạy"
+// phải sạch để dừng đúng thứ; "cái gì vừa chết và vì sao" là câu người ta hỏi
+// sau khi mọi thứ im. Gộp lại thì bảng phiên đang chạy dài dần theo lịch sử.
+//
+// Trạng thái ở đây đã được phanLoaiPhienChet quyết, không mặt nào suy lại.
+func (a *API) SessionHong(limit int) ([]store.Session, error) {
+	return a.db.PhienChet(limit)
+}
+
+// phanLoaiPhienChet là ĐIỂM QUYẾT ĐỊNH DUY NHẤT: một phiên vừa được phát hiện
+// chết thì mang trạng thái gì.
+//
+// Cắm vào sổ ở New(); sổ gọi nó ngay tại chỗ trước đây gán cứng `lost`.
+//
+// Ba lần trả về ("", "", 0) dưới đây đều là CỐ Ý — mỗi lần là một kiểu "không
+// đo được", và không đo được thì phiên ở lại `lost`:
+//
+//   - phiên không có file log (chạy thẳng terminal, không phải fleet);
+//   - provider lạ, không có adapter;
+//   - log không đọc được (đã dọn, ổ mạng rớt).
+//
+// Lần thứ tư nằm trong provider.PhanLoaiChet: adapter đọc được file nhưng không
+// tìm thấy bản ghi có cấu trúc (Codex, Cursor — cả hai khai thẳng DocKetQua trả
+// false; Grok/Antigravity khi bản ghi thiếu dòng kết). Không suy đoán ở bất kỳ
+// lần nào trong bốn.
+func phanLoaiPhienChet(s store.Session) (string, string, int64) {
+	if s.Log == "" {
+		return "", "", 0
+	}
+	ad, err := adapterOf(s.Provider)
+	if err != nil {
+		return "", "", 0
+	}
+	raw, err := os.ReadFile(s.Log)
+	if err != nil {
+		return "", "", 0
+	}
+	k, ok := ad.DocKetQua(string(raw))
+	return provider.PhanLoaiChet(k, ok)
 }
 
 // SessionStop — action "session.stop". id < 0 nghĩa là dừng tất cả.

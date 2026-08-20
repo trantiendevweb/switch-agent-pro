@@ -111,6 +111,12 @@
   @keyframes nhiptho{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.78)}}
   .ag.run .st i{animation:nhiptho 1.05s var(--ease) infinite}
   .ag.pending .st i{animation:nhiptho 1.7s var(--ease) infinite}
+  /* Phiên ĐÃ CHẾT: card lùi một bậc và ĐỨNG YÊN. Nó vẫn ở trong lưới vì câu
+     "vì sao hạm đội trống" chỉ trả lời được khi cái xác còn nằm đó — nhưng nó
+     không được tranh nhìn với thứ đang sống, và tuyệt đối không được thở. */
+  .ag.chet{opacity:.74}
+  .ag.chet .aura{opacity:.35}
+  .ag.chet .st i{animation:none}
   .ag .viec{margin-top:9px;display:flex;gap:7px;align-items:baseline;font-size:12.5px}
   .ag .verb{font-family:var(--font-mono);font-size:10px;letter-spacing:.07em;flex:none;
     text-transform:uppercase;color:var(--lo)}
@@ -858,14 +864,61 @@ function glyph(h){
   return `<svg class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">${p}</svg>`;
 }
 
-// trangThai: phiên CLI chỉ có hai trạng thái ĐỌC ĐƯỢC từ DTO.
+// trangThai: ĐỌC LẠI `state` của DTO, KHÔNG suy ra.
 //
-// pid > 0 nghĩa là có tiến trình thật đang chạy. pid <= 0 là phiên đã ghi sổ
-// nhưng chưa thấy tiến trình — đó là "pending", không phải "running". Ba trạng
-// thái còn lại (done/idle/error) không suy ra được từ /api/state nên trang này
-// KHÔNG bịa ra chúng: phiên đã dừng thì biến khỏi danh sách, và biến mất là câu
-// trả lời trung thực hơn một cái card xám nằm lại.
-function trangThai(s){ return (s.pid > 0) ? 'running' : 'pending'; }
+// Từ schema v9, hợp đồng quyết trạng thái phiên ở đúng MỘT chỗ
+// (api.phanLoaiPhienChet → provider.PhanLoaiChet) và gửi kèm trong /api/state.
+// Trang này chỉ vẽ lại. Trước đây nó tự tính từ pid, còn màn 3D tự đoán từ bước
+// flow — hai mặt, hai luật, cùng một dữ liệu.
+//
+// Đường lui `pid>0 ? running : pending` chỉ dùng khi DTO KHÔNG mang `state`
+// (server cũ). Giữ lại vì trang và binary có thể lệch phiên bản qua cache.
+function trangThai(s){ return s.state || ((s.pid > 0) ? 'running' : 'pending'); }
+
+// dangSong: phiên còn tiến trình thật. Chỉ những phiên này mới đếm vào "hạm đội
+// đang chạy" và mới có nút Dừng — bấm Dừng một phiên đã chết là thao tác vô nghĩa.
+function dangSong(s){ return trangThai(s) === 'running'; }
+
+// MAU_PHIEN: mã trạng thái → biến màu. Màu lấy nguyên từ vendor/token.css, trang
+// KHÔNG khai mã màu nào (xem designsystem_test.go).
+//
+// Ba trạng thái v9 chia hai nhóm theo VIỆC PHẢI LÀM, vì đó là thứ màu nên nói:
+// rate_limited là "chờ rồi chạy lại" → cùng sắc chờ với pending; blocked/failed
+// là "phải sửa gì đó mới chạy được" → sắc hỏng. `lost` xám vì nó đúng nghĩa
+// không biết, và một màu cảnh báo cho cái không biết là bịa mức độ.
+const MAU_PHIEN = {
+  running:      'var(--run)',
+  pending:      'var(--pending)',
+  rate_limited: 'var(--pending)',
+  blocked:      'var(--error)',
+  failed:       'var(--error)',
+  lost:         'var(--idle)',
+  stopped:      'var(--idle)'
+};
+function mauPhien(st){ return MAU_PHIEN[st] || 'var(--idle)'; }
+
+// NHAN_PHIEN: nhãn NGƯỜI ĐỌC HIỂU. Mã máy (`rate_limited`) vẫn nằm ở data-state
+// để soi được, nhưng cái đập vào mắt phải là việc phải làm.
+const NHAN_PHIEN = {
+  running:      'đang chạy',
+  pending:      'đang mở',
+  rate_limited: 'hết hạn mức',
+  blocked:      'bị chặn quyền',
+  failed:       'lỗi nhà cung cấp',
+  lost:         'chết, chưa rõ vì sao',
+  stopped:      'đã dừng'
+};
+function nhanPhien(st){ return NHAN_PHIEN[st] || st; }
+
+// capLai: đổi mốc unix `hanMucDenLai` thành câu người đọc dùng được.
+// Không có mốc thì trả '' — ô để trống, không lấp bằng chữ suy ra.
+function capLai(unix, now){
+  if(!unix) return '';
+  const con = unix - now;
+  if(con <= 0) return 'đã cấp lại — chạy lại được';
+  const h = Math.floor(con/3600), m = Math.floor((con%3600)/60);
+  return 'cấp lại sau ' + (h ? h+'h'+m+'m' : m+'m');
+}
 
 let profiles=[];
 function render(state){
@@ -876,31 +929,44 @@ function render(state){
   const ham = $('ham'); ham.innerHTML='';
   ss.forEach(s=>{
     const st = trangThai(s);
+    const song = dangSong(s);
     const h = hang(s.addr), tk = taiKhoan(s.addr);
     const noi = s.worktree ? s.worktree.split(/[\\/]/).slice(-2).join('/') : 'thư mục hiện tại';
     const c = document.createElement('article');
-    c.className = 'ag song ' + (st==='running' ? 'run' : 'pending');
+    // Lớp `song` bật nhịp thở + quầng. Phiên đã chết KHÔNG được thở: nhịp là
+    // dấu hiệu đọc-từ-xa của "đang sống", gắn nó vào xác là nói dối bằng hoạt hoạ.
+    c.className = song ? ('ag song ' + (st==='pending' ? 'pending' : 'run')) : 'ag chet';
     // --c là màu TRẠNG THÁI (rail, aura, pill); --prov là sắc HÃNG (chỉ glyph).
-    c.style.setProperty('--c', st==='running' ? 'var(--run)' : 'var(--pending)');
+    c.style.setProperty('--c', mauPhien(st));
     c.style.setProperty('--prov', 'var(--prov-' + h + ', var(--prov-may))');
+    c.dataset.state = st;
+    // Dòng "việc": phiên sống nói nơi làm, phiên chết nói VÌ SAO chết. Lý do đến
+    // từ hợp đồng (state_ly_do), trang không tự sinh chữ nào.
+    const lai = capLai(s.hanMucDenLai, now);
+    const viec = song
+      ? `<span class="verb">nơi làm</span><span class="txt" title="${esc(s.log||'')}">${esc(noi)}</span>`
+      : `<span class="verb">vì sao</span><span class="txt" title="${esc(s.lyDo||'')}">${esc(s.lyDo || 'không đo được')}</span>`;
     c.innerHTML =
       `<span class="rail"></span><span class="aura"></span>` +
       `<div class="h1">${glyph(h)}` +
         `<span class="who">${esc(h)}:<b>${esc(tk)}</b></span>` +
-        `<span class="st"><i></i>${st}</span></div>` +
-      `<div class="viec"><span class="verb">nơi làm</span>` +
-        `<span class="txt" title="${esc(s.log||'')}">${esc(noi)}</span></div>` +
+        `<span class="st" title="${esc(st)}"><i></i>${esc(nhanPhien(st))}</span></div>` +
+      `<div class="viec">${viec}</div>` +
       `<div class="meta">` +
         `<div><span class="k">tokens</span><span class="v trong" title="/api/state chưa mang token của phiên CLI về">${CHUA_DO}</span></div>` +
-        `<div><span class="k">cost</span><span class="v trong" title="/api/state chưa mang chi phí của phiên CLI về">${CHUA_DO}</span></div>` +
+        (lai
+          ? `<div><span class="k">hạn mức</span><span class="v">${esc(lai)}</span></div>`
+          : `<div><span class="k">cost</span><span class="v trong" title="/api/state chưa mang chi phí của phiên CLI về">${CHUA_DO}</span></div>`) +
         `<div><span class="k">elapsed</span><span class="v">${esc(elapsed(s.started, now))}</span></div>` +
       `</div>` +
-      `<button class="btn danger dung" data-stop="${s.id}">Dừng</button>`;
+      (song ? `<button class="btn danger dung" data-stop="${s.id}">Dừng</button>` : '');
     ham.appendChild(c);
   });
-  $('scount').textContent = ss.length;
+  // Đếm CHỈ phiên còn sống: "3 phiên" mà hai trong đó đã chết là con số nói dối.
+  const nSong = ss.filter(dangSong).length;
+  $('scount').textContent = nSong;
   $('ham-empty').style.display = ss.length ? 'none':'block';
-  $('tq-phien').textContent = ss.length;
+  $('tq-phien').textContent = nSong;
 
   // profiles
   profiles = state.profiles||[];

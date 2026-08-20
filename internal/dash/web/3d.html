@@ -71,8 +71,13 @@
 </div>
 <div id="detail" class="panel">
   <div class="a" id="d-addr"></div>
+  <div class="kv"><span class="k">Trạng thái</span><span id="d-state"></span></div>
   <div class="kv"><span class="k">PID</span><span id="d-pid"></span></div>
   <div class="kv"><span class="k">Nơi làm việc</span><span id="d-where" style="font-size:11px"></span></div>
+  <!-- Hai dòng dưới chỉ hiện khi hợp đồng ĐO ĐƯỢC chúng. Ẩn hẳn chứ không để
+       ô trống có nhãn: một nhãn "Vì sao" trống trông như dữ liệu bị mất. -->
+  <div class="kv" id="d-lydo-row" style="display:none"><span class="k">Vì sao</span><span id="d-lydo" style="font-size:11px"></span></div>
+  <div class="kv" id="d-hanmuc-row" style="display:none"><span class="k">Hạn mức</span><span id="d-hanmuc" style="font-size:11px"></span></div>
   <button id="d-stop">Dừng phiên này</button>
 </div>
 <div id="tip"></div>
@@ -142,6 +147,25 @@ const NEN = mauChuoi('--void', '#070810');
 const MAU_TT = {running:mauToken('--run'), done:mauToken('--done'),
                 failed:mauToken('--error'), pending:mauToken('--pending'),
                 '':mauToken('--idle')};
+
+// Ba trạng thái phiên đo được từ schema v9, dùng cho ORB (bước flow không có
+// chúng — chúng nói về PHIÊN, không nói về bước).
+//
+// Chia màu theo VIỆC PHẢI LÀM, y hệt mặt 2D: rate_limited là "chờ rồi chạy
+// lại" nên mang sắc chờ; blocked/failed là "phải sửa mới chạy được" nên mang
+// sắc hỏng; lost xám vì nó đúng nghĩa KHÔNG BIẾT. Hai mặt phải đọc như một
+// sản phẩm — trước đây chúng đã từng lệch nhau và đó là lý do có token.css.
+const MAU_PHIEN = {running:mauToken('--run'), pending:mauToken('--pending'),
+                   rate_limited:mauToken('--pending'), blocked:mauToken('--error'),
+                   failed:mauToken('--error'), lost:mauToken('--idle'),
+                   stopped:mauToken('--idle')};
+const NHAN_PHIEN = {running:'đang chạy', pending:'đang mở',
+                    rate_limited:'hết hạn mức', blocked:'bị chặn quyền',
+                    failed:'lỗi nhà cung cấp', lost:'chết, chưa rõ vì sao',
+                    stopped:'đã dừng'};
+// Đọc LẠI state của DTO. Đường lui chỉ dùng khi server cũ không gửi `state`.
+function ttPhien(s){ return s.state || (s.pid > 0 ? 'running' : 'pending'); }
+function mauPhien(tt){ return MAU_PHIEN[tt] || mauToken('--idle'); }
 // Sắc HÃNG = da robot. Đây là DANH TÍNH chứ không phải trạng thái, nên nó chỉ
 // nằm trên robot; vòng dưới chân mới mang màu trạng thái. Cùng bộ --prov-* mà
 // hội thoại 2D dùng để tô huy hiệu hãng.
@@ -417,7 +441,12 @@ function build(state){
   clickable=[]; agents={}; orbs.length=0; tiaCore.length=0;
   const sessions = state.sessions||[];
   const profiles = state.profiles||[];
-  $('scount').textContent = sessions.length + ' phiên';
+  // `sessions` mang CẢ phiên vừa chết bất thường (schema v9). Bộ đếm ở góc chỉ
+  // được đếm cái còn sống — "5 phiên" mà ba trong đó là xác là một con số nói dối.
+  const song = sessions.filter(s=>ttPhien(s)==='running');
+  const chet = sessions.filter(s=>ttPhien(s)!=='running');
+  $('scount').textContent = song.length + ' phiên'
+    + (chet.length ? ' · ' + chet.length + ' đã chết' : '');
 
   // MỘT NODE MỖI TÀI KHOẢN, không gộp theo provider: đội của bạn có hai tài khoản
   // Claude khác nhau, gộp lại thì không nhìn ra ai là người giao việc, ai là thợ.
@@ -434,7 +463,9 @@ function build(state){
 
     const st = buocCuaAddr(addr);
     const tt = st ? st.state||'pending' : '';
-    const dangChay = tt==='running' || sessions.some(x=>x.addr.split('#')[0]===addr);
+    // `song` chứ không phải `sessions`: một tài khoản chỉ còn phiên đã chết thì
+    // robot của nó phải đứng im, không sáng như đang cày.
+    const dangChay = tt==='running' || song.some(x=>x.addr.split('#')[0]===addr);
 
     const bot = taoRobot(TINT[prov]||MAU_LO);
     bot.position.set(c.x, 0.15, c.z);
@@ -455,8 +486,15 @@ function build(state){
     // Nhãn: TÀI KHOẢN · vai trò · việc đang làm
     const el=document.createElement('div'); el.className='lbl';
     const vai = agents[addr].vai ? '<i style="color:var(--mid);font-style:normal">'+agents[addr].vai+'</i> · ' : '';
+    // Không có bước flow thì nhãn nói về PHIÊN. Phiên chết gần nhất của tài
+    // khoản này nói được nhiều hơn chữ "rảnh" — rảnh và chết-vì-hết-hạn-mức là
+    // hai chuyện khác hẳn, và gộp lại là giấu mất chuyện thứ hai.
+    const chetCuaAddr = chet.find(x=>x.addr.split('#')[0]===addr);
     const viec = st ? (st.id+' <b style="color:'+('#'+MAU_TT[tt].toString(16).padStart(6,'0'))+'">'+(tt||'chờ')+'</b>')
-                    : (sessions.some(x=>x.addr.split('#')[0]===addr) ? 'đang chạy' : 'rảnh');
+                    : song.some(x=>x.addr.split('#')[0]===addr) ? 'đang chạy'
+                    : chetCuaAddr ? '<b style="color:'+('#'+mauPhien(ttPhien(chetCuaAddr)).toString(16).padStart(6,'0'))+'">'
+                                    + (NHAN_PHIEN[ttPhien(chetCuaAddr)]||ttPhien(chetCuaAddr)) + '</b>'
+                    : 'rảnh';
     el.innerHTML = addr + '<small>' + vai + viec + '</small>';
     document.body.appendChild(el);
     labels.push({el, pos:c.clone().setY(3.4)});
@@ -514,10 +552,16 @@ function build(state){
     const goc = gocGoc + (k - (count-1)/2)*0.17;
     const p = new THREE.Vector3(Math.cos(goc)*R_ORB, 1.15, Math.sin(goc)*R_ORB);
 
-    // Phiên đang sống thì mặc định là đang chạy; có bước flow thì bước nói thật
-    // hơn (bước có thể còn đang chờ tài nguyên).
-    const tt = A && A.state === 'pending' ? 'pending' : 'running';
-    const mau = MAU_TT[tt];
+    // Trạng thái phiên đến từ HỢP ĐỒNG (/api/state → api.phanLoaiPhienChet),
+    // màn 3D không suy lại. Trước đây dòng này đoán "sống thì mặc định đang
+    // chạy", nên một phiên đã chết vì hết hạn mức vẫn hiện orb xanh đang thở —
+    // đúng kiểu nói dối bằng hoạt hoạ mà skill dashboard cấm.
+    //
+    // Bước flow chỉ được nói thêm khi phiên CÒN SỐNG: bước `pending` của một
+    // phiên đã chết không có nghĩa gì nữa.
+    let tt = ttPhien(s);
+    if(tt === 'running' && A && A.state === 'pending') tt = 'pending';
+    const mau = mauPhien(tt);
 
     // MeshBasicMaterial: unlit, nên orb tự phát sáng đúng màu token thay vì bị
     // đèn trong cảnh kéo lệch. Màu trạng thái phải đọc chính xác như pill 2D.
@@ -530,8 +574,10 @@ function build(state){
     vanh.position.copy(p); vanh.rotation.x = Math.PI*0.42; orbGroup.add(vanh);
 
     const glow = taoQuang(mau, 2.6); glow.position.copy(p); orbGroup.add(glow);
+    // Nhịp đập là dấu hiệu ĐANG SỐNG. Phiên đã chết đập chậm vẫn là đập, và
+    // người liếc màn hình sẽ đọc ra "còn sống, chỉ chậm" — nên nhịp = 0.
     orbs.push({m, vanh, glow, tt, ph:i*1.37, co:2.6,
-               nhanh: tt==='running' ? 3.2 : 1.5});
+               nhanh: tt==='running' ? 3.2 : tt==='pending' ? 1.5 : 0});
 
     // BEAM lõi -> orb: lõi điều phối cấp việc cho phiên, và đường này nói đúng
     // điều đó. Mờ, đơn sắc theo màu trạng thái, không tranh nhìn với orb.
@@ -562,7 +608,8 @@ function pick(e){ mouse.x=(e.clientX/innerWidth)*2-1; mouse.y=-(e.clientY/innerH
 canvas.addEventListener('pointermove', e=>{ const h=pick(e); hover=h?h.object:null;
   const tip=$('tip'); if(hover){
     tip.style.display='block'; tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px';
-    tip.textContent = (hover.userData.session.addr)+' · PID '+hover.userData.session.pid; canvas.style.cursor='pointer';
+    const hs = hover.userData.session, htt = ttPhien(hs);
+    tip.textContent = hs.addr+' · '+(NHAN_PHIEN[htt]||htt)+' · PID '+hs.pid; canvas.style.cursor='pointer';
   } else { tip.style.display='none'; canvas.style.cursor='grab'; } });
 let downXY=null;
 canvas.addEventListener('pointerdown', e=>downXY=[e.clientX,e.clientY]);
@@ -570,9 +617,30 @@ canvas.addEventListener('pointerup', e=>{ if(!downXY)return; const moved=Math.hy
   if(moved>8) return; const h=pick(e); if(!h){ $('detail').style.display='none'; selected=null; return; }
   selected=h.object.userData.session; showDetail(selected); });
 
+// capLai: mốc unix hạn mức được cấp lại → câu người đọc dùng được. Không có
+// mốc thì trả '' và dòng đó bị ẩn — không lấp chỗ trống bằng chữ suy ra.
+function capLai(unix){
+  if(!unix) return '';
+  const con = unix - Math.floor(Date.now()/1000);
+  if(con <= 0) return 'đã cấp lại — chạy lại được';
+  const h = Math.floor(con/3600), m = Math.floor((con%3600)/60);
+  return 'cấp lại sau ' + (h ? h+'h'+m+'m' : m+'m');
+}
+
 function showDetail(s){
+  const tt = ttPhien(s);
   $('d-addr').textContent=s.addr; $('d-pid').textContent=s.pid;
+  $('d-state').textContent = NHAN_PHIEN[tt] || tt;
+  $('d-state').style.color = '#'+mauPhien(tt).toString(16).padStart(6,'0');
   $('d-where').textContent = s.worktree ? s.worktree.split(/[\\/]/).slice(-2).join('/') : 'thư mục hiện tại';
+  $('d-lydo-row').style.display = s.lyDo ? 'flex' : 'none';
+  $('d-lydo').textContent = s.lyDo || '';
+  const lai = capLai(s.hanMucDenLai);
+  $('d-hanmuc-row').style.display = lai ? 'flex' : 'none';
+  $('d-hanmuc').textContent = lai;
+  // Bấm Dừng một phiên đã chết là thao tác vô nghĩa: tiến trình không còn đó.
+  // Dọn tiến trình con mồ côi là việc KHÁC, có đường riêng (`sagent quet`).
+  $('d-stop').style.display = tt==='running' ? '' : 'none';
   $('detail').style.display='block';
 }
 $('d-stop').onclick = async ()=>{ if(!selected)return;

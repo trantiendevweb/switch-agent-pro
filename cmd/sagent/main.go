@@ -404,24 +404,42 @@ func cmdStatus() {
 	if err != nil {
 		fail(err)
 	}
+	// Phiên vừa chết BẤT THƯỜNG phải hiện ra ngay cả khi không còn phiên nào
+	// chạy — đó chính là lúc câu "vì sao trống trơn" cần được trả lời nhất.
+	hong, _ := a.SessionHong(10)
 	fmt.Println()
-	if len(list) == 0 {
+	if len(list) == 0 && len(hong) == 0 {
 		fmt.Println("  Không có phiên nào đang chạy.")
 		fmt.Println("  Bật thử: sagent fleet claude:<tên> --copies 4 -- -p \"...\"")
 		fmt.Println()
 		return
 	}
-	fmt.Println("  Phiên đang chạy")
-	fmt.Println()
-	for _, s := range list {
-		where := s.Log
-		if s.Worktree != "" {
-			where = "worktree: " + s.Worktree
+	if len(list) == 0 {
+		fmt.Println("  Không có phiên nào đang chạy.")
+	} else {
+		fmt.Println("  Phiên đang chạy")
+		fmt.Println()
+		for _, s := range list {
+			where := s.Log
+			if s.Worktree != "" {
+				where = "worktree: " + s.Worktree
+			}
+			fmt.Printf("   #%-3d %-18s PID %-7d %6s  %s\n",
+				s.ID, s.Addr(), s.PID, time.Since(s.Started).Truncate(time.Second), where)
 		}
-		fmt.Printf("   #%-3d %-18s PID %-7d %6s  %s\n",
-			s.ID, s.Addr(), s.PID, time.Since(s.Started).Truncate(time.Second), where)
+		fmt.Printf("\n  %d phiên. Dừng hết: sagent stop all\n", len(list))
 	}
-	fmt.Printf("\n  %d phiên. Dừng hết: sagent stop all\n\n", len(list))
+	if len(hong) > 0 {
+		now := time.Now()
+		fmt.Println()
+		fmt.Println("  Phiên đã chết")
+		fmt.Println()
+		for _, s := range hong {
+			fmt.Println(dongPhienHong(s, now))
+		}
+		fmt.Println("\n  Tiến trình con còn sót: sagent quet")
+	}
+	fmt.Println()
 }
 
 func cmdStop(args []string) {

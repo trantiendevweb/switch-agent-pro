@@ -24,11 +24,40 @@ import (
 )
 
 // Trạng thái một phiên.
+//
+// Ba trạng thái dưới `StateLost` là `lost` ĐÃ BIẾT VÌ SAO. Chúng không phải một
+// tầng phân loại riêng: phiên nào cũng đi qua đúng một điểm quyết định
+// (provider.PhanLoaiChet, cắm vào sổ qua DungPhanLoaiChet), và điểm đó chỉ nói
+// tên trạng thái khi ĐO ĐƯỢC. Không đo được thì phiên ở lại `lost`.
 const (
 	StateRunning = "running"
 	StateStopped = "stopped"
 	StateLost    = "lost" // tiến trình biến mất mà không qua `stop`
+
+	// Ba chuỗi này phải TRÙNG provider.ChetHanMuc/ChetChanQuyen/ChetLoiAPI —
+	// có test ghim, xem internal/api/phientrangthai_test.go.
+	StateHanMuc = "rate_limited" // hết hạn mức; han_muc_den_lai nói lúc nào cấp lại
+	StateChan   = "blocked"      // mọi tool bị từ chối quyền
+	StateHong   = "failed"       // nhà cung cấp trả mã lỗi (api_error_status)
 )
+
+// ChetBatThuong liệt kê mọi trạng thái nghĩa là "tiến trình biến mất mà không
+// qua `stop`". Dùng ở đúng những chỗ trước đây so bằng với StateLost — thêm
+// trạng thái mới mà quên chỗ nào thì phiên đó tàng hình khỏi `session.sweep`,
+// tức đám tiến trình con của nó tiêu hạn mức mà không ai nhìn thấy.
+func ChetBatThuong() []string {
+	return []string{StateLost, StateHanMuc, StateChan, StateHong}
+}
+
+// LaChetBatThuong: state có phải một kiểu chết-không-qua-stop không.
+func LaChetBatThuong(state string) bool {
+	for _, s := range ChetBatThuong() {
+		if s == state {
+			return true
+		}
+	}
+	return false
+}
 
 // Session là một phiên agent đang/đã chạy.
 type Session struct {
@@ -42,6 +71,14 @@ type Session struct {
 	Worktree string // git worktree riêng của phiên, rỗng = chạy thẳng thư mục hiện tại
 	Started  time.Time
 	State    string
+
+	// StateLyDo là câu giải thích ĐO ĐƯỢC đi kèm State, rỗng khi không đo được.
+	// Không phải nơi để nhét văn bản tự do: nó đến từ provider.KetQua.Hong().
+	StateLyDo string
+	// HanMucDenLai là mốc unix hạn mức được cấp lại, 0 = không rõ. Ghi cho MỌI
+	// trạng thái đọc được nó, không riêng `rate_limited` — mốc thời gian là thứ
+	// đo được, và vứt đi thì không lấy lại được.
+	HanMucDenLai int64
 }
 
 // Addr trả về địa chỉ hiển thị, ví dụ "claude:phu#2".
@@ -66,7 +103,25 @@ func itoa(n int) string {
 }
 
 // DB bọc *sql.DB để lõi không phải biết SQL.
-type DB struct{ db *sql.DB }
+type DB struct {
+	db *sql.DB
+	// phanLoai: xem DungPhanLoaiChet. nil = giữ nguyên StateLost.
+	phanLoai PhanLoaiChet
+}
+
+// PhanLoaiChet nói một phiên vừa bị phát hiện chết nên mang trạng thái nào.
+//
+// Vì sao là một hàm cắm vào chứ không phải mã trong gói này: câu trả lời nằm
+// trong BẢN GHI của agent, mà đọc bản ghi là việc của provider — `store` không
+// được biết Claude hay Grok là gì. Đây cũng là cách giữ "một chỗ quyết định":
+// tầng trên cắm ĐÚNG MỘT hàm, và mọi đường phát hiện phiên chết đều đi qua nó.
+//
+// Trả về trangThai == "" nghĩa là KHÔNG KẾT LUẬN ĐƯỢC → phiên ở lại `lost`.
+type PhanLoaiChet func(Session) (trangThai, lyDo string, hanMucDenLai int64)
+
+// DungPhanLoaiChet cắm bộ phân loại vào sổ. Không cắm (CLI cũ, test của gói
+// khác) thì hành vi y hệt trước: phiên chết là `lost`, không lý do.
+func (d *DB) DungPhanLoaiChet(f PhanLoaiChet) { d.phanLoai = f }
 
 // Path là đường dẫn file cơ sở dữ liệu.
 func Path() string { return filepath.Join(paths.AccountsRoot(), "state.db") }
@@ -97,7 +152,7 @@ func OpenAt(path string) (*DB, error) {
 		db.Close()
 		return nil, err
 	}
-	return &DB{db}, nil
+	return &DB{db: db}, nil
 }
 
 func (d *DB) Close() error { return d.db.Close() }
@@ -240,6 +295,46 @@ var migrations = []string{
 		key_id   TEXT    NOT NULL DEFAULT '',
 		ghi_luc  TEXT    NOT NULL
 	);`,
+
+	// v9 — VÌ SAO phiên chết, khi đo được.
+	//
+	// Trước bước này cột `state` chỉ có ba giá trị, và mọi phiên tự chết đều bị
+	// gán cứng `lost`. `lost` trả lời "nó không còn chạy" nhưng không trả lời
+	// câu người vận hành thật sự hỏi: chạy lại được ngay, hay phải chờ hạn mức,
+	// hay phải cấp quyền, hay token đã hết hạn. Bốn việc phải làm khác hẳn nhau
+	// mà nhìn bảng thì giống hệt nhau.
+	//
+	// Hai cột này là chỗ giữ câu trả lời khi provider ĐO ĐƯỢC nó:
+	//   state_ly_do     — câu giải thích, lấy từ provider.KetQua.Hong();
+	//   han_muc_den_lai — mốc unix hạn mức cấp lại, từ rate_limit_info.resetsAt.
+	//
+	// KHÔNG có cột nào ở đây chứa output của agent. Bản ghi đã nằm sẵn ở file
+	// log (cột `log`); chép một bản thứ hai vào sổ trạng thái là tự tạo thêm một
+	// kho dữ liệu khách — cùng lý do đã ghi ở v7.
+	//
+	// Cả hai đều NOT NULL DEFAULT: phiên ghi từ bản sagent cũ đọc lại được ngay,
+	// mang giá trị rỗng đúng nghĩa "không đo được".
+	`ALTER TABLE sessions ADD COLUMN state_ly_do TEXT NOT NULL DEFAULT '';
+	 ALTER TABLE sessions ADD COLUMN han_muc_den_lai INTEGER NOT NULL DEFAULT 0;`,
+}
+
+// cotPhien là danh sách cột đọc ra một Session, dùng chung cho mọi truy vấn để
+// hai chỗ không thể lệch nhau. COALESCE cho cột thêm sau: file cũ có thể có
+// dòng NULL nếu ai đó ghi tay.
+const cotPhien = `id,provider,account,clone,dir,pid,COALESCE(log,''),COALESCE(worktree,''),
+	started,state,COALESCE(state_ly_do,''),COALESCE(han_muc_den_lai,0)`
+
+// quetPhien đọc một dòng theo đúng thứ tự cotPhien.
+func quetPhien(rows *sql.Rows) (Session, error) {
+	var s Session
+	var started string
+	err := rows.Scan(&s.ID, &s.Provider, &s.Account, &s.Clone, &s.Dir,
+		&s.PID, &s.Log, &s.Worktree, &started, &s.State, &s.StateLyDo, &s.HanMucDenLai)
+	if err != nil {
+		return s, err
+	}
+	s.Started, _ = time.Parse(time.RFC3339, started)
+	return s, nil
 }
 
 // MaxStepOutput là trần kích thước kết quả lưu cho mỗi bước.
@@ -522,51 +617,75 @@ func (d *DB) AddSession(s Session) (int64, error) {
 // Cần riêng hàm này vì hậu duệ của chúng có thể VẪN CHẠY và vẫn tiêu hạn mức —
 // `Running()` cố ý không trả về chúng, nên nếu không có đường nào khác thì đám
 // tiến trình đó không ai nhìn thấy.
+//
+// Từ schema v9, "tự chết" có bốn tên chứ không còn một: `lost` là chưa biết vì
+// sao, ba tên kia là ĐÃ BIẾT. Hàm này lấy CẢ BỐN — biết vì sao nó chết không
+// làm cho đám tiến trình con của nó bớt tiêu hạn mức.
 func (d *DB) Lost() ([]Session, error) {
-	rows, err := d.db.Query(
-		`SELECT id,provider,account,clone,dir,pid,COALESCE(log,''),COALESCE(worktree,''),started,state
-		   FROM sessions WHERE state=? ORDER BY id`, StateLost)
+	return d.locPhien(`state IN (?,?,?,?) ORDER BY id`, dsChet()...)
+}
+
+// PhienChet trả về các phiên đã kết thúc bất thường, MỚI NHẤT TRƯỚC, có trần.
+//
+// Khác Lost() ở thứ tự và ở cái trần: đây là đường cho MẶT NGƯỜI DÙNG (bảng
+// `sagent status`, /api/state). Sổ giữ mọi phiên từng chạy, nên không giới hạn
+// thì bảng dài dần theo tháng và cái vừa hỏng lại nằm tít dưới đáy.
+func (d *DB) PhienChet(limit int) ([]Session, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	return d.locPhien(`state IN (?,?,?,?) ORDER BY id DESC LIMIT ?`,
+		append(dsChet(), limit)...)
+}
+
+// dsChet là ChetBatThuong() đóng gói làm tham số cho câu SQL `IN (?,?,?,?)`.
+// Sửa danh sách trạng thái mà quên chỗ này thì câu SQL sai số dấu hỏi và lỗi
+// ngay — không lệch im lặng.
+func dsChet() []any {
+	ds := ChetBatThuong()
+	out := make([]any, 0, len(ds))
+	for _, s := range ds {
+		out = append(out, s)
+	}
+	return out
+}
+
+func (d *DB) locPhien(where string, args ...any) ([]Session, error) {
+	rows, err := d.db.Query(`SELECT `+cotPhien+` FROM sessions WHERE `+where, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []Session
 	for rows.Next() {
-		var s Session
-		var started string
-		if err := rows.Scan(&s.ID, &s.Provider, &s.Account, &s.Clone, &s.Dir,
-			&s.PID, &s.Log, &s.Worktree, &started, &s.State); err != nil {
+		s, err := quetPhien(rows)
+		if err != nil {
 			return nil, err
 		}
-		s.Started, _ = time.Parse(time.RFC3339, started)
 		out = append(out, s)
 	}
 	return out, rows.Err()
 }
 
 func (d *DB) Running() ([]Session, error) {
-	rows, err := d.db.Query(
-		`SELECT id,provider,account,clone,dir,pid,COALESCE(log,''),COALESCE(worktree,''),started,state
-		   FROM sessions WHERE state=? ORDER BY id`, StateRunning)
+	rows, err := d.db.Query(`SELECT `+cotPhien+
+		` FROM sessions WHERE state=? ORDER BY id`, StateRunning)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	var out []Session
-	var dead []int64
+	var dead []Session
 	for rows.Next() {
-		var s Session
-		var started string
-		if err := rows.Scan(&s.ID, &s.Provider, &s.Account, &s.Clone, &s.Dir,
-			&s.PID, &s.Log, &s.Worktree, &started, &s.State); err != nil {
+		s, err := quetPhien(rows)
+		if err != nil {
 			return nil, err
 		}
-		s.Started, _ = time.Parse(time.RFC3339, started)
 		if process.IsAlive(s.PID) {
 			out = append(out, s)
 		} else {
-			dead = append(dead, s.ID)
+			dead = append(dead, s)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -577,8 +696,18 @@ func (d *DB) Running() ([]Session, error) {
 	// khoá quá lâu. Trả kèm lỗi; tầng api quyết định cảnh báo hay bỏ qua — nó có
 	// bus sự kiện, còn store thì không.
 	var loiDanhDau error
-	for _, id := range dead {
-		if _, err := d.db.Exec(`UPDATE sessions SET state=? WHERE id=?`, StateLost, id); err != nil {
+	for _, s := range dead {
+		// ĐIỂM QUYẾT ĐỊNH DUY NHẤT của trạng thái phiên chết. Trước v9 dòng dưới
+		// gán cứng StateLost; nay nó hỏi bộ phân loại đã cắm, và CHỈ đổi khi bộ
+		// đó nói được một cái tên. Không cắm, hoặc cắm mà không đo được → `lost`
+		// y như cũ. Không suy đoán ở bất kỳ chỗ nào khác.
+		st, ly, han := StateLost, "", int64(0)
+		if d.phanLoai != nil {
+			if st2, ly2, han2 := d.phanLoai(s); st2 != "" {
+				st, ly, han = st2, ly2, han2
+			}
+		}
+		if err := d.SetStateChiTiet(s.ID, st, ly, han); err != nil {
 			loiDanhDau = err
 		}
 	}
@@ -586,8 +715,18 @@ func (d *DB) Running() ([]Session, error) {
 }
 
 // SetState đổi trạng thái một phiên.
+//
+// Xoá luôn lý do cũ: một phiên chuyển sang trạng thái mới mà giữ lại câu giải
+// thích của trạng thái trước là nói dối bằng dữ liệu cũ.
 func (d *DB) SetState(id int64, state string) error {
-	_, err := d.db.Exec(`UPDATE sessions SET state=? WHERE id=?`, state, id)
+	return d.SetStateChiTiet(id, state, "", 0)
+}
+
+// SetStateChiTiet đổi trạng thái KÈM lý do đo được và mốc hạn mức cấp lại.
+func (d *DB) SetStateChiTiet(id int64, state, lyDo string, hanMucDenLai int64) error {
+	_, err := d.db.Exec(
+		`UPDATE sessions SET state=?, state_ly_do=?, han_muc_den_lai=? WHERE id=?`,
+		state, lyDo, hanMucDenLai, id)
 	return err
 }
 
