@@ -152,3 +152,25 @@ func (cursor) ArgsHoSo(string) []string { return nil }
 func (cursor) ModelArgs(string) []string { return nil }
 
 func (cursor) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
+
+// NangLuc — bảng khai báo cho Cursor. Nhiều dòng CHƯA ĐO vì máy dev không cài
+// cursor-agent: nói thẳng ra đúng hơn là suy từ tài liệu rồi để lượt chạy đầu
+// tiên phát hiện hộ.
+func (cursor) NangLuc() []NangLuc {
+	return []NangLuc{
+		Duoc(NLHeadless, "`cursor-agent --trust -p \"<prompt>\"` in kết quả ra stdout; --trust "+
+			"là cờ HẸP NHẤT làm được việc, cố ý không dùng --yolo/-f"),
+		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh"),
+		Chua(NLTuDuyetQuyen, "CHƯA ĐO: máy này không cài cursor-agent nên không chạy `--help` được"),
+		Chua(NLThuMuc, "CHƯA ĐO: máy này không cài cursor-agent"),
+		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong Cursor\\auth.json phải chuyển thành cờ"),
+		Chua(NLKetQuaCoCauTruc, "CHƯA ĐO cách đọc dữ liệu có cấu trúc của provider này"),
+		Duoc(NLTachTaiKhoan, "chép ĐÚNG Cursor\\auth.json sang một APPDATA giả thì danh tính đi "+
+			"theo và `status` báo đúng email; hồ sơ mới thì \"Not logged in\". Đo từng biến một: "+
+			"chỉ APPDATA mới tách được, USERPROFILE/LOCALAPPDATA/HOME đều không"),
+		Chua(NLHanToken, "CHƯA ĐO: auth.json có thể mang dấu thời gian hết hạn, nhưng chưa dựng "+
+			"được cảnh token sắp hết hạn để xác nhận đọc đúng trường nào — cảnh báo sai giờ còn "+
+			"tệ hơn không cảnh báo"),
+		Duoc(NLDanhTinh, "trường email/userEmail/user_email trong Cursor\\auth.json"),
+	}
+}

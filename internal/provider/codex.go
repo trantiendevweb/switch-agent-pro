@@ -230,3 +230,28 @@ func (codex) ArgsHoSo(string) []string { return nil }
 func (codex) ModelArgs(string) []string { return nil }
 
 func (codex) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
+
+// NangLuc — bảng khai báo cho Codex. Hai dòng "làm được" của nhóm cờ mới chỉ đo
+// bằng `--help` chứ CHƯA chạy thật (hết hạn mức tới 20/08) — bằng chứng nói
+// thẳng điều đó thay vì để người đọc tưởng đã chạy qua.
+func (codex) NangLuc() []NangLuc {
+	return []NangLuc{
+		Duoc(NLHeadless, "`codex exec \"<prompt>\"` = \"Run Codex non-interactively\" (0.147.0) — "+
+			"lệnh con, KHÁC hẳn cờ -p của Claude"),
+		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh; nil ở ModelArgs nghĩa là chưa "+
+			"biết, không phải \"không có model\""),
+		Duoc(NLTuDuyetQuyen, "`codex --help`: --dangerously-bypass-approvals-and-sandbox. Codex "+
+			"còn có nấc trung gian --sandbox/--ask-for-approval mà provider khác không có. "+
+			"CHƯA chạy thật để xác nhận hành vi"),
+		Duoc(NLThuMuc, "`codex --help`: -C, --cd <DIR>. CHƯA chạy thật"),
+		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong ~/.codex phải chuyển thành cờ"),
+		Chua(NLKetQuaCoCauTruc, "CHƯA ĐO cách đọc dữ liệu có cấu trúc; phiên Codex chết vì lý do "+
+			"gì thì sổ để nguyên `lost` chứ không đoán"),
+		Duoc(NLTachTaiKhoan, "đặt CODEX_HOME vào thư mục rỗng thì `codex login status` trả "+
+			"\"Not logged in\" dù ~/.codex thật đang đăng nhập"),
+		Duoc(NLHanToken, "claim `exp` trong JWT access_token của auth.json; đo 2026-08-17: "+
+			"cửa sổ ~6,5 ngày"),
+		Duoc(NLDanhTinh, "email lấy từ phần claim của id_token (chỉ giải base64, không gọi "+
+			"mạng); đăng nhập bằng API key thì hiện \"(API key)\""),
+	}
+}

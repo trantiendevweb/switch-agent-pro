@@ -161,6 +161,9 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"profile.so":    "/api/so/ho-so",
 		"route.list":    "/api/so/route",
 		"tele.notify":   "/api/tele",
+		// Bảng năng lực: mặt web hỏi được "provider nào làm được gì" mà không
+		// phải mở terminal — nó chỉ đọc chữ viết sẵn trong mã, không chạm hồ sơ.
+		"provider.nang-luc": "/api/nang-luc",
 	}
 	// Miễn trừ CÓ LÝ DO — không phải danh sách để nhét cho qua test.
 	mienTru := map[string]string{

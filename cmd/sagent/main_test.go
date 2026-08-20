@@ -110,3 +110,24 @@ func TestCoKhoSongSotQuaCacCoKhac(t *testing.T) {
 		t.Fatal("không gõ --kho mà vẫn hiểu là chạy khan")
 	}
 }
+
+// Bảng năng lực phải gõ được bằng ĐÚNG một tên lệnh có thật.
+//
+// TestNgangQuyen ở trên chỉ đòi "có một mục nào đó nhận action này" — mà mục đó
+// có thể là một chỗ giữ chỗ `__xxx` với run=nil, đúng cách mười một action khác
+// trong bảng đang được khai (chúng là CỜ của lệnh khác, hợp lệ). Năng lực thì
+// không phải cờ của ai cả: nó phải là một lệnh gõ được, nếu không thì người
+// dùng terminal vẫn không có cách nào hỏi "provider này làm được gì".
+func TestCoLenhNangLucGoDuoc(t *testing.T) {
+	c, ok := commands["nang-luc"]
+	if !ok {
+		t.Fatal("không có lệnh `sagent nang-luc` — bảng năng lực chỉ mặt web xem được, " +
+			"đúng thứ luật ngang quyền cấm")
+	}
+	if c.run == nil {
+		t.Fatal("lệnh `nang-luc` không có hàm chạy")
+	}
+	if c.action != "provider.nang-luc" {
+		t.Fatalf("lệnh `nang-luc` gắn nhầm action %q", c.action)
+	}
+}

@@ -286,3 +286,13 @@ func TestFanOutVanCanhBaoChepTokenKhiAdapterCoFileRieng(t *testing.T) {
 		t.Fatalf("cảnh báo phải nói đúng số bản và giữ chữ CHƯA ĐO: %v", evs)
 	}
 }
+
+// NangLuc: adapter GIẢ nên khai CHƯA ĐO hết — nó không đo được gì trên máy nào
+// cả. Khai bừa "làm được" ở đây là bộ conformance của gói provider bắt ngay.
+func (fakeAgent) NangLuc() []provider.NangLuc {
+	out := make([]provider.NangLuc, 0, len(provider.MoiNangLuc))
+	for _, m := range provider.MoiNangLuc {
+		out = append(out, provider.Chua(m.Khoa, "adapter giả trong test — không đo gì"))
+	}
+	return out
+}

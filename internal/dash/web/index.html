@@ -208,6 +208,46 @@
   .nk-o .card{margin-top:12px}
   .nk-o > h2:first-child{margin-top:14px}
 
+  /* ---- bảng năng lực provider (ô Tổng quan) ----
+     BA trạng thái, BA màu khác nhau — và đó là toàn bộ lý do khối này tồn tại.
+     Gộp "đã đo, provider KHÔNG có" với "chưa ai đo" thành một màu xám là xoá
+     mất đúng thứ cần nói: Grok không có rào duyệt quyền nào (chuyện an ninh, đã
+     đo) trông sẽ y hệt Cursor chưa ai đo (chuyện việc còn phải làm). */
+  .nl{padding:4px 0 2px}
+  .nl .prov{display:flex;align-items:center;gap:8px;padding:9px 13px 5px;
+    font-family:var(--font-mono);font-size:11.5px;color:var(--hi)}
+  .nl .prov b{font-weight:600}
+  .nl .prov .dm{margin-left:auto;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--lo)}
+  .nl .m{display:flex;align-items:flex-start;gap:8px;padding:4px 13px;
+    font-size:12px;line-height:1.45;border-left:2px solid transparent}
+  .nl .m i{width:7px;height:7px;border-radius:50%;background:var(--c);
+    flex:none;display:block;margin-top:5px}
+  .nl .m .ten{font-family:var(--font-mono);font-size:11.5px;color:var(--hi);
+    flex:none;width:132px}
+  .nl .m .mo{color:var(--mid);min-width:0}
+  .nl .m.duoc{--c:var(--run)}
+  .nl .m.khong{--c:var(--idle)}
+  .nl .m.chua{--c:var(--pending)}
+  /* Chưa đo là thứ CÒN PHẢI LÀM, nên nó được kéo mắt về: một vạch mỏng bên
+     trái, đúng ngôn ngữ rail status của card agent. */
+  .nl .m.chua{border-left-color:var(--pending);background:rgba(246,178,61,.05)}
+  .nl .m .bc{display:block;font-size:11px;color:var(--lo)}
+  .nl .lech{margin:6px 13px;border:1px solid rgba(255,93,121,.4);
+    background:rgba(255,93,121,.08);border-radius:8px;padding:7px 9px;
+    font-size:11.5px;color:var(--error);line-height:1.45}
+  .nl-ct{padding:2px 14px 13px;font-size:11.5px;color:var(--lo);line-height:1.9}
+  .nl-ct b{color:var(--mid);font-weight:600}
+  /* Chú giải dùng ĐÚNG chấm CSS của bảng chứ không phải một ký tự hình tròn:
+     design system cấm ký tự làm icon (uxui_test.go), và chấm chép tay thì sửa
+     token màu xong chú giải giữ màu cũ, im lặng. */
+  .nl-ct .ch{display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--c);margin:0 3px 0 9px;vertical-align:baseline}
+  .nl-ct .ch:first-child{margin-left:0}
+  .nl-ct .ch.duoc{--c:var(--run)}
+  .nl-ct .ch.khong{--c:var(--idle)}
+  .nl-ct .ch.chua{--c:var(--pending)}
+
   /* Dưới 720px: một cột, và ngăn kéo phủ full màn — trên điện thoại một tấm
      panel 430px vừa che gần hết màn vừa để hở một dải nền vô dụng. */
   @media(max-width:720px){
@@ -549,6 +589,22 @@
           <tbody id="profiles"></tbody>
         </table>
       </div>
+
+      <!-- Năng lực provider — action "provider.nang-luc", cùng nguồn với
+           `sagent nang-luc`. Đứng ngay dưới bảng Tài khoản vì hai bảng trả lời
+           hai nửa của cùng một câu: bảng trên nói "nick nào dùng được", bảng
+           này nói "nick đó LÀM ĐƯỢC GÌ". -->
+      <h2 style="margin-top:18px">Năng lực provider <span class="dem" id="nl-dem">—</span></h2>
+      <div class="card" style="margin-top:0">
+        <div id="nl" class="empty">đang đọc…</div>
+        <div class="nl-ct">
+          <span class="ch duoc"></span> đã đo, làm được
+          <span class="ch khong"></span> đã đo, provider KHÔNG có thứ đó
+          <span class="ch chua"></span> chưa ai đo.
+          Hai cái sau <b>khác nhau</b>: cái giữa là một kết luận, cái cuối là việc còn phải làm.
+          Xem ở terminal: <code>sagent nang-luc --chua-do</code>
+        </div>
+      </div>
     </section>
 
   </div>
@@ -770,6 +826,53 @@ $('tele-thu').onclick = async () => {
     out.textContent = 'Đã gửi. Không thấy gì trong Telegram thì kiểm lại chat id.';
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
+
+// Bảng năng lực — action "provider.nang-luc" qua /api/nang-luc.
+//
+// Câu chữ (tên năng lực, bằng chứng, số chỗ chưa đo) đều do SERVER gửi sang,
+// không có bảng tra nào chép lại ở đây: khoá `chon-model` mà trang này tự đặt
+// tên là "Chọn model" thì CLI và web nói hai kiểu, và sửa một bên sẽ quên bên
+// kia. Trang chỉ quyết định màu và cách xếp.
+const NL_LOP = {'lam-duoc':'duoc', 'khong-lam-duoc':'khong', 'chua-do':'chua'};
+const NL_DOC = {'lam-duoc':'làm được', 'khong-lam-duoc':'không có', 'chua-do':'chưa đo'};
+async function napNangLuc(){
+  const box = $('nl');
+  try{
+    const d = await api('/api/nang-luc');
+    const ds = d.provider || [];
+    if(!ds.length){ box.className='empty'; box.textContent='Không có provider nào.'; return; }
+    box.className = 'nl';
+    box.innerHTML = '';
+    for(const p of ds){
+      const chuaDo = p.muc.filter(m => m.trang_thai === 'chua-do').length;
+      const dau = document.createElement('div');
+      dau.className = 'prov';
+      dau.innerHTML = '<b>' + esc(p.provider) + '</b>' +
+        '<span class="dm">' + (chuaDo ? chuaDo + ' chưa đo' : 'đo đủ') + '</span>';
+      box.appendChild(dau);
+      for(const m of p.muc){
+        const d1 = document.createElement('div');
+        d1.className = 'm ' + (NL_LOP[m.trang_thai] || 'chua');
+        d1.innerHTML =
+          '<i role="img" aria-label="' + esc(NL_DOC[m.trang_thai] || m.trang_thai) + '"></i>' +
+          '<span class="ten">' + esc(m.khoa) + '</span>' +
+          '<span class="mo">' + esc(m.mo || '') +
+            '<span class="bc">' + esc(m.bang_chung) + '</span></span>';
+        box.appendChild(d1);
+      }
+      // Lệch = lời khai chọi với hành vi thật của chính adapter. Bình thường
+      // rỗng (conformance test giữ nó rỗng), nhưng nếu một bản build lọt qua
+      // thì trang phải NÓI RA — bảng năng lực sai còn tệ hơn không có bảng.
+      for(const l of (p.lech || [])){
+        const e1 = document.createElement('div');
+        e1.className = 'lech';
+        e1.textContent = 'LỆCH: ' + l;   // textContent: câu này ghép từ dữ liệu adapter
+        box.appendChild(e1);
+      }
+    }
+    $('nl-dem').textContent = (d.so_chua_do|0) ? (d.so_chua_do|0) + ' chưa đo' : 'đo đủ';
+  }catch(e){ box.className='empty'; box.textContent = 'không đọc được: ' + e.message; }
+}
 
 async function napDB(){
   try{
@@ -1268,6 +1371,7 @@ napRoute();
 napAILichSu();
 napDB();
 napTele();
+napNangLuc();
 setInterval(refresh, 5000); // đồng hồ "đang chạy bao lâu" + phòng khi lỡ event
 </script>
 </body>

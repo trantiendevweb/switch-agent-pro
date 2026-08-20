@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -50,6 +51,13 @@ var Actions = []string{
 	"profile.run",
 	"profile.sync",
 	"profile.verify",
+	// Bảng NĂNG LỰC của từng provider ở ba trạng thái: làm được / không làm
+	// được / chưa đo. Nằm trong hợp đồng chứ không phải một dòng in ở `verify`,
+	// vì nó trả lời câu người vận hành hỏi TRƯỚC khi bấm chạy: "provider này có
+	// chọn được model không, có tự duyệt quyền được không, đọc được kết quả
+	// không". Không có nó thì câu trả lời chỉ nằm trong bình luận mã nguồn, và
+	// người dùng phát hiện ra bằng cách lượt chạy dừng lại giữa chừng.
+	"provider.nang-luc",
 	// SỔ ĐĂNG KÝ (schema v8) đối chiếu với đĩa. Nằm trong hợp đồng chứ không phải
 	// một mẹo đọc DB: đây là câu trả lời cho "cái gì trên đĩa là do sagent tạo
 	// ra" — thứ quyết định `xoa` có được phép chạy hay không. Mặt nào cũng phải
@@ -454,6 +462,44 @@ func (a *API) ProfileVerify(providerName string, chapNhanDrift bool) (map[string
 	// và vì siết quyền lúc tạo thư mục là việc BEST-EFFORT — ổ mạng hay FAT32
 	// có thể từ chối. Không có ô kiểm này thì thất bại đó im lặng.
 	out["kho hồ sơ"] = []provider.Check{khoHoSoCheck()}
+	return out, nil
+}
+
+// NangLucProvider là báo cáo năng lực của MỘT provider.
+//
+// Lech không phải phần phụ: nó là chỗ lời khai chọi với hành vi thật của chính
+// adapter đó. Bình thường luôn rỗng vì conformance test giữ nó rỗng — nhưng nếu
+// một bản build lọt qua với bảng sai, mặt nào đọc báo cáo cũng phải THẤY điều
+// đó thay vì hiển thị một bảng đẹp đẽ mà nội dung dối.
+type NangLucProvider struct {
+	Provider string             `json:"provider"`
+	Muc      []provider.NangLuc `json:"muc"`
+	Lech     []string           `json:"lech,omitempty"`
+}
+
+// NangLuc — action "provider.nang-luc". providerName rỗng = mọi provider.
+//
+// Trả về theo THỨ TỰ TÊN, không theo thứ tự map: bốn mặt đọc chung một hợp đồng
+// thì thứ tự cũng phải giống nhau, nếu không bảng trên dashboard nhảy loạn mỗi
+// lần làm mới.
+func (a *API) NangLuc(providerName string) ([]NangLucProvider, error) {
+	names := provider.Names()
+	if providerName != "" {
+		if _, err := adapterOf(providerName); err != nil {
+			return nil, err
+		}
+		names = []string{providerName}
+	}
+	sort.Strings(names)
+	out := make([]NangLucProvider, 0, len(names))
+	for _, n := range names {
+		ad, _ := provider.Get(n)
+		out = append(out, NangLucProvider{
+			Provider: n,
+			Muc:      ad.NangLuc(),
+			Lech:     provider.KiemNangLuc(ad),
+		})
+	}
 	return out, nil
 }
 
