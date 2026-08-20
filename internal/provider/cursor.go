@@ -137,34 +137,61 @@ func (c cursor) Verify() []Check {
 // sang APPDATA giả là danh tính đi theo, hồ sơ mới thì "Not logged in".
 func (cursor) TachDuocTaiKhoan() bool { return true }
 
-// ArgsTuDuyetQuyen: CHƯA ĐO: máy này không cài cursor-agent nên không chạy `--help` được
-func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return nil, false }
+// ArgsTuDuyetQuyen: `--trust` — ĐÃ CHẠY THẬT 21/08/2026 trên bản 2026.08.11.
+//
+// `--help` mô tả ba nấc: `--trust` ("Trust the current workspace without
+// prompting"), `-f/--force` ("Force allow commands unless explicitly denied") và
+// `--yolo` (alias của --force). Đo trong một git repo vứt đi: `--trust` MỘT MÌNH
+// đã đủ để agent ghi file trong workspace — không cần tới --force/--yolo.
+//
+// Giữ nấc hẹp nhất là quyết định có ý thức, giống Codex chọn `--approve-for-me`
+// thay vì cờ bỏ cả sandbox: "đủ để làm việc" và "toàn quyền" là hai thứ khác
+// nhau, và mặc định phải là cái thứ nhất.
+func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--trust"}, true }
 
-// ArgsThuMuc: CHƯA ĐO: máy này không cài cursor-agent
+// ArgsThuMuc: `cursor-agent` KHÔNG có cờ đổi thư mục — `--help` bản 2026.08.11
+// không có `--cwd` lẫn `-C`. Nó làm việc trong thư mục của tiến trình.
+//
+// Trả nil ở đây là ĐÚNG và đủ: `fleet` đã chạy tiến trình con với `workDir` là
+// worktree của phiên (`profile.StartDetached`), nên Cursor vào đúng chỗ mà không
+// cần cờ nào. Đây là "đã đo, provider không có thứ đó", KHÁC "chưa ai đo".
 func (cursor) ArgsThuMuc(dir string) []string { return nil }
 
 func (cursor) ArgsHoSo(string) []string { return nil }
 
-// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
-// ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
-// nil = chua biet, KHONG phai "khong co model" — ben goi se canh bao thay vi
-// im lang bo qua lua chon cua nguoi dung.
-func (cursor) ModelArgs(string) []string { return nil }
+// ModelArgs: `--model <model>` — có trong `--help` bản 2026.08.11 (help nêu ví
+// dụ: gpt-5, sonnet-4-thinking). CHƯA chạy thật để xác nhận nó ĐỔI model đúng,
+// nên bảng năng lực vẫn khai ChuaDo — nhưng cờ thì trả về, vì truyền nó là
+// chuyện vô hại: sai tên model thì CLI báo lỗi ngay chứ không âm thầm chạy
+// model khác.
+func (cursor) ModelArgs(model string) []string { return []string{"--model", model} }
 
-func (cursor) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
+// DocKetQua: đọc dòng `{"type":"result"}` của `--output-format stream-json` —
+// ĐÃ CHẠY THẬT 21/08/2026.
+func (cursor) DocKetQua(raw string) (KetQua, bool) { return docKetQuaCursor(raw) }
 
-// NangLuc — bảng khai báo cho Cursor. Nhiều dòng CHƯA ĐO vì máy dev không cài
-// cursor-agent: nói thẳng ra đúng hơn là suy từ tài liệu rồi để lượt chạy đầu
-// tiên phát hiện hộ.
+// NangLuc — bảng khai báo cho Cursor.
+//
+// Phần lớn các dòng CHƯA ĐO cũ đã được đóng ngày 21/08/2026: máy dev nay CÓ
+// cursor-agent (bản 2026.08.11), nên chạy thật được thay vì suy từ tài liệu.
+// Xem docs/DO-LUONG.md.
 func (cursor) NangLuc() []NangLuc {
 	return []NangLuc{
 		Duoc(NLHeadless, "`cursor-agent --trust -p \"<prompt>\"` in kết quả ra stdout; --trust "+
 			"là cờ HẸP NHẤT làm được việc, cố ý không dùng --yolo/-f"),
-		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh"),
-		Chua(NLTuDuyetQuyen, "CHƯA ĐO: máy này không cài cursor-agent nên không chạy `--help` được"),
-		Chua(NLThuMuc, "CHƯA ĐO: máy này không cài cursor-agent"),
+		Duoc(NLChonModel, "`--model <model>` (đo 21/08, CHẠY THẬT): truyền tên không tồn tại "+
+			"thì CLI TỪ CHỐI và liệt kê model hợp lệ (\"Cannot use this model: … Available "+
+			"models: auto, gpt-5.3-codex, composer-2.5, claude-opus-5-thinking-high, …\") — "+
+			"tức cờ được nhận và có hiệu lực, không bị nuốt im lặng"),
+		Duoc(NLTuDuyetQuyen, "`--trust` (đo 21/08, CHẠY THẬT trên 2026.08.11): một mình đã đủ "+
+			"để agent ghi file trong workspace. Không cần --force/--yolo — cố ý giữ nấc hẹp nhất"),
+		Khong(NLThuMuc, "cursor-agent KHÔNG có cờ đổi thư mục: --help (2026.08.11) không có "+
+			"--cwd lẫn -C. Không cần: fleet đã chạy tiến trình con với workDir là worktree của phiên"),
 		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong Cursor\\auth.json phải chuyển thành cờ"),
-		Chua(NLKetQuaCoCauTruc, "CHƯA ĐO cách đọc dữ liệu có cấu trúc của provider này"),
+		Duoc(NLKetQuaCoCauTruc, "`--output-format stream-json` (đo 21/08, CHẠY THẬT): dòng cuối "+
+			"{\"type\":\"result\"} mang is_error, subtype, result, request_id và usage "+
+			"(inputTokens/outputTokens — camelCase, KHÁC Claude). Không có total_cost_usd nên "+
+			"chi phí vẫn chưa đo được"),
 		Duoc(NLTachTaiKhoan, "chép ĐÚNG Cursor\\auth.json sang một APPDATA giả thì danh tính đi "+
 			"theo và `status` báo đúng email; hồ sơ mới thì \"Not logged in\". Đo từng biến một: "+
 			"chỉ APPDATA mới tách được, USERPROFILE/LOCALAPPDATA/HOME đều không"),

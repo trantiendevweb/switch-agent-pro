@@ -2391,3 +2391,39 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   chúng lại. Ba trạng thái năng lực của dự án đúng ở chỗ tách "đo rồi, không có"
   khỏi "chưa ai đo" — nhưng nó không tách được "đo bằng đọc help" khỏi "đo bằng
   chạy thật", mà khoảng cách đó vừa đủ để nuốt một lỗ hổng quyền.
+
+## 21/08 — Đ3: Cursor. Máy CÓ cursor-agent, và bốn ô CHƯA ĐO đóng cùng lúc
+
+- **Đo lúc nào**: 21/08/2026, ô ĐỎ số 3.
+- **Sai lầm nền của ô này**: bảng năng lực ghi *"máy này không cài cursor-agent"*
+  — nhưng `Get-Command cursor-agent` cho ra
+  `C:\Users\Administrator\AppData\Local\cursor-agent\cursor-agent.ps1`, bản
+  **2026.08.11**. Ghi chú đúng vào lúc viết, sai vào lúc đọc. Một dòng CHƯA ĐO
+  không tự hết hạn.
+- **Đo bằng cách nào**: một git repo vứt đi, ba lượt chạy thật.
+- **Con số / Bằng chứng**:
+
+  | Câu hỏi | Kết quả |
+  |---|---|
+  | `--trust` có đủ để ghi file không? | **ĐỦ** — agent tạo được file. Không cần `--force`/`--yolo` |
+  | Có đọc được kết quả có cấu trúc không? | **CÓ** — `--output-format stream-json`, 7 dòng JSON, dòng cuối `{"type":"result","is_error":false,"usage":{...}}` |
+  | `--model` có hiệu lực không? | **CÓ** — tên sai thì CLI từ chối: *"Cannot use this model: … Available models: auto, gpt-5.3-codex, composer-2.5, claude-opus-5-thinking-high, …"* |
+  | Có cờ đổi thư mục không? | **KHÔNG** — `--help` không có `--cwd` lẫn `-C` |
+
+- **Đã sửa hay chưa**: **ĐÃ SỬA.** Bốn dòng bảng năng lực đổi trạng thái:
+  `tu-duyet-quyen` và `chon-model` và `ket-qua-co-cau-truc` → **LamDuoc**;
+  `khai-thu-muc` → **KhongLamDuoc** (đã đo, provider không có thứ đó — khác hẳn
+  "chưa ai đo"). Thêm `docKetQuaCursor`.
+- **Bẫy đã tránh được nhờ đo thật**: `usage` của Cursor dùng **camelCase**
+  (`inputTokens`) chứ không phải `input_tokens` như Claude. Chép bộ đọc của
+  Claude sang thì token về 0 — và 0 đọc như *"miễn phí"*, không như *"chưa đọc
+  được"*. Cursor cũng **không** trả `total_cost_usd`, nên chi phí vẫn là chưa đo.
+- **Một lỗi tôi suýt tạo ra**: định nhét `request_id` vào trường `LoiAPI` cho
+  tiện. `LoiAPI` là `api_error_status` — thứ **phân loại** trạng thái `failed`.
+  Làm vậy thì mọi lượt Cursor đều mang một "mã lỗi", và một lượt hỏng bất kỳ sẽ
+  bị xếp thành `failed` kèm một chuỗi vô nghĩa. Chỉ điền khi `is_error` thật.
+- **Bài học**: `KhongLamDuoc` là một kết luận, không phải một khoảng trống.
+  Cursor không có cờ thư mục — và điều đó **không sao**, vì `fleet` đã chạy tiến
+  trình con với `workDir` là worktree của phiên. Ba trạng thái năng lực đáng giá
+  đúng ở chỗ này: nếu chỉ có hai, "không có cờ" sẽ phải khai chung với "chưa đo"
+  và người sau lại đi đo lại một thứ đã có câu trả lời.
