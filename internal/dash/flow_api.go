@@ -254,6 +254,30 @@ func (s *Server) handleFlowDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /api/flow/tom-tat?id=N — BẢN TÓM TẮT một lượt chạy, kèm phần đối chiếu
+// lời agent với git.
+//
+// Vì sao có mặt ở web chứ không chỉ ở terminal: /api/flow/detail đã đổ ra đủ
+// mọi thứ agent nói, nhưng đọc hết một lượt bốn bước rồi tự kết luận là việc
+// người dùng đang phải làm bằng tay — và bốn lần trong lịch sử dự án (lượt #21,
+// #29, #31, #34) kết luận rút ra từ lời agent đã sai. Đây là endpoint duy nhất
+// trả về CÂU TRẢ LỜI thay vì nguyên liệu.
+//
+// GET chứ không POST: nó chỉ đọc, không đổi gì trong sổ.
+func (s *Server) handleFlowTomTat(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if err != nil {
+		writeErr(w, fmt.Errorf("thiếu hoặc sai tham số id"))
+		return
+	}
+	tt, err := s.api.FlowTomTat(id)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, tt)
+}
+
 // POST /api/flow/cancel — đánh dấu một lượt chạy dở dang là ĐÃ HUỶ.
 //
 // Có mặt ở web chứ không chỉ ở terminal, vì đây đúng là chỗ người ta phát hiện

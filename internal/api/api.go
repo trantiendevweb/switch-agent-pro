@@ -91,6 +91,11 @@ var Actions = []string{
 	"flow.cancel",
 	"flow.save",
 	"flow.delete",
+	// Tóm tắt một lượt chạy VÀ đối chiếu lời agent với git. Nằm trong hợp đồng
+	// chứ không phải một mẹo đọc log: câu "lượt vừa rồi ai làm được gì" hiện chỉ
+	// trả lời được bằng cách người đọc tự tin những gì agent in ra — mà lượt #21,
+	// #29, #31, #34 đều cho thấy lời agent chọi thẳng với git.
+	"flow.tom-tat",
 	// Báo tin ra ngoài. Bốn mặt điều khiển đều phải MỞ RA mới thấy chuyện gì
 	// xảy ra; đây là mặt duy nhất tự tìm tới người dùng khi lượt chạy có sự cố.
 	"tele.notify",
