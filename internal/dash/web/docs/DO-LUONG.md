@@ -2081,4 +2081,26 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   2. *PHẦN 2 (Tài liệu)*: Khóa ba bất biến giao diện (INV-UI-1, INV-UI-2, INV-UI-3) vào `MASTER-PLAN.md` và ghi nhận đầy đủ số liệu đo đạc vào `DO-LUONG.md`.
 - **Bài học màn 3D trắng trơn**: Trong môi trường không có mạng (offline, air-gap) hoặc mạng nội bộ chặn truy cập ra các CDN công cộng (`cdnjs`, `jsdelivr`, `fonts.googleapis.com`), việc gọi asset từ CDN bên ngoài khiến thư viện 3D không thể nạp, dẫn tới lỗi khởi tạo và màn hình 3D hoàn toàn trắng trơn không hoạt động được. Là một control plane local-first chạy native một binary trên Windows (assets nhúng qua Go `embed`), toàn bộ giao diện dashboard bắt buộc phải offline tuyệt đối lúc runtime (INV-UI-1), không được phép phụ thuộc vào bất kỳ kết nối internet nào để hiển thị.
 
+## 20/08 — Dung lượng binary và asset 3D văn phòng: GLTFLoader.js + RobotExpressive.glb
+
+- **Đo lúc nào**: Ngày 20/08/2026, trong đợt triển khai giao diện văn phòng 3D (`vanphong.html`) theo kế hoạch `docs/KE-HOACH-VAN-PHONG.md`.
+- **Đo bằng cách nào**:
+  1. Tải thật và đo kích thước byte chính xác của 2 asset từ nguồn chuẩn Three.js r128: `RobotExpressive.glb` (HTTP 200, **463.988 byte**) và `GLTFLoader.js` (HTTP 200, **96.550 byte**).
+  2. Thực hiện biên dịch kiểm thử file thực thi Go với đầy đủ cờ phát hành chuẩn (`go build -trimpath -ldflags "-s -w" ./cmd/sagent`) trước và sau khi đưa 2 asset vào `internal/dash/web/vendor/`.
+- **Con số / Bằng chứng**:
+  - **Tài nguyên thêm mới (Vendor Assets):**
+    - `internal/dash/web/vendor/RobotExpressive.glb`: **463.988 byte** (~453,1 KB)
+    - `internal/dash/web/vendor/GLTFLoader.js`: **96.550 byte** (~94,3 KB)
+    - Tổng dung lượng asset thêm vào: **560.538 byte** (~547,4 KB / ~0,53 MB).
+  - **Dung lượng file thực thi binary (`sagent.exe` trên Windows amd64):**
+    - **TRƯỚC khi thêm asset** (chỉ có Three.js r128 core + 3 font woff2 + `token.css`): **14.516.736 byte** (~13,84 MB, ghi nhận 13,8 MB).
+    - **SAU khi nhúng thêm 2 asset 3D**: **15.077.376 byte** (~14,38 MB, làm tròn ~14,4 MB).
+    - Mức phình thực tế của file binary: đúng **560.640 byte** (~547,5 KB).
+  - **So sánh với dự tính:** Kế hoạch ban đầu ước tính binary tăng thêm ~1 MB (từ 13,7 MB lên ~14,7 MB). Nhờ chọn đúng file mô hình chuẩn nén tối ưu (463 KB) và loader độc lập (96 KB), kích thước thực tế chỉ tăng ~0,53 MB (lên ~14,4 MB), tiết kiệm gần 500 KB dung lượng lưu trữ so với mức trần dự kiến.
+- **Đã sửa hay chưa**: **ĐÃ ĐO VÀ CẬP NHẬT**. Cập nhật đầy đủ số đo thực tế vào `docs/THIET-KE.md`, `internal/dash/web/docs/THIET-KE.md`, `docs/DO-LUONG.md`, và cập nhật thông số dung lượng binary trong `README.md` (từ 13,7 MB lên ~14,4 MB).
+- **Bài học & Nguyên tắc áp dụng:**
+  - *Nới luật có kiểm soát:* Giữ vững lệnh cấm đối với các addon hiệu ứng hậu kỳ nặng (`EffectComposer`, `UnrealBloomPass`, `OrbitControls`) nhằm tránh kéo theo chuỗi phụ thuộc rườm rà và rủi ro màn hình trắng trơn. Chỉ nới lỏng cho phép duy nhất loader độc lập (`GLTFLoader.js`) để tận dụng 13 hoạt ảnh chuyển động có sẵn từ mô hình `.glb`.
+  - *Đo thật trước khi chia việc:* Việc tải và đo đạc trực tiếp cả hai asset trước khi bắt tay vào triển khai giúp loại bỏ hoàn toàn rủi ro đường dẫn hỏng (404/URL chết), đảm bảo kế hoạch bám sát số liệu thực tế thay vì phỏng đoán.
+
+
 

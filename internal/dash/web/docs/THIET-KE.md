@@ -781,4 +781,93 @@ Lệnh này sẽ in ra bảng kế hoạch tĩnh (dry-run) hiển thị cột va
 > - **Đã kiểm:** Cấu hình 5 vai chuẩn (`ceo`, `leader`, `coder`, `tester`, `soi`) trên flow `doi-4`, hiển thị vai trò trong lệnh `--kho` và cảnh báo khi nhập vai trò lạ.
 > - **Chưa kiểm:** Hoạt ảnh di chuyển 3D riêng biệt cho các vai trò tuỳ biến do người dùng tự đặt thêm ngoài 5 vai chuẩn trên.
 
+---
+
+## 16. Mặt văn phòng (3D)
+
+Mặt văn phòng ảo 3D (`vanphong.html`) là không gian mô phỏng trực quan nơi làm việc thực tế của cả đội ngũ AI agent. Thay vì chỉ hiển thị các quả cầu trừu tượng xếp trên vòng tròn, màn hình này dựng lên một văn phòng làm việc với các phòng ban chuyên môn, nhân vật robot 3D có hoạt ảnh chuyển động thể hiện đúng trạng thái công việc và bóng thoại phát ngôn thời gian thực.
+
+---
+
+### 1. Bốn phòng chuyên môn và sảnh chung theo loại việc
+
+Không gian văn phòng được chia thành **4 phòng ban chuyên môn** bao quanh **1 sảnh chung** ở trung tâm:
+
+| Khu vực | Phòng ban | Vai trò phụ trách | Loại việc thực hiện |
+|---|---|---|---|
+| **Phòng 1** | **Phòng Họp & Điều phối** | `leader`, `ceo` | Lập kế hoạch tổng thể, phân rã công việc, theo dõi tiến độ, kiểm tra đối chiếu kết quả Git và phê duyệt trộn nhánh. |
+| **Phòng 2** | **Phòng Code (Lập trình)** | `coder` | Trực tiếp viết mã nguồn mới, sửa lỗi, hoàn thiện logic nghiệp vụ hoặc soạn thảo tài liệu hướng dẫn. |
+| **Phòng 3** | **Phòng Test (Kiểm thử)** | `tester` | Chạy các kịch bản kiểm thử tự động (CI / test suite) để đánh giá chất lượng sản phẩm. |
+| **Phòng 4** | **Phòng Review & Soi** | `soi` | Đọc mã nguồn độc lập, rà soát lịch sử thay đổi (Git diff), phát hiện lỗi logic hoặc rủi ro tiềm ẩn mà không sửa trực tiếp vào file. |
+| **Sảnh giữa** | **Sảnh chung (Khu vực mở)** | *(Rỗng / Chưa phân vai)* | Dành cho các agent hoặc bước chưa phân vai cụ thể (`vai_tro` để rỗng), các bước phụ trợ gửi tin nhắn (`notify`), hoặc agent đang chờ nhận việc chung. |
+
+**Quy tắc thiết kế không gian & màu sắc:**
+- **Sàn và vách thấp đơn sắc:** Toàn bộ sàn nhà, vách ngăn phòng và bàn ghế văn phòng đều được dựng bằng các hình khối hình học tối giản với gam màu trung tính đơn sắc (`--panel`, `--panel-2`, `--line`, `--void`).
+- **Màu chỉ dành cho trạng thái:** Tuân thủ triết lý thiết kế cốt lõi (*Color Only for Status*), màu sắc rực rỡ chỉ được áp dụng cho **nhân vật và trạng thái của agent** (`--run` xanh ngọc, `--pending` vàng cam, `--done` xanh dương, `--error` đỏ, `--idle` xám). Việc giữ khung cảnh đơn sắc giúp người vận hành chỉ cần liếc mắt trong 1 giây là nhận biết ngay agent nào đang làm việc, agent nào gặp sự cố mà không bị nhiễu loạn bởi màu sơn phòng ốc.
+- **Minh bạch chỗ chưa phân vai:** Thể hiện rõ triết lý *"Thà thấy rõ chỗ chưa khai còn hơn để máy tự đoán hộ"*. Bước nào chưa gán vai trò sẽ đứng ngay tại sảnh chung ở giữa để người dùng biết và bổ sung khi cần.
+
+---
+
+### 2. Vì sao chuyển động phải mang thông tin và nhịp thở là ngoại lệ duy nhất?
+
+Trong một bảng điều khiển công việc chuyên nghiệp, mọi hiệu ứng hình ảnh đều phải phục vụ việc truyền tải thông tin hữu ích cho người vận hành, tránh các hoạt ảnh vô nghĩa gây tốn tài nguyên và mất tập trung.
+
+**Bảng ánh xạ chuyển động sang trạng thái thực tế:**
+
+| Hoạt ảnh nhân vật | Hành động thực tế của Agent | Nguồn dữ liệu xác thực |
+|---|---|---|
+| **Đi bộ (`Walking`)** | Agent di chuyển từ phòng này sang phòng khác khi chuyển đổi giữa các bước công việc khác loại. | So sánh phòng ban của bước trước và bước hiện tại từ `/api/flow/detail`. |
+| **Vẫy tay (`Wave`)** | Agent đến gặp đồng nghiệp để giao việc hoặc nhận bàn giao. | Phát hiện quan hệ phụ thuộc (`needs`) giữa hai bước trong quy trình. |
+| **Chạy tại chỗ (`Running`)** | Agent đang tích cực thực thi bước công việc của mình (`state = "running"`). | Đọc trạng thái bước đang xử lý từ `/api/flow/detail`. |
+| **Giơ ngón cái (`ThumbsUp`)** | Bước công việc hoàn thành xuất sắc (`state = "done"`). | Kết quả bước thành công không có lỗi. |
+| **Lắc đầu từ chối (`No`)** | Bước công việc bị lỗi hoặc thất bại (`state = "failed"`). | Bước trả về lỗi hoặc kiểm thử không đạt. |
+| **Bóng thoại (HTML Overlay)** | Hiện bong bóng lời thoại chứa câu trả lời rút gọn của agent. | Lấy trực tiếp từ dòng đầu của trường `output` THẬT trong `/api/flow/detail`, tuyệt đối không tự bịa câu chữ. |
+| **Máy chấm (CI / Tester)** | Nhân vật kiểm thử mang hình dáng khối máy móc riêng biệt, khác hẳn nhân vật robot của agent người. | Giúp người vận hành phân biệt rạch ròi đâu là tác tử AI và đâu là máy chấm tự động. |
+
+**Nhịp thở (`Idle`) là ngoại lệ DUY NHẤT:**
+- Khi một agent đang ở trạng thái rảnh rỗi chờ việc, nhân vật vẫn có chuyển động thở nhẹ hoặc đung đưa nhẹ tại chỗ (`Idle`).
+- Đây là chuyển động **duy nhất không mang thông tin trạng thái mới**. Mục đích là để khung cảnh 3D không bị "chết cứng", giúp người vận hành nhận biết hệ thống render WebGL và kết nối dữ liệu vẫn đang hoạt động bình thường mà không gây rối mắt.
+- Khi người dùng bật chế độ giảm chuyển động trên hệ điều hành (`prefers-reduced-motion`), toàn bộ hoạt ảnh đi lại và nhịp thở đều được tắt ngay lập tức, chuyển về trạng thái tĩnh hoàn toàn.
+
+---
+
+### 3. Vì sao dùng `.glb` CC0 sẵn 13 clip đặt tên theo trạng thái thay vì tự vẽ?
+
+Thay vì tự vẽ các khối hình học thô sơ hay tự lập trình hoạt ảnh bằng mã nguồn, dự án chọn nhúng file mô hình chuẩn **`RobotExpressive.glb`** (bản quyền công cộng CC0 / Public Domain trích từ bộ ví dụ của Three.js):
+
+1. **Khớp 100% nhu cầu nghiệp vụ:** File mô hình tích hợp sẵn **13 hoạt ảnh khung xương (skeletal animations)** được đặt tên chuẩn xác theo từng hành vi và cảm xúc: `Idle`, `Walking`, `Running`, `Wave`, `ThumbsUp`, `No`, `Punch`, `Death`, `Sitting`, `Standing`, `Jump`, `Yes`, `WalkJump`. Các clip này bao quát đầy đủ mọi trạng thái vòng đời của một tác vụ AI mà không cần viết thêm engine hoạt hình phức tạp.
+2. **Kích thước siêu nhẹ và tối ưu GPU:** File `.glb` nhị phân chỉ nặng đúng **463.988 byte** (~453 KB), tích hợp toàn bộ khung xương, chất liệu và chuyển động trong một file duy nhất, nạp cực nhanh và tốn rất ít tài nguyên GPU.
+3. **An toàn bản quyền tuyệt đối (CC0):** Được phát hành theo giấy phép CC0 (Public Domain), hoàn toàn tự do đóng gói và phân phối thương mại/mã nguồn mở mà không có bất kỳ rủi ro pháp lý nào.
+4. **Nới luật Addon Three.js có kiểm soát:**
+   - **Vẫn CẤM addon hiệu ứng:** Tiếp tục cấm các addon hiệu ứng hậu kỳ nặng nề (`EffectComposer`, `UnrealBloomPass`, `OrbitControls`) vì chúng kéo theo nhiều file phụ thuộc, tốn tài nguyên và dễ gây lỗi màn hình trắng trơn. Camera xoay 3D tiếp tục được tự viết tay gọn nhẹ.
+   - **CHO PHÉP loader vendor độc lập:** Chấp nhận nạp thêm **`GLTFLoader.js`** (r128, dung lượng 96.550 byte) nhúng tĩnh vào `internal/dash/web/vendor/`. Loader này là một file độc lập, không kéo theo phụ thuộc nào khác, giúp mở ra khả năng nạp mô hình 3D sinh động cho toàn bộ hệ thống.
+
+---
+
+### 4. Vì sao `3d.html` vẫn được giữ nguyên làm mặt sơ đồ?
+
+Hai màn hình 3D phục vụ hai góc nhìn bổ trợ cho nhau và cùng tồn tại song song:
+
+- **`3d.html` (Mặt sơ đồ vĩ mô - Ring & Core):** Là góc nhìn bao quát toàn bộ hạm đội. Xếp các agent trên một vòng tròn (Ring) quanh lõi điều phối (Core) giúp người vận hành quét nhanh tổng số tài khoản đang sống, tỷ lệ hạn mức (quota) còn lại và các luồng truyền dữ liệu dạng tia sáng chỉ trong 1 giây (*nhìn phát hiểu ngay — glanceable*).
+- **`vanphong.html` (Mặt văn phòng vi mô - Office Simulation):** Là góc nhìn chi tiết vào từng quy trình làm việc. Giúp người vận hành nhìn thấy rõ tiến trình phối hợp thực tế giữa các agent: ai đang sang phòng nào, giao việc cho ai, kiểm thử máy chấm thế nào và kết quả đầu ra ra sao mà không cần phải mở dòng lệnh đọc nhật ký.
+- **Cùng một nguồn dữ liệu:** Cả hai giao diện đều đọc chung một nguồn sự thật duy nhất qua API `/api/state` và `/api/flow/detail`, dùng chung bộ token màu `vendor/token.css` và hoạt động hoàn toàn offline 100%.
+
+---
+
+### 5. Số đo dung lượng file thực thi (Binary Size) TRƯỚC và SAU khi thêm asset
+
+Toàn bộ tài nguyên 3D mới được nhúng trực tiếp vào file thực thi duy nhất của Go (`go:embed` trong `internal/dash/web/vendor/`). Số đo thực tế trên môi trường Windows 64-bit (build bằng cờ `-trimpath -ldflags "-s -w"`):
+
+| Trạng thái | Kích thước Binary (`sagent.exe`) | Thành phần tài nguyên nhúng |
+|---|---|---|
+| **TRƯỚC khi thêm asset 3D văn phòng** | **14.516.736 byte** (~13,84 MB, ghi nhận 13,8 MB) | Three.js r128 core (`three.min.js`: 603 KB) + 3 font chữ woff2 (Space Grotesk: 49 KB, Inter: 352 KB, JetBrains Mono: 114 KB) + `token.css` (4 KB). |
+| **SAU khi thêm asset 3D văn phòng** | **15.077.376 byte** (~14,38 MB, làm tròn ~14,4 MB) | Nhúng thêm mô hình robot `RobotExpressive.glb` (463.988 byte) + thư viện nạp `GLTFLoader.js` (96.550 byte). |
+| **Mức tăng thực tế** | **+560.640 byte** (~547,5 KB / ~0,53 MB) | Thấp hơn nhiều so với mức ước tính ban đầu trong kế hoạch (~1 MB, dự kiến ~14,7 MB), giúp tiết kiệm dung lượng đáng kể cho file thực thi. |
+
+> [!NOTE]
+> **Thứ đã kiểm và chưa kiểm:**
+> - **Đã kiểm:** Khả năng tải về thành công của cả 2 file asset từ nguồn Three.js r128 (HTTP 200), kiểm tra dung lượng chính xác từng byte, đo kích thước file thực thi `.exe` trước và sau khi build Go embed, kiểm tra hiển thị font và cấu trúc 4 phòng + sảnh chung trên Windows PowerShell.
+> - **Chưa kiểm:** Tốc độ khung hình (FPS) của hoạt ảnh 13 clip chuyển động khi chạy đồng thời trên các máy tính cấu hình văn phòng không có card đồ hoạ rời (GPU yếu).
+
+
 

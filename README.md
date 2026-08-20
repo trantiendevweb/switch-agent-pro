@@ -3,7 +3,7 @@
 > ⚡ **Mới bắt đầu?** Xem ngay [**Hướng dẫn 5 phút đầu tiên (docs/BAT-DAU.md)**](docs/BAT-DAU.md) — dành riêng cho người không rành kỹ thuật (cách cài đặt 1 dòng, vượt cảnh báo Windows và 3 bước dùng ngay).
 
 **Local-first control plane điều phối nhiều coding agent và nhiều AI API.**
-Một file `.exe` **13,7 MB**, không phụ thuộc gì, chạy native trên **Windows**,
+Một file `.exe` **14,4 MB**, không phụ thuộc gì, chạy native trên **Windows**,
 có dashboard quan sát realtime.
 
 ```
@@ -60,7 +60,7 @@ iex (irm https://raw.githubusercontent.com/trantiendevweb/switch-agent-pro/main/
 > giấy phép, nên mở mã nguồn không gỡ được cảnh báo này. Thay vào đó mỗi bản phát hành có
 > `SHA256SUMS.txt`: trình cài **tự đối chiếu băm**, và bạn kiểm lại tay được bất cứ lúc nào.
 
-Nó tải một file `.exe` (~13,7 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
+Nó tải một file `.exe` (~14,4 MB) từ GitHub Releases, **đối chiếu SHA256**, đặt vào
 `%USERPROFILE%\bin` rồi thêm vào PATH của người dùng. Chỉ cần Windows 10 trở lên —
 PowerShell 5.1 có sẵn là đủ. Có bản `amd64` và `arm64`, trình cài tự chọn.
 
@@ -187,7 +187,8 @@ sagent dash                       # in ra URL, mở trên trình duyệt (cùng 
 ```
 
 Dashboard 2D xem phiên đang chạy, bật/dừng hạm đội, nhật ký sự kiện realtime; bấm
-nút **3D** để xem dạng không gian (orb = phiên thật, bấm orb để dừng đúng phiên đó).
+nút **3D** để xem dạng sơ đồ không gian (orb = phiên thật, bấm orb để dừng đúng phiên đó)
+hoặc bấm **Văn phòng** để xem mô phỏng văn phòng 3D theo phòng ban (robot đi lại, vẫy tay giao việc, bóng thoại realtime).
 Mặc định chỉ nghe `127.0.0.1`, chặn Host/Origin lạ, DTO allowlist nên không gửi
 token/API key ra trình duyệt. Assets nhúng trong binary (không cần Node).
 
