@@ -200,6 +200,46 @@ var migrations = []string{
 		mili       INTEGER NOT NULL DEFAULT 0
 	);
 	CREATE INDEX IF NOT EXISTS idx_api_calls_luc ON api_calls(luc);`,
+
+	// v8 — SỔ ĐĂNG KÝ: cái gì trên đĩa là do sagent tạo ra.
+	//
+	// Vì sao cần một cái sổ trong khi thư mục đã nằm ngay đó: đĩa nói "có thư
+	// mục này", nó KHÔNG nói "sagent tạo ra thư mục này". Hai câu đó khác nhau ở
+	// đúng chỗ nguy hiểm nhất của dự án — `xoa`. Cho tới trước bảng này, lá chắn
+	// duy nhất là kiểm chuỗi đường dẫn (`insideStore`), tức là hễ thứ gì rơi vào
+	// ~/.ai-accounts thì mặc nhiên bị coi là của sagent và xoá đệ quy được.
+	// MASTER-PLAN Pha 1 đòi ngược lại: "chỉ xoá thư mục mà registry SỞ HỮU".
+	//
+	// Sổ cũng là thứ duy nhất trả lời được "sổ ghi có mà đĩa không có" — hồ sơ
+	// bị xoá sau lưng sagent (dọn tay, đồng bộ OneDrive, máy khác) hiện không
+	// để lại dấu vết nào.
+	//
+	// CỐ Ý KHÔNG CÓ CỘT NÀO CHỨA SECRET.
+	//
+	// `routes_so` ghi `key_id` — TÊN FILE khoá trong ~/.ai-accounts/api-keys,
+	// không phải khoá. Đây đúng là điều luật số 1 của config đòi ("file cấu hình
+	// không bao giờ chứa secret"), và sổ trạng thái không được là cái cửa sau
+	// của luật đó: state.db nằm ngoài repo nhưng vẫn bị chép theo khi người ta
+	// gửi nhau bản sao lưu để gỡ lỗi. Có test canh danh sách cột:
+	// xem TestCaA_SoV8CoBangVaKhongCoCotSecret.
+	`CREATE TABLE IF NOT EXISTS profiles_so (
+		id        INTEGER PRIMARY KEY AUTOINCREMENT,
+		provider  TEXT    NOT NULL,
+		account   TEXT    NOT NULL,
+		dir       TEXT    NOT NULL,
+		so_tao_ra INTEGER NOT NULL DEFAULT 0,
+		ghi_luc   TEXT    NOT NULL,
+		UNIQUE(provider, account)
+	);
+	CREATE INDEX IF NOT EXISTS idx_profiles_so_dir ON profiles_so(dir);
+	CREATE TABLE IF NOT EXISTS routes_so (
+		id       INTEGER PRIMARY KEY AUTOINCREMENT,
+		ten      TEXT    NOT NULL UNIQUE,
+		base_url TEXT    NOT NULL DEFAULT '',
+		model    TEXT    NOT NULL DEFAULT '',
+		key_id   TEXT    NOT NULL DEFAULT '',
+		ghi_luc  TEXT    NOT NULL
+	);`,
 }
 
 // MaxStepOutput là trần kích thước kết quả lưu cho mỗi bước.

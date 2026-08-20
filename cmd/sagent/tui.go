@@ -27,7 +27,7 @@ func isInteractive() bool {
 func runTUI() {
 	if !isInteractive() {
 		// Không có bàn phím: in bảng + trợ giúp thay vì đứng chờ.
-		cmdList()
+		cmdList(nil)
 		fmt.Println("  (không có bàn phím — bỏ qua bảng chọn tương tác)")
 		return
 	}
