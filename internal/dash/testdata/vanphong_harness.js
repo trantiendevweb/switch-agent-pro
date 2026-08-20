@@ -53,10 +53,17 @@ function attr(n) {
 }
 
 const veLai = [];
+const nhomTao = [];   // moi Group duoc tao, de do lai vi tri noi that
 let demLine = 0, demHat = 0;
 // Hinh cau la lop RIENG de dem duoc: hat chay doc duong giao viec la Mesh duy
 // nhat dung hinh cau trong ca canh.
 class GeoCau extends Geo {}
+// Ba lop nay NHO lai kich thuoc that. Khong nho thi khong do duoc hai mon noi
+// that co cam vao nhau khong — ma do la dung loai loi da xay ra: tu ho so dua
+// vach ben cam vao goc mat ban hang sau.
+class GeoHop extends Geo { constructor(w, h, d) { super(); this.fw = w; this.fh = h; this.fd = d; } }
+class GeoTru extends Geo { constructor(rt, rb, h) { super(); const r = Math.max(rt, rb); this.fw = r * 2; this.fh = h; this.fd = r * 2; } }
+class GeoPhang extends Geo { constructor(w, h) { super(); this.fw = w; this.fh = h; this.fd = 0.02; } }
 const THREE = {
   WebGLRenderer: class { setPixelRatio() {} setSize() {} render() { veLai.push(1); } },
   Scene: class extends Obj {},
@@ -66,12 +73,12 @@ const THREE = {
   Box3: class { setFromObject() { this.max = { y: 1.8 }; this.min = { y: 0 }; return this; } },
   AmbientLight: class extends Obj {}, DirectionalLight: class extends Obj {},
   MeshStandardMaterial: Mat, MeshBasicMaterial: Mat, LineBasicMaterial: Mat,
-  BoxGeometry: Geo, CylinderGeometry: Geo, PlaneGeometry: Geo, CircleGeometry: Geo,
+  BoxGeometry: GeoHop, CylinderGeometry: GeoTru, PlaneGeometry: GeoPhang, CircleGeometry: Geo,
   TorusGeometry: Geo, SphereGeometry: GeoCau, EdgesGeometry: Geo, BufferGeometry: Geo,
   BufferAttribute: function (a) { return attr(a.length / 3); },
   Mesh: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; this.isMesh = true;
       if (g instanceof GeoCau) demHat++; } },
-  Group: class extends Obj {},
+  Group: class extends Obj { constructor() { super(); nhomTao.push(this); } },
   Line: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; demLine++; } },
   LineSegments: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } },
   GridHelper: class extends Obj { constructor() { super(); this.material = { transparent: false, opacity: 1 }; } },
@@ -219,18 +226,91 @@ setTimeout(() => {
   if (demLine !== 6) { console.error('  HONG: so duong noi sai'); hong++; }
   if (demHat !== 1) { console.error('  HONG: so hat sai'); hong++; }
 
-  // 3) NGUOI DUNG DUNG CHO CUA BAN MINH: chỗ thứ i trong phòng phải nằm trong
-  //    long phong, khong loi ra ngoai vach.
-  const phongThu = { khoa: 'code', x: 15, z: 0, kieu: 'ban', goc: Math.atan2(-15, 0) };
-  ctx.dungPhong(phongThu);
-  for (let i = 0; i < 8; i++) {
-    const c = ctx.oTrongPhong(phongThu, i, 8);
-    const dx = Math.abs(c.v.x - phongThu.x), dz = Math.abs(c.v.z - phongThu.z);
-    if (Math.max(dx, dz) > 4.6) {
-      console.error('  HONG: cho thu ' + i + ' loi ra ngoai phong', c.v.x, c.v.z);
-      hong++;
+  // 3) HINH HOC PHONG. Toi khong co mat de nhin canh 3D, nen phai DO. Ba dieu:
+  //    (a) moi mon noi that nam trong long phong, khong xuyen qua vach;
+  //    (b) moi cho dung cung nam trong long phong;
+  //    (c) khong mon noi that nao cam vao cho dung cua nguoi.
+  //
+  //    (c) da bat duoc mot loi that: tu ho so dua vach ben o z=-1.2 cam vao goc
+  //    ban hang sau 0.35 don vi.
+  const NUA = 4.6, CACH = 0.55;
+  [['ban', 15, 0], ['may', 0, 15], ['hop', 0, -15]].forEach(([kieu, px, pz]) => {
+    const p = { khoa: 't', x: px, z: pz, kieu };
+    const truoc = nhomTao.length;
+    ctx.dungPhong(p);
+    const nhom = nhomTao.slice(truoc);
+    if (!nhom.length) { console.error('  HONG: dungPhong khong tao Group nao'); hong++; return; }
+    const phong = nhom[0];
+
+    // Gom toa do RIENG cua tung mon: ghe la Group long trong Group phong.
+    const mon = [];
+    let soNhom = 0;
+    const di = (o, ox, oz, cha) => o.children.forEach(c => {
+      const x = ox + c.position.x, z = oz + c.position.z;
+      if (c.children.length) { di(c, x, z, ++soNhom); return; }
+      const g = c.geometry;
+      mon.push({ x, z, y: c.position.y, cha,
+        fw: g && g.fw, fh: g && g.fh, fd: g && g.fd });
+    });
+    di(phong, 0, 0, 0);
+
+    mon.forEach(m => {
+      if (Math.abs(m.x) > NUA || Math.abs(m.z) > NUA) {
+        console.error('  HONG[' + kieu + ']: noi that loi ra ngoai vach', m.x.toFixed(2), m.z.toFixed(2));
+        hong++;
+      }
+    });
+
+    // Doi cho dung tu toa do san ve toa do rieng cua phong de so voi noi that.
+    const c0 = Math.cos(p.goc), s0 = Math.sin(p.goc);
+    for (let i = 0; i < 8; i++) {
+      const c = ctx.oTrongPhong(p, i, 8);
+      const dx = c.v.x - p.x, dz = c.v.z - p.z;
+      const lx = dx * c0 - dz * s0, lz = dx * s0 + dz * c0;
+      if (Math.abs(lx) > NUA || Math.abs(lz) > NUA) {
+        console.error('  HONG[' + kieu + ']: cho thu ' + i + ' loi ra ngoai phong',
+          lx.toFixed(2), lz.toFixed(2));
+        hong++;
+        continue;
+      }
+      // Chi xet mon o TAM THAN NGUOI (y trong 0.3..1.5). Mat ban cao 0.74 nam
+      // ngay truoc mat nguoi la dung; van de la mon nao chiem CHO DUNG.
+      mon.forEach(m => {
+        if (m.y < 0.3 || m.y > 1.5) return;
+        const d = Math.hypot(m.x - lx, m.z - lz);
+        if (d < CACH) {
+          console.error('  HONG[' + kieu + ']: mon noi that cam vao cho thu ' + i +
+            ' (cach ' + d.toFixed(2) + ')', m.x.toFixed(2), m.z.toFixed(2));
+          hong++;
+        }
+      });
     }
-  }
+    // (d) HAI MON NOI THAT KHONG DUOC CAM VAO NHAU.
+    //
+    // Chi xet mon DAY (ca hai chieu day >= 0.4) va o TAM NGUOI NHIN (y cham vao
+    // khoang 0.3..1.6). Bo qua mon mong nhu chan ban, vien man hinh, khe tu:
+    // chung VON PHAI cham vao mat ban, dua chung vao la bao dong gia lien tuc.
+    // Bo qua ca hai mon trong CUNG mot nhom con (bon phan cua mot cai ghe).
+    const day = mon.filter(m => m.fw >= 0.4 && m.fd >= 0.4 &&
+      (m.y + m.fh / 2) > 0.3 && (m.y - m.fh / 2) < 1.6);
+    for (let i = 0; i < day.length; i++) {
+      for (let j = i + 1; j < day.length; j++) {
+        const a = day[i], b = day[j];
+        if (a.cha === b.cha && a.cha !== 0) continue;
+        const gx = Math.min(a.x + a.fw / 2, b.x + b.fw / 2) - Math.max(a.x - a.fw / 2, b.x - b.fw / 2);
+        const gz = Math.min(a.z + a.fd / 2, b.z + b.fd / 2) - Math.max(a.z - a.fd / 2, b.z - b.fd / 2);
+        const gy = Math.min(a.y + a.fh / 2, b.y + b.fh / 2) - Math.max(a.y - a.fh / 2, b.y - b.fh / 2);
+        if (gx > 0.02 && gz > 0.02 && gy > 0.02) {
+          console.error('  HONG[' + kieu + ']: hai mon noi that cam vao nhau — chong ' +
+            gx.toFixed(2) + ' x ' + gz.toFixed(2) + ' x ' + gy.toFixed(2),
+            '(' + a.x.toFixed(2) + ',' + a.z.toFixed(2) + ')',
+            '(' + b.x.toFixed(2) + ',' + b.z.toFixed(2) + ')');
+          hong++;
+        }
+      }
+    }
+    console.log('  phong ' + kieu + ': ' + mon.length + ' mon (' + day.length + ' mon day), do xong');
+  });
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');
   process.exit(hong ? 1 : 0);
 }, 400);

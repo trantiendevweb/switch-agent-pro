@@ -374,16 +374,21 @@ function themBang(g, rong, cao){
   v.position.copy(b.position); g.add(v);
 }
 
-// Tủ hồ sơ dựa vách bên.
+// Tủ hồ sơ, đặt ở GÓC SAU phòng — đúng hai ô mà phòng test dùng cho tủ máy.
+//
+// Bản đầu tôi dựa nó vào vách bên ở z=-1.2. Ở đó nó cắm vào góc mặt bàn hàng
+// sau — bài đo trong vanphong_test.go báo chồng 0.29 × 0.18 × 0.08. Góc sau thì
+// trống thật, cũng đã đo.
 function themTu(g, x){
-  const t = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.55, 0.48), matGhe);
-  t.position.set(x, 0.78, -1.2); g.add(t);
+  const z = -NUA_PHONG + 0.62;
+  const t = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.55, 0.55), matGhe);
+  t.position.set(x, 0.78, z); g.add(t);
   const v = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.95, 1.55, 0.48)), matVien.clone());
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.85, 1.55, 0.55)), matVien.clone());
   v.position.copy(t.position); g.add(v);
   [0.35, 0.78, 1.21].forEach(y=>{
-    const ngan = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.03, 0.02), matChan);
-    ngan.position.set(x, y, -0.95); g.add(ngan);
+    const ngan = new THREE.Mesh(new THREE.BoxGeometry(0.70, 0.03, 0.02), matChan);
+    ngan.position.set(x, y, z + 0.29); g.add(ngan);
   });
 }
 
