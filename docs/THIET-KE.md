@@ -532,3 +532,55 @@ tự đo lại trên máy họ như `kiem-tra.ps1` hiện nay.
 - **Skill UI = `ui-ux-pro-max`** (bạn đã gửi). Hệ thiết kế đã sinh & lưu ở
   `design-system/switch-agent-pro/MASTER.md`. Đề xuất cài thành skill dùng
   chung ở `~/.claude/skills/` (chờ bạn đồng ý — xem câu hỏi cuối).
+
+---
+
+## 14. AI quản lý (Báo cáo & Giám sát luồng)
+
+Mục tiêu của AI quản lý là theo dõi toàn diện tiến trình làm việc của hạm đội agent, phát hiện sớm sai sót và lập báo cáo trung thực cho người vận hành mà không làm xáo trộn kiến trúc hệ thống.
+
+### 1. Vì sao chọn bản QUẢN LÝ (đọc + báo cáo) thay vì can thiệp trực tiếp?
+
+Trong thực tế điều hành nhiều agent, có hai hướng tiếp cận:
+- **Hướng can thiệp trực tiếp (Active Interceptor):** Can thiệp giữa chừng vào tiến trình đang chạy để ngắt lệnh hoặc ép agent đổi hướng.
+- **Hướng quản lý & giám sát (Passive Observer / Manager):** Đọc toàn bộ nhật ký hội thoại, quan sát hiện trạng mã nguồn qua git và xuất bản báo cáo tóm tắt tình hình (`flow.tom-tat`).
+
+Switch-Agent-Pro chọn **bản QUẢN LÝ (đọc + báo cáo)** vì hai lý do thực tế:
+
+1. **Ràng buộc kỹ thuật của CLI:** Các agent chạy ở chế độ ngầm / không tương tác (headless, ví dụ `claude -p`) hoàn toàn không có kênh giao tiếp hai chiều để nhận lệnh can thiệp giữa chừng. Việc can thiệp trực tiếp đòi hỏi phải thay đổi toàn bộ kiến trúc chạy tiến trình agent, tăng độ phức tạp và rủi ro gây treo tiến trình.
+2. **Khả thi ngay trên dữ liệu sẵn có:** Bản quản lý làm được ngay dựa trên dữ liệu hội thoại đã được ghi nhận đầy đủ trong `FlowRunDetail` và API `/api/flow/detail`. Hệ thống chỉ cần đọc dữ liệu có sẵn này kết hợp với trạng thái git là có thể xuất ngay bức tranh tổng thể: ai đã làm gì, ai chưa làm, bước nào bị hỏng vì sao, và việc gì đang bị treo.
+
+---
+
+### 2. Vì sao phải TỰ ĐỌC GIT thay vì tin lời agent?
+
+> **Nguyên tắc cốt lõi: "Lệch thì tin git" — Git là thước đo khách quan duy nhất.**
+
+Không thể chỉ dựa vào lời tự báo cáo của agent để đánh giá tiến độ hay chất lượng, vì AI hoàn toàn có thể gặp hiện tượng ảo giác (hallucination), phán đoán sai hoặc báo cáo hoàn thành nhưng thực tế chưa lưu thay đổi.
+
+Dưới đây là các **số đo có thật** được ghi nhận qua các lượt chạy thực tế chứng minh lời agent không thể thay thế việc kiểm tra git:
+
+| Lượt chạy | Lời agent tự báo cáo | Thực tế máy đo (Git) | Hậu quả nếu tin lời agent |
+|---|---|---|---|
+| **Lượt #21** | Agent báo trạng thái hoàn thành (`completed`). | Nhánh `sagent/may-1` **không có commit nào** (0 commit). | Lầm tưởng công việc đã xong trong khi chưa có dòng mã nào được ghi nhận. |
+| **Lượt #29 & #31** | Người soi (reviewer agent) phán đoán "nên trộn" (`mergeable`). | Nhánh đích có **0 commit** trên nền `main`. | Trộn một nhánh rỗng vào nhánh chính, gây nhiễu lịch sử git. |
+| **Lượt #34** | Agent báo hai nhánh "giẫm chân nhau" (xung đột file). | Giao tập hợp các file bị sửa giữa hai nhánh là **tập rỗng**. | Báo động giả, làm dừng luồng oan uổng dù hai nhánh sửa các file hoàn toàn độc lập. |
+
+Vì vậy, bộ tóm tắt bắt buộc phải **tự đọc Git** (dùng `workspace.Xem` đếm `git rev-list --count goc..HEAD`) làm bằng chứng máy đọc khách quan, sau đó đối chiếu với mọi trường lời khai của agent (nhãn trộn, giẫm chân, "có việc"). Khi phát hiện có sự sai lệch, hệ thống sẽ in thẳng thông báo: **"lời agent mâu thuẫn với git"** và luôn lấy số liệu git làm sự thật cuối cùng.
+
+---
+
+### 3. Ba cái bẫy kỹ thuật phải tránh khi đối chiếu
+
+Khi xây dựng bộ dò đối chiếu giữa lời văn bản của agent và số liệu Git thực tế, có 3 cái bẫy kỹ thuật kinh điển cần xử lý triệt để:
+
+1. **Bẫy phủ định làm lừa bộ dò từ khóa:**
+   - *Hiện tượng:* Nếu chỉ tìm từ khóa đơn giản (như `"trộn"` hoặc `"giẫm chân"`), câu *"KHÔNG nên trộn"* hoặc *"KHÔNG có giẫm chân"* sẽ bị nhận diện nhầm thành agent đang bảo *"nên trộn"* hoặc *"có giẫm chân"*.
+   - *Cách xử lý:* Bộ phân tích phải xử lý mệnh đề phủ định (nhận diện các từ "không", "chưa", "đừng", "no", "not" đi kèm) để không đảo ngược ý nghĩa câu nói của agent.
+2. **Bẫy khớp chuỗi không có biên từ (Word Boundary):**
+   - *Hiện tượng:* So khớp chuỗi tên nhánh không có biên từ khiến `sagent/may-1` bị khớp nhầm vào `sagent/may-1-2` hoặc `sagent/may-1-fix`.
+   - *Cách xử lý:* Phải kiểm tra biên từ (khoảng trắng, ký tự phân tách hoặc đầu/cuối chuỗi) quanh định danh nhánh, đảm bảo khớp chính xác tuyệt đối tên nhánh, tránh vu oan hoặc gán nhầm commit của nhánh khác.
+3. **Bẫy chạy `git log -1` trên nhánh rỗng:**
+   - *Hiện tượng:* Khi một nhánh rỗng chưa hề có commit mới (`goc..HEAD` bằng 0), nếu gọi lệnh `git log -1` thì Git sẽ in ra commit mới nhất của nhánh cha (`main`). Điều này khiến hệ thống lầm tưởng nhánh con đã làm việc và có commit.
+   - *Cách xử lý:* Luôn đếm số lượng commit trước qua `git rev-list --count goc..HEAD`. Nếu bằng 0, phải khẳng định thẳng là **"nhánh rỗng / KHÔNG có commit nào"** và tuyệt đối không chạy `git log -1`.
+
