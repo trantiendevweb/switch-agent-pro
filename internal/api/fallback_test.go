@@ -1,3 +1,9 @@
+// Chuyển route dự phòng — ba ca CƠ BẢN.
+//
+// Phần siết của hợp đồng nằm ở lichsu_test.go: chỉ chuyển ĐÚNG MỘT LẦN, không
+// chuyển khi lỗi do người dùng (401/403/prompt rỗng), và KetQua phải mang lỗi
+// gốc + request id của route chính về tận tay người gọi. Sửa AICall thì đọc CẢ
+// HAI file, đừng sửa xong chỉ chạy file này.
 package api
 
 import (
@@ -151,5 +157,13 @@ func TestGoiDichDanhThiKhongTuChuyenRoute(t *testing.T) {
 	}
 	if goiPhu {
 		t.Fatal("gọi đích danh 'chinh' mà tự chuyển sang 'phu' — người dùng chọn nhà cung cấp là có lý do")
+	}
+	// Và sổ chỉ được có ĐÚNG một dòng: một lời gọi thật thì một dòng.
+	ds, err := a.AIHistory(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds) != 1 || ds[0].Route != "chinh" || ds[0].OK {
+		t.Errorf("sổ lời gọi API không khớp với chuyện đã xảy ra: %+v", ds)
 	}
 }

@@ -22,6 +22,7 @@ var duongPhaiCon = []string{
 	"/api/stop",        // dừng phiên
 	"/api/quet",        // quét tiến trình mồ côi
 	"/api/ai",          // hỏi thẳng AI API
+	"/api/ai/lich-su",  // sổ lời gọi API: tiêu bao nhiêu, ở đâu, có chạy được không
 	"/api/db",          // xem sổ trạng thái
 	"/api/flow/run",    // chạy workflow
 	"/api/flow/kho",    // chạy khan

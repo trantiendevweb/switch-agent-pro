@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/acl"
@@ -15,6 +16,7 @@ import (
 //
 //	sagent api key <id>            đặt API key (đọc từ stdin, KHÔNG hiện trên màn hình)
 //	sagent api ds                  liệt kê route đã cấu hình
+//	sagent api --lich-su [n]       sổ lời gọi: tiêu bao nhiêu, ở đâu, có chạy được không
 //	sagent api <route> "prompt"    gọi
 func cmdAPI(args []string) {
 	if len(args) == 0 {
@@ -26,9 +28,72 @@ func cmdAPI(args []string) {
 		apiDatKey(rest(args))
 	case "ds", "list":
 		apiDs()
+	case "--lich-su", "lich-su", "--history":
+		apiLichSu(rest(args))
 	default:
 		apiGoi(args[0], rest(args))
 	}
+}
+
+// apiLichSu in sổ lời gọi API — action "api.history".
+//
+// KHÔNG in prompt và câu trả lời: sổ không lưu chúng, cố ý. Xem ghi chú
+// migration v7 trong internal/store.
+func apiLichSu(args []string) {
+	n := 20
+	if len(args) > 0 {
+		if v, err := strconv.Atoi(args[0]); err == nil && v > 0 {
+			n = v
+		}
+	}
+	a, done := open()
+	defer done()
+	ds, err := a.AIHistory(n)
+	done()
+	if err != nil {
+		fail(err)
+	}
+	fmt.Println()
+	if len(ds) == 0 {
+		fmt.Println("  Sổ lời gọi API còn trống. Gọi thử: sagent api <route> \"câu hỏi\"")
+		fmt.Println()
+		return
+	}
+	fmt.Println("  Lịch sử lời gọi API (không lưu câu hỏi và câu trả lời)")
+	fmt.Println()
+	var tongVao, tongRa, hong int
+	for _, g := range ds {
+		dau := "✓"
+		if !g.OK {
+			dau, hong = "✗", hong+1
+		}
+		fmt.Printf("  %s %s  %-12s %-20s vào %5d, ra %5d  %.1fs\n",
+			dau, g.Luc.Format("02/01 15:04"), g.Route, g.Model,
+			g.TokensIn, g.TokensOut, float64(g.Mili)/1000)
+		if !g.OK {
+			// Nguyên văn lỗi, kèm request id của nhà cung cấp — đó là thứ duy
+			// nhất dùng được khi phải đi hỏi họ.
+			fmt.Printf("      %s\n", motDong(g.LyDo))
+		}
+		tongVao += g.TokensIn
+		tongRa += g.TokensOut
+	}
+	fmt.Println()
+	fmt.Printf("  %d lời gọi, %d hỏng · vào %d, ra %d token\n", len(ds), hong, tongVao, tongRa)
+	// Chưa có bảng giá theo model nên KHÔNG in một con số tiền: bịa ra thì nó
+	// trông như đã đo. Token là thứ đo được, in token.
+	fmt.Println()
+}
+
+// motDong ép lý do hỏng về một dòng để bảng không vỡ. Thân lỗi nguyên văn của
+// nhà cung cấp có thể dài nhiều dòng; đây chỉ là chỗ liếc, muốn đọc đủ thì xem
+// mặt web hoặc sổ.
+func motDong(s string) string {
+	s = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, "\r", " "), "\n", " "))
+	if len(s) > 150 {
+		s = s[:150] + "…"
+	}
+	return s
 }
 
 func apiDatKey(args []string) {
@@ -119,6 +184,13 @@ func apiGoi(ten string, args []string) {
 	fmt.Println()
 	// Đường API tiêu TIỀN theo token, khác đường CLI tiêu hạn mức. Không in ra
 	// thì người dùng không biết mình vừa tiêu gì.
-	fmt.Printf("  %s · vào %d, ra %d, tổng %d token · %.1fs\n",
-		kq.Model, kq.Usage.Vao, kq.Usage.Ra, kq.Usage.Tong, kq.Mat.Seconds())
+	fmt.Printf("  %s · %s · vào %d, ra %d, tổng %d token · %.1fs\n",
+		kq.Route, kq.Model, kq.Usage.Vao, kq.Usage.Ra, kq.Usage.Tong, kq.Mat.Seconds())
+	// ĐÃ CHUYỂN ROUTE thì nói ra ngay dưới câu trả lời, kèm lỗi NGUYÊN VĂN của
+	// route chính. CLI không nghe bus event, nên nếu chỉ bus.Warnf thì người
+	// đứng ở terminal không bao giờ biết câu này đến từ nhà cung cấp khác.
+	if kq.DaChuyenRoute() {
+		fmt.Printf("  ! route %q hỏng, câu trên do %q trả lời:\n      %s\n",
+			kq.RouteChinh, kq.Route, motDong(kq.LoiChinh))
+	}
 }

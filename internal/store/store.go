@@ -167,6 +167,39 @@ var migrations = []string{
 	// Lưu prompt ĐÃ THAY BIẾN (không phải mẫu trong flows.toml) vì đó mới là thứ
 	// agent thật sự nhận.
 	`ALTER TABLE flow_steps ADD COLUMN prompt TEXT;`,
+
+	// v7 — LỊCH SỬ lời gọi API (đường thứ hai).
+	//
+	// Vì sao cần: đường này tiêu TIỀN theo token, không phải hạn mức thuê bao.
+	// Trước bảng này, một lời gọi in usage ra màn hình rồi biến mất — hết tháng
+	// nhìn hoá đơn thì không có gì đối chiếu, và "route chính hỏng bao nhiêu lần
+	// tuần này" là câu không ai trả lời được.
+	//
+	// CỐ Ý KHÔNG CÓ CỘT prompt VÀ CỘT CÂU TRẢ LỜI.
+	//
+	// Khác với flow_steps (lưu cả hai, xem v4 và v6): ở đó agent chạy trên máy
+	// người dùng với dữ liệu của chính họ, và không đọc lại được prompt thì không
+	// gỡ được lỗi thay-biến. Ở đây thì khác — người ta dán cả đoạn mã, khoá, dữ
+	// liệu khách vào prompt gửi cho nhà cung cấp bên ngoài. Ghi thêm một bản sao
+	// vĩnh viễn xuống đĩa là tự tạo một kho bí mật thứ hai mà không ai xin, ngay
+	// trong một dự án mà luật số 1 là "file cấu hình không bao giờ chứa secret".
+	// Muốn xem lại câu hỏi thì nhìn màn hình lúc gõ; sổ này chỉ trả lời "tốn bao
+	// nhiêu, ở đâu, có chạy được không".
+	//
+	// Có test canh điều này: xem TestLichSuAPIKhongLuuPromptVaCauTraLoi.
+	`CREATE TABLE IF NOT EXISTS api_calls (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		luc        TEXT    NOT NULL,
+		route      TEXT    NOT NULL,
+		model      TEXT    NOT NULL DEFAULT '',
+		tokens_in  INTEGER NOT NULL DEFAULT 0,
+		tokens_out INTEGER NOT NULL DEFAULT 0,
+		cost_usd   REAL    NOT NULL DEFAULT 0,
+		ok         INTEGER NOT NULL DEFAULT 0,
+		ly_do      TEXT    NOT NULL DEFAULT '',
+		mili       INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_calls_luc ON api_calls(luc);`,
 }
 
 // MaxStepOutput là trần kích thước kết quả lưu cho mỗi bước.
@@ -516,4 +549,94 @@ func (d *DB) Running() ([]Session, error) {
 func (d *DB) SetState(id int64, state string) error {
 	_, err := d.db.Exec(`UPDATE sessions SET state=? WHERE id=?`, state, id)
 	return err
+}
+
+// ---------------------------- lịch sử lời gọi API ----------------------------
+
+// GoiAPI là MỘT dòng trong sổ lời gọi API (bảng api_calls, schema v7).
+//
+// Sổ này ghi "tốn bao nhiêu / ở đâu / có chạy được không". Nó KHÔNG ghi câu hỏi
+// và câu trả lời — lý do ở ghi chú migration v7, đừng thêm vào.
+type GoiAPI struct {
+	ID    int64
+	Luc   time.Time
+	Route string
+	Model string // model nhà cung cấp BÁO LẠI; rỗng khi lời gọi hỏng
+	// TokensIn/TokensOut lấy từ `usage` của phản hồi, không phải đếm tay.
+	TokensIn  int
+	TokensOut int
+	// CostUSD là chi phí quy ra tiền. Endpoint chat/completions KHÔNG trả giá,
+	// nên hiện luôn là 0: chỗ này chờ bảng giá theo model, và bịa một con số
+	// nhân bừa đơn giá thì tệ hơn để trống — nó trông như đã đo.
+	CostUSD float64
+	OK      bool
+	// LyDo là lỗi NGUYÊN VĂN khi hỏng (kèm request id của nhà cung cấp). Rỗng
+	// khi OK.
+	LyDo string
+	Mili int // thời gian lời gọi, mili giây
+}
+
+// MaxLyDoAPI là trần độ dài lý do hỏng lưu xuống sổ.
+//
+// Có trần vì thân lỗi là nguyên văn của nhà cung cấp và họ có thể trả về cả
+// trang HTML khi hạ tầng của họ sập. Cắt phần ĐUÔI, giữ phần ĐẦU — ngược với
+// output của bước workflow, vì ở lỗi HTTP thì mã và request id nằm ngay đầu.
+const MaxLyDoAPI = 4 * 1024
+
+// AddAPICall ghi một lời gọi vào sổ. Ghi cả lần THÀNH lẫn lần BẠI: "route chính
+// hỏng bao nhiêu lần tuần này" chỉ trả lời được khi lần bại cũng có dòng.
+func (d *DB) AddAPICall(g GoiAPI) (int64, error) {
+	luc := g.Luc
+	if luc.IsZero() {
+		luc = time.Now()
+	}
+	ly := g.LyDo
+	if len(ly) > MaxLyDoAPI {
+		ly = ly[:MaxLyDoAPI] + "…(cắt)"
+	}
+	res, err := d.db.Exec(
+		`INSERT INTO api_calls(luc,route,model,tokens_in,tokens_out,cost_usd,ok,ly_do,mili)
+		 VALUES(?,?,?,?,?,?,?,?,?)`,
+		luc.Format(time.RFC3339), g.Route, g.Model, g.TokensIn, g.TokensOut,
+		g.CostUSD, boolInt(g.OK), ly, g.Mili)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// APICalls liệt kê lịch sử, mới nhất trước.
+func (d *DB) APICalls(limit int) ([]GoiAPI, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := d.db.Query(
+		`SELECT id,luc,route,COALESCE(model,''),COALESCE(tokens_in,0),COALESCE(tokens_out,0),
+		        COALESCE(cost_usd,0),ok,COALESCE(ly_do,''),COALESCE(mili,0)
+		   FROM api_calls ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []GoiAPI
+	for rows.Next() {
+		var g GoiAPI
+		var luc string
+		var ok int
+		if err := rows.Scan(&g.ID, &luc, &g.Route, &g.Model, &g.TokensIn, &g.TokensOut,
+			&g.CostUSD, &ok, &g.LyDo, &g.Mili); err != nil {
+			return nil, err
+		}
+		g.Luc, _ = time.Parse(time.RFC3339, luc)
+		g.OK = ok != 0
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

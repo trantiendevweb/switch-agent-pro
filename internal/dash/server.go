@@ -63,6 +63,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/quet", s.guard(s.handleQuet))
 	m.HandleFunc("/api/db", s.guard(s.handleDB))
 	m.HandleFunc("/api/ai", s.guard(s.handleAI))
+	m.HandleFunc("/api/ai/lich-su", s.guard(s.handleAILichSu))
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
@@ -718,6 +719,62 @@ func (s *Server) handleAI(w http.ResponseWriter, r *http.Request) {
 			"vao": kq.Usage.Vao, "ra": kq.Usage.Ra, "tong": kq.Usage.Tong,
 		},
 		"giay": kq.Mat.Seconds(),
+		// Route THẬT SỰ trả lời, và — nếu đã phải chuyển — route chính hỏng vì
+		// gì, NGUYÊN VĂN kèm request id. Không trả về thì người bấm nút không
+		// biết câu này đến từ nhà cung cấp nào và tiêu tiền của ai.
+		"route":       kq.Route,
+		"da_thu":      kq.DaThu,
+		"route_chinh": kq.RouteChinh,
+		"loi_chinh":   kq.LoiChinh,
+	})
+}
+
+// handleAILichSu — action "api.history": sổ lời gọi API.
+//
+// CHỈ ĐỌC, và sổ không có prompt lẫn câu trả lời (xem migration v7). Nhờ vậy
+// đây là endpoint duy nhất của mặt web đụng tới đường API mà không thể lỡ tay
+// phơi nội dung hội thoại ra trình duyệt.
+func (s *Server) handleAILichSu(w http.ResponseWriter, r *http.Request) {
+	n := 20
+	if v, err := strconv.Atoi(r.URL.Query().Get("n")); err == nil && v > 0 && v <= 200 {
+		n = v
+	}
+	ds, err := s.api.AIHistory(n)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	type dto struct {
+		Luc       string  `json:"luc"`
+		Route     string  `json:"route"`
+		Model     string  `json:"model"`
+		TokensIn  int     `json:"tokens_vao"`
+		TokensOut int     `json:"tokens_ra"`
+		CostUSD   float64 `json:"chi_phi_usd"`
+		OK        bool    `json:"ok"`
+		LyDo      string  `json:"ly_do,omitempty"`
+		Giay      float64 `json:"giay"`
+	}
+	out := make([]dto, 0, len(ds))
+	var tongVao, tongRa, hong int
+	for _, g := range ds {
+		if !g.OK {
+			hong++
+		}
+		tongVao += g.TokensIn
+		tongRa += g.TokensOut
+		out = append(out, dto{
+			Luc: g.Luc.Format(time.RFC3339), Route: g.Route, Model: g.Model,
+			TokensIn: g.TokensIn, TokensOut: g.TokensOut, CostUSD: g.CostUSD,
+			OK: g.OK, LyDo: g.LyDo, Giay: float64(g.Mili) / 1000,
+		})
+	}
+	writeJSON(w, map[string]any{
+		"muc":       out,
+		"tong_vao":  tongVao,
+		"tong_ra":   tongRa,
+		"so_hong":   hong,
+		"khong_luu": "sổ này không lưu câu hỏi và câu trả lời",
 	})
 }
 

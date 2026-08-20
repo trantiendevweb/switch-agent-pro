@@ -67,6 +67,9 @@ func init() {
 		"dash":    {"dash.serve", "mở dashboard 2D ở trình duyệt", cmdDash},
 		"db":      {"db.admin", "xem/sao lưu/khôi phục state.db", cmdDB},
 		"api":     {"api.call", "gọi thẳng AI API (đường thứ hai)", cmdAPI},
+		// `sagent api --lich-su` — không có tên lệnh cấp một riêng, vì nó là một
+		// cờ của `api`. Vẫn phải khai ở đây để test ngang quyền thấy nó.
+		"__apils": {"api.history", "lịch sử lời gọi API (tiêu bao nhiêu, ở đâu)", nil},
 		"version": {"config.version", "phiên bản của binary này", func(a []string) { cmdVersion() }},
 		"tele":    {"tele.notify", "báo Telegram khi lượt chạy có sự cố", cmdTele},
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},

@@ -241,7 +241,26 @@
     border:1px solid rgba(246,178,61,.35);border-radius:8px;padding:8px 10px;line-height:1.45}
   /* Ba ô này in ra toàn dữ liệu máy: đường dẫn state.db, danh sách PID mồ côi,
      và số token/giây của lần gọi API. Sans-serif thì cột số không thẳng hàng. */
-  #dbinfo,#quetout,#ai-out{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+  #dbinfo,#quetout,#ai-out,#ai-ls{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+
+  /* ---- Sổ lời gọi API: bảng liếc, tô theo THÀNH/BẠI ---- */
+  .ls-dau{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:12px 14px 6px;font-size:12px;color:var(--lo);letter-spacing:.04em;text-transform:uppercase}
+  #ai-ls{max-height:210px;overflow:auto;padding:0 14px 4px}
+  #ai-ls .d{display:flex;gap:10px;align-items:baseline;padding:4px 0;
+    border-bottom:1px solid var(--line);color:var(--mid)}
+  #ai-ls .d:last-child{border-bottom:0}
+  #ai-ls .luc{color:var(--lo);flex:none}
+  #ai-ls .rt{color:var(--hi);flex:none;min-width:82px}
+  #ai-ls .tk{margin-left:auto;flex:none;color:var(--mid)}
+  /* Thành/bại là CHẤM CSS, không phải ký tự: ký tự đổi hình theo phông của máy
+     và không đổi màu theo trạng thái — design system của dự án cấm. */
+  #ai-ls .cham{width:7px;height:7px;border-radius:50%;flex:none;background:currentColor;align-self:center}
+  #ai-ls .ok{color:var(--run)}
+  #ai-ls .ko{color:var(--error)}
+  /* Lý do hỏng là NGUYÊN VĂN của nhà cung cấp, trong đó có request id — thứ duy
+     nhất dùng được khi phải đi hỏi họ. Cho xuống dòng đủ, đừng cắt bằng ellipsis. */
+  #ai-ls .ly{color:var(--error);font-size:11.5px;padding:0 0 6px 0;white-space:pre-wrap;word-break:break-word}
 
   /* ---- Nhật ký: full-width, mono, tô theo LOẠI sự kiện ---- */
   #log{padding:10px 13px;max-height:300px;overflow:auto;font-family:var(--font-mono);font-size:12px}
@@ -458,6 +477,15 @@
           <button class="go" type="submit">Gửi</button>
         </form>
         <div id="ai-out" class="empty">Chưa hỏi gì.</div>
+        <div class="ls-dau">
+          <span>Sổ lời gọi</span>
+          <button type="button" class="btn" id="ai-ls-nap">Làm mới</button>
+        </div>
+        <div id="ai-ls" class="empty">đang đọc…</div>
+        <div class="phu" style="padding:0 14px 14px;font-size:11.5px;color:var(--lo);line-height:1.45">
+          Sổ ghi route, model, token và lý do hỏng. <b>Không lưu câu hỏi và câu trả lời</b> —
+          prompt gửi ra ngoài thường có mã và dữ liệu riêng, một bản sao vĩnh viễn trên đĩa là kho bí mật không ai xin.
+        </div>
       </div>
     </section>
 
@@ -658,6 +686,54 @@ async function napRoute(){
   }catch(e){ /* chưa cấu hình thì im, không bắn lỗi đỏ vào mặt người dùng */ }
 }
 
+// Sổ lời gọi API — action "api.history".
+//
+// Số ở đây là số THẬT do server đọc từ bảng api_calls, không phải cộng dồn trong
+// tab này: mở lại trình duyệt vẫn thấy, và lần gọi từ terminal cũng nằm trong đó.
+async function napAILichSu(){
+  const box = $('ai-ls');
+  try{
+    const d = await api('/api/ai/lich-su?n=30');
+    const ds = d.muc || [];
+    if(!ds.length){
+      box.className = 'empty';
+      box.textContent = 'Chưa gọi lần nào.';
+      return;
+    }
+    box.className = '';
+    box.innerHTML = '';
+    for(const g of ds){
+      const dong = document.createElement('div');
+      dong.className = 'd';
+      dong.innerHTML =
+        '<i class="cham ' + (g.ok ? 'ok' : 'ko') + '" role="img" aria-label="' +
+          (g.ok ? 'chạy được' : 'hỏng') + '"></i>' +
+        '<span class="luc">' + esc(gioNgan(g.luc)) + '</span>' +
+        '<span class="rt">' + esc(g.route) + '</span>' +
+        '<span>' + esc(g.model || '—') + '</span>' +
+        '<span class="tk">vào ' + (g.tokens_vao|0) + ' · ra ' + (g.tokens_ra|0) +
+          ' · ' + (g.giay||0).toFixed(1) + 's</span>';
+      box.appendChild(dong);
+      if(!g.ok && g.ly_do){
+        const ly = document.createElement('div');
+        ly.className = 'ly';
+        ly.textContent = g.ly_do;   // textContent: lý do là NGUYÊN VĂN của nhà cung cấp, không diễn giải thành HTML
+        box.appendChild(ly);
+      }
+    }
+    const tong = document.createElement('div');
+    tong.className = 'd';
+    tong.innerHTML = '<span class="rt">tổng</span><span class="tk">' + ds.length +
+      ' lời gọi, ' + (d.so_hong|0) + ' hỏng · vào ' + (d.tong_vao|0) +
+      ', ra ' + (d.tong_ra|0) + ' token</span>';
+    box.appendChild(tong);
+  }catch(e){ box.className='empty'; box.textContent = 'không đọc được: ' + e.message; }
+}
+function gioNgan(iso){ const d = new Date(iso); return isNaN(d) ? String(iso) :
+  String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + ' ' +
+  String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+$('ai-ls-nap').onclick = napAILichSu;
+
 // Báo tin Telegram: mặt web CHỈ xem trạng thái và gửi thử.
 //
 // Đặt token là việc của terminal — dash có chế độ phơi ra mạng, mà một secret gõ
@@ -736,10 +812,18 @@ $('aiform').onsubmit = async ev => {
     const d = await api('/api/ai', {method:'POST', body: JSON.stringify({
       route: $('ai-route').value, prompt: $('ai-prompt').value })});
     out.style.whiteSpace = 'pre-wrap';
-    out.textContent = d.noi_dung + '\n\n— ' + d.model + ' · vào ' + d.usage.vao +
+    let chan = '\n\n— ' + (d.route ? d.route + ' · ' : '') + d.model + ' · vào ' + d.usage.vao +
       ', ra ' + d.usage.ra + ', tổng ' + d.usage.tong + ' token · ' + d.giay.toFixed(1) + 's';
+    // ĐÃ CHUYỂN ROUTE thì phải nói ra, kèm lỗi NGUYÊN VĂN của route chính. Đổi
+    // nhà cung cấp trong im lặng nghĩa là người dùng không biết câu trả lời này
+    // đến từ đâu và vừa tiêu tiền của ai.
+    if(d.route_chinh){
+      chan += '\nĐã chuyển route: "' + d.route_chinh + '" hỏng, câu trên do "' + d.route + '" trả lời.\n' + d.loi_chinh;
+    }
+    out.textContent = d.noi_dung + chan;
     aiDo.vao += d.usage.vao||0; aiDo.ra += d.usage.ra||0;
     veTongQuan();
+    napAILichSu();
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
 
@@ -1116,6 +1200,7 @@ connect();
 // cả máy, phải do người dùng bấm.
 napFlow();
 napRoute();
+napAILichSu();
 napDB();
 napTele();
 setInterval(refresh, 5000); // đồng hồ "đang chạy bao lâu" + phòng khi lỡ event
