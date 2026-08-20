@@ -314,6 +314,18 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 		}
 		kqCuoi = kq
 
+		// HỢP ĐỒNG ĐẦU RA. Agent chạy xong, thoát mã 0, không lỗi nào — nhưng nếu
+		// nó không GIAO RA thứ được giao thì bước này chưa làm xong.
+		//
+		// Kiểm ở ĐÂY, ngay trước khi ghi StepDone, chứ không phải ở chỗ đọc báo
+		// cáo: ghi done rồi mới nói "à nhưng mà" thì mọi thứ đọc sổ sau đó đều đã
+		// tin nhầm — kể cả bước sau đang chờ nó.
+		if err == nil {
+			if thieu := ThieuPhaiCo(s, kq.Output); thieu != "" {
+				err = fmt.Errorf("%s", thieu)
+			}
+		}
+
 		if err == nil {
 			_ = r.DB.SetStep(runID, s.ID, store.StepDone, "", attempt)
 			if kq.Output != "" {

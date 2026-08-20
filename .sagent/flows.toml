@@ -231,6 +231,11 @@ Yêu cầu bắt buộc:
       worktree = true
       timeout_sec = 1800
       on_failure = "continue"
+      # HOP DONG DAU RA: khong co ket luan thi buoc nay CHUA LAM, khong phai
+      # "da soi va khong co y kien" — hai cau do khac han nhau.
+      # Tu ket luan lay tu CHINH prompt ben duoi, khong phai mot bo chung
+      # nam cung trong ma. Xem internal/flow/phaico.go.
+      phai_co = ["NÊN TRỘN", "CẦN SỬA THÊM", "VỨT"]
       prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm. Việc
 của bạn là TÌM LỖI, không phải khen. CHỈ ĐỌC — tuyệt đối không sửa, không commit.
 
@@ -313,6 +318,10 @@ COMMIT: <mã commit ngắn, lấy bằng git rev-parse --short HEAD>"""
       needs = ["tho"]
       worktree = true
       timeout_sec = 1200
+      # Buoc nay khong phan xet tron hay khong, no phai giao ra HAI DONG co ten.
+      # Hop dong vi the la ten dong, khong phai tu ket luan — moi buoc mot hop
+      # dong rieng, lay tu chinh prompt cua no.
+      phai_co = ["THAY DOI:"]
       prompt = """CHỈ ĐỌC, không sửa gì. Chạy đúng hai lệnh này:
 
     git log --oneline main..sagent/may-1
@@ -615,6 +624,11 @@ Output máy chấm:
       needs = ["kiem-cuoi", "code-doc"]
       timeout_sec = 900
       on_failure = "continue"
+      # HOP DONG DAU RA: khong co ket luan thi buoc nay CHUA LAM, khong phai
+      # "da soi va khong co y kien" — hai cau do khac han nhau.
+      # Tu ket luan lay tu CHINH prompt ben duoi, khong phai mot bo chung
+      # nam cung trong ma. Xem internal/flow/phaico.go.
+      phai_co = ["NEN TRON", "CAN SUA THEM", "VUT"]
       prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm.
 CHỈ ĐỌC — không sửa, không commit, không tạo file.
 
@@ -803,6 +817,11 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
       doc_duoc = ["kiem-2"]
       timeout_sec = 900
       on_failure = "continue"
+      # HOP DONG DAU RA: khong co ket luan thi buoc nay CHUA LAM, khong phai
+      # "da soi va khong co y kien" — hai cau do khac han nhau.
+      # Tu ket luan lay tu CHINH prompt ben duoi, khong phai mot bo chung
+      # nam cung trong ma. Xem internal/flow/phaico.go.
+      phai_co = ["NEN TRON", "CAN SUA THEM", "VUT"]
       prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm.
 CHỈ ĐỌC — không sửa, không commit, không tạo file.
 

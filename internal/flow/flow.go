@@ -152,6 +152,29 @@ type Step struct {
 	// nói rõ là đã bị chặn, chứ không phải chuỗi rỗng. Xem doc_duoc.go.
 	DocDuoc []string `toml:"doc_duoc,omitempty" json:"docDuoc,omitempty"`
 
+	// PhaiCo là HỢP ĐỒNG ĐẦU RA: kết quả bước phải chứa ít nhất một trong những
+	// chuỗi này thì mới tính là xong.
+	//
+	//	phai_co = ["NÊN TRỘN", "KHÔNG NÊN TRỘN"]
+	//
+	// VÌ SAO CÓ: lượt chạy #46, bước `soi` (grok) nhận HTTP 503 từ nhà cung cấp
+	// và trả về đúng một câu — "Sorry, I encountered an error: Grok API error:
+	// 503 Service temporarily unavailable". CLI thoát mã 0, bản ghi không có
+	// trường lỗi nào, nên bước được ghi là DONE. Bản tóm tắt in "không bước nào
+	// hỏng", lượt chạy đi tiếp, và việc trộn nhánh diễn ra mà KHÔNG AI SOI.
+	//
+	// Đó là kiểu hỏng tệ nhất của một cổng kiểm: nó không sập, nó chỉ lặng lẽ
+	// gật đầu. "Đã soi và không thấy gì" với "chưa từng được soi" là hai câu
+	// khác hẳn nhau, mà nhìn vào bảng thì giống hệt.
+	//
+	// ĐÂY KHÔNG PHẢI DÒ CHUỖI LỖI. Dò chuỗi lỗi là đoán xem nhà cung cấp viết
+	// câu xin lỗi thế nào — họ đổi câu chữ là hỏng. Còn đây là kiểm bước có
+	// GIAO RA thứ nó được giao hay không, và danh sách do người viết flow khai
+	// trong flows.toml chứ không nằm cứng trong mã.
+	//
+	// Không khai (nil) = không kiểm gì, y như trước.
+	PhaiCo []string `toml:"phai_co,omitempty" json:"phaiCo,omitempty"`
+
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
 	Retry      int    `toml:"retry,omitempty" json:"retry,omitempty"`
