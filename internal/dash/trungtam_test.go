@@ -367,3 +367,34 @@ func TestVanPhongPhucVuVaDoiDangNhap(t *testing.T) {
 		t.Error("trang phuc vu ra khong phai vanphong.html")
 	}
 }
+
+// Nhan luot chay phai noi ro DANG XEM CAI GI. refresh() lay
+// `runs.find(r => r.state==='running') || runs[0]`, nen khong co luot nao chay
+// thi no roi ve luot GAN NHAT va ve y het mot luot dang song.
+//
+// Ngay 21/08 chu du an mo mat 3D, thay day buoc do va hoi "cai nay co hoat dong
+// that khong". Thu ho xem la luot #47 chay 19:42 NGAY HOM TRUOC, da xong tu lau,
+// va ca ba loi tren do deu da duoc va. Cham xanh "da ket noi" khong cuu duoc
+// hieu lam nay: no noi ve luong SSE con song, khong noi gi ve luot dang hien.
+func TestVanPhongNhanLuotNoiRoMocThoiGian(t *testing.T) {
+	s := maTrungTam(t)
+	for _, can := range []struct{ chuoi, vi string }{
+		{`id="flowmoc"`, "cho dat nhan luot tren thanh tren"},
+		{"function veNhanLuot(", "ham ve nhan luot"},
+		{"function gioMoc(", "ham dinh dang moc thoi gian"},
+		{"flowStarted = run.started", "phai LAY moc tu DTO, khong tu doan"},
+		{"giay * 1000", "DTO tra .Unix() = GIAY, phai nhan 1000 moi ra mili"},
+	} {
+		if !strings.Contains(s, can.chuoi) {
+			t.Errorf("trung-tam.html thieu %q (%s)", can.chuoi, can.vi)
+		}
+	}
+	// Luot da xong phai bi HA MAU cho chim di, chu khong sang nhu luot dang chay.
+	if !strings.Contains(s, "#flowmoc.cu{") {
+		t.Error("thieu kieu #flowmoc.cu — luot da xong phai chim hon luot dang chay")
+	}
+	// Va no phai PHAN BIET hai truong hop, khong phai luc nao cung in mot chu.
+	if !strings.Contains(s, "flowTrangThai === 'running'") {
+		t.Error("nhan luot khong phan biet dang chay voi da xong")
+	}
+}

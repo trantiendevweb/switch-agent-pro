@@ -27,6 +27,14 @@
   #conn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mid)}
   #conn .d{width:9px;height:9px;border-radius:50%;background:var(--error)}
   #conn.on .d{background:var(--run)}
+  /* Nhãn lượt chạy. KHÔNG thêm màu mới: lượt đang sống dùng --mid như chrome
+     còn lại, lượt đã xong bị HẠ xuống --lo cho chìm hẳn đi. Màu trong dự án này
+     dành cho status của agent, không dành cho khung. */
+  #flowmoc{display:none;align-items:center;gap:6px;font-size:11px;
+    font-family:var(--font-mono);color:var(--mid);white-space:nowrap}
+  #flowmoc.hien{display:flex}
+  #flowmoc.cu{color:var(--lo)}
+  #flowmoc .n{border:1px solid var(--line-2);border-radius:999px;padding:1px 8px}
   /* Thanh điều hướng là KHUNG: đơn sắc. Tab đang mở nổi bằng độ sáng, không màu. */
   .nav{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
   .nav a{text-decoration:none;color:var(--hi);border:1px solid var(--line-2);border-radius:8px;
@@ -204,6 +212,7 @@
     Switch-Agent-Pro <small>Trung tâm · dữ liệu thật</small>
   </div>
   <div id="flowname" style="font-size:12px;color:var(--link);font-weight:600;font-family:var(--font-mono)"></div>
+  <div id="flowmoc"></div>
   <div id="conn"><span class="d"></span><span id="conntext">đang kết nối…</span></div>
   <div class="nav">
     <a href="./">2D</a>
@@ -1116,14 +1125,44 @@ function xoaNhan(){
   bongThoai.forEach(b => b.el.remove()); bongThoai.length = 0;
 }
 
-// Dòng ĐẦU của output THẬT, cắt cho vừa bóng thoại. Không có output thì không
-// có bóng — thà trống còn hơn bịa một câu cho cảnh sinh động.
+// Lời NGƯỜI ĐỌC ĐƯỢC đầu tiên trong output THẬT, cắt cho vừa bóng thoại. Không
+// có thì không có bóng — thà trống còn hơn bịa một câu cho cảnh sinh động.
 function loiThoai(st){
   if(!st || !st.output) return '';
   const dong = String(st.output).split('\n').map(d => d.trim()).filter(Boolean);
-  if(!dong.length) return '';
-  const d = dong[0];
-  return d.length > 110 ? d.slice(0, 110) + '…' : d;
+  for(const d of dong){
+    const chu = chuNguoiDoc(d);
+    if(chu) return chu.length > 110 ? chu.slice(0, 110) + '…' : chu;
+  }
+  return '';
+}
+
+// Tách LỜI AGENT ra khỏi TIẾNG MÁY. Trả '' nếu dòng đó chỉ là sự kiện của máy.
+//
+// VÌ SAO CÓ (21/08): fleet chạy Claude kèm `--output-format stream-json`, nên
+// dòng ĐẦU của output luôn là {"type":"system","subtype":"init","cwd":"C:\\Users\\…"}.
+// Hàm cũ lấy đúng dòng đầu, tức dán nguyên cục JSON đó lên đầu nhân vật giữa màn
+// hình 3D — đúng thứ đang hiện ở bước `gop` của lượt #47. Người xem đọc được
+// "cwd", "subtype" và kết luận hệ thống đang hỏng, trong khi bước đó hỏng vì một
+// lý do hoàn toàn khác (OAuth hết hạn) mà cục JSON kia không hề nói ra.
+//
+// Không đoán: dòng nào không rút được chữ người thì BỎ QUA để xét dòng sau, chứ
+// không bịa một câu thay thế.
+function chuNguoiDoc(d){
+  if(d[0] !== '{' && d[0] !== '[') return d;             // không phải JSON → lời thật
+  let o; try{ o = JSON.parse(d); }catch(_){ return ''; }  // JSON vỡ → bỏ, đừng đoán
+  if(!o || typeof o !== 'object') return '';
+  const gon = s => String(s).replace(/\s+/g, ' ').trim();
+  // Câu chốt của cả lượt chạy.
+  if(typeof o.result === 'string' && gon(o.result)) return gon(o.result);
+  // Lời agent nói giữa chừng.
+  const nd = o.message && o.message.content;
+  if(Array.isArray(nd)){
+    const t = gon(nd.filter(c => c && c.type === 'text' && c.text)
+                    .map(c => c.text).join(' '));
+    if(t) return t;
+  }
+  return '';   // init / tool_use / usage… — tiếng máy, không có gì để nói
 }
 
 // ---- ĐƯỜNG GIAO VIỆC: nối người với người theo đúng cạnh `needs` ----
@@ -1379,7 +1418,54 @@ function capNhat(){
   // Bảng chi tiết phải theo dữ liệu mới. Để nó đứng im trong khi bước đã đổi
   // trạng thái là nói dối ngay giữa màn hình. Nhân vật biến mất thì đóng bảng.
   if(chonKhoa && !nhanVat[chonKhoa]) dongChiTiet(); else veChiTiet();
-  $('flowname').textContent = flowName ? ('flow: ' + flowName) : 'chưa có lượt chạy nào';
+  veNhanLuot();
+}
+
+// Nhãn lượt chạy — TRẢ LỜI câu "cái tôi đang xem có phải việc đang diễn ra không".
+//
+// VÌ SAO CÓ (21/08): `refresh()` lấy `runs.find(r => r.state==='running') || runs[0]`.
+// Không có lượt nào chạy thì nó lặng lẽ rơi về lượt GẦN NHẤT và vẽ y hệt một lượt
+// đang sống — cùng nhân vật, cùng bong bóng, cùng chấm xanh. Người dùng mở màn
+// hình thấy đầy bước đỏ rồi hỏi "cái này có hoạt động thật không"; thứ họ xem là
+// lượt #47 chạy 19:42 NGÀY HÔM TRƯỚC, xong từ lâu, và các lỗi trên đó đều đã vá.
+//
+// Chấm xanh "đã kết nối" KHÔNG cứu được hiểu lầm này: nó nói về luồng SSE còn
+// sống, không nói gì về lượt chạy đang hiển thị. Hai thứ đó khác nhau, mà nhìn
+// vào thì giống hệt — nên phải có một dòng nói thẳng mốc thời gian.
+// Dọn con bằng removeChild chứ KHÔNG bằng innerHTML: mặt này có luật cấm
+// innerHTML (trungtam_test.go) vì chữ đổ vào đây là output của agent — dữ liệu
+// người khác viết, một dấu `<` là đủ để nó chạy thành thẻ HTML.
+function doTrong(el){ while(el.firstChild) el.removeChild(el.firstChild); }
+
+function veNhanLuot(){
+  const ten = $('flowname'), moc = $('flowmoc');
+  if(!flowName){
+    ten.textContent = 'chưa có lượt chạy nào';
+    moc.className = ''; doTrong(moc);
+    return;
+  }
+  ten.textContent = 'flow: ' + flowName;
+  const song = flowTrangThai === 'running';
+  moc.className = 'hien' + (song ? '' : ' cu');
+  doTrong(moc);
+  if(flowRunID){
+    const n = document.createElement('span');
+    n.className = 'n'; n.textContent = '#' + flowRunID;
+    moc.appendChild(n);
+  }
+  const c = document.createElement('span');
+  // Lượt đã kết thúc thì mốc thời gian là thông tin QUAN TRỌNG NHẤT ở đây, nên
+  // nó đứng ngay cạnh trạng thái chứ không giấu trong tooltip.
+  c.textContent = song ? 'đang chạy' : (flowTrangThai || 'đã xong') + ' · ' + gioMoc(flowStarted);
+  moc.appendChild(c);
+}
+
+// DTO trả `Started` bằng .Unix() — GIÂY, không phải mili giây. Nhân nhầm 1000
+// là lệch đi 55 năm mà vẫn hiện ra một ngày trông hợp lý.
+function gioMoc(giay){
+  if(!giay) return 'chưa rõ mốc';
+  const d = new Date(giay * 1000), hai = n => String(n).padStart(2, '0');
+  return hai(d.getDate()) + '/' + hai(d.getMonth() + 1) + ' ' + hai(d.getHours()) + ':' + hai(d.getMinutes());
 }
 
 // ---- dữ liệu: MỘT nguồn cho cả ba mặt — /api/flow/detail ----
@@ -1396,10 +1482,11 @@ async function refresh(){
     const fd = await fr.json();
     const runs = fd.runs || [];
     const run = runs.find(r => r.state === 'running') || runs[0];
-    if(!run){ flowName = ''; flowSteps = []; flowRunID = 0; flowTrangThai = ''; capNhat(); return; }
+    if(!run){ flowName = ''; flowSteps = []; flowRunID = 0; flowTrangThai = ''; flowStarted = 0; capNhat(); return; }
     flowName = run.flow;
     flowRunID = run.id;
     flowTrangThai = run.state || '';
+    flowStarted = run.started || 0;
     const dr = await fetch('/api/flow/detail?id=' + run.id, {headers:H});
     if(dr.ok){
       const d = await dr.json();
@@ -1746,6 +1833,8 @@ const chuot = new THREE.Vector2();
 let chonKhoa = '';          // nhân vật đang mở bảng chi tiết
 let flowRunID = 0;
 let flowTrangThai = '';
+// Mốc bắt đầu của lượt ĐANG HIỂN THỊ (giây, từ DTO .Unix()). Xem veNhanLuot().
+let flowStarted = 0;
 
 // Gắn khoá lên đối tượng để tia bắn trúng còn biết nó là ai. Gán THÊM một thuộc
 // tính chứ không thay cả userData: máy chấm giữ tham chiếu vật liệu màn hình

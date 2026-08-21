@@ -197,7 +197,7 @@ function deNhau(a, b) {
   return a.l < b.r - 2 && a.r > b.l + 2 && a.t < b.d - 2 && a.d > b.t + 2;
 }
 const kho = {};
-['scene', 'conn', 'conntext', 'flowname', 'scount', 'thieu', 'thieuten', 'thieuly',
+['scene', 'conn', 'conntext', 'flowname', 'flowmoc', 'scount', 'thieu', 'thieuten', 'thieuly',
   'chitiet', 'ct-dong', 'ct-ten', 'ct-phu', 'ct-bang', 'ct-out', 'ct-nut',
   'ct-hoithoai', 'ct-huy', 'ct-dungphien', 'ct-bao',
   // HUD + thanh lenh cua mat Trung tam
@@ -612,6 +612,39 @@ setTimeout(async () => {
         hong++;
       }
     }
+  }
+
+  // N) BONG THOAI PHAI BO TIENG MAY.
+  //
+  // fleet chay Claude kem --output-format stream-json, nen dong DAU cua output
+  // luon la su kien init cua may. Ham cu lay dung dong dau, tuc dan nguyen cuc
+  // {"type":"system","subtype":"init","cwd":"C:\Users\..."} len dau nhan vat
+  // giua man hinh 3D. Do dung la thu da hien o buoc `gop` luot #47 va lam nguoi
+  // dung ket luan he thong dang hong, trong khi buoc do hong vi OAuth het han.
+  if (typeof ctx.loiThoai === 'function') {
+    const may  = '{"type":"system","subtype":"init","cwd":"C:\\Users\\Administrator"}';
+    const that = '{"type":"assistant","message":{"content":[{"type":"text","text":"da sua internal/api"}]}}';
+    const ra = ctx.loiThoai({ output: may + '\n' + that });
+    if (/subtype|"cwd"/.test(ra)) {
+      console.error('  HONG: bong thoai con dan tieng may stream-json: ' + ra);
+      hong++;
+    }
+    if (!/da sua internal\/api/.test(ra)) {
+      console.error('  HONG: khong rut duoc loi that trong stream-json: ' + JSON.stringify(ra));
+      hong++;
+    }
+    // Chi co tieng may thi THA TRONG con hon bia mot cau cho canh sinh dong.
+    if (ctx.loiThoai({ output: may }) !== '') {
+      console.error('  HONG: chi co tieng may ma van sinh ra bong thoai');
+      hong++;
+    }
+    // Loi thuong (khong phai JSON) van phai di qua nguyen ven.
+    if (ctx.loiThoai({ output: 'dang sua internal/aiapi' }) !== 'dang sua internal/aiapi') {
+      console.error('  HONG: loi thuong bi ham loc an mat');
+      hong++;
+    }
+  } else {
+    console.error('  HONG: khong thay ham loiThoai'); hong++;
   }
 
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');
