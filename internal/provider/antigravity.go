@@ -147,10 +147,34 @@ func (antigravity) ArgsThuMuc(dir string) []string { return []string{"--add-dir"
 
 func (antigravity) ArgsHoSo(string) []string { return nil }
 
-// ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
-// nil = chua biet, KHONG phai "khong co model" — ben goi se canh bao thay vi
-// im lang bo qua lua chon cua nguoi dung.
-func (antigravity) ModelArgs(string) []string { return nil }
+// ModelArgs: `--model <model>` — ĐÃ CHẠY THẬT 21/08/2026, bản CLI 1.1.16.
+//
+// Bằng chứng mạnh nhất là CLI TỪ CHỐI tên model sai NGAY TỪ DÒNG LỆNH, trước khi
+// tốn một token nào: `agy -p ... --model khong-ton-tai-9x` thoát mã 1 với
+// "invalid model selection (--model \"khong-ton-tai-9x\" --effort \"\"): model ...
+// is not recognized as a known model or custom model in settings" rồi liệt kê 14
+// model hợp lệ. Tức cờ ĐƯỢC ĐỌC và được đối chiếu với sổ model thật.
+//
+// CÒN MỘT NỬA nữa mới đủ: từ chối tên sai chỉ chứng minh cờ được đọc để KIỂM
+// TRA, chưa chứng minh nó được dùng để ĐỊNH TUYẾN. Phép đo quyết định: chạy ĐÚNG
+// MỘT PROMPT qua ba model, so `input_tokens` trong `--output-format json`:
+//
+//	gemini-3.7-flash-low      → 13.747
+//	claude-opus-4-6-thinking  → 15.764
+//	gpt-oss-120b-medium       → 11.174
+//
+// Cùng prompt, cùng repo, cùng CLI — biến duy nhất là `--model`. Ba con số khác
+// nhau nghĩa là ba bộ tách từ khác nhau đã đọc cùng một đầu vào: cờ thật sự đổi model.
+//
+// PHÉP ĐO ĐÃ BẮT ĐẦU SAI, giữ lại để người sau không lặp: hỏi thẳng agent
+// "Google hay Anthropic tạo ra bạn?" với --model claude-opus-4-6-thinking thì nó
+// trả "Google". Tự khai danh tính KHÔNG dùng được ở đây — lời nhắc hệ thống của
+// Antigravity đè lên câu trả lời. Số token thì không biết nói dối.
+//
+// THỨ TỰ CỜ: `argsChoBuoc` chèn ModelArgs VÀO TRƯỚC HeadlessArgs, nên dòng thật là
+// `agy --model <m> --output-format stream-json -p <prompt>`. Đã chạy đúng dạng đó,
+// không phải dạng cờ-đứng-sau: 13.742 token, đúng chữ ký của gemini-3.7-flash-low.
+func (antigravity) ModelArgs(model string) []string { return []string{"--model", model} }
 
 func (antigravity) DocKetQua(raw string) (KetQua, bool) { return docKetQuaAntigravity(raw) }
 
@@ -161,7 +185,10 @@ func (antigravity) NangLuc() []NangLuc {
 	return []NangLuc{
 		Duoc(NLHeadless, "`agy -p \"<prompt>\"` chạy không tương tác; --output-format stream-json "+
 			"cho bản ghi NDJSON có cấu trúc"),
-		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh"),
+		Duoc(NLChonModel, "`--model <model>` (đo 21/08, CHẠY THẬT, bản 1.1.16): tên model sai "+
+			"bị TỪ CHỐI ngay từ dòng lệnh (thoát 1, \"model ... is not recognized\" + liệt kê 14 "+
+			"model hợp lệ). Cờ CÓ ĐỊNH TUYẾN chứ không chỉ để kiểm tra: cùng một prompt chạy "+
+			"ba model cho ba mức input_tokens khác nhau — 13.747 / 15.764 / 11.174"),
 		Duoc(NLTuDuyetQuyen, "`agy --help` + chạy thật (lần chạy #10, #11): agent đọc được repo "+
 			"và trả đúng \"Go\" với --dangerously-skip-permissions"),
 		Duoc(NLThuMuc, "`agy --help`: --add-dir. Chạy thật trong git worktree: không có cờ thì "+

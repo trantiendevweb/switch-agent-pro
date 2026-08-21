@@ -44,6 +44,16 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   (Claude có `total_cost_usd`) và "chưa đo" (Codex/Cursor/Antigravity không có trường giá).
   DTO không để lộ số 0 giả cho chi phí chưa đo, bảo toàn lưới an toàn không đụng file web.
   Xem `docs/DO-LUONG.md`, mục 21/08 C4.
+- **Cập nhật 21/08, lượt "đóng C3 chọn model từ dòng lệnh"**: đóng **C3** hoàn
+  toàn — Antigravity (`--model`) và Codex (`-m`) đều CHẠY THẬT, hai kiểu bằng
+  chứng khác hẳn nhau: Antigravity từ chối tên model bịa **ngay ở phía máy mình**
+  (thoát 1, liệt kê 14 model), còn Codex **không chặn gì** ở tầng CLI — máy chủ
+  mới trả HTTP 400. Nửa thứ hai (cờ có ĐỊNH TUYẾN không, chứ không chỉ được kiểm
+  tra) đo bằng số: cùng một prompt qua ba model Antigravity cho ba mức
+  `input_tokens` (13.747 / 15.764 / 11.174), và `-m` của Codex **ghi đè**
+  `model = "gpt-5.6-sol"` trong `config.toml`. **Đếm lại cột `ChuaDo` sau lượt
+  này: còn 5** — antigravity 2, claude 1, codex 1, cursor 1, grok 0; cột
+  `NLChonModel` sạch trên cả năm provider. Xem `docs/BAO-CAO-DONG-C3.md`.
 - **Cập nhật 21/08, lượt "giảm rủi ro C2 Grok"**: đã thiết lập bài canh định kỳ gọi
   CLI thật `TestE2EGrokDocDuocOutputThat` (`SAGENT_E2E_GROK=1`) trong
   `internal/provider/ketqua_grok_e2e_test.go`. Phép đo thật hôm nay xác nhận CLI Grok
@@ -176,9 +186,11 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 > **Cùng commit đó còn đóng thật ba ô nữa của Cursor**, nhưng sổ này chưa viết
 > lại chúng vì lượt làm việc được giao đúng ô Đ3: **C1** (`DocKetQua` →
 > `docKetQuaCursor`, `cursor.go:173` + `Duoc(NLKetQuaCoCauTruc)` ở `:193`),
-> **C3** (`ModelArgs` → `--model`, `cursor.go:169` + `Duoc(NLChonModel)` ở `:184`),
+> **C3** (`ModelArgs` → `--model`, `cursor.go:374` + `Duoc(NLChonModel)`) — ô C3
+> nay **đã đóng hoàn toàn**, gồm cả Antigravity và Codex; xem mục C3,
 > **C6** (`ArgsThuMuc` → `Khong(NLThuMuc)`, `cursor.go:158` + `:190`).
-> Xem ghi chú "⚠ ĐÃ LẠC HẬU" ở đầu ba mục đó.
+> C1 và C3 nay đã viết lại theo khuôn đóng; chỉ còn **C6** mang nhãn
+> "⚠ ĐÃ LẠC HẬU" — đọc nhãn đó trước khi đọc gạch đầu dòng bên dưới nó.
 
 <details><summary>Nội dung ô nợ khi còn mở</summary>
 
@@ -503,7 +515,103 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   thì ta biết vào **ngày đó**, không phải ba tuần sau.
 
 
-## C3. Ba provider CHƯA ĐO cách chọn model từ dòng lệnh
+## ~~C3~~ ✅ ĐÃ ĐÓNG HOÀN TOÀN 21/08 — cả năm provider chọn được model từ dòng lệnh
+
+> **Kết quả**: `ModelArgs` của **Antigravity** trả `--model <model>`
+> (`internal/provider/antigravity.go:177`), của **Codex** trả `-m <model>`
+> (`internal/provider/codex.go:277`); cả hai khai `Duoc(NLChonModel)`
+> (`antigravity.go:188`, `codex.go:292`). Cursor đã đóng từ `bacc137`. Cột
+> `NLChonModel` nay **không còn ô `ChuaDo` nào** trên cả năm provider.
+>
+> ### Vì sao ô này đáng đóng bằng tiền, không phải bằng cảm giác gọn gàng
+>
+> Sổ này ghi ô C3 là ô **tốn tiền trực tiếp**, và con số ở `internal/api/model_test.go:9-12`
+> là chỗ nó thành tiền thật: **lượt chạy #34 tốn 9,40 USD, riêng bước `code-go`
+> 8,18 USD** — vì MỌI bước đều chạy model mạnh nhất, kể cả bước chỉ viết tài liệu.
+> Trước hôm nay, khai `model = "..."` cho một bước Antigravity/Codex chỉ đổi lấy
+> một dòng cảnh báo; bước vẫn chạy model mặc định. Với Codex, "mặc định" có tên
+> cụ thể: `~/.codex/config.toml` khai `model = "gpt-5.6-sol"` và nói thẳng lý do
+> — *"MODEL MẶC ĐỊNH = mạnh nhất, có lý do"*. Nên cái mất không phải giả thuyết.
+>
+> ### Phép đo: hai provider, HAI KIỂU BẰNG CHỨNG KHÁC HẲN NHAU
+>
+> Tiền lệ Cursor nói bằng chứng mạnh nhất là **CLI từ chối một tên model bịa**.
+> Đúng với Antigravity, **sai với Codex** — và chỗ khác nhau đó mới là phần đáng đọc.
+>
+> **Antigravity (bản 1.1.16)** — chặn ở phía máy mình, trước khi tốn token:
+>
+> ```
+> $ agy -p "..." --model khong-ton-tai-9x
+> Error: invalid model selection (--model "khong-ton-tai-9x" --effort ""):
+>        model khong-ton-tai-9x is not recognized as a known model or custom model in settings
+> Available models: [liệt kê đủ 14 model]        → thoát mã 1
+> ```
+>
+> **Codex (bản 0.147.0)** — KHÔNG chặn gì cả. CLI nhận cờ, in `model:
+> khong-ton-tai-9x` ở đầu bản ghi, chỉ càu nhàu *"Model metadata … not found.
+> Defaulting to fallback metadata"*, rồi **máy chủ** mới chặn: HTTP 400 *"The
+> 'khong-ton-tai-9x' model is not supported when using Codex with a ChatGPT
+> account"*. Đó vẫn là bằng chứng — thậm chí là bằng chứng đi xa hơn: giá trị
+> **đã đi hết đường xuống thân yêu cầu API**. Nhưng nếu lượt đo chỉ tìm đúng
+> khuôn "CLI từ chối" thì nó sẽ kết luận nhầm là Codex nuốt cờ.
+>
+> ### Nửa thứ hai, và vì sao KHÔNG được bỏ
+>
+> Từ chối tên sai chỉ chứng minh cờ được đọc **để kiểm tra**. Nó không chứng minh
+> cờ được dùng **để định tuyến**. Hai phép đo riêng cho hai provider:
+>
+> - **Antigravity — cùng một prompt, ba model, ba mức `input_tokens`**:
+>   `gemini-3.7-flash-low` → **13.747**, `claude-opus-4-6-thinking` → **15.764**,
+>   `gpt-oss-120b-medium` → **11.174**. Cùng prompt, cùng repo, cùng CLI; biến duy
+>   nhất là `--model`. Ba bộ tách từ khác nhau đọc cùng một đầu vào ⇒ cờ đổi model thật.
+> - **Codex — cờ GHI ĐÈ hồ sơ**: `config.toml` khai `gpt-5.6-sol`. Chạy không cờ,
+>   đầu bản ghi in `model: gpt-5.6-sol`; chạy `-m gpt-5.4-mini`, đầu bản ghi đổi
+>   thành `model: gpt-5.4-mini` và lượt chạy xong thật (12.291 token). Đây đúng là
+>   chiều mà `grok.go:236-238` đã bác một lần — *"provider tự đọc model từ hồ sơ"*
+>   không được mặc định tin — nên phải đo riêng. Ở đây kết quả là **cờ thắng hồ sơ**.
+>
+> ### Một phép đo ĐÃ BẮT ĐẦU SAI, giữ lại vì người sau sẽ thử đúng cách đó
+>
+> Cách hiển nhiên để kiểm "có đúng model không" là hỏi thẳng agent. Đã thử: chạy
+> `--model claude-opus-4-6-thinking` rồi hỏi *"bạn do Google hay Anthropic tạo ra?"*
+> — nó trả **"Google"**. Nếu tin câu đó thì kết luận sẽ là *cờ bị nuốt, khai
+> `KhongLamDuoc`* — **sai hoàn toàn**, và sai theo hướng đắt hơn hiện trạng.
+> **Tự khai danh tính không phải phép đo**: lời nhắc hệ thống của Antigravity đè
+> lên câu trả lời. Số token thì không biết nói dối. Cùng họ với bài học của Đ3:
+> *tiêu đề commit không phải bằng chứng*.
+>
+> ### Cái bẫy THỨ TỰ CỜ, đã đo chứ không suy
+>
+> `argsChoBuoc` (`internal/api/api.go:1397`) **chèn `ModelArgs` VÀO TRƯỚC**
+> `HeadlessArgs`. Với Codex, `-m` lại là cờ của **lệnh con** `exec`, nên dòng thật
+> là `codex -m <model> exec --json <prompt>` — cờ đứng **trước** lệnh con. Suy từ
+> `--help` thì đây là chỗ hỏng. Đã chạy đúng dạng đó và Codex nhận. Antigravity
+> cũng đã chạy đúng dạng chèn-trước (`agy --model <m> --output-format stream-json
+> -p <prompt>` → 13.742 token, đúng chữ ký của `gemini-3.7-flash-low`), chứ không
+> phải chỉ dạng cờ-đứng-sau lúc thử tay. Thứ tự này nay có bài kiểm khoá lại:
+> `TestCodexDatCoModelTruocLenhCon`.
+>
+> ### Bài kiểm phải sửa, và vì sao đó không phải "sửa test cho xanh"
+>
+> `TestProviderChuaDoModelThiPhaiCanhBao` dùng **provider thật `antigravity`** làm
+> vật thử cho nhánh cảnh báo. Đóng ô này xong, bài kiểm gãy — **không phải vì
+> nhánh cảnh báo hỏng, mà vì nó hết vật thử**: không còn provider thật nào trả
+> `nil`. Nhánh cảnh báo vẫn phải sống, vì nó là thứ duy nhất đứng giữa người dùng
+> và một hoá đơn chạy model mặc định, cho provider **tiếp theo** được thêm vào mà
+> chưa ai đo. Nên vật thử đổi sang adapter GIẢ (`giaAdapter.ModelArgs` →
+> `nil`), và thêm hai bài kiểm khẳng định chiều ngược lại: hai provider vừa đo
+> phải truyền cờ xuống thật **và không được cảnh báo nữa** (cảnh báo thừa cũng là
+> một kiểu sai — nó đẩy người đọc đi tìm một vấn đề không tồn tại).
+>
+> ### Nợ MỚI lượt này lôi ra (chưa trả, chưa cắn được ai hôm nay)
+>
+> Trong `argsChoBuoc`, nhánh *"provider KHÔNG có rào quyền nào"* **gán đè** lên
+> biến `canhBao`. Một provider vừa không-có-rào-quyền vừa chưa-đo-model sẽ **mất
+> câu cảnh báo về model**. Hôm nay không provider nào rơi vào cả hai ô cùng lúc
+> nên nó chưa cắn được ai — ghi lại đúng vì đó là lý do duy nhất nó chưa cắn.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 > ⚠ **ĐÃ LẠC HẬU MỘT PHẦN (đối chiếu mã 21/08)**: **Cursor** đã đóng trong commit
 > `bacc137` — `internal/provider/cursor.go:169` trả `--model <model>`, bảng khai
@@ -531,6 +639,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
     bị bác **ít nhất một lần** — không được mặc định tin.
 - **Chặn được vì**: `internal/api/model_test.go:48-70` bắt cả hai chiều — im lặng
   bỏ qua là đỏ, và chặn không cho chạy cũng là đỏ.
+
+</details>
 
 ## ~~C4~~ ✅ ĐÃ ĐÓNG 21/08 — Token và chi phí phiên CLI: Claude ĐỌC ĐƯỢC SỐ THẬT, Codex/Cursor LÀ KẾT LUẬN "CHƯA ĐO"
 
@@ -928,7 +1038,8 @@ người sau đừng dọn nhầm.
 |---|---|---|
 | `internal/api/quyen_test.go:48-52` | Provider CHƯA ĐO mà vẫn chạy tiếp = đỏ | Đ3 |
 | `internal/api/tuduyetquyen_test.go:24,61,72` | Bảng khai nói "đã đo" mà `ArgsTuDuyetQuyen()` nói chưa = đỏ | Đ1, Đ3 |
-| `internal/api/model_test.go:48,63,70` | Chưa đo model thì phải **cảnh báo** và vẫn **chạy được** — không im lặng, không chặn | C3 |
+| `internal/api/model_test.go` (`TestProviderChuaDoModelThiPhaiCanhBao`) | Chưa đo model thì phải **cảnh báo** và vẫn **chạy được** — không im lặng, không chặn. Vật thử nay là adapter GIẢ: từ 21/08 không provider thật nào còn `nil` | C3 |
+| `internal/api/model_test.go` (`TestAntigravityVaCodexTruyenDuocModel`, `TestCodexDatCoModelTruocLenhCon`) | Hai provider đã đo phải truyền cờ xuống thật, **không cảnh báo thừa**, và `-m` của Codex phải đứng **trước** lệnh con `exec` | C3 |
 | `internal/provider/nangluc_test.go:78,230` | `(nil, false)` phải đọc là `ChuaDo`; conformance đối chiếu bảng khai với hành vi thật | toàn bộ mức Đỏ |
 | `internal/provider/token_cursor_test.go` | Hạn token Cursor đọc từ **refresh** chứ không phải access; và **mọi ngõ hỏng phải trả `false`**, cấm bịa ra một mốc | Đ4 |
 | `internal/provider/trangthai_test.go:128` | Provider chưa đọc được kết quả thì phiên **ở lại `lost`**, không kết luận | C1 |
@@ -975,7 +1086,12 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
 7. ~~**Đ4 Antigravity**~~ — **đã trả 21/08 theo đúng đề nghị này**: đổi sang
    `Khong(NLHanToken)` kèm lý do, theo tiền lệ của Grok. Không đo gì cả — đó là
    nội dung của việc, không phải chỗ cắt bớt.
-8. **V3** (danh tính Cursor) — ô mới của lượt 21/08. Lời khai đã sửa; phần còn
+8. ~~**C3** (chọn model từ dòng lệnh)~~ — **đã đóng 21/08**, và nó bác chính
+   khuôn bằng chứng mà tiền lệ Cursor đặt ra: "CLI từ chối tên model bịa" đúng
+   với Antigravity nhưng **sai với Codex** (Codex nhận cờ, máy chủ mới chặn).
+   Lượt này còn suýt kết luận ngược vì tin lời agent tự khai danh tính — xem mục
+   C3, phần "một phép đo đã bắt đầu sai".
+9. **V3** (danh tính Cursor) — ô mới của lượt 21/08. Lời khai đã sửa; phần còn
    nợ là đo cách đọc email qua `cursor-agent status`.
 
 # Phạm vi sổ này KHÔNG phủ
@@ -989,7 +1105,8 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
   đó đã trả N1 trong mã** (`internal/profile/tokenhoisinh_test.go`,
   `internal/fleet/fleet_test.go`); giới hạn trên chỉ còn đúng với bản quét đầu.
 - **C1 đã viết lại 21/08** (nửa Cursor đóng, tiêu đề bỏ Cursor ra, nửa Codex giữ
-  nguyên từng chữ cho phiên đang làm nó). **Hai ô C3/C6 vẫn mới chỉ được gắn nhãn
-  "đã lạc hậu", chưa viết lại theo khuôn đóng** — nội dung mô tả bên dưới các
-  nhãn đó vẫn là văn bản cũ, còn nói Cursor chưa đo. Đọc nhãn trước, đừng đọc
-  thẳng gạch đầu dòng.
+  nguyên từng chữ cho phiên đang làm nó). **C3 đã viết lại theo khuôn đóng 21/08**
+  (đo thật Antigravity + Codex; văn bản cũ giữ trong khối `<details>`). **C6 vẫn
+  mới chỉ được gắn nhãn "đã lạc hậu", chưa viết lại theo khuôn đóng** — nội dung
+  mô tả bên dưới nhãn đó vẫn là văn bản cũ, còn nói Cursor chưa đo. Đọc nhãn
+  trước, đừng đọc thẳng gạch đầu dòng.
