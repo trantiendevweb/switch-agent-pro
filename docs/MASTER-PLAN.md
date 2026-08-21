@@ -647,13 +647,50 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   `:56` (`agents`) — dùng ngay không cần file. Đây là **bản trùng** của dòng
   "3 flow mẫu dựng sẵn" đã tick bên dưới; giữ cả hai thì kế hoạch tự nói sai về
   mình, nên tick luôn. Chạy 21/08: `sagent flow list` in **11 flow**, gồm cả ba mẫu.
-- [ ] Plugin model: TOML chỉ manifest/config tĩnh; logic động là **executable riêng** qua
+- [x] Plugin model: TOML chỉ manifest/config tĩnh; logic động là **executable riêng** qua
   JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.
-  **CHƯA LÀM THẬT** — đã kiểm chứ không đoán: `grep -rni "plugin\|json-rpc" internal/
-  cmd/ --include=*.go` chỉ ra **một** dòng, và đó là chuỗi `"pluginUsage"` trong
-  `internal/provider/claude.go:210` (một khoá JSON của Claude, không liên quan).
-  Không có manifest, không có tiến trình con nói JSON-RPC, không có hộp quyền.
-  Xếp `[ ]` chứ không `[!]`: không thiếu gì bên ngoài cả.
+  Làm 22/08 ở `internal/plugin` (manifest · quyen · rpc · chay · bochay), plugin mẫu
+  `cmd/sagent-plugin-mau`, node `plugin` trong `internal/flow`, lệnh `sagent plugin`
+  và `/api/plugins`. Bốn ràng buộc, và chỗ ĐO được từng cái:
+  - **TOML chỉ tĩnh** — lược đồ không có trường nào nhận biểu thức/script/lệnh, và
+    bộ đọc **TỪ CHỐI KHOÁ LẠ** (`Doc` soi `md.Undecoded()`). Đây là phần đáng kể:
+    thư viện TOML mặc định **bỏ qua** khoá không khai, nên `gia_tri = "sk-..."` hay
+    `[hook] truoc_khi_chay = "..."` sẽ nằm im trong file — người viết tưởng nó chạy,
+    người soi tưởng nó đã được xử lý. `TestManifestTuChoiKhoaLa` bắt cả ba ca đó.
+  - **Executable riêng, JSON-RPC/stdio, có số phiên bản** — `GiaoThuc = 1`, bắt tay
+    bằng `sagent.bat_tay` NGAY trong `Mo()`, trước khi có ai kịp gửi dữ liệu (kể cả
+    secret) cho tiến trình con. Lệch số thì **dừng ở lượt bắt tay**, không phải nổ
+    giữa một lượt flow đang chạy. Khung bản tin dùng CHUNG cho hai phía (`PhucVu`
+    cho plugin, `Client` cho host), nên hai bên không có đường nào lệch nhau về khung.
+  - **Secret chỉ là tham chiếu** — manifest chỉ có `key_id`; giá trị nằm ở
+    `~/.ai-accounts/api-keys/<id>.key` và đọc qua đúng `aiapi.DocKey` (một bản duy
+    nhất của luật "kho ở đâu, tên thế nào là hợp lệ"). Giá trị đi qua **stdio** lúc
+    bắt tay — cố ý KHÔNG qua argv (mọi tiến trình trên máy đọc được dòng lệnh) và
+    KHÔNG qua biến môi trường (con cháu của plugin thừa hưởng hết).
+  - **Capability tối thiểu** — plugin không khai thì KHÔNG có. Đo bằng cách chạy
+    **cùng một binary** hai lần, chỉ khác mấy dòng TOML, rồi so hai câu trả lời:
+    `TestKhongKhaiThuMucThiKhongThayThuMucDuAn`,
+    `TestKhongKhaiMoiTruongThiKhongThayBienCuaCha`,
+    `TestKhongKhaiSecretThiKhongNhanDuocGiaTri`. Cả ba đã được thử ngược (bỏ hàng
+    rào đi thì test đỏ), trừ ca secret — hàng rào thật của nó nằm ở tầng đọc
+    manifest (`TestKhaiSecretMaKhongKhaiQuyenThiTuChoi`), nhánh trong `docSecret`
+    chỉ là lớp thứ hai.
+  Bảng quyền (`sagent plugin quyen`) có **HAI cột chứ không phải một**: plugin KHAI
+  gì, và host **CHẶN được tới đâu** — ba trạng thái y như bảng năng lực provider.
+  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên hai chỗ này phải nói thẳng:
+  - `ghi-thu-muc-lam-viec`: **KHÔNG CHẶN ĐƯỢC** (đã đo, là kết luận chứ không phải
+    khoảng trống). Thấy được đường dẫn thì ghi được; chặn ghi đòi ACL riêng cho từng
+    lần chạy, chưa làm. Cách chặn thật đang có là không cấp `thu-muc-lam-viec`.
+  - `mang`: **CHƯA ĐO**. Host hiện KHÔNG chặn tiến trình con mở socket. Còn đường
+    WFP/AppContainer trên Windows nhưng chưa ai thử, chưa có phép đo nào trên máy
+    thật. **Không khai quyền `mang` KHÔNG có nghĩa là plugin bị chặn** — CLI in
+    cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.
+  Node `plugin` bật `implemented = true` vì đã chạy THẬT đầu-cuối
+  (`TestFlowChayPluginThat`: build binary → `flow.Runner` thật → tiến trình con →
+  kết quả chuyền sang bước sau), không phải vì đã viết xong mã. Nó là ĐƯỜNG THỨ BA
+  bên cạnh agent và model API, và cắm vào đúng `internal/flow` để dùng lại DAG,
+  retry, `on_failure`, `{{bien}}`, `doc_duoc`, `phai_co` — chứ không mọc thành hệ
+  thứ hai bắt người dùng học hai bộ luật cho cùng một câu "bước này hỏng thì sao".
 - [x] `internal/flow`: schema `flows.toml`, tầng đọc (mẫu dựng sẵn → global →
   dự án), **kiểm tra DAG** (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
   thứ tự chạy topo **ổn định**, `{{bien}}`.

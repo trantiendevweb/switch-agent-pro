@@ -35,6 +35,25 @@ type ModelRunner interface {
 	GoiModel(ctx context.Context, route, prompt string) (KetQuaAgent, error)
 }
 
+// PluginRunner chạy node `plugin` — đường THỨ BA: không phải agent, không phải
+// model API, mà một EXECUTABLE do người dùng cài, nói JSON-RPC trên stdio.
+//
+// Tách khỏi hai interface trên vì tham số của nó không giao nhau với chúng: một
+// plugin không có tài khoản, không có model, không có worktree, không có quyền
+// tự duyệt tool. Nhét chung một interface là bắt mỗi bên mang theo một nắm tham
+// số vô nghĩa với mình.
+//
+// Cố ý trả về CHUỖI chứ không phải KetQuaAgent: plugin chạy trên máy người dùng
+// và không tiêu token của ai, nên nó không có gì để nói trong các trường chi phí
+// — trả về KetQuaAgent là mời gọi sổ chi phí ghi những con số 0 mà không ai
+// phân biệt được với "chưa đo".
+//
+// Cài đặt thật: internal/plugin.BoChay. Gói flow KHÔNG import gói đó — khai
+// interface ở đây thì test của flow chạy được mà không phải biên dịch plugin nào.
+type PluginRunner interface {
+	GoiPlugin(ctx context.Context, ten, vao string, thamSo map[string]string) (string, error)
+}
+
 // KetQuaAgent là những gì một lượt chạy agent trả về cho bộ thực thi flow.
 type KetQuaAgent struct {
 	Output    string  // kết quả cho bước sau dùng
@@ -52,6 +71,10 @@ type Runner struct {
 	// Model chạy node `model`. nil = chưa cắm, và node `model` sẽ báo lỗi rõ
 	// ràng thay vì im lặng bỏ qua.
 	Model ModelRunner
+
+	// Plugin chạy node `plugin`. nil = chưa cắm — cùng luật với Model: bước báo
+	// lỗi nói rõ là chưa cắm, chứ không bỏ qua rồi trả về chuỗi rỗng.
+	Plugin PluginRunner
 
 	// MaxParallel là trần số bước/agent chạy cùng lúc, lấy từ policy của dự án.
 	MaxParallel int

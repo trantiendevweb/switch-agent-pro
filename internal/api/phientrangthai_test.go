@@ -220,12 +220,19 @@ func TestBoChayFlowCoDuCaHaiDuong(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer a.Close()
-	r := a.runner(Addr{})
+	r := a.runner(Addr{}, t.TempDir())
 	if r.Agent == nil {
 		t.Error("Runner.Agent nil — moi buoc agent se hong")
 	}
 	if r.Model == nil {
 		t.Error("Runner.Model nil — moi node `model` se hong, va nguoi soi cua doi-4 " +
 			"chay bang node do (CLI grok da hong vinh vien tu 20/08)")
+	}
+	// Duong THU BA: node `plugin`. Cung mot lop bay — internal/plugin co day du
+	// test rieng, nhung neu khong ai cam BoChay vao day thi moi buoc plugin deu
+	// hong voi cau "bo chay plugin chua duoc cam", va khong test nao cua goi kia
+	// nhin thay chuyen do.
+	if r.Plugin == nil {
+		t.Error("Runner.Plugin nil — moi node `plugin` se hong du internal/plugin da chay duoc")
 	}
 }
