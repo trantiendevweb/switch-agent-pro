@@ -2540,3 +2540,153 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   chứa: **một clone không giữ gì cả, và nó là bản mới nhất**. "Đã sửa cho lần
   hỏng trước" và "đã đo cho lần hỏng sau" là hai chuyện khác nhau — khoảng cách
   giữa chúng vừa đủ để nuốt thêm một tài khoản.
+
+## 21/08 — Codex đọc được kết quả có cấu trúc: `codex exec --json`, 6 lượt chạy thật (đóng ô nợ C1)
+
+**Lệnh đã chạy** (codex-cli 0.147.0, Windows, tài khoản thật):
+
+```
+codex exec --json --skip-git-repo-check -C . "Tra loi dung mot tu: XONG"
+```
+
+**Cờ tìm được**: `--json` — nguyên văn `codex exec --help`: *"Print events to
+stdout as JSONL"*. Khác Grok ở chỗ đây là **cờ có thật**, không phải định dạng
+quan sát được (xem ô C2), nên nó là hợp đồng chứ không phải may mắn.
+
+**Output THẬT, nguyên văn:**
+
+```
+{"type":"thread.started","thread_id":"01a0230f-5486-7772-b11d-950ebaba350f"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"XONG"}}
+{"type":"turn.completed","usage":{"input_tokens":17625,"cached_input_tokens":11008,
+ "cache_write_input_tokens":0,"output_tokens":6,"reasoning_output_tokens":0}}
+```
+
+### Lượt đo đầu tiên CHẾT TREO, và đó là phép đo có giá trị nhất trong ngày
+
+Lượt đầu tiên bị giết sau 5 phút, `out.jsonl` **0 byte**. Lý do nằm ở stderr:
+
+```
+Reading additional input from stdin...
+```
+
+`codex exec` thấy stdin là **ống dẫn** thì coi đó là phần prompt nối thêm và
+**đợi vô hạn** — help nói rõ: *"If stdin is piped and a prompt is also provided,
+stdin is appended as a `<stdin>` block"*. Nối stdin vào `NUL` là hết. Dự án đã
+biết chuyện này (`internal/profile/clone.go:349` nối `c.Stdin = devNull` kèm ghi
+chú đúng về Codex), nhưng đây là lần nó được **đo lại từ đầu**: bất kỳ ai chạy
+Codex ngoài đường đó mà để `Stdin = nil` hay ống dẫn đều treo, và treo **im
+lặng** — không lỗi, không output, chỉ hết giờ.
+
+### Lược đồ đầy đủ, và bốn cái bẫy — cả bốn đều đo được
+
+| Sự kiện | Mang gì | Dùng vào |
+|---|---|---|
+| `thread.started` | `thread_id` | — |
+| `turn.started` | — | — |
+| `item.completed` + `agent_message` | `text` | `TraLoi` |
+| `item.completed` + `command_execution` | `command`, `exit_code`, `status` | `ToolHong`, lá chắn chạy quẩn |
+| `turn.completed` | `usage.input_tokens` / `output_tokens` | `TokenVao` / `TokenRa` |
+| `turn.failed` | `error.message` | `CoLoi`, `LoiAPI` |
+
+1. **Mỗi lời gọi tool in RA HAI DÒNG** — `item.started` rồi `item.completed`,
+   cùng `item.id`. Đo được ở lượt bảo agent chạy một lệnh **hai lần**: bản ghi ra
+   **bốn** dòng `command_execution`. Đếm cả hai thì mọi con số lặp **gấp đôi sự
+   thật**, và với ngưỡng `TranLapLienTiep = 10` thì một agent lặp 5 lần bị vu oan
+   là chạy quẩn. Bộ đọc chỉ nhận `item.completed` — cũng là dòng duy nhất có
+   `exit_code` thật.
+2. **Một lượt có NHIỀU `agent_message`.** Lượt gọi tool mở đầu bằng *"Tôi sẽ chạy
+   đúng lệnh hai lần như yêu cầu."* rồi mới tới `"DONE"`. Lấy cái đầu thì bước
+   sau nhận được một **lời hứa** thay vì kết quả. Lấy cái cuối.
+3. **`{"type":"error"}` KHÔNG phải lượt hỏng.** Lượt 401 in **11 dòng** error
+   (`Reconnecting... 2/5`) trước khi chết — nhưng đó là các lần **thử lại**, và
+   một lượt thử lại rồi *thành công* in đúng những dòng ấy. Chỉ `turn.failed` mới
+   là chết.
+4. **`turn.failed` KHÔNG có `usage`.** Lượt hỏng thì token bằng 0 vì Codex không
+   nói, không phải vì nó miễn phí.
+
+### Lượt CHẾT: đo bằng `CODEX_HOME` trỏ vào thư mục rỗng
+
+```
+codex exec --json ...        # CODEX_HOME=<thư mục rỗng>
+→ exit 1
+{"type":"turn.failed","error":{"message":"unexpected status 401 Unauthorized:
+  Missing bearer or basic authentication in header,
+  url: https://api.openai.com/v1/responses, cf-ray: a2e7ab421c36ddbd-HKG,
+  request id: req_1552c246e9de4d4e8a53bf944570155a"}}
+```
+
+`error.message` mang cả `request id` — thứ **hỏi lại nhà cung cấp được**, nên nó
+vào đúng ô `LoiAPI` (cùng lý lẽ với `request_id` của Cursor). Kết quả:
+`PhanLoaiChet` xếp lượt này thành `failed` kèm nguyên văn câu lỗi, thay vì để nó
+nằm lại `lost` với dòng chữ *"chết, chưa rõ vì sao"*.
+
+### Lượt TOOL HỎNG: `exit 3`
+
+```
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution",
+ "command":"…powershell.exe -Command 'exit 3'","exit_code":3,"status":"failed"}}
+```
+
+`status:"failed"` **và** `exit_code:3` — xét cả hai, vì lệnh bị sandbox chặn có
+thể có `status` mà không có mã thoát.
+
+### ĐO ĐƯỢC MỘT ĐIỀU **KHÔNG** ĐO ĐƯỢC: số tool bị chặn quyền
+
+Chạy **không** có `--approve-for-me` (tức sandbox chỉ-đọc) rồi bắt agent ghi file:
+
+```
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message",
+ "text":"Không thể tạo thu.txt: môi trường hiện tại bị khóa **chỉ đọc**,
+         và thao tác ghi đã bị hệ thống từ chối. …"}}
+{"type":"turn.completed","usage":{…}}
+```
+
+Lượt kết thúc **`turn.completed` bình thường**. Không một dòng nào nói tới quyền,
+không có item nào cho patch bị từ chối. Lời từ chối **chỉ nằm trong văn xuôi
+tiếng Việt do model tự viết**.
+
+Nên `TuChoiSo` để **0**, và đây không phải chỗ chưa làm xong: đọc được nó thì
+phải dò chuỗi trong câu chữ của model — đúng thứ `trangthai.go` cấm (*"LUẬT:
+KHÔNG DÒ CHUỖI"*). **Hệ quả phải nói thẳng: `ChetChanQuyen` KHÔNG BAO GIỜ kết
+luận được cho Codex.** Bài `TestCodexKhongBiaSoToolBiChanQuyen` giữ chỗ này cho
+người sau không lặng lẽ nhét một phép dò chuỗi vào.
+
+### Còn lại những gì CHƯA đo được
+
+- **`ChiPhiUSD`**: không có trường giá nào. Để 0, y hệt Cursor. Không nhân token
+  với đơn giá — đơn giá còn tuỳ model và tuỳ gói.
+- **`SoLuotTu`, `HanMucDenLai`, `KetCuc`**: không có trường tương ứng. Để rỗng/0.
+  Bịa một giá trị cho `KetCuc` thì `trangthai.go` sẽ đem so với enum của Claude.
+- **`cached_input_tokens` / `reasoning_output_tokens`**: chưa đo được chúng là
+  phần **con** hay phần **thêm** của `input_tokens` / `output_tokens`. Nên không
+  cộng, không trừ — lấy đúng con số nhà cung cấp dán nhãn.
+
+### Kiểm chứng đầu-cuối, và đây mới là bằng chứng
+
+Args dựng bằng **chính adapter** (`HeadlessArgs` + `ArgsThuMuc`), rồi đọc lại
+bằng **chính adapter** (`ketqua_codex_e2e_test.go`, bật bằng `SAGENT_E2E_CODEX=1`):
+
+```
+LỆNH: …\npm\codex.cmd [exec --json Tra loi dung mot tu: ALPHA --cd …\Temp --skip-git-repo-check]
+ĐỌC ĐƯỢC: TraLoi="ALPHA" CoLoi=false TokenVao=17627 TokenRa=6 ToolHong=0 Hong=""
+PhanLoaiChet: "done" ""
+```
+
+Dòng cuối là con số đáng nhìn nhất: **trước lượt đo này nó là `""`** — phiên ở
+lại `lost`, và bốn mặt điều khiển in *"chết, chưa rõ vì sao"* cho một lượt chạy
+**thành công**.
+
+### Đã sửa gì
+
+- `internal/provider/ketqua_codex.go` (mới) — bộ đọc.
+- `internal/provider/codex.go` — `DocKetQua` gọi bộ đọc thật; `HeadlessArgs`
+  thêm `--json`; bảng khai đổi `Chua(NLKetQuaCoCauTruc)` → `Duoc(...)`.
+- `--json` để ở `HeadlessArgs` chứ **không** chép cứng chỗ khác, nên
+  `CoConThieu` (`bosungco.go`) tự bổ sung được cho đường `sagent fleet` — đường
+  truyền args thô đã từng làm 20 phiên liền rơi về `lost` ngày 20/08.
+- 11 bài kiểm trên **bản ghi thật** + 1 bài canh định kỳ gọi CLI thật.
+
+**Chi phí phép đo**: 6 lượt `codex exec`, tổng ~146k token vào / ~418 token ra.
+Codex không in giá nên không quy ra tiền được — đúng cái ô `ChiPhiUSD` vẫn để 0.

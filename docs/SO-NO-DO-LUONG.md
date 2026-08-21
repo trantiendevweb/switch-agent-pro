@@ -18,6 +18,15 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   bằng chứng là hàm trả về gì và bảng năng lực khai gì. Lần này đã mở
   `internal/provider/cursor.go` và hai chốt trong `internal/api/api.go` ra đọc
   trước khi tin tiêu đề. Xem `docs/BAO-CAO-DON-SO-NO.md`.
+- **Cập nhật 21/08, lượt "đóng C1 phần Codex"**: đóng **C1** hoàn toàn — Codex
+  đọc được kết quả có cấu trúc bằng `codex exec --json`, 6 lượt chạy thật. Quét
+  lại: **51 dòng** trong **26 file** (trước: 55 / 23). Số dòng giảm 4 nhưng số
+  **file tăng 3**, và đó không phải nghịch lý: hai file mới
+  (`ketqua_codex.go`, `ketqua_codex_test.go`) cùng
+  `ketqua_codex_e2e_test.go` đều mang chữ "CHƯA ĐO" **có chủ ý** — chúng ghi
+  đúng cái đã đo được là *không* đo được (chi phí, số tool bị chặn quyền). Nợ
+  được **nói ra** thì đếm vào sổ; đó là mục đích của sổ, không phải lỗi của nó.
+  Xem `docs/BAO-CAO-DONG-C1-CODEX.md`.
 
 ## Vì sao cần sổ này khi đã có `sagent nang-luc --chua-do`
 
@@ -243,12 +252,55 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 # 🟠 MỨC CAM — đoán sai là mất tiền hoặc mất kết luận
 
-## C1. Codex và Cursor CHƯA ĐO cách đọc kết quả có cấu trúc
+## ~~C1~~ ✅ ĐÃ ĐÓNG HOÀN TOÀN 21/08 — Codex và Cursor ĐỌC ĐƯỢC kết quả có cấu trúc
 
-> ⚠ **ĐÃ LẠC HẬU MỘT NỬA (đối chiếu mã 21/08)**: phần **Cursor** đã đóng trong
-> commit `bacc137` — `internal/provider/cursor.go:173` gọi `docKetQuaCursor`, và
-> bảng khai `Duoc(NLKetQuaCoCauTruc)` ở `:193`. Phần **Codex** vẫn mở đúng như mô
-> tả dưới. Mục này chưa viết lại vì lượt làm việc được giao đúng ô Đ3 và N1.
+> **Cursor** đóng trước đó (commit `bacc137`): `internal/provider/cursor.go:173`
+> gọi `docKetQuaCursor`, bảng khai `Duoc(NLKetQuaCoCauTruc)` ở `:193`.
+>
+> **Codex** đóng ngày 21/08 bằng **6 lượt `codex exec` chạy thật** trên
+> codex-cli 0.147.0, tài khoản thật. Cờ là `--json` (*"Print events to stdout as
+> JSONL"*, có thật trong `codex exec --help`). Mã đã đổi:
+>
+> - `internal/provider/ketqua_codex.go` (mới) — bộ đọc, kèm bốn cái bẫy đo được.
+> - `internal/provider/codex.go` — `DocKetQua` gọi bộ đọc thật; `HeadlessArgs`
+>   thêm `--json`; bảng khai `Chua(NLKetQuaCoCauTruc)` → `Duoc(...)`.
+> - 11 bài kiểm trên **bản ghi thật** + 1 bài canh gọi CLI thật
+>   (`ketqua_codex_e2e_test.go`, `SAGENT_E2E_CODEX=1`).
+>
+> **Bằng chứng đầu-cuối** (args dựng bằng chính adapter, đọc lại bằng chính adapter):
+>
+> ```
+> ĐỌC ĐƯỢC: TraLoi="ALPHA" CoLoi=false TokenVao=17627 TokenRa=6 Hong=""
+> PhanLoaiChet: "done" ""
+> ```
+>
+> Trước lượt đo, dòng cuối là `""` — phiên ở lại `lost`, bốn mặt điều khiển in
+> *"chết, chưa rõ vì sao"* cho một lượt chạy **thành công**.
+>
+> **HAI THỨ VẪN CHƯA ĐO ĐƯỢC, và chúng đã được đo để biết là không đo được:**
+>
+> 1. **`ChiPhiUSD` = 0** — bản ghi Codex không có trường giá nào, y hệt Cursor.
+>    Số 0 đó vẫn phải hiện kèm chữ "chưa đo" (xem **C4**), không được đọc thành
+>    "miễn phí". Đừng nhân token với đơn giá.
+> 2. **`TuChoiSo` = 0, VĨNH VIỄN** — chạy không có `--approve-for-me` rồi bắt
+>    agent ghi file: bản ghi ra `turn.completed` **bình thường**, không một
+>    trường nào nói tới quyền. Lời từ chối chỉ nằm trong **văn xuôi do model tự
+>    viết** ("môi trường hiện tại bị khóa **chỉ đọc**"). Đọc được nó thì phải dò
+>    chuỗi — đúng thứ `trangthai.go` cấm. **Hệ quả: `ChetChanQuyen` KHÔNG BAO GIỜ
+>    kết luận được cho Codex.** Bài `TestCodexKhongBiaSoToolBiChanQuyen` giữ chỗ.
+>
+> Chưa đo nốt: `SoLuotTu`, `HanMucDenLai`, `KetCuc` (không có trường tương ứng);
+> và `cached_input_tokens` là phần **con** hay phần **thêm** của `input_tokens`
+> — nên không cộng, không trừ.
+>
+> **Nợ mới sinh ra từ ô này**: bộ đọc Codex nay có đúng điểm yếu mà **C2** mô tả
+> cho Grok, chỉ nhẹ hơn một bậc — `--json` là cờ có thật nên đây là hợp đồng, còn
+> Grok chỉ là quan sát. Bài canh định kỳ ở trên là cách biết vào **ngày** Codex
+> đổi định dạng, không phải ba tuần sau.
+>
+> Xem `docs/DO-LUONG.md`, mục *21/08 — Codex đọc được kết quả có cấu trúc*.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
 
 - **Ở đâu**: `internal/provider/codex.go:226,248` và
   `internal/provider/cursor.go:148,167` — cả hai `DocKetQua` trả
@@ -272,6 +324,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   nhầm, hậu quả **nặng hơn** không đọc. `internal/provider/quan_test.go:212-214`
   ghim đúng chỗ này: một kết luận "chạy quẩn" đến từ bản ghi ta chưa đọc được là
   kết luận không được phép có — vì nó sẽ giết một lượt chạy lành.
+
+</details>
 
 ## C2. Bộ đọc kết quả của Grok dựa trên quan sát, không phải hợp đồng
 

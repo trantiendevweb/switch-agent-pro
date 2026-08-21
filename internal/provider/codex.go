@@ -53,7 +53,13 @@ func (c codex) Version() (string, error) {
 
 // Đã đo trên 0.147.0: `codex exec "<prompt>"` = "Run Codex non-interactively".
 // KHÁC hẳn Claude (`-p`) — đây chính là lý do phải để việc này cho adapter.
-func (codex) HeadlessArgs(prompt string) []string { return []string{"exec", prompt} }
+//
+// `--json` = "Print events to stdout as JSONL" (đo 21/08/2026, CHẠY THẬT). Không
+// có cờ này thì `codex exec` chỉ in chữ cho người đọc, `DocKetQua` không có gì
+// để đọc, và MỌI phiên Codex rơi về `lost` — đúng cái nợ vừa trả. Cờ nằm ở
+// HeadlessArgs chứ không chép cứng chỗ khác, để `CoConThieu` (bosungco.go) tự bổ
+// sung được cho đường `sagent fleet` vốn truyền args thô.
+func (codex) HeadlessArgs(prompt string) []string { return []string{"exec", "--json", prompt} }
 
 func (codex) BaseDir() string { return filepath.Join(paths.Home(), ".codex") }
 
@@ -245,21 +251,24 @@ func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
 
 func (codex) ArgsHoSo(string) []string { return nil }
 
-// DocKetQua: CHUA DO cach doc du lieu co cau truc cua provider nay.
 // ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
 // nil = chua biet, KHONG phai "khong co model" — ben goi se canh bao thay vi
 // im lang bo qua lua chon cua nguoi dung.
 func (codex) ModelArgs(string) []string { return nil }
 
-func (codex) DocKetQua(string) (KetQua, bool) { return KetQua{}, false }
+// DocKetQua đọc JSONL của `codex exec --json` — ĐÃ ĐO THẬT 21/08/2026, xem
+// ketqua_codex.go để biết lược đồ, bốn cái bẫy, và danh sách thứ VẪN chưa đo
+// được (chi phí, số lượt, hạn mức, và đặc biệt là TuChoiSo).
+func (codex) DocKetQua(raw string) (KetQua, bool) { return docKetQuaCodex(raw) }
 
 // NangLuc — bảng khai báo cho Codex. Hai dòng cờ quyền và cờ thư mục ĐÃ CHẠY
 // THẬT ngày 21/08/2026; trước đó chúng chỉ được đo bằng `--help`, và sổ nợ đo
 // lường xếp chúng vào mức ĐỎ đúng vì lý do đó — xem docs/DO-LUONG.md.
 func (codex) NangLuc() []NangLuc {
 	return []NangLuc{
-		Duoc(NLHeadless, "`codex exec \"<prompt>\"` = \"Run Codex non-interactively\" (0.147.0) — "+
-			"lệnh con, KHÁC hẳn cờ -p của Claude"),
+		Duoc(NLHeadless, "`codex exec --json \"<prompt>\"` = \"Run Codex non-interactively\" (0.147.0) — "+
+			"lệnh con, KHÁC hẳn cờ -p của Claude. Stdin PHẢI nối vào NUL: thấy stdin là ống "+
+			"dẫn thì codex đợi prompt nối thêm và TREO vô hạn (đo 21/08: treo 5 phút, 0 byte)"),
 		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh; nil ở ModelArgs nghĩa là chưa "+
 			"biết, không phải \"không có model\""),
 		Duoc(NLTuDuyetQuyen, "`--approve-for-me` (đo 21/08, CHẠY THẬT): tự duyệt nhưng VẪN "+
@@ -269,8 +278,11 @@ func (codex) NangLuc() []NangLuc {
 		Duoc(NLThuMuc, "`-C, --cd <DIR>` (đo 21/08, CHẠY THẬT): chạy trong thư mục tạm rồi bảo "+
 			"agent đọc một file chỉ có ở đó — nó đọc đúng"),
 		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong ~/.codex phải chuyển thành cờ"),
-		Chua(NLKetQuaCoCauTruc, "CHƯA ĐO cách đọc dữ liệu có cấu trúc; phiên Codex chết vì lý do "+
-			"gì thì sổ để nguyên `lost` chứ không đoán"),
+		Duoc(NLKetQuaCoCauTruc, "`codex exec --json` in JSONL (đo 21/08, CHẠY THẬT 6 lượt): "+
+			"`turn.completed` mang usage.input_tokens/output_tokens, `turn.failed` mang "+
+			"error.message, `item.completed` mang agent_message và command_execution kèm "+
+			"exit_code — đủ cho lá chắn chạy quẩn. VẪN CHƯA ĐO: chi phí (không có trường giá) "+
+			"và số tool bị chặn quyền (Codex chỉ nói bằng văn xuôi, không có trường)"),
 		Duoc(NLTachTaiKhoan, "đặt CODEX_HOME vào thư mục rỗng thì `codex login status` trả "+
 			"\"Not logged in\" dù ~/.codex thật đang đăng nhập"),
 		Duoc(NLHanToken, "claim `exp` trong JWT access_token của auth.json; đo 2026-08-17: "+
