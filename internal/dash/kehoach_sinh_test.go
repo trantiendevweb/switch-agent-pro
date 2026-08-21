@@ -99,8 +99,14 @@ func TestTrangKeHoachChoDuOViec(t *testing.T) {
 		if trongRao {
 			continue
 		}
-		if strings.HasPrefix(dd, "- [ ] ") || strings.HasPrefix(dd, "- [x] ") || strings.HasPrefix(dd, "- [X] ") {
-			muon++
+		// Bốn dấu, không phải hai: `[~]` là xong một phần, `[!]` là bị chặn vì
+		// thiếu thứ bên ngoài. Quên chúng ở đây thì phép đếm bên .md nhỏ hơn số ô
+		// bên .html, và thông điệp lỗi sẽ đổ oan cho bộ sinh là "nhân đôi mục".
+		for _, dau := range []string{"- [ ] ", "- [x] ", "- [X] ", "- [~] ", "- [!] "} {
+			if strings.HasPrefix(dd, dau) {
+				muon++
+				break
+			}
 		}
 	}
 	if muon == 0 {
