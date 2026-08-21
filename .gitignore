@@ -25,3 +25,7 @@ __pycache__/
 
 # Worktree tạm của workflow — không thuộc repo.
 .claude/worktrees/
+
+# Log cua `sagent dash` khi chay nen (tao 21/08 luc dung lai dash sau reboot)
+.dash.out.log
+.dash.err.log
