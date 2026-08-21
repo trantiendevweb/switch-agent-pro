@@ -317,7 +317,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
   `legacy/v1-powershell/`; `design-system/switch-agent-pro/`; 3 trang HTML sạch tên cũ.
 
-### Pha 0 — Đo giả định & lập hợp đồng  **64%** (2 xong · 5 một phần)
+### Pha 0 — Đo giả định & lập hợp đồng  **71%** (3 xong · 4 một phần)
 🎯 Chứng minh cơ chế của **cả hai đường** trước khi khoá interface.
 - [~] Test harness không chứa credential trong repo; mọi output **redaction**.
   - **Xong — không credential trong repo**: giàn test chạy trên HOME giả
@@ -419,24 +419,35 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - **CHƯA — nửa API**: `sagent nang-luc` chỉ in 5 nhóm harness. Không có bảng năng
     lực nào cho nhà cung cấp API; `grep -rni "experimental" internal/` ra 0 dòng.
     Câu "route này hỗ trợ tool/vision/reasoning không" hiện không ai trả lời được.
-- [~] **Threat model** cho subscription credential, API key, dashboard, command exec.
-  - **CHƯA — không có tài liệu gộp.** `docs/security/THREAT-MODEL.md` **không tồn
-    tại**; artifact mà mục này hứa vẫn thiếu.
-  - **Xong — nhưng nằm rải, và là bằng chứng chứ không phải lời hứa**: cả bốn mặt
-    đều đã có phân tích tấn công + bản vá **đo được**, ghi trong `docs/DO-LUONG.md`:
-    subscription credential (junction-attack đi xuyên `os.ReadDir`, path-traversal
-    **đã nổ thật một lần và xoá mất `~/.claude`**, Windows ACL: `0o600` và `0o644`
-    có ACL y hệt trên Windows) · API key (chỉ tham chiếu bằng `key_id`, **không có
-    cột secret trong DB**, có test chặn key rò ra lỗi) · dashboard (loopback ·
-    băm mật khẩu · chặn Host lạ chống DNS-rebind · chặn Origin lạ chống CSRF ·
-    `docs/DO-LUONG.md:1005` ghi lỗi thật `/login` từng nằm ngoài `guard`) ·
-    command exec (`internal/flow/flow.go` — node `shell` chỉ nhận **argv**, cố ý
-    không nhận chuỗi shell).
-  - Việc còn lại là **gom lại thành một tài liệu có sườn** (tài sản → kẻ tấn công →
-    đường vào → biện pháp), không phải đi đo lại từ đầu.
+- [x] **Threat model** cho subscription credential, API key, dashboard, command exec.
+  ✅ **VIẾT XONG 21/08 — [`docs/MO-HINH-DE-DOA.md`](MO-HINH-DE-DOA.md)** (tên tiếng
+  Việt, thay cho `docs/security/THREAT-MODEL.md` mà artifact cũ hứa).
+  - **Có sườn, không phải bài luận**: tài sản → **sáu vị trí đứng của kẻ tấn công
+    (K1–K6)** → mỗi mối đe doạ nói rõ *làm được gì · đứng ở đâu · hiện có gì chặn*,
+    kèm `file:dòng` thật. Bốn nhãn trạng thái, **không có nhãn "có vẻ ổn"**:
+    ✅ ĐÃ CÓ · 🟡 CÓ MỘT PHẦN · 🔴 KHÔNG CÓ GÌ · ⬜ CHƯA ĐO ĐƯỢC (kèm lý do).
+  - **Đo trên máy THẬT, không phải máy dev sạch** (21/08 23:45): dash đang chạy
+    `--host 0.0.0.0 --port 8788` (PID 16368, bind `::`), firewall `sagent-dash-8788`
+    = **Allow**, `4625` **157 lượt/giờ** (sáng ~3.900, 14:20 là 1.867), rule chặn
+    đang giữ **61 IP** (14:20 là 53). Kho: **4** `.credentials.json` trong `.clones`,
+    **2** file `.key`, **90** worktree.
+  - **Nói thẳng 11 chỗ đang hở**, xếp theo hậu quả. Ba dòng đầu: (1) mật khẩu dash
+    là hàng rào **duy nhất VÀ cuối cùng** — sau nó không còn tầng nào, mà sau cửa đó
+    là `POST /api/fleet` + `/api/flow/save` = **thực thi mã tuỳ ý dưới
+    `Administrator`**; (2) agent chạy trong `~/.ai-accounts/.worktrees/…` tức **cách
+    kho bí mật đúng ba cấp `..`**, không hộp cát; (3) **không ghi lại lần đăng nhập
+    sai nào của dash** — đang bị dò cũng không biết, trong khi RDP thì đếm được
+    tới từng lượt.
+  - **Không đo được thì ghi là không đo được**: cổng 8788 chưa thử từ máy ngoài;
+    chưa chạy phép đo "agent có thật sự đọc được `api-keys/*.key` từ worktree
+    không" (tốn một lượt hạn mức thật); `lsass` vẫn **chưa có dump** nên
+    brute-force vẫn là **nghi phạm**.
+  - **Có lưới an toàn**: mục K liệt kê **18 bài kiểm** đang ghim từng bản vá được
+    dẫn trong tài liệu — gỡ bản vá là đỏ, nên tài liệu không trôi thành văn bia.
 - **Artifact:** `docs/research/phase0/*` (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
-  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), `docs/security/THREAT-MODEL.md`,
-  `docs/adr/0001-domain-boundaries.md`, `docs/OPEN_SOURCE_LEDGER.md`.
+  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), **`docs/MO-HINH-DE-DOA.md`** (thay
+  cho `docs/security/THREAT-MODEL.md` — cùng nội dung, tên tiếng Việt như mọi tài liệu
+  khác của dự án), `docs/adr/0001-domain-boundaries.md`, `docs/OPEN_SOURCE_LEDGER.md`.
 - **DoD:** mỗi kết luận có command/OS/output-redacted; **không token thật** ở đâu;
   capability chưa đo = `unknown`; interface nháp suy ra từ **≥2 harness và ≥2 API protocol**.
 - ⚠ **Blocker cần bạn:** **API key** thật (local-only, redaction) cho phần API path.
@@ -447,6 +458,15 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   là artifact của chính pha này. Đếm lại theo mã: **2 xong · 5 xong một phần ·
   0 chưa làm → 4,5/7 = 64%**. Ba thứ còn thiếu thật
   là: tầng redaction chung, bảng năng lực cho nửa API, và tài liệu threat model.
+- **Cập nhật 21/08 tối:** ô **threat model** đóng — `docs/MO-HINH-DE-DOA.md`. Đếm lại:
+  **3 xong · 4 xong một phần · 0 chưa làm → 5/7 = 71%**. Còn đúng **hai** thứ thiếu:
+  tầng redaction chung và bảng năng lực cho nửa API.
+  **Và ô này đóng bằng một kết luận khó chịu, ghi ra đây để không ai đọc lướt:**
+  gom bốn mặt lại một chỗ mới thấy thứ mà từng mặt riêng lẻ giấu được — **mật khẩu
+  dashboard và cờ `--tu-duyet-quyen` gặp nhau ở `POST /api/fleet`**, nên một mật khẩu
+  6 ký tự trên một cổng đang phơi ra internet là **thực thi mã tuỳ ý dưới
+  `Administrator`**. Không mặt nào trong bốn mặt tự nói ra được điều đó; **chỉ có cái
+  sườn mới nói ra**. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.
 
 ### Pha 1 — Storage + Claude slice + 1 API slice  **95%** (9 xong · 1 một phần)
 🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và **hai lát cắt dọc**.
@@ -784,7 +804,9 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
     / `FlowApprove` mà CLI dùng — nên approval gate vẫn không thể bị bỏ qua từ
     đường web. `internal/dash/lachan_test.go:151` giữ ánh xạ `flow.approve` →
     `/api/flow/decide`, tức luật ngang quyền vẫn có răng ở tầng hợp đồng.
-  - **CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.** `grep -rn "decide" internal/dash/web/`
+  - ~~**CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.**~~ ✅ **ĐÃ VÁ 21/08** — xem 5c.
+    Mô tả dưới đây giữ lại vì nó là cách ĐO ra lỗi, vẫn dùng được lần sau.
+  - **(Hiện trạng lúc phát hiện)** `grep -rn "decide" internal/dash/web/`
     ra **0 dòng**; `grep -rni "reject\|tu-choi"` cũng không có nút nào. Người dùng
     mở dashboard thấy bước `waiting` mà **không có chỗ bấm Duyệt / Từ chối** —
     phải quay về terminal gõ `sagent flow approve <#> <bước>`.
@@ -800,11 +822,17 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 **5c · Workflow board.**  **93%** (6 xong · 1 một phần)
 - [x] `/flow.html`: chọn flow + tài khoản + biến rồi **chạy**; xem lịch sử; mở
   một lần chạy thấy **từng bước và trạng thái** (done/running/waiting/failed/skipped).
-- [~] **Duyệt / từ chối ngay trên web** — cùng đường `Approve()` với CLI, nên
-  approval gate vẫn không thể bị bỏ qua. ⚠ **HẠ TỪ `[x]` XUỐNG `[~]` ngày 21/08:**
-  đường server còn nguyên (`/api/flow/decide`), nhưng **nút bấm đã biến mất khỏi
-  mọi trang** trong một lần vẽ lại giao diện — `grep -rn "decide" internal/dash/web/`
-  ra 0 dòng. Xem mục Approval gate ở 5b để biết cách đo và lịch sử commit.
+- [x] **Duyệt / từ chối ngay trên web** — cùng đường `Approve()` với CLI, nên
+  approval gate vẫn không thể bị bỏ qua. ✅ **VÁ LẠI 21/08, cùng ngày phát hiện**:
+  nút từng biến mất trong một lần vẽ lại giao diện (`grep -rn "decide"
+  internal/dash/web/` ra **0 dòng**), nay dựng lại ở khối tiến độ lượt chạy trên
+  mặt 2D — bước mang trạng thái `waiting` thì hiện thẳng **Duyệt / Từ chối**, gọi
+  `POST /api/flow/decide {id, step, approve}`. Khoá cả hai nút ngay khi bấm: mạng
+  chậm mà bấm hai lần là gửi hai quyết định.
+  **Và ghim để không mất lần nữa**: `TestMoiHanhDongCuaNguoiDungDeuCoDuongVaoTuWeb`
+  bắt mọi endpoint hành động phải có ít nhất một trang gọi tới. Luật ngang quyền
+  cũ chỉ canh **API ↔ CLI**; đây là mảnh **UI ↔ API** còn thiếu, và chính chỗ
+  thiếu đó làm nút biến mất mà không bài kiểm nào đỏ.
 - [x] Endpoint chạy flow **trả ngay** rồi làm ở nền: bước agent có thể mất hàng
   chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.
 - [x] Đã chạy thật qua HTTP: `shell → approve → shell`, dừng đúng ở gate, duyệt
@@ -931,7 +959,7 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
 | Pha | `[x]` | `[~]` | `[ ]` | `[!]` | Điểm | % |
 |---|---|---|---|---|---|---|
 | Bước 0 — Đổi tên | 3 | 0 | 1 | 0 | 3,0/4 | **75%** |
-| Pha 0 — Đo giả định | 2 | 5 | 0 | 0 | 4,5/7 | **64%** |
+| Pha 0 — Đo giả định | 3 | 4 | 0 | 0 | 5/7 | **71%** |
 | Pha 1 — Storage + slice | 9 | 1 | 0 | 0 | 9,5/10 | **95%** |
 | Pha 2 — Song song + Workspace | 22 | 0 | 0 | 0 | 22,0/22 | **100%** |
 | Pha 2.5 — Codex + OpenAI-compat | 8 | 0 | 0 | 0 | 8,0/8 | **100%** |
