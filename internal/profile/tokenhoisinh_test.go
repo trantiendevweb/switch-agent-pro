@@ -23,9 +23,10 @@ import (
 // Bước 3 là chỗ hỏng, và bài này canh đúng nó: `Clone` không được hồi sinh một
 // token cũ đè lên bản mới hơn.
 //
-// Chú ý phạm vi: bài này KHÔNG khẳng định nhà cung cấp có xoay vòng refresh
-// token hay không — cái đó vẫn CHƯA ĐO. Nó chỉ khẳng định công refresh không bị
-// đánh rơi, và đó là điều đúng bất kể nhà cung cấp làm gì.
+// Chú ý phạm vi: bài này chỉ khẳng định công refresh không bị đánh rơi, và đó
+// là điều đúng bất kể nhà cung cấp làm gì. Hai câu hỏi về nhà cung cấp thì đã
+// đo xong ở chỗ khác: xoay vòng refresh token (20/08) và cuộc đua N-clone cùng
+// refresh (21/08, xem `duarefresh_test.go`).
 
 func TestCloneKhongHoiSinhTokenCu(t *testing.T) {
 	_, fakeBase := fakeHome(t)

@@ -2427,3 +2427,116 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   trình con với `workDir` là worktree của phiên. Ba trạng thái năng lực đáng giá
   đúng ở chỗ này: nếu chỉ có hai, "không có cờ" sẽ phải khai chung với "chưa đo"
   và người sau lại đi đo lại một thứ đã có câu trả lời.
+
+## 21/08 — Đ5: cuộc đua N-clone cùng refresh. MỘT bản thắng, bản thua tự xoá trắng token của mình
+
+- **Đo lúc nào**: 21/08/2026, 04:19:33Z (11:19 giờ máy). Ô ĐỎ số 5 của
+  `docs/SO-NO-DO-LUONG.md` — nửa còn lại của cái bẫy đã cắn ngày 20/08.
+- **Câu hỏi**: mục 20/08 đã đo được nhà cung cấp **xoay vòng** refresh token, tức
+  một bản refresh là N−1 bản còn lại chết. Nửa chưa đo là **cuộc đua thật**: hai
+  clone cùng vượt mốc hết hạn trong cùng vài giây thì **bản nào thắng**, và
+  **bản thua nhận lỗi gì**.
+- **Đo bằng cách nào** — nhân đôi đúng thủ tục 20/08, thiết kế để không mất tài
+  khoản nào:
+  1. Chọn tài khoản `phu`, **không** phải `tns` — `tns` là tài khoản của chính
+     phiên đang đo, hỏng nó là hỏng luôn lượt chạy này. Sao lưu
+     `.credentials.json` của cả hai bản clone `phu`, ghi vân tay SHA-256 8 ký tự
+     đầu thay vì in token.
+  2. **Chạy đối chứng trước**: một thư mục config **tạm** `C` mang token của
+     `phu/1`, ép `expiresAt` về quá khứ 1 giờ, chạy `claude -p`. Bước này vừa
+     chứng minh token gốc còn sống, vừa lấy ra một refresh token **mới toanh**
+     làm hạt giống cho cuộc đua — để cuộc đua không phải xuất phát từ một token
+     đã đi qua tay ai.
+  3. Gieo **hai** thư mục tạm `A` và `B` từ kết quả bước 2 — cùng một refresh
+     token, cùng bị ép `expiresAt` về quá khứ.
+  4. Bật hai tiến trình `claude -p` **đồng bộ bằng file cờ**: cả hai khởi động
+     trước, quay vòng chờ file `GO` xuất hiện rồi mới chạy. Không dựa vào việc
+     gõ hai lệnh nhanh tay.
+  5. Sau đo: mang token của bản THẮNG về cả `phu/1` lẫn `phu/2`, rồi chạy thật
+     một lượt nữa để xác nhận tài khoản còn dùng được.
+- **Con số / Bằng chứng**:
+
+  | Mốc | refresh token | access token |
+  |---|---|---|
+  | Hạt giống (`A` và `B` giống hệt nhau) | `86fb2200` | `7ab8e294` |
+  | Sau cuộc đua — **A (thắng)** | **`d22e079d`** | `884df52d` |
+  | Sau cuộc đua — **B (thua)** | **rỗng** | **rỗng** |
+
+  Hai tiến trình xuất phát cách nhau **16ms** (A `04:19:33.497`, B
+  `04:19:33.513`). Kết cục:
+
+  | | A | B |
+  |---|---|---|
+  | mã thoát | **0** | **1** |
+  | `is_error` | `false` | `true` |
+  | `terminal_reason` | `completed` | `api_error` |
+  | `result` | `OK` | `Failed to authenticate: OAuth session expired and could not be refreshed` |
+  | thời gian | 6,98s (API 4,18s) | **chết sau 186ms** |
+  | chi phí | 0,0761945 USD | 0 |
+
+  **Đúng một bản thắng. Không có cửa sổ ân hạn nào cho bản thua** — nó không nhận
+  được token mới, cũng không được dùng lại token cũ.
+- **Phát hiện KHÔNG đoán ra được nếu không chạy thật** — bản thua **tự ghi đè
+  file token của chính nó thành rỗng**:
+
+  ```json
+  {"claudeAiOauth":{"accessToken":"","refreshToken":"","expiresAt":0,
+   "refreshTokenExpiresAt":1789634099575,"scopes":[...],
+   "subscriptionType":"max","rateLimitTier":"default_claude_max_20x"}}
+  ```
+
+  Vẫn còn `refreshTokenExpiresAt` (17/09, tương lai) và `subscriptionType: max`,
+  nên **nhìn qua vẫn giống một hồ sơ đã đăng nhập**. Đây chính là hình dạng đã
+  bắt gặp ngày 20/08 trên `.clones/claude/phu/1` ("không còn trường này") mà lúc
+  đó chưa giải thích được: nó là **chữ ký của một bản THUA cuộc đua refresh**.
+  Cũng đúng hình dạng `expiresAt: 0` = "đăng nhập dở dang" đã đo 19/08.
+- **Và chi tiết giết người: bản THUA ghi file SAU bản thắng.**
+
+  ```
+  A/.credentials.json  11:19:35.484608900   (token sống)
+  B/.credentials.json  11:19:35.500304400   (rỗng)  <- mới hơn 16ms
+  ```
+
+  Bản thua hỏng nhanh (186ms) nên nó ghi xong trước khi bản thắng chạy hết lượt
+  gọi API. Nghĩa là sau mỗi cuộc đua, **bản clone có `mtime` mới nhất là bản
+  hỏng**.
+- **LỖI THẬT tìm ra nhờ phép đo này**: `profile.SyncBackTokens` chọn bản clone
+  theo **mtime mới nhất** khi hồ sơ gốc còn token. Ghép với dòng trên: lượt bật
+  hạm đội kế tiếp sẽ chép **file rỗng của bản thua đè lên hồ sơ gốc**. Dựng lại
+  bằng test với đúng hình dạng file đã đo, kết quả còn tệ hơn dự đoán:
+
+  ```
+  --- FAIL: TestKhongDongBoNguocFileRongCuaBanThuaCuocDua
+      từ chối trong khi vẫn còn một bản token sống:
+      fake:phu chưa đăng nhập — chạy `sagent fake:phu` rồi /login trước
+  ```
+
+  Tức là: token sống **vẫn nằm nguyên trong bản thắng**, mà công cụ bắt người
+  dùng đăng nhập lại. Đúng "mất tài khoản lần thứ hai theo một chuỗi khác nhưng
+  cùng một gốc" mà sổ nợ đã cảnh báo.
+- **Đã sửa hay chưa**: **ĐÃ SỬA**, hai chỗ:
+  1. `SyncBackTokens` **bỏ qua mọi bản clone không còn token dùng được**, dù
+     mtime mới đến đâu (`internal/profile/clone.go`). Không bản nào còn token thì
+     không đồng bộ gì cả — hồ sơ gốc giữ nguyên, không bị cái rỗng nuốt.
+  2. `provider.PhanLoaiChet` thêm nhánh `terminal_reason == "api_error"`. Đo
+     được: bản ghi của bản thua **đọc ra hoàn hảo** (`Hong()` trả nguyên văn câu
+     `OAuth session expired…`) nhưng `PhanLoaiChet` trả **rỗng**, vì
+     `api_error_status` là `null` — nên phiên ở lại `lost` và bốn mặt điều khiển
+     in **"chết, chưa rõ vì sao"** cho đúng cái chết **có lý do rõ nhất** hệ
+     thống đọc được. Nay xếp `failed` kèm nguyên văn câu lỗi. Vẫn không dò chuỗi:
+     `terminal_reason` là trường có tên, giá trị enum.
+- **Cảnh báo lúc bung hạm đội** (`internal/fleet/fleet.go`) nay nói ra số đo thay
+  vì chỉ nói nguyên tắc: chỉ **một** bản refresh thành công, bản thua dừng ngay
+  với câu lỗi nguyên văn và để lại file token **rỗng** — không phải lỗi mạng,
+  không phải hết hạn mức.
+- **Tài khoản sau phép đo**: `phu/1` và `phu/2` cùng mang token thắng `d22e079d`;
+  chạy lại thật một lượt → `is_error=false`, `result=OK`,
+  `terminal_reason=completed`. Không mất đăng nhập nào. Tổng chi phí phép đo:
+  **0,2286 USD** (ba lượt `claude -p`, mỗi lượt ~0,0762 USD; lượt của bản thua
+  tốn 0).
+- **Bài học**: bản sửa ngày 20/08 (`Clone` gọi `SyncBackTokens` trước khi chép
+  đè) đúng, nhưng nó được viết dựa trên hình dung "clone giữ token MỚI, gốc giữ
+  token CŨ". Cuộc đua đẻ ra một hình dạng thứ ba mà hình dung đó không có chỗ
+  chứa: **một clone không giữ gì cả, và nó là bản mới nhất**. "Đã sửa cho lần
+  hỏng trước" và "đã đo cho lần hỏng sau" là hai chuyện khác nhau — khoảng cách
+  giữa chúng vừa đủ để nuốt thêm một tài khoản.

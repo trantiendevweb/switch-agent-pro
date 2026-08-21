@@ -44,6 +44,20 @@ func CloneDir(prov, account string, n int) string {
 // Nghĩa là chép token ra N chỗ KHÔNG cần N tiến trình đua nhau mới hỏng: MỘT
 // bản refresh là N-1 bản còn lại chết. Bản gốc cũng là một trong số đó.
 //
+// ⚠ ĐÃ ĐO NỐT NỬA CÒN LẠI (21/08/2026, ô Đ5) — cuộc đua THẬT:
+//
+// Hai clone mang cùng một refresh token, cùng bị ép hết hạn, bật cách nhau 16ms:
+//
+//	A: exit 0, refresh 86fb2200 -> d22e079d, lượt chạy xong bình thường
+//	B: exit 1 sau 186ms, "Failed to authenticate: OAuth session expired and
+//	   could not be refreshed", và tự ghi đè .credentials.json của mình thành
+//	   accessToken "" / refreshToken "" / expiresAt 0
+//
+// Không có bản thứ ba: đúng một bản thắng, không có cửa sổ ân hạn nào cho bản
+// thua. Và chi tiết quyết định cho khối đồng bộ bên dưới: bản THUA ghi file SAU
+// bản thắng (nó hỏng nhanh, còn bản thắng phải đợi hết lượt gọi API), nên "clone
+// có mtime mới nhất" chính là clone RỖNG.
+//
 // Đó là lý do khối đồng bộ ngược bên dưới không phải chuyện dọn dẹp cho gọn —
 // nó là thứ giữ cho tài khoản còn đăng nhập được.
 func Clone(a provider.Adapter, account string, copies int) ([]string, error) {
@@ -194,9 +208,19 @@ func SyncBackTokens(a provider.Adapter, account string) (string, error) {
 		if err != nil {
 			continue
 		}
+		// Bản KHÔNG còn token thì không bao giờ đáng mang về, dù mtime mới đến
+		// đâu. Đây là chỗ cuộc đua N-clone cắn (đo 21/08, ô Đ5): hai clone cùng
+		// refresh thì bản THUA ghi file rỗng SAU bản thắng — đo được 16ms sau —
+		// nên "mới nhất" đúng là bản hỏng. Không có dòng này, đồng bộ ngược chép
+		// cái rỗng đó đè lên hồ sơ gốc, và lượt bật hạm đội kế tiếp từ chối chạy
+		// với câu "chưa đăng nhập — chạy /login" trong khi token sống vẫn nằm
+		// nguyên trong bản thắng bên cạnh.
+		if !a.HasToken(thuMuc) {
+			continue
+		}
 		if !gocCoToken {
 			// Gốc rỗng: chọn clone CÒN TOKEN, mới nhất trong số đó.
-			if a.HasToken(thuMuc) && (newest == "" || st.ModTime().After(newestTime)) {
+			if newest == "" || st.ModTime().After(newestTime) {
 				newest, newestTime = p, st.ModTime()
 			}
 			continue

@@ -157,7 +157,24 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   `Khong(NLHanToken, ...)` vì API key **không có** hạn đọc được từ file — một kết
   luận, không phải một khoảng trống.
 
-## Đ5. N bản clone CÙNG refresh một lúc — chưa đo
+## ~~Đ5~~ ✅ ĐÃ ĐÓNG 21/08 — Cuộc đua N-clone: ĐÃ CHẠY THẬT
+
+> **Kết quả**: hai clone cùng token, cùng bị ép hết hạn, bật cách nhau **16ms**
+> → **đúng MỘT bản thắng** (`86fb2200` → `d22e079d`), không có cửa sổ ân hạn.
+> Bản thua chết sau **186ms** với *"Failed to authenticate: OAuth session
+> expired and could not be refreshed"* và **tự ghi đè file token của chính nó
+> thành rỗng** (`expiresAt: 0`).
+>
+> **Hai lỗi thật tìm được nhờ chạy**: (1) bản thua ghi file **SAU** bản thắng,
+> nên `SyncBackTokens` chọn-theo-mtime sẽ chép **file rỗng đè lên hồ sơ gốc** —
+> dựng lại được bằng test, và kết cục là công cụ đòi `/login` trong khi token
+> sống vẫn nằm trong bản thắng; (2) `PhanLoaiChet` trả rỗng cho bản ghi này
+> (`api_error_status` là `null`), nên cái chết **có lý do rõ nhất** lại hiện ra
+> là *"chết, chưa rõ vì sao"*. Đã sửa cả hai.
+> Xem `docs/DO-LUONG.md`, mục 21/08, và `internal/profile/duarefresh_test.go`.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/fleet/fleet_test.go:264-265`; `docs/DO-LUONG.md` mục 20/08
   (phần *"Còn treo"*).
@@ -176,6 +193,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 - **Đo thế nào để đóng**: đúng thủ tục đã dùng ở mục 20/08 của `DO-LUONG.md` (sao
   lưu, vân tay SHA-256 8 ký tự đầu, thư mục config tạm nên không mất gì), nhưng
   ép `expiresAt` của **hai** clone về quá khứ rồi bật cả hai cùng lúc.
+
+</details>
 
 ---
 
@@ -388,6 +407,8 @@ người sau đừng dọn nhầm.
 | `internal/dash/mat2d_test.go:165,182` | Ô chưa có số phải ghi `CHUA_DO`; cấm điền `0`, cấm đọc trường không tồn tại | C4 |
 | `internal/dash/ngankeo_test.go:273` | Khối tiến độ phải đi qua `datSo()` | C4 |
 | `internal/fleet/fleet_test.go:281-289` | Cảnh báo phải nói **đúng số bản** và nói ra hậu quả xoay vòng | Đ5, N1 |
+| `internal/profile/duarefresh_test.go` | Đồng bộ ngược KHÔNG được chọn file rỗng của bản thua cuộc đua, dù mtime mới nhất | Đ5 |
+| `internal/provider/duarefresh_banthua_test.go` | Bản ghi của bản thua phải ra `failed` kèm nguyên văn câu lỗi, không rơi về `lost` | Đ5, C1 |
 | `internal/fleet/fleet_test.go:296`; `internal/profile/{clone_acl,ditru,profile}_test.go` | Adapter GIẢ khai `ChuaDo` toàn bộ — khai bừa "làm được" là conformance bắt | toàn bộ |
 
 Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này chứ không phải nợ:
@@ -407,8 +428,10 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
    `codex exec` trong worktree vứt đi, và đang là ô **duy nhất** khai xanh mà
    chưa có bằng chứng chạy thật. Lý do hoãn cũ là hết hạn mức tới 20/08; lý do đó
    đã hết hạn theo chính hạn mức.
-2. **Đ5** (cuộc đua N-clone) — thủ tục đã có sẵn ở `DO-LUONG.md` 20/08, chỉ nhân
-   đôi. Đây là nửa còn lại của cái bẫy đã cắn một lần.
+2. ~~**Đ5** (cuộc đua N-clone)~~ — **đã đóng 21/08**, và nó không chỉ trả lời
+   câu hỏi cũ: phép đo lôi ra hai lỗi thật trong `SyncBackTokens` và
+   `PhanLoaiChet`. Nửa còn lại của cái bẫy đã cắn một lần thì cắn theo một kiểu
+   khác hẳn nửa đầu.
 3. **N1** (xoá dòng nợ ngược) — sửa hai câu bình luận, không phải đo gì.
 4. **Đ4 Cursor**, **Đ3**, **C6** — cùng một rào chắn: máy dev chưa cài
    `cursor-agent`. Cài một lần là đóng được ba ô.

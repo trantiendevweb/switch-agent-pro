@@ -126,6 +126,13 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 				"sẽ giết token của các bản kia GIỮA CHỪNG, và đồng bộ ngược không chen vào "+
 				"được lúc đó. Lượt chạy dài thì nên chia cho NHIỀU TÀI KHOẢN thay vì nhiều "+
 				"bản của một tài khoản.", o.Copies)
+			// Đo 21/08 (ô Đ5): đua thật, hai bản cách nhau 16ms. ĐÚNG MỘT bản
+			// thắng; bản thua chết sau 186ms với đúng câu dưới đây rồi tự ghi đè
+			// file token của mình thành rỗng. Nói ra nguyên văn câu lỗi để người
+			// vận hành đọc log là nhận ra ngay, thay vì đi tìm nguyên nhân khác.
+			bus.Warnf("Đo thật: chỉ MỘT bản refresh thành công; bản thua dừng ngay với "+
+				"\"OAuth session expired and could not be refreshed\" và để lại file token "+
+				"RỖNG (expiresAt 0) — không phải lỗi mạng, không phải hết hạn mức.")
 		}
 	}
 	if o.Worktree {
