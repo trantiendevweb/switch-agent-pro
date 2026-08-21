@@ -52,6 +52,13 @@ type KetQua struct {
 	LenhLap     string
 	SoLanLap    int
 	DemDuocTool bool
+
+	// SoLoiGoiTool là TỔNG số lời gọi tool bóc được trong lượt — CỠ MẪU đứng
+	// sau SoLanLap. `SoLanLap=1` trên một lượt 300 lời gọi nghĩa là agent chưa
+	// lần nào lặp; `SoLanLap=1` trên một lượt bóc được đúng 1 lời gọi thì không
+	// nghĩa gì hết. Không có con số này thì hai ca đó nhìn giống hệt nhau, và
+	// mọi kết luận về ngưỡng TranLapLienTiep đều là đoán. Xem quan.go.
+	SoLoiGoiTool int
 }
 
 // Hong trả về lý do nếu lượt chạy này KHÔNG thành công, hoặc "" nếu ổn.

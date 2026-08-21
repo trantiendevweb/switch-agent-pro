@@ -39,11 +39,23 @@ import (
 // liên tiếp với ĐÚNG một tham số đã là quá tay, và lần thứ 10 không mang thêm
 // thông tin gì so với lần thứ 9.
 //
-// Nói thẳng con số này ĐƯỢC BAO NHIÊU BẰNG CHỨNG: ca quẩn duy nhất đo được là
-// 399 lần liên tiếp — cách ngưỡng rất xa, nên nó chứng minh ngưỡng KHÔNG BỎ SÓT
-// ca thật. Mặt kia (có bắt oan lượt bình thường không) thì CHƯA ĐO ĐƯỢC: chưa
-// đếm chuỗi lặp dài nhất trên một bản ghi lượt-chạy-bình-thường nào. Khi nào đo
-// được thì chỉnh theo số, đừng chỉnh theo cảm giác.
+// Nói thẳng con số này ĐƯỢC BAO NHIÊU BẰNG CHỨNG. Hai mặt, cả hai đã đo:
+//
+//   - KHÔNG BỎ SÓT ca thật: ca quẩn duy nhất đo được là 399 lần liên tiếp —
+//     cách ngưỡng 39 lần, không có cửa lọt.
+//   - KHÔNG BẮT OAN lượt bình thường: ĐO 21/08/2026 trên bản ghi THẬT của máy
+//     này — 9 phiên fleet bình thường trong sổ, 414 lời gọi tool bóc được,
+//     chuỗi lặp liên tiếp dài nhất trên TOÀN BỘ là 1. Tức không lần nào một
+//     agent đang làm việc gọi lại y hệt lời gọi ngay trước nó. Khoảng cách tới
+//     ngưỡng là 9. Phép đo nằm ở quan_do_thuc_test.go và chạy lại mỗi lần
+//     `go test`, nên ngày một lượt bình thường tiến sát 10 là biết ngay.
+//
+// Số đo KHÔNG đòi đổi ngưỡng, nên ngưỡng giữ nguyên 10. Đo lại rồi hẵng chỉnh,
+// đừng chỉnh theo cảm giác.
+//
+// Phần đo được che tới đâu thì nói tới đó: 414 lời gọi ấy đều là Claude. Bản ghi
+// của Antigravity và Grok trên máy này KHÔNG mang tham số lời gọi nên không đếm
+// được — chúng vẫn ở "KHÔNG BIẾT", đúng như ketqua_antigravity.go đã khai.
 const TranLapLienTiep = 10
 
 // Quan kết luận agent trong lượt này có chạy quẩn hay không.
@@ -76,6 +88,16 @@ type demQuan struct {
 	chuKy   string // chữ ký của chuỗi dài nhất
 	daiNhat int    // độ dài chuỗi dài nhất
 	docDuoc bool   // đã bóc được ÍT NHẤT một lời gọi có tham số
+
+	// soLoiGoi là TỔNG số lời gọi bóc được trong lượt — CỠ MẪU của phép đếm.
+	//
+	// Thiếu nó thì `daiNhat` đọc một mình không kết luận được gì: một bản ghi
+	// chỉ bóc nổi ĐÚNG MỘT lời gọi cũng cho daiNhat=1, y hệt một lượt 500 lời
+	// gọi mà không lần nào lặp liên tiếp. Hai bản ghi ấy nói hai điều trái
+	// ngược nhau về ngưỡng TranLapLienTiep — cái đầu không nói gì cả, cái sau
+	// là bằng chứng. Đây là con số phép đo thực (quan_do_thuc_test.go) cần để
+	// biết nó đang kết luận trên bao nhiêu dữ liệu.
+	soLoiGoi int
 }
 
 // Them nạp một lời gọi tool. `ok=false` nghĩa là không bóc được chữ ký dùng
@@ -92,6 +114,7 @@ func (d *demQuan) Them(chuKy string, ok bool) {
 		return
 	}
 	d.docDuoc = true
+	d.soLoiGoi++
 	if chuKy == d.truoc {
 		d.dai++
 	} else {
@@ -102,9 +125,10 @@ func (d *demQuan) Them(chuKy string, ok bool) {
 	}
 }
 
-// KetLuan trả về chuỗi lặp dài nhất, kèm cờ CÓ ĐỌC ĐƯỢC lời gọi tool nào không.
-func (d *demQuan) KetLuan() (lenh string, soLan int, docDuoc bool) {
-	return d.chuKy, d.daiNhat, d.docDuoc
+// KetLuan trả về chuỗi lặp dài nhất, CỠ MẪU (tổng số lời gọi bóc được), kèm cờ
+// CÓ ĐỌC ĐƯỢC lời gọi tool nào không.
+func (d *demQuan) KetLuan() (lenh string, soLan, soLoiGoi int, docDuoc bool) {
+	return d.chuKy, d.daiNhat, d.soLoiGoi, d.docDuoc
 }
 
 // chuKyTool dựng CHỮ KÝ của một lời gọi tool: tên tool CỘNG tham số.
