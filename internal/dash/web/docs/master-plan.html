@@ -877,13 +877,53 @@ Dựng sẵn trong binary: <code>internal/flow/builtin.go:10</code> (<code>fanou
 <code>:56</code> (<code>agents</code>) — dùng ngay không cần file. Đây là <strong>bản trùng</strong> của dòng
 &#34;3 flow mẫu dựng sẵn&#34; đã tick bên dưới; giữ cả hai thì kế hoạch tự nói sai về
 mình, nên tick luôn. Chạy 21/08: <code>sagent flow list</code> in <strong>11 flow</strong>, gồm cả ba mẫu.</li>
-<li class="task"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
+<li class="task done"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
 JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.
-<strong>CHƯA LÀM THẬT</strong> — đã kiểm chứ không đoán: <code>grep -rni &#34;plugin\|json-rpc&#34; internal/
-cmd/ --include=*.go</code> chỉ ra <strong>một</strong> dòng, và đó là chuỗi <code>&#34;pluginUsage&#34;</code> trong
-<code>internal/provider/claude.go:210</code> (một khoá JSON của Claude, không liên quan).
-Không có manifest, không có tiến trình con nói JSON-RPC, không có hộp quyền.
-Xếp <code>[ ]</code> chứ không <code>[!]</code>: không thiếu gì bên ngoài cả.</li>
+Làm 22/08 ở <code>internal/plugin</code> (manifest · quyen · rpc · chay · bochay), plugin mẫu
+<code>cmd/sagent-plugin-mau</code>, node <code>plugin</code> trong <code>internal/flow</code>, lệnh <code>sagent plugin</code>
+và <code>/api/plugins</code>. Bốn ràng buộc, và chỗ ĐO được từng cái:
+<ul>
+<li><strong>TOML chỉ tĩnh</strong> — lược đồ không có trường nào nhận biểu thức/script/lệnh, và
+bộ đọc <strong>TỪ CHỐI KHOÁ LẠ</strong> (<code>Doc</code> soi <code>md.Undecoded()</code>). Đây là phần đáng kể:
+thư viện TOML mặc định <strong>bỏ qua</strong> khoá không khai, nên <code>gia_tri = &#34;sk-...&#34;</code> hay
+<code>[hook] truoc_khi_chay = &#34;...&#34;</code> sẽ nằm im trong file — người viết tưởng nó chạy,
+người soi tưởng nó đã được xử lý. <code>TestManifestTuChoiKhoaLa</code> bắt cả ba ca đó.</li>
+<li><strong>Executable riêng, JSON-RPC/stdio, có số phiên bản</strong> — <code>GiaoThuc = 1</code>, bắt tay
+bằng <code>sagent.bat_tay</code> NGAY trong <code>Mo()</code>, trước khi có ai kịp gửi dữ liệu (kể cả
+secret) cho tiến trình con. Lệch số thì <strong>dừng ở lượt bắt tay</strong>, không phải nổ
+giữa một lượt flow đang chạy. Khung bản tin dùng CHUNG cho hai phía (<code>PhucVu</code>
+cho plugin, <code>Client</code> cho host), nên hai bên không có đường nào lệch nhau về khung.</li>
+<li><strong>Secret chỉ là tham chiếu</strong> — manifest chỉ có <code>key_id</code>; giá trị nằm ở
+<code>~/.ai-accounts/api-keys/&lt;id&gt;.key</code> và đọc qua đúng <code>aiapi.DocKey</code> (một bản duy
+nhất của luật &#34;kho ở đâu, tên thế nào là hợp lệ&#34;). Giá trị đi qua <strong>stdio</strong> lúc
+bắt tay — cố ý KHÔNG qua argv (mọi tiến trình trên máy đọc được dòng lệnh) và
+KHÔNG qua biến môi trường (con cháu của plugin thừa hưởng hết).</li>
+<li><strong>Capability tối thiểu</strong> — plugin không khai thì KHÔNG có. Đo bằng cách chạy
+<strong>cùng một binary</strong> hai lần, chỉ khác mấy dòng TOML, rồi so hai câu trả lời:
+<code>TestKhongKhaiThuMucThiKhongThayThuMucDuAn</code>,
+<code>TestKhongKhaiMoiTruongThiKhongThayBienCuaCha</code>,
+<code>TestKhongKhaiSecretThiKhongNhanDuocGiaTri</code>. Cả ba đã được thử ngược (bỏ hàng
+rào đi thì test đỏ), trừ ca secret — hàng rào thật của nó nằm ở tầng đọc
+manifest (<code>TestKhaiSecretMaKhongKhaiQuyenThiTuChoi</code>), nhánh trong <code>docSecret</code>
+chỉ là lớp thứ hai.
+Bảng quyền (<code>sagent plugin quyen</code>) có <strong>HAI cột chứ không phải một</strong>: plugin KHAI
+gì, và host <strong>CHẶN được tới đâu</strong> — ba trạng thái y như bảng năng lực provider.
+Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên hai chỗ này phải nói thẳng:</li>
+<li><code>ghi-thu-muc-lam-viec</code>: <strong>KHÔNG CHẶN ĐƯỢC</strong> (đã đo, là kết luận chứ không phải
+khoảng trống). Thấy được đường dẫn thì ghi được; chặn ghi đòi ACL riêng cho từng
+lần chạy, chưa làm. Cách chặn thật đang có là không cấp <code>thu-muc-lam-viec</code>.</li>
+<li><code>mang</code>: <strong>CHƯA ĐO</strong>. Host hiện KHÔNG chặn tiến trình con mở socket. Còn đường
+WFP/AppContainer trên Windows nhưng chưa ai thử, chưa có phép đo nào trên máy
+thật. <strong>Không khai quyền <code>mang</code> KHÔNG có nghĩa là plugin bị chặn</strong> — CLI in
+cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.
+Node <code>plugin</code> bật <code>implemented = true</code> vì đã chạy THẬT đầu-cuối
+(<code>TestFlowChayPluginThat</code>: build binary → <code>flow.Runner</code> thật → tiến trình con →
+kết quả chuyền sang bước sau), không phải vì đã viết xong mã. Nó là ĐƯỜNG THỨ BA
+bên cạnh agent và model API, và cắm vào đúng <code>internal/flow</code> để dùng lại DAG,
+retry, <code>on_failure</code>, <code>{{bien}}</code>, <code>doc_duoc</code>, <code>phai_co</code> — chứ không mọc thành hệ
+thứ hai bắt người dùng học hai bộ luật cho cùng một câu &#34;bước này hỏng thì sao&#34;.</li>
+</ul>
+</li>
 <li class="task done"><span class="box"></span><code>internal/flow</code>: schema <code>flows.toml</code>, tầng đọc (mẫu dựng sẵn → global →
 dự án), <strong>kiểm tra DAG</strong> (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
 thứ tự chạy topo <strong>ổn định</strong>, <code>{{bien}}</code>.</li>

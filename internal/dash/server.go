@@ -78,6 +78,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 	m.HandleFunc("/api/nang-luc", s.guard(s.handleNangLuc))
 	m.HandleFunc("/api/nhat-ky", s.guard(s.handleNhatKy))
+	m.HandleFunc("/api/plugins", s.guard(s.handlePlugins))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
 	m.HandleFunc("/api/run", s.guard(s.handleRun))

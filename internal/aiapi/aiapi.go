@@ -141,6 +141,13 @@ func docKey(id string) (string, error) {
 	return k, nil
 }
 
+// DocKey là docKey cho gói khác dùng — cùng một kho key, cùng một luật tên.
+//
+// Có mặt để internal/plugin KHÔNG phải viết bản sao thứ hai của "secret nằm ở
+// đâu và tên thế nào là hợp lệ". Hai bản sao của một luật an ninh là hai bản sẽ
+// lệch nhau, và bản lệch bao giờ cũng là bản lỏng hơn.
+func DocKey(id string) (string, error) { return docKey(id) }
+
 type yeuCau struct {
 	Model    string    `json:"model"`
 	Messages []tinNhan `json:"messages"`

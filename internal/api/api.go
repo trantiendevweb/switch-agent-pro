@@ -30,6 +30,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
 	"github.com/trantiendevweb/switch-agent-pro/internal/nhatky"
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
+	"github.com/trantiendevweb/switch-agent-pro/internal/plugin"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
@@ -103,6 +104,10 @@ var Actions = []string{
 	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
 	// động này thì không mặt nào nhìn ra chúng.
 	"session.sweep",
+	// PLUGIN: mã của người khác chạy trên máy mình. Nằm trong hợp đồng vì đây là
+	// câu phải trả lời được TRƯỚC khi để một flow gọi tới nó — plugin nào đã cài,
+	// nó xin quyền gì, và host CHẶN được quyền đó tới đâu. Xem internal/plugin.
+	"plugin.list",
 	"dash.serve",
 	// db.admin cùng loại với dash.serve: có mặt trong hợp đồng, nhưng mặt web
 	// KHÔNG tự làm được phần nặng của nó. `db restore` ghi đè chính file mà
@@ -1590,7 +1595,7 @@ func (a *API) waitSessions(ctx context.Context, ids []int64) error {
 	}
 }
 
-func (a *API) runner(defaultProfile Addr) *flow.Runner {
+func (a *API) runner(defaultProfile Addr, dir string) *flow.Runner {
 	// Tài khoản mặc định đi kèm để event báo hỏng nói được "chạy bằng tài khoản
 	// nào" — bước không khai `profile` thì đây là câu trả lời duy nhất đúng.
 	mac := ""
@@ -1599,8 +1604,12 @@ func (a *API) runner(defaultProfile Addr) *flow.Runner {
 	}
 	return &flow.Runner{
 		DB: a.db, Bus: a.bus,
-		Agent:          agentBridge{a: a, fallback: defaultProfile},
-		Model:          modelBridge{a: a},
+		Agent: agentBridge{a: a, fallback: defaultProfile},
+		Model: modelBridge{a: a},
+		// Đường THỨ BA: plugin ngoài. `dir` vừa là nơi tìm .sagent/plugins, vừa là
+		// thư mục làm việc cấp cho plugin nào KHAI quyền thu-muc-lam-viec — plugin
+		// không khai thì internal/plugin không đưa đường dẫn này cho nó.
+		Plugin:         &plugin.BoChay{Dir: dir, Ghi: func(m string) { a.bus.Infof("%s", m) }},
 		DefaultProfile: mac,
 		MaxParallel:    a.cfg.Policy.MaxParallelSessions,
 		// Node `test`/`lint` lấy lệnh từ .sagent/project.toml, khỏi lặp lại
@@ -1735,7 +1744,7 @@ func (a *API) FlowRunCuChay(ctx context.Context, dir, name string, vars map[stri
 				h.Addr, h.LyDo, strings.Join(h.Buoc, ", "))
 		}
 	}
-	return a.runner(defaultProfile).Start(ctx, f, dir, vars)
+	return a.runner(defaultProfile, dir).Start(ctx, f, dir, vars)
 }
 
 // FlowResume — chạy tiếp một lần chạy đang dở.
@@ -1748,7 +1757,7 @@ func (a *API) FlowResume(ctx context.Context, runID int64, defaultProfile Addr) 
 	if err != nil {
 		return flow.Result{}, err
 	}
-	return a.runner(defaultProfile).Resume(ctx, runID, f)
+	return a.runner(defaultProfile, run.Dir).Resume(ctx, runID, f)
 }
 
 // FlowCancel — action "flow.cancel". Đánh dấu một lần chạy dở dang là ĐÃ HUỶ.
@@ -1756,7 +1765,7 @@ func (a *API) FlowResume(ctx context.Context, runID int64, defaultProfile Addr) 
 // KHÔNG giết tiến trình nào: sổ trạng thái và tiến trình là hai chuyện. Dừng
 // tiến trình là việc của `sagent stop`.
 func (a *API) FlowCancel(runID int64, by string) error {
-	return a.runner(Addr{}).Huy(runID, by)
+	return a.runner(Addr{}, "").Huy(runID, by)
 }
 
 // FlowRunDetail trả về lần chạy + trạng thái từng bước + định nghĩa flow.
@@ -1776,7 +1785,7 @@ func (a *API) FlowRunDetail(runID int64) (store.Run, map[string]store.StepRun, f
 // FlowApproveOnly chỉ đánh dấu đã duyệt, KHÔNG chạy tiếp — để mặt web trả lời
 // người bấm nút ngay rồi mới chạy phần còn lại ở nền.
 func (a *API) FlowApproveOnly(runID int64, stepID, by string) error {
-	return a.runner(Addr{}).Approve(runID, stepID, by)
+	return a.runner(Addr{}, "").Approve(runID, stepID, by)
 }
 
 // FlowSave — action "flow.save". Ghi flow vào flows.toml (nguồn sự thật).
@@ -1796,7 +1805,9 @@ func (a *API) FlowSteps(runID int64) (map[string]store.StepRun, error) { return 
 
 // FlowApprove — action "flow.approve". Duyệt (hoặc từ chối) rồi chạy tiếp.
 func (a *API) FlowApprove(ctx context.Context, runID int64, stepID, by string, ok bool, defaultProfile Addr) (flow.Result, error) {
-	r := a.runner(defaultProfile)
+	// Approve/Reject không chạy bước nào; phần chạy tiếp đi qua FlowResume,
+	// và chính nó dựng Runner mới với đúng thư mục của lượt chạy.
+	r := a.runner(defaultProfile, "")
 	if !ok {
 		return flow.Result{RunID: runID, State: store.RunCanceled}, r.Reject(runID, stepID, by)
 	}

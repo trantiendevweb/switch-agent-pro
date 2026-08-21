@@ -1,0 +1,54 @@
+# Manifest của plugin mẫu `tom-luoc` — xem internal/plugin và cmd/sagent-plugin-mau.
+#
+# CÁCH DÙNG (một lệnh, chạy từ gốc repo):
+#
+#   go build -o .sagent/plugins/tom-luoc/sagent-plugin-mau ./cmd/sagent-plugin-mau
+#   sagent plugin                  # phải thấy `tom-luoc`, không còn dòng CHƯA CÓ EXECUTABLE
+#
+# rồi đặt một bước vào flows.toml:
+#
+#   [[flows.vi-du.steps]]
+#   id     = "gon"
+#   type   = "plugin"
+#   needs  = ["soi"]
+#   plugin = "tom-luoc"
+#   vao    = "{{steps.soi.output}}"
+#   tham_so = { so_dong = "10" }
+#
+# FILE NÀY CHỈ LÀ KHAI BÁO TĨNH. Không có logic ở đây, và bộ đọc TỪ CHỐI mọi khoá
+# không có trong lược đồ — kể cả một khoá trông vô hại như `gia_tri` hay `script`.
+# Logic nằm ở executable, nói JSON-RPC trên stdio.
+
+version = 1
+
+[plugin]
+ten = "tom-luoc"
+mo_ta = "tóm lược kết quả dài thành số đo + vài dòng cuối"
+phien_ban = "0.1.0"
+giao_thuc = 1
+# Đường dẫn TƯƠNG ĐỐI trong thư mục plugin, ghi tên trần không đuôi: trên Windows
+# host tự thử thêm .exe, nên đúng file này chép sang máy khác vẫn dùng được.
+exec = "sagent-plugin-mau"
+
+# KHÔNG CÓ [[quyen]] NÀO — và đó là điểm chính của bản mẫu.
+#
+# Plugin này chỉ cần chữ gửi qua stdio, nên nó không xin thư mục làm việc, không
+# xin biến môi trường, không xin secret. Host cấp đúng bằng đó: tiến trình con
+# chạy trong một thư mục tạm rỗng, với môi trường dựng từ đầu.
+#
+# Muốn xin thì thêm khối như dưới đây — `ly_do` bắt buộc, và `sagent plugin quyen`
+# sẽ nói cho bạn biết host có CHẶN được quyền đó thật hay không:
+#
+#   [[quyen]]
+#   khoa  = "thu-muc-lam-viec"
+#   ly_do = "đọc file kết quả trong thư mục dự án"
+#
+# Secret thì chỉ được là THAM CHIẾU, không bao giờ là giá trị:
+#
+#   [[quyen]]
+#   khoa  = "secret"
+#   ly_do = "gọi API của bên thứ ba"
+#
+#   [[secret]]
+#   ten    = "token"       # tên plugin nhận được
+#   key_id = "grok"        # tên file trong ~/.ai-accounts/api-keys, KHÔNG phải key
