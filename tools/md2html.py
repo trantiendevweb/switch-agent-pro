@@ -75,6 +75,12 @@ margin-right:8px;vertical-align:-2px}
 .task.done .box{background:var(--run);border-color:var(--run);position:relative}
 .task.done .box::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
 border:solid #0F172A;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.task.part .box{border-color:var(--warn);position:relative}
+.task.part .box::after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:5px;
+background:var(--warn);border-radius:2px 0 0 2px}
+.task.block .box{border-color:var(--limit);position:relative}
+.task.block .box::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;
+color:var(--limit);font-size:11px;font-weight:800;line-height:1}
 .top{position:fixed;right:16px;bottom:calc(16px + var(--safe-b));z-index:15;background:var(--panel);
 border:1px solid var(--border);color:var(--fg);border-radius:999px;width:44px;height:44px;display:grid;
 place-items:center;cursor:pointer;backdrop-filter:blur(14px);text-decoration:none}
@@ -140,8 +146,16 @@ def normalize_lists(text):
 
 
 def task_lists(h):
-    """Bien '- [ ]' / '- [x]' thanh o tick tinh (khong can JS)."""
+    """Bien '- [ ]' / '- [x]' / '- [~]' / '- [!]' thanh o tick tinh (khong can JS).
+
+    Bon dau chu khong phai hai, giong tools/sinhkehoach: [~] la xong mot phan,
+    [!] la bi chan vi thieu thu ben ngoai. Bo sot hai dau moi thi chung lot ra
+    trang duoi dang chu tho '[~]' — xau nhung thay ngay; nguy hiem hon nhieu la
+    neu ai do "sua" bang cach gop chung vao done, luc do trang noi doi.
+    """
     h = re.sub(r'<li>\s*\[[xX]\]\s*', '<li class="task done"><span class="box"></span>', h)
+    h = re.sub(r'<li>\s*\[~\]\s*', '<li class="task part"><span class="box"></span>', h)
+    h = re.sub(r'<li>\s*\[!\]\s*', '<li class="task block"><span class="box"></span>', h)
     h = re.sub(r'<li>\s*\[ \]\s*', '<li class="task"><span class="box"></span>', h)
     return h
 
@@ -164,6 +178,11 @@ def main(argv):
         output_format="html5",
     )
     body = task_lists(body)
+    # ~~gach ngang~~ -> <del>. Goi markdown khong bat extension nay, nen truoc
+    # ngay 21/08 moi cho ~~...~~ trong MASTER-PLAN.md loi ra trang duoi dang hai
+    # dau ngã tho (dem duoc: 4 cho). Bo sinh Go (tools/sinhkehoach) co reGach lam
+    # dung viec nay — hai trang cua cung mot file .md ma hien khac nhau la loi.
+    body = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", body)
     # bang cuon ngang duoc tren dien thoai
     body = body.replace("<table>", '<div class="tw"><table>').replace("</table>", "</table></div>")
 

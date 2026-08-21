@@ -68,6 +68,15 @@ margin-right:8px;vertical-align:-2px}
 .task.done .box{background:var(--run);border-color:var(--run);position:relative}
 .task.done .box::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
 border:solid #0F172A;border-width:0 2px 2px 0;transform:rotate(45deg)}
+/* [~] xong mot phan: o day NUA. Co y khong dung dau tick mo dan — mo dan doc ra
+   la "xong, hoi nhat", con nua o doc ra la "moi duoc mot nua", va do moi la nghia. */
+.task.part .box{border-color:var(--warn);position:relative}
+.task.part .box::after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:5px;
+background:var(--warn);border-radius:2px 0 0 2px}
+/* [!] bi chan: dau cham than, khong phai o trong. Bi chan KHAC chua lam. */
+.task.block .box{border-color:var(--limit);position:relative}
+.task.block .box::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;
+color:var(--limit);font-size:11px;font-weight:800;line-height:1}
 .top{position:fixed;right:16px;bottom:calc(16px + var(--safe-b));z-index:15;background:var(--panel);
 border:1px solid var(--border);color:var(--fg);border-radius:999px;width:44px;height:44px;display:grid;
 place-items:center;cursor:pointer;backdrop-filter:blur(14px);text-decoration:none}
@@ -415,32 +424,204 @@ sang SQLite. (3) Chưa có domain layer, daemon, API path, workflow. (4) Chưa c
 </blockquote>
 <hr />
 <h2>7. Lộ trình (8 pha, mỗi pha ra 1 bản dùng được)</h2>
-<h3>Bước 0 — Đổi tên ✅ XONG (2026-08-17)</h3>
+<blockquote>
+<p><strong>Bốn dấu, không phải hai</strong> (soát lại 21/08/2026). Trước lượt soát này chỉ có
+<code>[x]</code> và <code>[ ]</code>, và hai dấu thì không đủ chỗ cho sự thật: một mục làm được 80%
+phải khai là <code>[ ]</code>, và một mục không làm được vì thiếu khoá API bên ngoài cũng
+khai là <code>[ ]</code> — y hệt một mục chưa ai đụng tới. Đếm ra 81 xong / 18 còn (82%),
+mà mở mã ra đọc thì phần lớn 18 mục kia đã làm rồi. <strong>Kế hoạch nói sai về chính
+nó, theo chiều bi quan.</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Dấu</th>
+<th>Nghĩa</th>
+<th>Luật</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[x]</code></td>
+<td>XONG</td>
+<td>phải dẫn được <code>file:dòng</code> hoặc lệnh chạy được. Không dẫn được thì <strong>đừng tick</strong></td>
+</tr>
+<tr>
+<td><code>[~]</code></td>
+<td>XONG MỘT PHẦN</td>
+<td>phải ghi rõ <strong>phần nào xong, phần nào chưa</strong></td>
+</tr>
+<tr>
+<td><code>[ ]</code></td>
+<td>CHƯA LÀM</td>
+<td>không ai đụng tới, và không có gì bên ngoài cản</td>
+</tr>
+<tr>
+<td><code>[!]</code></td>
+<td>BỊ CHẶN</td>
+<td><strong>làm được, nhưng thiếu thứ bên ngoài</strong> (khoá API thật, phần mềm chưa cài)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Gộp <code>[ ]</code> với <code>[!]</code> là nói dối theo chiều bi quan: một đằng là nợ của dự án,
+một đằng là thứ dự án không tự gỡ được. Lượt soát 21/08 xếp 18 mục thành
+<strong>7 <code>[x]</code> · 9 <code>[~]</code> · 2 <code>[ ]</code> · 0 <code>[!]</code></strong> — ô <code>[!]</code> rỗng vì thứ duy nhất còn
+bị chặn thật (OpenRouter/Ollama, thiếu key) nằm ở dòng <code>⬜</code> trong Trạng thái
+Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</code>=1, <code>[~]</code>=0,5,
+<code>[ ]</code>=0, <code>[!]</code> <strong>không vào mẫu số</strong>. Bảng đếm ở cuối mục 7.</p>
+</blockquote>
+<h3>Bước 0 — Đổi tên  <strong>75%</strong> (3 xong · 1 chưa)</h3>
 <ul>
 <li class="task done"><span class="box"></span><code>go.mod</code> module → <code>github.com/trantiendevweb/switch-agent-pro</code>; <code>cmd/ccswitch</code>
 → <code>cmd/sagent</code> (git mv); cập nhật mọi import; <strong>build + vet + test xanh</strong>; <code>sagent ds</code> chạy đúng.</li>
 <li class="task done"><span class="box"></span>Cập nhật <code>install/cai-dat.{ps1,sh}</code>, CI, <code>.gitignore</code> sang <code>sagent</code>.</li>
-<li class="task"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code> (làm khi viết installer phát hành).</li>
+<li class="task"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code>. <strong>Vẫn CHƯA LÀM, và lý do hoãn
+cũ đã hết hiệu lực</strong>: mục này ghi &#34;làm khi viết installer phát hành&#34;, nhưng
+installer đã có từ Pha 7 (<code>install/cai-dat.ps1</code>, <code>install/get.ps1</code>,
+<code>.github/workflows/phat-hanh.yml</code>) mà alias thì không. Đo 21/08:
+<code>grep -ni &#34;alias\|ccswitch&#34; install/</code> <strong>không ra dòng nào</strong>, và
+<code>cmd/sagent/main.go</code> không đọc <code>os.Args[0]</code> nên gọi binary bằng tên khác cũng
+không đổi hành vi. Xếp <code>[ ]</code> chứ không <code>[!]</code>: không có thứ gì bên ngoài cản —
+chỉ là chưa làm. (Riêng phần <code>ccswitch</code> còn một nút thật: Pha 7 ghi &#34;chưa có
+bản <code>ccswitch</code> thật để mở ra xem&#34;, nên tương thích cờ của nó vẫn là suy đoán.)</li>
 <li class="task done"><span class="box"></span>Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
 <code>legacy/v1-powershell/</code>; <code>design-system/switch-agent-pro/</code>; 3 trang HTML sạch tên cũ.</li>
 </ul>
-<h3>Pha 0 — Đo giả định &amp; lập hợp đồng</h3>
+<h3>Pha 0 — Đo giả định &amp; lập hợp đồng  <strong>64%</strong> (2 xong · 5 một phần)</h3>
 <p>🎯 Chứng minh cơ chế của <strong>cả hai đường</strong> trước khi khoá interface.</p>
 <ul>
-<li class="task"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.</li>
-<li class="task"><span class="box"></span><strong>Subscription</strong> (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
+<li class="task part"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.
+<ul>
+<li><strong>Xong — không credential trong repo</strong>: giàn test chạy trên HOME giả
+(<code>homeGia(t)</code> trong <code>internal/aiapi/aiapi_test.go</code>) và khoá bịa
+(<code>sk-bi-mat-khong-duoc-lo</code>). Adapter GIẢ trong <code>internal/fleet/fleet_test.go:296</code>
+và <code>internal/profile/{clone_acl,ditru,profile}_test.go</code> khai <code>ChuaDo</code> toàn bộ,
+nên không test nào mượn được danh tính thật.</li>
+<li><strong>Xong — key không rò ra thông điệp lỗi</strong>: <code>internal/aiapi/aiapi_test.go:100</code>
+(<code>TestKeyDiDungChoVaKhongRoRaLoi</code>) khẳng định key tới đúng header
+<code>Authorization</code> nhưng KHÔNG có mặt trong <code>err.Error()</code> — thông điệp đó đi ra
+cả terminal lẫn dashboard.</li>
+<li><strong>Xong — mặt web dùng allowlist chứ không phơi struct</strong>: <code>internal/dash/server.go:665-667</code>
+dựng <code>profileDTO</code> bằng danh sách trường tường minh, token chỉ còn cờ <code>HasToken</code>.</li>
+<li><strong>CHƯA — không có TẦNG redaction chung</strong>: <code>grep -rni &#34;redact&#34; internal/ cmd/</code>
+ra <strong>0 dòng</strong>. Nhật ký phiên (<code>~/.ai-accounts/.nhat-ky/</code>) là stdout thô của
+agent, không đi qua bộ lọc nào.</li>
+<li><strong>CHƯA — không có bài kiểm quét toàn repo tìm credential</strong>. Tính chất &#34;repo
+sạch&#34; hiện đúng nhờ kỷ luật, không nhờ một phép đo tự chạy.</li>
+</ul>
+</li>
+<li class="task part"><span class="box"></span><strong>Subscription</strong> (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
 root override có bao trùm config/session/auth? token ở file/env/keyring? file nào
 đọc/ghi lúc login/prompt/refresh/exit? <strong>concurrent refresh</strong> khi 2 process chung
 credential? copy token có tạo session hợp lệ, bao lâu? headless/JSON/stream/ACP/
-resume/cancel? state máy dùng chung ngoài config root?</li>
-<li class="task"><span class="box"></span><strong>API</strong> (Anthropic, OpenAI, Gemini, xAI/Grok, DeepSeek, OpenAI-compatible): auth
+resume/cancel? state máy dùng chung ngoài config root?
+<ul>
+<li><strong>Xong cho NĂM harness</strong> (claude · codex · cursor · antigravity · grok; Gemini
+CLI đã bỏ), bảng đo ở <code>docs/DO-LUONG.md:14-20</code>. Bốn câu đã có câu trả lời đo
+được cho cả năm: <strong>biến tách</strong> (<code>CLAUDE_CONFIG_DIR</code> / <code>CODEX_HOME</code> / <code>APPDATA</code>
+/ <code>USERPROFILE</code>), <strong>token nằm ở file hay keyring</strong> (Antigravity là Windows
+Credential Manager, khoá cố định <code>gemini:antigravity</code> → một máy một tài khoản),
+<strong>headless</strong> và <strong>kết quả có cấu trúc</strong>.</li>
+<li><strong>Xong — concurrent refresh</strong>: <code>docs/DO-LUONG.md:2431</code> (Đ5, 21/08) chạy cuộc
+đua N-clone thật: một bản thắng, bản thua <strong>tự xoá trắng token của mình</strong>.</li>
+<li><strong>Xong — token sống bao lâu</strong>: <code>docs/DO-LUONG.md:2669</code> (Đ4) — Claude ~7,5 giờ
+(refresh tới 16/09), Codex ~6,5 ngày, Cursor đọc từ <strong>refresh</strong> token;
+Antigravity là <strong>kết luận KHÔNG đọc được</strong>, không phải khoảng trống.</li>
+<li><strong>Xong — state máy dùng chung ngoài config root</strong>: phân loại <code>~/.codex</code> thành
+danh tính vs <strong>khoá ghi/SQLite</strong> (<code>thread-writer-locks</code>, <code>*.sqlite*</code>) ở Pha 2.5.</li>
+<li><strong>CHƯA — ACP</strong>: <code>grep -rni &#34;acp&#34; internal/ cmd/</code> không ra gì. Không harness nào
+được đo qua giao thức này.</li>
+<li><strong>CHƯA — resume/cancel Ở TẦNG HARNESS</strong>: <code>flow resume</code>/<code>flow huy</code> là resume và
+cancel của <strong>bộ thực thi flow</strong> (<code>internal/flow/approve.go:65</code>), không phải cờ
+<code>--resume</code>/hủy phiên của từng CLI. Chưa ai đo chúng.</li>
+<li><strong>CHƯA — nhật ký đọc/ghi file lúc login/prompt/refresh/exit</strong>: mới đo được
+file nào GIỮ danh tính, chưa đo được trình tự chạm file theo từng pha.</li>
+</ul>
+</li>
+<li class="task part"><span class="box"></span><strong>API</strong> (Anthropic, OpenAI, Gemini, xAI/Grok, DeepSeek, OpenAI-compatible): auth
 mode, base URL, model naming, headers; protocol (Responses/Chat Completions/Anthropic
 Messages/Gemini native); streaming/tool/reasoning/vision/structured-output/usage;
-error+rate-limit schema, retry headers, health, model discovery.</li>
-<li class="task"><span class="box"></span>Junction Windows ✓ / symlink Linux từ Go, không admin.</li>
-<li class="task"><span class="box"></span>Behavior khi stream/process ngắt, reboot, config ghi dở.</li>
-<li class="task"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).</li>
-<li class="task"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.</li>
+error+rate-limit schema, retry headers, health, model discovery.
+<ul>
+<li><strong>Xong — 3/6 nhà cung cấp, 1/4 giao thức.</strong> xAI/Grok · DeepSeek ·
+OpenAI-compatible generic đều đo thật qua <code>modelapi.vn</code> (<code>docs/DO-LUONG.md:2188</code>
+và <code>:2322</code>). Auth (Bearer), base URL tuỳ ý, model naming, header: <code>internal/aiapi/aiapi.go:168</code>.</li>
+<li><strong>Xong — streaming + usage</strong>: <code>internal/aiapi/stream.go:30</code> (<code>GoiStream</code>). Đo
+được đúng cái bẫy: endpoint tương thích OpenAI KHÔNG trả <code>usage</code> khi stream
+trừ khi hỏi bằng <code>stream_options.include_usage</code> — <code>internal/aiapi/stream_test.go:54</code>
+canh điều đó. Nhà cung cấp không trả thì bật <code>ThieuUsage</code> (<code>:105</code>) chứ không
+ghi 0 như thể miễn phí.</li>
+<li><strong>Xong — error schema + health + model discovery</strong>: lỗi giữ <strong>nguyên văn</strong> kèm
+request id (<code>stream_test.go:153</code>); <code>internal/aiapi/suckhoe.go:55</code> hỏi
+<code>GET /models</code> nên trả lời được cả &#34;route sống không&#34; lẫn &#34;model khai có thật
+không&#34; lẫn &#34;nhà cung cấp liệt kê bao nhiêu model&#34;.</li>
+<li><strong>CHƯA — ba giao thức còn lại</strong>: Anthropic Messages, Gemini native, OpenAI
+Responses. Phần này <strong>bị chặn thật</strong>: máy chỉ có khoá của nhà bán lại, và
+<code>docs/DO-LUONG.md</code> đã đo rằng khoá đó trả <strong>401 ở <code>api.deepseek.com</code></strong>.</li>
+<li><strong>CHƯA — rate-limit schema và retry header</strong>: <code>grep -rn &#34;429\|Retry-After&#34;
+internal/aiapi internal/api</code> ra <strong>0 dòng</strong>. Bị 429 thì hiện xử lý y như mọi
+lỗi HTTP khác, và <code>Retry-After</code> bị bỏ qua.</li>
+<li><strong>CHƯA — tool / reasoning / vision / structured-output</strong>: chỉ mới đi đường
+prompt → text.</li>
+</ul>
+</li>
+<li class="task done"><span class="box"></span>Junction Windows ✓ / <del>symlink Linux</del> từ Go, không admin. Đo ở
+<code>docs/DO-LUONG.md:112-122</code>: <code>sagent them claude:smoketest</code> (không quyền quản
+trị) nối <strong>17 mục dùng chung</strong>, PowerShell xác nhận <code>ReparsePoint = True</code> cho
+mọi mục, riêng <code>.claude.json</code> là <code>False</code> (file riêng thật). <code>link.IsLink</code> qua
+<code>GetFileAttributes</code> nhận đúng. Nhánh Linux <strong>bỏ khỏi phạm vi</strong> theo quyết định
+&#34;CHỈ WINDOWS&#34; ở đầu tài liệu, nên ô này không còn nợ gì.</li>
+<li class="task done"><span class="box"></span>Behavior khi stream/process ngắt, reboot, config ghi dở — cả ba đều đã đo,
+và mỗi cái ra một kết luận khác nhau:
+<ul>
+<li><strong>stream ngắt</strong>: <code>internal/aiapi/stream_test.go:131</code> (<code>TestManhHongKhongGietCaLuot</code>)
+— một mảnh SSE hỏng không giết cả lượt; <code>:192</code> — stream rỗng bị coi là HỎNG
+chứ không phải &#34;trả lời rỗng&#34;.</li>
+<li><strong>process ngắt</strong>: <code>process.KillTree</code> (đo ở <code>docs/DO-LUONG.md</code> mục Pha 7) —
+<code>taskkill /T</code> bỏ sót đám con khi cha đã thoát; <code>status</code> đối chiếu PID thật rồi
+tự đánh dấu <code>lost</code>, <code>sagent quet</code> tìm tiến trình mồ côi và <strong>mặc định chỉ báo</strong>
+vì Windows dùng lại PID.</li>
+<li><strong>reboot</strong>: <code>docs/KHAC-PHUC-SU-CO.md</code> mục 2 — lượt chạy kẹt <code>running</code> vĩnh
+viễn vì <code>state.db</code> không kịp nhận tín hiệu. Trạng thái từng bước nằm ở SQLite
+nên <code>flow resume</code> chạy tiếp được. <strong>Nói thẳng phần chưa đẹp</strong>: không có khâu
+tự dọn lúc khởi động — người dùng phải gõ <code>sagent flow huy &lt;#&gt;</code>.</li>
+<li><strong>config ghi dở</strong>: <code>internal/jsonutil/jsonutil.go:28</code> <code>AtomicWrite</code> ghi file
+tạm rồi <code>Rename</code>; <code>Backup</code> (<code>:38</code>) sao lưu trước khi đè. Phía DB thì chặn hạ
+cấp schema + tự sao lưu bằng <code>VACUUM INTO</code> (Pha 7).</li>
+</ul>
+</li>
+<li class="task part"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).
+<ul>
+<li><strong>Xong cho HARNESS, và sạch</strong>: <code>internal/provider/nangluc.go:21-28</code> khai ba
+trạng thái <code>LamDuoc</code> / <code>KhongLamDuoc</code> / <code>ChuaDo</code>, có conformance test đối
+chiếu lời khai với hành vi thật (<code>internal/provider/nangluc_test.go:78,230</code>).
+Chạy 21/08: <code>sagent nang-luc --chua-do</code> → <strong>&#34;Không còn năng lực nào chưa đo.&#34;</strong>
+— 5 provider × 9 năng lực, <strong>0 ô <code>ChuaDo</code></strong>.</li>
+<li><strong>Bốn trạng thái rút thành ba, CÓ CHỦ Ý</strong>: <code>experimental</code> bị bỏ vì nó trộn hai
+câu khác nhau (&#34;đã đo, hơi rung&#34; và &#34;chưa ai đo&#34;). <code>KhongLamDuoc</code> là một <strong>kết
+luận</strong> chứ không phải khoảng trống — đó là chỗ ba trạng thái đáng giá hơn hai.</li>
+<li><strong>CHƯA — nửa API</strong>: <code>sagent nang-luc</code> chỉ in 5 nhóm harness. Không có bảng năng
+lực nào cho nhà cung cấp API; <code>grep -rni &#34;experimental&#34; internal/</code> ra 0 dòng.
+Câu &#34;route này hỗ trợ tool/vision/reasoning không&#34; hiện không ai trả lời được.</li>
+</ul>
+</li>
+<li class="task part"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.
+<ul>
+<li><strong>CHƯA — không có tài liệu gộp.</strong> <code>docs/security/THREAT-MODEL.md</code> <strong>không tồn
+tại</strong>; artifact mà mục này hứa vẫn thiếu.</li>
+<li><strong>Xong — nhưng nằm rải, và là bằng chứng chứ không phải lời hứa</strong>: cả bốn mặt
+đều đã có phân tích tấn công + bản vá <strong>đo được</strong>, ghi trong <code>docs/DO-LUONG.md</code>:
+subscription credential (junction-attack đi xuyên <code>os.ReadDir</code>, path-traversal
+<strong>đã nổ thật một lần và xoá mất <code>~/.claude</code></strong>, Windows ACL: <code>0o600</code> và <code>0o644</code>
+có ACL y hệt trên Windows) · API key (chỉ tham chiếu bằng <code>key_id</code>, <strong>không có
+cột secret trong DB</strong>, có test chặn key rò ra lỗi) · dashboard (loopback ·
+băm mật khẩu · chặn Host lạ chống DNS-rebind · chặn Origin lạ chống CSRF ·
+<code>docs/DO-LUONG.md:1005</code> ghi lỗi thật <code>/login</code> từng nằm ngoài <code>guard</code>) ·
+command exec (<code>internal/flow/flow.go</code> — node <code>shell</code> chỉ nhận <strong>argv</strong>, cố ý
+không nhận chuỗi shell).</li>
+<li>Việc còn lại là <strong>gom lại thành một tài liệu có sườn</strong> (tài sản → kẻ tấn công →
+đường vào → biện pháp), không phải đi đo lại từ đầu.</li>
+</ul>
+</li>
 <li><strong>Artifact:</strong> <code>docs/research/phase0/*</code> (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
 ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <code>docs/security/THREAT-MODEL.md</code>,
 <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
@@ -448,9 +629,14 @@ ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <code>docs/security/THREAT-M
 capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.</li>
 <li>⚠ <strong>Blocker cần bạn:</strong> <strong>API key</strong> thật (local-only, redaction) cho phần API path.
 (Blocker &#34;máy/VM Linux&#34; đã bỏ cùng nhánh Linux — xem khối quyết định đầu tài liệu.)</li>
-<li><strong>Trạng thái:</strong> Windows/Claude subscription + junction đã đo (<code>docs/DO-LUONG.md</code>); còn lại chưa.</li>
+<li><strong>Trạng thái (soát lại 21/08/2026):</strong> pha này từng ghi <strong>0/7</strong> trong khi phần
+lớn nội dung của nó đã làm xong từ lâu — cả <code>docs/DO-LUONG.md</code> (3.400+ dòng số
+đo) lẫn <code>docs/SO-NO-DO-LUONG.md</code> (sổ nợ đo lường, nay chỉ còn đúng mục C2) đều
+là artifact của chính pha này. Đếm lại theo mã: <strong>2 xong · 5 xong một phần ·
+0 chưa làm → 4,5/7 = 64%</strong>. Ba thứ còn thiếu thật
+là: tầng redaction chung, bảng năng lực cho nửa API, và tài liệu threat model.</li>
 </ul>
-<h3>Pha 1 — Storage + Claude slice + 1 API slice  🟡 một phần</h3>
+<h3>Pha 1 — Storage + Claude slice + 1 API slice  <strong>95%</strong> (9 xong · 1 một phần)</h3>
 <p>🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
 <ul>
 <li class="task done"><span class="box"></span><del><code>internal/domain</code></del> <strong>bỏ</strong> theo mục 2b — dùng thẳng các package hiện có.</li>
@@ -461,14 +647,27 @@ capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong
 <li class="task done"><span class="box"></span><strong>Xoá an toàn (Safe delete)</strong>: chỉ cho phép xoá thư mục cấu hình do sổ đăng ký sở hữu; tái sử dụng <code>link.IsLink</code> để không bao giờ đi xuyên junction làm mất dữ liệu thư mục gốc.</li>
 <li class="task done"><span class="box"></span><strong>API lõi &amp; CLI cho sổ</strong>: bổ sung action mới vào <code>api.Actions</code> và hỗ trợ lệnh CLI <code>sagent profile list --so</code>, <code>sagent route list</code> để tra cứu danh sách từ sổ SQLite.</li>
 <li class="task done"><span class="box"></span><strong>Claude Harness Adapter chính thức</strong>: bổ sung kiểu năng lực 3 trạng thái (làm được / không làm được / chưa đo) vào interface <code>provider.Adapter</code>, khai báo trung thực cho cả 5 adapter (Claude, Codex, Cursor, Antigravity, Grok), xây dựng bộ conformance test dùng chung chống khai báo sai lệch, và công bố báo cáo năng lực qua <code>api.Actions</code>, lệnh CLI <code>sagent capability</code> / <code>sagent nang-luc</code>, cùng endpoint/giao diện dashboard.</li>
-<li class="task"><span class="box"></span><strong>1 direct-API vertical slice hoàn chỉnh</strong> (kết nối trực tiếp Anthropic API, stream response, ghi nhận usage/error không lộ key) — <em>Chưa làm vì</em>: hiện mới có client OpenAI-compatible cơ bản ở Pha 4 (<code>internal/aiapi</code>); lát cắt dọc API hoàn chỉnh kèm streaming chuẩn cần xử lý cẩn trọng để không mất thông tin <code>usage</code> (giữ nguyên theo quyết định ở Pha 4).</li>
-<li class="task"><span class="box"></span><strong>Verb <code>verify</code> và <code>route test</code> đầy đủ</strong> — <em>Chưa làm vì</em>: các lệnh xem và quản lý cơ bản (<code>profile list --so</code>, <code>route list</code>, <code>session run/list/stop</code>) đã hoạt động; phần kiểm tra tính hợp lệ sâu (<code>verify</code>) và thử nghiệm route tự động (<code>route test</code>) đang chờ tích hợp bộ kiểm tra kết nối mạng và khóa API thực tế.</li>
+<li class="task part"><span class="box"></span><strong>1 direct-API vertical slice hoàn chỉnh</strong> (kết nối trực tiếp Anthropic API, stream response, ghi nhận usage/error không lộ key). Lý do treo cũ (&#34;client OpenAI-compatible cơ bản&#34;, &#34;streaming cần xử lý cẩn trọng để không mất <code>usage</code>&#34;) <strong>đã hết hạn từ 21/08</strong> — xem <code>docs/DO-LUONG.md:2322</code>.
+<ul>
+<li><strong>Xong — lát cắt dọc ĐẦY ĐỦ cho giao thức OpenAI-compatible</strong>: gọi thường (<code>internal/aiapi/aiapi.go:168</code>) và gọi stream (<code>internal/aiapi/stream.go:30</code>) đi CHUNG một đường nên cùng sổ, cùng luật fallback. Đo thật: deepseek 389 token/3,6s, grok 1926 token/31s.</li>
+<li><strong>Xong — <code>usage</code> không mất</strong>: hỏi bằng <code>stream_options.include_usage</code>, thiếu thì bật <code>ThieuUsage</code> chứ không ghi 0.</li>
+<li><strong>Xong — error không lộ key</strong>: lỗi giữ nguyên văn kèm request id; <code>internal/aiapi/aiapi_test.go:100</code> canh key không rò ra <code>err.Error()</code>.</li>
+<li><strong>Xong — ghi nhận usage</strong>: bảng <code>api_calls</code> (<code>internal/store/store.go:267</code>, migration v7), ghi cả lượt THÀNH và lượt BẠI (<code>internal/api/api.go:933</code>); cố ý không lưu prompt/câu trả lời.</li>
+<li><strong>CHƯA — đúng chữ &#34;Anthropic&#34;</strong>: <code>internal/aiapi</code> nói giao thức Chat Completions + <code>Bearer</code>, không phải Anthropic Messages (<code>x-api-key</code> + <code>anthropic-version</code> + sự kiện SSE khác hẳn). Phần này <strong>bị chặn</strong>: máy chỉ có khoá của nhà bán lại, đã đo là trả 401 ở endpoint gốc.</li>
+</ul>
+</li>
+<li class="task done"><span class="box"></span><strong>Verb <code>verify</code> và <code>route test</code> đầy đủ</strong>. Lý do treo cũ là &#34;đang chờ tích hợp bộ kiểm tra kết nối mạng và khoá API thực tế&#34; — <strong>cả hai đã có</strong>.
+<ul>
+<li><code>sagent verify [provider]</code> — <code>cmd/sagent/main.go:402</code> (<code>cmdVerify</code>) → <code>internal/api/api.go:483</code> (<code>ProfileVerify</code>). Chạy 21/08 trên máy thật: 5 provider × (tìm thấy lệnh · thư mục base · nơi giữ token · <strong>provider drift</strong>), cộng ô kiểm <strong>Windows ACL</strong> của kho hồ sơ. Thoát ≠ 0 khi có mục đỏ — lượt chạy hôm nay bắt được Claude 2.1.234→2.1.235 và Antigravity 1.1.16→1.1.17, cảnh báo cố ý <strong>không tự tắt</strong> (phải <code>sagent verify --chap-nhan</code>).</li>
+<li><code>route test</code> = <strong><code>sagent route kiem</code></strong> — <code>cmd/sagent/route.go:96</code>, <code>internal/api/api.go:381</code> (<code>RouteKiem</code>), <code>internal/aiapi/suckhoe.go:55</code> (<code>Kiem</code>). Chạm mạng thật bằng khoá thật. Chạy 21/08: <code>✓ deepseek dùng được 173ms · ✓ grok dùng được 168ms</code>.</li>
+</ul>
+</li>
 <li><strong>DoD:</strong> CI Windows xanh; đổi Claude subscription không đăng nhập lại; API route
 stream + ghi usage/error không lộ key; xoá session không đụng credential/project gốc;
 fault injection không tạo JSON/DB dở; <strong>hết Python</strong>.</li>
-<li><strong>Trạng thái:</strong> Đã hoàn thành sổ đăng ký SQLite (migration v8), đối chiếu 2 chiều sổ ↔ đĩa, xoá an toàn chỉ khi sổ sở hữu, lệnh CLI/API tương ứng (<code>profile list --so</code>, <code>route list</code>), và Claude Harness Adapter chính thức (kèm bảng năng lực 3 trạng thái, conformance test, báo cáo CLI/API/Dashboard); 2 hạng mục còn lại (direct-API vertical slice hoàn chỉnh và verb verify/route test) tiếp tục giữ nguyên lý do còn treo để hoàn thiện sau.</li>
+<li><strong>Trạng thái:</strong> Đã hoàn thành sổ đăng ký SQLite (migration v8), đối chiếu 2 chiều sổ ↔ đĩa, xoá an toàn chỉ khi sổ sở hữu, lệnh CLI/API tương ứng (<code>profile list --so</code>, <code>route list</code>), và Claude Harness Adapter chính thức (kèm bảng năng lực 3 trạng thái, conformance test, báo cáo CLI/API/Dashboard). <strong>Soát lại 21/08:</strong> hai hạng mục &#34;còn treo&#34; đã hết treo — <code>verify</code> và <code>route kiem</code> chạy thật trên máy này (<strong>xong</strong>), lát cắt dọc API hoàn chỉnh đã có cho giao thức OpenAI-compatible (<strong>xong một phần</strong>, chỉ còn đúng chữ &#34;Anthropic Messages&#34; và nó bị chặn vì thiếu khoá). Điểm pha: <strong>9,5/10 = 95%</strong>.</li>
 </ul>
-<h3>Pha 2 — Chạy song song + Project/Workspace  🟡 một phần</h3>
+<h3>Pha 2 — Chạy song song + Project/Workspace  <strong>100%</strong> (22 xong)</h3>
 <p>🎯 Biến công cụ profile thành <strong>runtime manager</strong> đa project.</p>
 <ul>
 <li class="task done"><span class="box"></span><strong>SQLite là SSOT</strong> (<code>~/.ai-accounts/state.db</code>); PID chỉ là thuộc tính
@@ -476,7 +675,16 @@ runtime — <code>status</code> đối chiếu PID thật và tự đánh dấu 
 <li class="task done"><span class="box"></span><code>clone</code> — chép credential ra N config dir riêng (mỗi bản <code>.claude.json</code>
 riêng nên <strong>không đua ghi</strong>); <code>fleet</code> — bật N phiên nền, log ra file;
 <code>status</code>; <code>stop &lt;số|all&gt;</code>; <code>clean</code> — xoá clone <strong>an toàn</strong> (không xuyên junction).</li>
-<li class="task done"><span class="box"></span>Cảnh báo thẳng: tiêu hạn mức gấp N, và <strong>concurrent refresh chưa đo</strong>.</li>
+<li class="task done"><span class="box"></span>Cảnh báo thẳng: tiêu hạn mức gấp N, và hậu quả của việc chép token ra N chỗ.</li>
+<li class="task done"><span class="box"></span><strong>Xoay vòng refresh token: ĐÃ ĐO (20/08/2026)</strong> — mỗi lần refresh cấp token
+mới và <strong>giết token cũ ngay</strong>. Nên chép token ra N chỗ <strong>không cần</strong> N tiến trình
+đua nhau mới hỏng: MỘT bản refresh là N−1 bản còn lại chết, hồ sơ gốc cũng nằm
+trong số đó. Chuỗi này đã làm mất phiên <code>claude:phu</code> giữa lượt chạy #47.
+<strong>Đã bịt:</strong> <code>profile.Clone</code> đồng bộ ngược trước khi chép đè (kiểm trên máy thật).
+<strong>Còn lại một cách hỏng KHÔNG bịt được bằng đồng bộ:</strong> hai bản đang chạy cùng
+lúc, một bản tới mốc refresh thì bản kia chết GIỮA CHỪNG — không có chỗ chen vào
+mà đồng bộ. <code>fleet</code> nói thẳng điều đó khi <code>--copies &gt; 1</code> và khuyên chia việc cho
+nhiều TÀI KHOẢN thay vì nhiều bản của một tài khoản. Xem <code>docs/DO-LUONG.md</code>.</li>
 <li class="task done"><span class="box"></span><strong>Cảnh báo token sắp hết hạn</strong> trước khi bật hạm đội — đã đo được Claude
 hết hạn sau ~7,5 giờ (Codex ~6,5 ngày), nên đội chạy dài chắc chắn vượt mốc.
 <code>TokenExpiry()</code> vào interface adapter, CHỈ đọc dấu thời gian.</li>
@@ -508,19 +716,45 @@ git thật và tiến trình con thật. Bắt được <strong>rò file descrip
 <code>StartDetached</code> — tiến trình cha mở file log rồi không đóng, mỗi lần <code>fleet</code>
 rò một handle và trên Windows khoá luôn file. Có test hồi quy cho bug
 &#34;đoán số thứ tự worktree&#34;.</li>
-<li class="task"><span class="box"></span><del><code>sagentd</code> daemon</del> <strong>bỏ</strong> (xem mục 2b) — <code>dash</code> sẽ là server tạm.</li>
-<li class="task"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code>.</li>
-<li class="task"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong>.</li>
-<li class="task"><span class="box"></span>Process backend native Windows/Linux; tmux tuỳ chọn (Linux).</li>
-<li class="task"><span class="box"></span>Session state machine + event stream.</li>
-<li class="task"><span class="box"></span>Route engine cơ bản: chọn provider/model/profile, health, fallback, usage/cost event.</li>
-<li class="task"><span class="box"></span>Recovery khi daemon/process chết; cleanup orphan an toàn.</li>
+</ul>
+<blockquote>
+<p><strong>Dọn ngày 20/08/2026:</strong> danh sách dưới đây từng chép lại nguyên bản kế hoạch
+gốc, nên bốn mục ĐÃ XONG ở trên vẫn còn nằm đây dưới dạng <code>[ ]</code> — kế hoạch nói
+sai về chính nó, đúng thứ dự án này lấy &#34;đo được&#34; làm gốc để chống. Mỗi dòng
+dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.</p>
+</blockquote>
+<ul>
+<li class="task done"><span class="box"></span><del><code>sagentd</code> daemon</del> <strong>bỏ</strong> (xem mục 2b) — <code>dash</code> là server thay thế, đã chạy.</li>
+<li class="task done"><span class="box"></span>Project discovery + <code>.sagent/project.toml</code> — trùng mục đã xong ở trên.</li>
+<li class="task done"><span class="box"></span>Workspace backend: directory + <strong>Git worktree</strong> — trùng mục đã xong ở trên.</li>
+<li class="task done"><span class="box"></span>Process backend native Windows (<code>profile.StartDetached</code>). Nhánh Linux và
+tmux <strong>bỏ</strong> theo quyết định &#34;CHỈ WINDOWS&#34; ở đầu tài liệu.</li>
+<li class="task done"><span class="box"></span>Session state machine + event stream — <code>internal/events</code> (bus + SSE) và
+<code>Session.State</code> ba trạng thái đo được của Pha 5b.</li>
+<li class="task done"><span class="box"></span>Recovery khi process chết; cleanup orphan an toàn — <code>status</code> đối chiếu PID
+thật và tự đánh dấu <code>lost</code>; <code>sagent quet</code> (<code>SessionSweep</code>) tìm tiến trình mồ côi.</li>
+<li class="task done"><span class="box"></span><strong>Route engine — mảnh <code>health</code> ĐÃ CÓ (soát lại 21/08).</strong> Chọn route ✅,
+fallback một lần ✅, usage/cost event ✅ (bảng <code>api_calls</code>, migration v7), và nay
+<strong>hỏi được &#34;route này còn sống không&#34; TRƯỚC khi chạy</strong>: <code>internal/aiapi/suckhoe.go:55</code>
+(<code>Kiem</code>) → <code>internal/api/api.go:381</code> (<code>RouteKiem</code>) → <code>cmd/sagent/route.go:96</code>
+(<code>sagent route kiem</code>), có endpoint web <code>/api/route/kiem</code> (<code>internal/dash/server.go:77</code>).
+Dòng cũ ở đây căn cứ vào <code>grep -ri health</code> không ra gì — mà mã đặt tên tiếng Việt
+(<code>SucKhoe</code>), nên <strong>phép grep chứ không phải mã đã sai</strong>; đó đúng là kiểu lệch im
+lặng mà mục này tồn tại để chống.
+Hai quyết định đáng ghi: (1) đi bằng <code>GET /models</code> nên <strong>không tốn token</strong> — một
+phép kiểm có tính tiền thì người ta thôi chạy, và health check không ai chạy thì
+bằng không có; (2) trả về <code>SucKhoe</code> chứ không phải một chữ &#34;ổn&#34;, vì <code>Song</code> (&#34;nhà
+cung cấp còn đó&#34;) khác <code>Dung()</code> (&#34;gọi bây giờ thì chạy&#34;) — có thật một ca route
+sống mà <code>.sagent/project.toml</code> khai <code>deepseek-chat</code>, một tên không tồn tại ở nhà
+bán lại. Timeout 15s, ngắn hơn hẳn <code>Goi</code> (120s). <strong>Vẫn nói rõ thứ nó KHÔNG trả
+lời được: hạn mức còn hay hết</strong> — cái đó chỉ lộ khi gọi thật.
+Chạy 21/08: <code>✓ deepseek dùng được 173ms · ✓ grok dùng được 168ms</code>.</li>
 <li><strong>DoD:</strong> 4 session cùng profile + 3 profile khác chạy đúng policy; 10 session đồng thời
 không hỏng config/state; restart daemon phục hồi đúng; ≥2 repo khác stack; không session
 nào ghi vào worktree session khác; chạy song song ≥1 subscription session và ≥1 API node.</li>
 <li><strong>Ánh xạ:</strong> thay thế prototype <code>registry</code>/<code>fleet</code> hiện tại.</li>
 </ul>
-<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  ✅ xong</h3>
+<h3>Pha 2.5 — Codex + OpenAI-compatible (chống overfit Claude)  <strong>100%</strong> (8 xong)</h3>
 <ul>
 <li class="task done"><span class="box"></span><strong>Đo Codex trên Windows</strong> (<code>@openai/codex</code> 0.147.0) — xem <code>docs/DO-LUONG.md</code>.
 Phép đo quyết định: <code>CODEX_HOME</code> trỏ vào thư mục rỗng thì <code>codex login status</code>
@@ -541,7 +775,12 @@ không ai biết. Có test khẳng định mỗi provider tự khai kiểu chạ
 hai provider không được trùng cách.</li>
 <li class="task done"><span class="box"></span><strong>Chạy flow thật bằng Codex</strong>: cùng hạ tầng clone/worktree/fleet/flow, chỉ
 khác adapter → đúng mục đích Pha 2.5 (chứng minh không đo ni theo Claude).</li>
-<li class="task"><span class="box"></span>Đường API (OpenAI-compatible) — chờ API key.</li>
+<li class="task done"><span class="box"></span>Đường API (OpenAI-compatible) — <del>chờ API key</del> <strong>đã có key và đã chạy thật</strong>.
+<code>internal/aiapi</code> + <code>sagent api &lt;route&gt;</code> (<code>cmd/sagent/main.go:81</code>): base URL tuỳ
+ý, khoá tham chiếu bằng <code>key_id</code>, lỗi giữ nguyên văn kèm request id, trả <code>usage</code>.
+Đo thật trên <code>modelapi.vn</code>: deepseek 127 token/2,3s và grok-4.5 1044 token/13,6s
+(<code>docs/DO-LUONG.md:2188</code>), stream 21/08 (<code>:2322</code>). Đúng mục đích Pha 2.5: cùng
+hạ tầng cho hai đường, thêm nhà cung cấp <strong>không phải sửa mã nào</strong>.</li>
 </ul>
 <p>🎯 Chứng minh kiến trúc không bị đo ni theo Claude/Anthropic.</p>
 <ul>
@@ -553,18 +792,78 @@ khác biệt tương tác nằm trong driver/model client; <strong>conformance s
 </ul>
 </li>
 </ul>
-<h3>Pha 3 — Flow DAG ghép được  🟢 chạy được (còn workflow board)</h3>
+<h3>Pha 3 — Flow DAG ghép được  <strong>90%</strong> (18 xong · 2 một phần · 1 chưa)</h3>
 <p>🎯 Người dùng định nghĩa workflow mới <strong>không sửa mã Go</strong>.</p>
 <ul>
-<li class="task"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
+<li class="task part"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
 retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
 theo capability/model/giá/health/fallback; <strong>approval gate</strong>; <strong>resume sau restart</strong>;
-idempotency key; failure policy (stop/continue/fallback/compensate).</li>
-<li class="task"><span class="box"></span>Node built-in: <code>agent · model · route · shell · test · lint · review · approve · merge · notify</code>.</li>
-<li class="task"><span class="box"></span>3 flow mẫu: <code>fanout</code> (nhiều agent → review → chọn), <code>squad</code> (API planner → agent
-implementer → reviewer → test → approval), <code>agents</code> (danh sách task theo concurrency).</li>
+idempotency key; failure policy (stop/continue/fallback/compensate).
+<strong>Đếm từng mảnh — 10 xong / 3 chưa</strong> (dòng này từng ghi <code>[ ]</code> trong khi engine
+đã chạy thật cả ngày):
+<ul>
+<li>✅ <strong>DAG + cycle validation</strong> — <code>internal/flow/flow.go:417</code> (<code>Order</code>, topo ổn
+định) và <code>:476-516</code> (dò chu trình, trả về <strong>đúng vòng lặp</strong> chứ không chỉ nói
+&#34;có chu trình&#34;).</li>
+<li>✅ <strong>input/output giữa step</strong> — <code>{{steps.&lt;id&gt;.output}}</code>, lưu ở SQLite
+(migration v4) nên sống qua resume. Hai trần: lưu 32KB, nhét vào prompt 6KB,
+giữ phần CUỐI và <strong>nói rõ đã cắt</strong>.</li>
+<li>✅ <strong>condition</strong> — <code>internal/flow/when.go</code>, <code>when = &#34;steps.kiem.output contains LOI&#34;</code>.
+Cố ý KHÔNG nhúng ngôn ngữ biểu thức đầy đủ; sai cú pháp thì BÁO LỖI chứ không
+âm thầm coi là false.</li>
+<li>✅ <strong>timeout</strong> — <code>internal/flow/step.go:221,308</code> (<code>timeout_sec</code>).</li>
+<li>✅ <strong>retry-backoff</strong> — <code>step.go:286</code> (<code>tries := s.Retry + 1</code>) và <code>:348</code>
+(lùi dần 2s, 4s, 6s…).</li>
+<li>✅ <strong>cancel</strong> — <code>internal/flow/approve.go:65</code> (<code>Huy</code>) → <code>internal/api/api.go:1758</code>
+(<code>FlowCancel</code>) → <code>sagent flow huy &lt;#&gt;</code>.</li>
+<li>✅ <strong>approval gate</strong> — <code>Approve()</code> là hàm DUY NHẤT chuyển bước approve sang
+<code>done</code>; có test gọi <code>Resume</code> nhiều lần khi chưa duyệt và khẳng định bước sau
+KHÔNG chạy.</li>
+<li>✅ <strong>resume sau restart</strong> — bảng <code>flow_runs</code>/<code>flow_steps</code>, bước đã <code>done</code>
+không chạy lại.</li>
+<li>✅ <strong>failure policy stop / continue / fallback</strong> — <code>flow.go:58-60</code>.</li>
+<li>✅ <strong>fallback + health ở tầng route</strong> — <code>internal/api/api.go:794</code> (một lần
+chuyển, không lặp hết danh sách), <code>internal/aiapi/suckhoe.go:55</code>.</li>
+<li>⬜ <strong>concurrency limit mới có 2/5 nấc</strong>: <code>Runner.MaxParallel</code> (<code>runner.go:56</code>)
+lấy từ <code>policy.max_parallel_sessions</code> — tức <strong>global + project</strong>. Không có trần
+riêng theo harness, theo provider, hay theo profile. Hệ quả: bốn bước cùng
+dùng một tài khoản Claude vẫn chạy song song được cho tới trần chung.</li>
+<li>⬜ <strong>artifact giữa step</strong> — <code>grep -n artifact internal/flow/*.go</code> ra <strong>0 dòng</strong>.
+Chỉ truyền được <strong>chuỗi output</strong>, không có khái niệm file sản phẩm.</li>
+<li>⬜ <strong>idempotency key</strong> — không có. Gọi <code>flow run</code> hai lần là hai lượt chạy thật.</li>
+<li>⬜ <strong>route theo capability / giá</strong> — chọn được theo <strong>tên</strong> (<code>Step.Route</code>,
+<code>flow.go:184</code>) chứ không theo năng lực hay giá; chi phí chỉ được ghi <strong>sau khi
+gọi</strong> (<code>api_calls.cost_usd</code>), không dùng để chọn trước.</li>
+<li>⬜ <strong>failure policy <code>compensate</code></strong> — không có. Bước hỏng thì dừng, đi tiếp, hoặc
+chạy bước dự phòng; không có đường hoàn tác việc đã làm.</li>
+</ul>
+</li>
+<li class="task part"><span class="box"></span>Node built-in: <code>agent · model · route · shell · test · lint · review · approve · merge · notify</code>.
+<strong>8/10 chạy được</strong>, khai ở <code>internal/flow/flow.go:30-38</code> và bảng <code>implemented</code>
+(<code>:42-55</code>) — nguyên tắc trung thực năng lực: loại chưa chạy được thì <strong>cảnh báo
+lúc <code>flow validate</code></strong>, không im lặng chấp nhận.
+<ul>
+<li>✅ <code>agent</code> · <code>shell</code> · <code>approve</code> · <code>notify</code> · <code>test</code> · <code>lint</code> · <code>review</code> · <code>model</code>
+(<code>model</code> bật 20/08 khi đường API đã đo thật).</li>
+<li>⬜ <code>merge</code> — <strong>khai rồi nhưng <code>implemented[TypeMerge] = false</code></strong> (<code>flow.go:53</code>),
+ghi chú &#34;còn chờ cơ chế merge an toàn&#34;. Viết vào <code>flows.toml</code> thì <code>validate</code> kêu.</li>
+<li>⬜ <code>route</code> — <strong>chưa có node riêng</strong>. Route hiện là một <strong>thuộc tính</strong> của bước
+<code>model</code> (<code>Step.Route</code>), không phải một node chọn đường rồi chuyền cho bước sau.</li>
+</ul>
+</li>
+<li class="task done"><span class="box"></span>3 flow mẫu: <code>fanout</code> (nhiều agent → review → chọn), <code>squad</code> (API planner → agent
+implementer → reviewer → test → approval), <code>agents</code> (danh sách task theo concurrency).
+Dựng sẵn trong binary: <code>internal/flow/builtin.go:10</code> (<code>fanout</code>), <code>:31</code> (<code>squad</code>),
+<code>:56</code> (<code>agents</code>) — dùng ngay không cần file. Đây là <strong>bản trùng</strong> của dòng
+&#34;3 flow mẫu dựng sẵn&#34; đã tick bên dưới; giữ cả hai thì kế hoạch tự nói sai về
+mình, nên tick luôn. Chạy 21/08: <code>sagent flow list</code> in <strong>11 flow</strong>, gồm cả ba mẫu.</li>
 <li class="task"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
-JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.</li>
+JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.
+<strong>CHƯA LÀM THẬT</strong> — đã kiểm chứ không đoán: <code>grep -rni &#34;plugin\|json-rpc&#34; internal/
+cmd/ --include=*.go</code> chỉ ra <strong>một</strong> dòng, và đó là chuỗi <code>&#34;pluginUsage&#34;</code> trong
+<code>internal/provider/claude.go:210</code> (một khoá JSON của Claude, không liên quan).
+Không có manifest, không có tiến trình con nói JSON-RPC, không có hộp quyền.
+Xếp <code>[ ]</code> chứ không <code>[!]</code>: không thiếu gì bên ngoài cả.</li>
 <li class="task done"><span class="box"></span><code>internal/flow</code>: schema <code>flows.toml</code>, tầng đọc (mẫu dựng sẵn → global →
 dự án), <strong>kiểm tra DAG</strong> (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
 thứ tự chạy topo <strong>ổn định</strong>, <code>{{bien}}</code>.</li>
@@ -607,11 +906,16 @@ SQLite (migration v4) nên <strong>sống sót qua resume</strong>. shell lấy 
 agent gộp log các phiên, notify lấy chính lời nhắn. Có hai trần: lưu 32KB,
 nhét vào prompt 6KB — giữ phần CUỐI (kết luận thường ở đó) và <strong>nói rõ đã cắt</strong>.
 Tham chiếu sai id thì giữ nguyên chuỗi để người viết thấy, không im lặng nuốt.</li>
-<li class="task"><span class="box"></span>Workflow board (mặt 4).</li>
+<li class="task done"><span class="box"></span>Workflow board (mặt 4) — <strong>đã có bản vận hành</strong>, xem chi tiết ở Pha 5c.
+<code>internal/dash/web/flow.html</code> (954 dòng): kéo node từ bảng trái vào canvas, nối
+cổng ra ↔ cổng vào (= <code>needs</code>), pan/zoom, cột phải sửa mọi thuộc tính, <strong>chặn
+vòng lặp ngay trên bảng</strong> trước khi gửi lên server. Lưu ghi thẳng vào
+<code>flows.toml</code> kèm toạ độ <code>x</code>/<code>y</code> (<code>internal/flow/save.go</code>) — bảng vẽ KHÔNG có kho
+riêng, nên flow dựng bằng giao diện và flow viết tay là MỘT thứ.</li>
 <li><strong>DoD:</strong> thêm flow mới không rebuild binary; fake harness/API/agent chạy trong CI; flow
 đang chạy tiếp tục sau restart; test chứng minh <strong>approval không thể bị bỏ qua</strong>.</li>
 </ul>
-<h3>Pha 4 — Mở rộng harness + AI API  🟡 một phần</h3>
+<h3>Pha 4 — Mở rộng harness + AI API  ✅ xong (trừ OpenRouter/Ollama: chưa có key)</h3>
 <ul>
 <li>Subscription: <strong>Gemini CLI, Cursor</strong>, OpenCode (nếu đo được).</li>
 <li>API: <strong>Google Gemini, xAI/Grok, DeepSeek, OpenRouter, Mistral, Groq, Ollama/LocalAI</strong>,
@@ -629,8 +933,17 @@ Gemini CLI <strong>bỏ</strong> — Google cắt khỏi gói miễn phí cho c�
 <li>✅ <strong>Generic OpenAI-compatible qua API</strong>: <code>internal/aiapi</code> + <code>sagent api &lt;route&gt;</code>.
 Custom base URL/model, key tham chiếu bằng <code>key_id</code>, lỗi giữ nguyên văn (còn
 request id), trả <code>usage</code>. Đo thật trên <code>modelapi.vn</code>: 1195 token / 11,8s.</li>
-<li>⬜ <strong>Chưa có streaming.</strong> Cố ý dừng: làm nửa vời thì mất <code>usage</code>, mà <code>usage</code> mới là
-thứ đáng giá nhất của đường API.</li>
+<li>✅ <strong>Streaming: XONG ở lõi và CLI</strong> (21/08/2026) — <code>aiapi.GoiStream</code> +
+<code>sagent api &lt;route&gt; --stream</code>. Nỗi lo cũ có thật: endpoint tương thích OpenAI
+KHÔNG gửi <code>usage</code> khi stream trừ khi hỏi bằng <code>stream_options.include_usage</code>.
+Đã hỏi, và đo được usage đầy đủ: deepseek 389 token/3,6s, grok 1926 token/31s.
+Nhà cung cấp nào không trả thì <code>ThieuUsage</code> bật và nói rõ là CHƯA ĐO chứ không
+phải miễn phí. Đi chung đường với lời gọi thường nên cùng sổ, cùng luật
+fallback. <strong>Mặt web cũng xong</strong> (21/08): <code>/api/ai</code> nhận cờ <code>stream</code> và trả SSE
+trên CHÍNH endpoint đó — không mở đường riêng, vì đây vẫn là action <code>api.call</code>,
+chỉ khác cách gửi về. Lỗi đi TRONG luồng chứ không bằng mã HTTP (header 200 đã
+gửi trước khi biết kết quả; đóng ngang thì trình duyệt tự thử lại và trả tiền
+lần nữa). <strong>Pha 4 xong.</strong></li>
 <li>✅ <strong>Fallback route</strong>: chỉ chuyển tiếp một lần sang route dự phòng; không fallback khi
 lỗi do người dùng (401/403/sai key/prompt rỗng); kết quả mang lỗi gốc nguyên văn +
 request id, ghi rõ tên hai route (đã thử và đã dùng), cùng usage của route thành công
@@ -638,15 +951,20 @@ request id, ghi rõ tên hai route (đã thử và đã dùng), cùng usage củ
 <li>✅ <strong>Lịch sử lời gọi API</strong>: lưu vào bảng <code>api_calls</code> ở migration v7 trong <code>state.db</code>
 (thời điểm, route, model, token vào-ra, chi phí, thành-bại, lý do hỏng); không lưu
 prompt và câu trả lời để bảo đảm riêng tư.</li>
-<li>⬜ DeepSeek/OpenRouter/Ollama: chưa đo. Cấu trúc đã generic nên nhiều khả năng chỉ
-là thêm route, nhưng <strong>chưa đo thì chưa nói là chạy được</strong>.</li>
+<li>✅ <strong>DeepSeek: ĐÃ ĐO</strong> (20/08/2026, 22:41) — <code>sagent api deepseek</code> chạy thật qua
+<code>modelapi.vn</code>, model <code>deepseek-v4-flash</code>: vào 90, ra 37, tổng <strong>127 token / 2,3s</strong>.
+Cùng lượt đo <code>grok-4.5</code>: vào 214, ra 830, tổng <strong>1044 token / 13,6s</strong>. Đúng như
+dự đoán &#34;chỉ là thêm route&#34; — không phải sửa mã nào. Lưu ý đã đo: key này KHÔNG
+dùng được ở <code>api.deepseek.com</code> (401), chỉ dùng được ở nhà bán lại; và route này
+trả HTTP 503 ba lần lúc 16:54–16:56 cùng ngày rồi tự hồi phục.</li>
+<li>⬜ OpenRouter/Ollama: chưa đo — chưa có key, và Ollama chưa cài trên máy này.</li>
 </ul>
 </li>
 </ul>
 <h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
 <p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
 gần lõi làm càng trước, để hợp đồng API được thử lửa trước khi vẽ đẹp.</p>
-<p><strong>5a · API lõi + Terminal.</strong>  ✅ XONG</p>
+<p><strong>5a · API lõi + Terminal.</strong>  <strong>100%</strong> (6 xong)</p>
 <ul>
 <li class="task done"><span class="box"></span><code>internal/api</code> — hợp đồng duy nhất, <code>api.Version = 1</code>, <code>api.Actions</code> liệt kê
 mọi hành động hệ thống làm được.</li>
@@ -662,7 +980,7 @@ chỉ <code>--copies</code>.</li>
 Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.</li>
 </ul>
 <p><em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</p>
-<p><strong>5b · Dashboard 2D.</strong>  ✅ nền tảng xong</p>
+<p><strong>5b · Dashboard 2D.</strong>  <strong>94%</strong> (7 xong · 1 một phần)</p>
 <ul>
 <li class="task done"><span class="box"></span><code>internal/dash</code>: server localhost bọc <code>internal/api</code> (không mở đường riêng
 vào store). Assets nhúng bằng Go <code>embed</code> — vẫn một binary.</li>
@@ -674,15 +992,38 @@ event cập nhật (không dựng UI chỉ từ event — người nghe chậm c
 <li class="task done"><span class="box"></span><strong>Bảo mật</strong>: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
 · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.</li>
 <li class="task done"><span class="box"></span><strong>Trạng thái phiên chi tiết (3 trạng thái đo được)</strong>: phân loại chính xác các phiên gặp sự cố sang <code>rate_limited</code> (chạm trần hạn mức, có mốc thời gian mở lại), <code>blocked</code> (bị chặn quyền thao tác), và <code>failed</code> (lỗi từ phía API nhà cung cấp) dựa trên dữ liệu có cấu trúc từ kết quả phiên (<code>provider.KetQua</code>, hiện đo được đầy đủ trên Claude; các adapter chưa đo vẫn giữ <code>lost</code>). Riêng trạng thái <code>queued</code> (xếp hàng chờ) <strong>CHƯA đo được</strong> và chưa thêm vì hệ thống chưa có cơ chế hàng đợi trong mã nguồn (<code>FleetStart</code> từ chối thẳng khi chạm trần <code>max_parallel_sessions</code>).</li>
-<li class="task"><span class="box"></span>Approval gate (chờ Pha 3 flow).</li>
+<li class="task part"><span class="box"></span>Approval gate — <del>chờ Pha 3 flow</del> Pha 3 xong rồi, <strong>nhưng lượt soát 21/08
+lôi ra một lỗ hồi quy thật</strong>:
+<ul>
+<li><strong>Xong — đường server</strong>: <code>/api/flow/decide</code> có ở <code>internal/dash/server.go:86</code>,
+xử lý ở <code>internal/dash/flow_api.go:159-182</code>, và nó gọi ĐÚNG <code>FlowApproveOnly</code>
+/ <code>FlowApprove</code> mà CLI dùng — nên approval gate vẫn không thể bị bỏ qua từ
+đường web. <code>internal/dash/lachan_test.go:151</code> giữ ánh xạ <code>flow.approve</code> →
+<code>/api/flow/decide</code>, tức luật ngang quyền vẫn có răng ở tầng hợp đồng.</li>
+<li><strong>CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.</strong> <code>grep -rn &#34;decide&#34; internal/dash/web/</code>
+ra <strong>0 dòng</strong>; <code>grep -rni &#34;reject\|tu-choi&#34;</code> cũng không có nút nào. Người dùng
+mở dashboard thấy bước <code>waiting</code> mà <strong>không có chỗ bấm Duyệt / Từ chối</strong> —
+phải quay về terminal gõ <code>sagent flow approve &lt;#&gt; &lt;bước&gt;</code>.</li>
+<li><strong>Đây là hồi quy, không phải việc chưa làm</strong>: <code>git log -S&#34;flow/decide&#34; --
+internal/dash/web/</code> cho thấy nút từng có ở <code>c55ed0b</code> (&#34;Mặt 4: workflow board —
+chạy flow và <strong>duyệt ngay trên web</strong>&#34;) và <code>fcf1b39</code>, rồi <strong>mất im lặng</strong> trong
+một lần vẽ lại giao diện sau đó. Vì vậy dòng &#34;Duyệt / từ chối ngay trên web&#34;
+đang tick ở Pha 5c <strong>hiện không còn đúng</strong> — xem ghi chú ở đó.</li>
+<li>Bài học đúng thứ dự án này lấy làm gốc: luật ngang quyền canh <strong>API ↔ CLI</strong>,
+không canh <strong>UI ↔ API</strong>. Nút biến mất mà không test nào đỏ.</li>
+</ul>
+</li>
 </ul>
 <p><em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.</p>
-<p><strong>5c · Workflow board.</strong>  ✅ bản vận hành xong</p>
+<p><strong>5c · Workflow board.</strong>  <strong>93%</strong> (6 xong · 1 một phần)</p>
 <ul>
 <li class="task done"><span class="box"></span><code>/flow.html</code>: chọn flow + tài khoản + biến rồi <strong>chạy</strong>; xem lịch sử; mở
 một lần chạy thấy <strong>từng bước và trạng thái</strong> (done/running/waiting/failed/skipped).</li>
-<li class="task done"><span class="box"></span><strong>Duyệt / từ chối ngay trên web</strong> — cùng đường <code>Approve()</code> với CLI, nên
-approval gate vẫn không thể bị bỏ qua.</li>
+<li class="task part"><span class="box"></span><strong>Duyệt / từ chối ngay trên web</strong> — cùng đường <code>Approve()</code> với CLI, nên
+approval gate vẫn không thể bị bỏ qua. ⚠ <strong>HẠ TỪ <code>[x]</code> XUỐNG <code>[~]</code> ngày 21/08:</strong>
+đường server còn nguyên (<code>/api/flow/decide</code>), nhưng <strong>nút bấm đã biến mất khỏi
+mọi trang</strong> trong một lần vẽ lại giao diện — <code>grep -rn &#34;decide&#34; internal/dash/web/</code>
+ra 0 dòng. Xem mục Approval gate ở 5b để biết cách đo và lịch sử commit.</li>
 <li class="task done"><span class="box"></span>Endpoint chạy flow <strong>trả ngay</strong> rồi làm ở nền: bước agent có thể mất hàng
 chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.</li>
 <li class="task done"><span class="box"></span>Đã chạy thật qua HTTP: <code>shell → approve → shell</code>, dừng đúng ở gate, duyệt
@@ -697,9 +1038,26 @@ MỘT thứ. Đã kiểm vòng tròn: bảng vẽ → file → <code>sagent flow
 <li class="task done"><span class="box"></span>Trạng thái khi chạy hiện ngay trên node (chấm ✓/●/?/✗).</li>
 </ul>
 <p><em>DoD:</em> flow tạo từ board và flow viết tay chạy y hệt nhau.</p>
-<p><strong>5d · Cấu hình theo project.</strong> <code>[ui]</code> trong <code>.sagent/project.toml</code> (mặt mặc định,
-cột, flow ghim, bật/tắt 3D) + tầng global.
-<em>DoD:</em> hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã.</p>
+<p><strong>5d · Cấu hình theo project.</strong>  <strong>100%</strong> (6 xong · 20/08/2026)</p>
+<ul>
+<li class="task done"><span class="box"></span>Hợp đồng <code>[ui]</code>: <code>default_surface</code>, <code>theme</code>, <code>columns</code>, <code>pinned_flows</code>,
+<code>enable_3d</code>, trên tầng global + project. Cấu hình sai kêu <strong>lúc đọc file</strong>
+(theme lạ, tên cột lạ, mâu thuẫn <code>default_surface=&#34;3d&#34;</code> + <code>enable_3d=false</code>),
+không để mặt web tự đoán rồi vẽ ra trang trống.</li>
+<li class="task done"><span class="box"></span><code>config.CotTaiKhoan</code> là nguồn duy nhất cho tên cột; có test giữ nó không
+trôi khỏi bảng nhãn bên JavaScript.</li>
+<li class="task done"><span class="box"></span><strong>Mặt terminal</strong>: gõ <code>sagent</code> không tham số ra đúng mặt project khai. Ba mặt
+web chỉ CHỈ ĐƯỜNG chứ không tự bật server — cấu hình nói họ thích mặt nào,
+không phải cho phép mở cổng thay họ.</li>
+<li class="task done"><span class="box"></span><strong>Mặt web</strong>: <code>[ui]</code> đi kèm <code>/api/state</code> (không làm endpoint riêng — mọi
+trang đã đọc ảnh chụp này khi kết nối, và endpoint mới kéo theo một action
+mới trong hợp đồng). <code>vendor/mat.js</code> là một luật cho cả bốn trang.</li>
+<li class="task done"><span class="box"></span><code>token.css</code> có bảng sáng. Màu trạng thái đậm hơn bản tối chứ không dùng
+lại: <code>#2FE0A0</code> đọc tốt trên nền <code>#070810</code> nhưng trên nền trắng thì mất chữ.</li>
+<li class="task done"><span class="box"></span><code>enable_3d = false</code> <strong>gỡ hẳn</strong> thẻ <code>&lt;a&gt;</code> chứ không ẩn bằng CSS — link ẩn vẫn
+nằm trong thứ tự Tab.</li>
+</ul>
+<p><em>DoD:</em> hai project khác nhau mở ra hai bố cục khác nhau, không sửa mã. ✅</p>
 <p><strong>Bảo mật chung cho mọi mặt web:</strong> chỉ bind loopback mặc định; random auth token;
 Origin validation + CSRF; <strong>không</strong> đưa credential/env/secret-path lên WebSocket;
 log redaction; mọi mutation có audit event.</p>
@@ -789,6 +1147,133 @@ phải đối chiếu vân tay. Không đối chiếu = chống được nghe l�
 </ul>
 </li>
 </ul>
+<h3>Bảng đếm lại (soát 21/08/2026)</h3>
+<p><code>[x]</code>=1 · <code>[~]</code>=0,5 · <code>[ ]</code>=0 · <code>[!]</code> không vào mẫu số.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Pha</th>
+<th><code>[x]</code></th>
+<th><code>[~]</code></th>
+<th><code>[ ]</code></th>
+<th><code>[!]</code></th>
+<th>Điểm</th>
+<th>%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bước 0 — Đổi tên</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>3,0/4</td>
+<td><strong>75%</strong></td>
+</tr>
+<tr>
+<td>Pha 0 — Đo giả định</td>
+<td>2</td>
+<td>5</td>
+<td>0</td>
+<td>0</td>
+<td>4,5/7</td>
+<td><strong>64%</strong></td>
+</tr>
+<tr>
+<td>Pha 1 — Storage + slice</td>
+<td>9</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>9,5/10</td>
+<td><strong>95%</strong></td>
+</tr>
+<tr>
+<td>Pha 2 — Song song + Workspace</td>
+<td>22</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>22,0/22</td>
+<td><strong>100%</strong></td>
+</tr>
+<tr>
+<td>Pha 2.5 — Codex + OpenAI-compat</td>
+<td>8</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>8,0/8</td>
+<td><strong>100%</strong></td>
+</tr>
+<tr>
+<td>Pha 3 — Flow DAG</td>
+<td>18</td>
+<td>2</td>
+<td>1</td>
+<td>0</td>
+<td>19,0/21</td>
+<td><strong>90%</strong></td>
+</tr>
+<tr>
+<td>Pha 5a — API lõi + Terminal</td>
+<td>6</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>6,0/6</td>
+<td><strong>100%</strong></td>
+</tr>
+<tr>
+<td>Pha 5b — Dashboard 2D</td>
+<td>7</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>7,5/8</td>
+<td><strong>94%</strong></td>
+</tr>
+<tr>
+<td>Pha 5c — Workflow board</td>
+<td>6</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>6,5/7</td>
+<td><strong>93%</strong></td>
+</tr>
+<tr>
+<td>Pha 5d — Cấu hình theo project</td>
+<td>6</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>6,0/6</td>
+<td><strong>100%</strong></td>
+</tr>
+<tr>
+<td><strong>TỔNG</strong></td>
+<td><strong>87</strong></td>
+<td><strong>10</strong></td>
+<td><strong>2</strong></td>
+<td><strong>0</strong></td>
+<td><strong>92,0/99</strong></td>
+<td><strong>93%</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>Pha 4, 6, 7 không dùng ô tick (viết bằng danh sách trạng thái ✅/⬜/🚫), nên không
+nằm trong bảng này — trạng thái của chúng đọc thẳng ở mục tương ứng.</p>
+<p><strong>82% → 93%.</strong> Con số cũ không phải do làm thêm việc hôm nay, mà do <strong>kế hoạch
+báo thấp chính nó</strong>: 7 trong 18 ô trống đã xong từ trước và chỉ thiếu người mở mã
+ra đối chiếu, 9 ô nữa xong quá nửa. Đây là lệch theo chiều bi quan — ít nguy hiểm
+hơn chiều tô hồng, nhưng vẫn là kế hoạch nói sai về chính nó, và nó khiến việc
+&#34;còn lại phải làm gì&#34; bị chôn dưới 18 dòng nhìn giống nhau.</p>
+<p><strong>Hai mục thật sự CHƯA LÀM</strong> (không có gì bên ngoài cản): alias <code>tk</code>/<code>ccswitch</code>
+ở Bước 0, và plugin model ở Pha 3.</p>
+<p><strong>Một lỗ hồi quy lượt soát này lôi ra</strong>: nút Duyệt / Từ chối trên mặt web đã biến
+mất im lặng — endpoint còn, UI mất. Xem Pha 5b.</p>
 <hr />
 <h2>8. Project config <code>.sagent/project.toml</code> (không chứa secret)</h2>
 <pre><code>version = 1

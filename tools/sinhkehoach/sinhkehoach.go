@@ -126,6 +126,15 @@ margin-right:8px;vertical-align:-2px}
 .task.done .box{background:var(--run);border-color:var(--run);position:relative}
 .task.done .box::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
 border:solid #0F172A;border-width:0 2px 2px 0;transform:rotate(45deg)}
+/* [~] xong mot phan: o day NUA. Co y khong dung dau tick mo dan — mo dan doc ra
+   la "xong, hoi nhat", con nua o doc ra la "moi duoc mot nua", va do moi la nghia. */
+.task.part .box{border-color:var(--warn);position:relative}
+.task.part .box::after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:5px;
+background:var(--warn);border-radius:2px 0 0 2px}
+/* [!] bi chan: dau cham than, khong phai o trong. Bi chan KHAC chua lam. */
+.task.block .box{border-color:var(--limit);position:relative}
+.task.block .box::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;
+color:var(--limit);font-size:11px;font-weight:800;line-height:1}
 .top{position:fixed;right:16px;bottom:calc(16px + var(--safe-b));z-index:15;background:var(--panel);
 border:1px solid var(--border);color:var(--fg);border-radius:999px;width:44px;height:44px;display:grid;
 place-items:center;cursor:pointer;backdrop-filter:blur(14px);text-decoration:none}
@@ -158,7 +167,7 @@ const khungDuoi = `</main>
 var (
 	reTieuDe  = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*#*$`)
 	reMuc     = regexp.MustCompile(`^([ \t]*)([-*+]|\d+\.)[ \t]+(.*)$`)
-	reViec    = regexp.MustCompile(`^\[([ xX])\][ \t]+`)
+	reViec    = regexp.MustCompile(`^\[([ xX~!])\][ \t]+`)
 	reLien    = regexp.MustCompile(`\[([^\]]+)\]\(([^)\s]+)\)`)
 	reDam     = regexp.MustCompile(`\*\*([^*]+)\*\*`)
 	reGach    = regexp.MustCompile(`~~([^~]+)~~`)
@@ -382,11 +391,7 @@ func danhSach(b *strings.Builder, dong []string, i, thut int) int {
 		}
 		vb := strings.Join(noi, "\n")
 		if v := reViec.FindStringSubmatch(vb); v != nil {
-			lop := "task"
-			if v[1] != " " {
-				lop = "task done"
-			}
-			b.WriteString(`<li class="` + lop + `"><span class="box"></span>` + noiTuyen(vb[len(v[0]):]))
+			b.WriteString(`<li class="` + lopViec(v[1]) + `"><span class="box"></span>` + noiTuyen(vb[len(v[0]):]))
 		} else {
 			b.WriteString("<li>" + noiTuyen(vb))
 		}
@@ -395,6 +400,30 @@ func danhSach(b *strings.Builder, dong []string, i, thut int) int {
 	dongLi()
 	b.WriteString("</" + the + ">\n")
 	return i
+}
+
+// lopViec dịch dấu trong ô việc sang lớp CSS.
+//
+// Vì sao BỐN dấu chứ không hai: bản trước chỉ phân biệt "rỗng" với "khác rỗng",
+// nên mọi thứ không phải `[ ]` đều vẽ thành dấu tick xanh. Từ 21/08 bản .md dùng
+// thêm `[~]` (xong một phần) và `[!]` (bị chặn vì thiếu thứ bên ngoài); để nguyên
+// luật cũ thì một mục mới làm được nửa sẽ hiện trên trang y hệt một mục đã xong —
+// đúng kiểu lệch im lặng mà cả bộ sinh này sinh ra để chặn.
+//
+// Dấu lạ rơi về "task" (ô trống). Không thể xảy ra vì reViec đã lọc, nhưng viết
+// nhánh mặc định là chưa-xong chứ không phải đã-xong: đoán sai theo chiều tô hồng
+// tốn hơn đoán sai theo chiều dè dặt.
+func lopViec(dau string) string {
+	switch dau {
+	case "x", "X":
+		return "task done"
+	case "~":
+		return "task part"
+	case "!":
+		return "task block"
+	default:
+		return "task"
+	}
 }
 
 func khoiDoan(b *strings.Builder, dong []string, i int) int {
