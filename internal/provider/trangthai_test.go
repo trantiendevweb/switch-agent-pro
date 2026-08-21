@@ -125,9 +125,17 @@ func TestHongKieuKhacKhongBiNhetVaoBaTrangThai(t *testing.T) {
 	}
 }
 
-// Provider CHƯA ĐO ĐƯỢC phải ở lại `lost`, kể cả khi đưa cho nó đúng bản ghi
-// của Claude. Đây là chỗ luật "không suy đoán" gặp thực tế: Codex/Cursor khai
-// thẳng là không đọc được.
+// Đưa bản ghi của Claude cho provider KHÁC thì phải ở lại `lost`. Đây là chỗ
+// luật "không suy đoán" gặp thực tế.
+//
+// LÝ DO CỦA BÀI NÀY ĐÃ ĐỔI, và đổi theo hướng nó còn CẦN hơn trước. Trước
+// 21/08/2026 cả Codex lẫn Cursor đều khai thẳng là không đọc được, nên bài này
+// chỉ canh cái `false` cứng. Nay CẢ HAI đều đọc được bản ghi CỦA CHÍNH MÌNH
+// (codex: `turn.completed` — ketqua_codex.go; cursor: dòng `{"type":"result"}` —
+// ketqua_cursor.go), nên cái nó canh bây giờ là chuyện khác và nguy hiểm hơn:
+// bộ đọc của provider này KHÔNG được nuốt bản ghi của provider kia. Lược đồ của
+// Claude và của Cursor giống nhau tới mức chép nhầm là đọc ra một kết quả TRÔNG
+// hợp lệ — và một kết luận sai đọc từ bản ghi của người khác thì không ai soi ra.
 func TestProviderChuaDoDuocThiKhongKetLuan(t *testing.T) {
 	for _, ten := range []string{"codex", "cursor"} {
 		ad, ok := Get(ten)
