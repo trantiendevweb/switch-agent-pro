@@ -229,6 +229,21 @@ func (claude) ArgsTuDuyetQuyen() ([]string, bool) {
 // ArgsThuMuc: đo `claude --help`: "--add-dir <directories...>  Additional directories to allow tool"
 func (claude) ArgsThuMuc(dir string) []string { return []string{"--add-dir", dir} }
 
+// ArgsHoSo: KHÔNG CẦN, và đây là KẾT LUẬN chứ không phải khoảng trống.
+//
+// Đo 21/08/2026 trên hồ sơ thật `~/.ai-accounts/claude/tns` (CLAUDE_CONFIG_DIR):
+//
+//   - `.claude.json` có 48 khoá tầng ngoài. Bốn khoá mang chữ "model" đều là
+//     CACHE của máy chủ (additionalModelCostsCache, additionalModelOptionsCache,
+//     modelAccessCache, orgModelDefaultCache) — không khoá nào là LỰA CHỌN model
+//     của người dùng.
+//   - `settings.json` trong hồ sơ chỉ có `env.DISABLE_AUTOUPDATER` và `tui` —
+//     hai thứ không có cờ dòng lệnh tương ứng, và cũng không cần: Claude Code
+//     đọc thẳng settings.json trong CLAUDE_CONFIG_DIR.
+//
+// Khác grok ở đúng chỗ quyết định: grok PHẢI đẻ ra cờ vì CLI của nó BỎ QUA
+// `defaultModel` trong chính file cấu hình của nó (đo 18/08). Claude thì không
+// có thiết lập nào bị bỏ qua như vậy, và model đã đi tường minh qua `--model`.
 func (claude) ArgsHoSo(string) []string { return nil }
 
 // timClaudeExe dò bản Claude Code đóng gói. Hai chỗ, vì gói Microsoft Store
@@ -277,8 +292,11 @@ func (claude) NangLuc() []NangLuc {
 		Duoc(NLTuDuyetQuyen, "`claude --help`: --dangerously-skip-permissions "+
 			"\"Bypass all permission checks\""),
 		Duoc(NLThuMuc, "`claude --help`: --add-dir <directories...>"),
-		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào của Claude phải đọc từ thư mục hồ sơ "+
-			"rồi chuyển thành cờ — model đã truyền tường minh qua --model"),
+		Khong(NLCoTuHoSo, "KHÔNG CẦN — đã mở hồ sơ thật ~/.ai-accounts/claude/tns ra tra "+
+			"(đo 21/08): .claude.json có 48 khoá, bốn khoá chứa chữ \"model\" đều là CACHE của "+
+			"máy chủ chứ không phải lựa chọn của người dùng; settings.json chỉ có "+
+			"env.DISABLE_AUTOUPDATER và tui. Không thiết lập nào phải chuyển thành cờ, và model "+
+			"đã truyền tường minh qua --model"),
 		Duoc(NLKetQuaCoCauTruc, "docKetQuaClaude đọc dòng {\"type\":\"result\"} của NDJSON: "+
 			"is_error, subtype, permission_denials, api_error_status, usage, total_cost_usd"),
 		Duoc(NLTachTaiKhoan, "token là file .credentials.json trong thư mục CLAUDE_CONFIG_DIR"),

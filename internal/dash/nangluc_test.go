@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 )
 
@@ -82,25 +83,57 @@ func TestDuongNangLucTraDuMoiProvider(t *testing.T) {
 // đều không kèm cờ nào rồi gộp thành một `false` cho gọn. Lúc đó Grok — provider
 // KHÔNG có rào duyệt quyền nào, một chuyện an ninh đã đo — trông y hệt Cursor mà
 // máy này chưa đo được gì.
-func TestBaTrangThaiSongSotQuaDTO(t *testing.T) {
+func TestDTOKhongDepTrangThaiNaoThanhTrangThaiKhac(t *testing.T) {
 	d := layNangLuc(t, "/api/nang-luc")
-	dem := map[string]int{}
+
+	// NGUỒN SỰ THẬT là chính lớp API mà handler gọi. So từng mục hai bên thay vì
+	// đòi "phải thấy đủ ba trạng thái trong dữ liệu sản phẩm".
+	//
+	// VÌ SAO ĐỔI (21/08): bản cũ đếm trạng thái trên dữ liệu THẬT rồi bắt cả ba
+	// phải xuất hiện. Nó chỉ xanh chừng nào dự án CÒN NỢ — đóng hết ô ChuaDo là
+	// nó đỏ, dù lớp web không gộp gì cả. Bài kiểm phạt đúng việc mà cả cuốn sổ nợ
+	// tồn tại để thúc đẩy.
+	//
+	// Cách so từng mục này CHẶT HƠN bản cũ: gộp "khong-lam-duoc" với "chua-do"
+	// thành một `false` sẽ bị bắt NGAY, kể cả khi không còn ô ChuaDo nào — vì lúc
+	// đó nó lộ ra ở những mục "khong-lam-duoc" đang có.
+	goc, err := (&api.API{}).NangLuc("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mongDoi := map[string]string{}
+	for _, p := range goc {
+		for _, m := range p.Muc {
+			mongDoi[p.Provider+"/"+m.Khoa] = string(m.TrangThai)
+		}
+	}
+
+	var soChuaDo, soMuc int
 	for _, p := range d.Provider {
 		for _, m := range p.Muc {
-			dem[m.TrangThai]++
+			soMuc++
+			khoa := p.Provider + "/" + m.Khoa
+			muon, co := mongDoi[khoa]
+			if !co {
+				t.Errorf("DTO có mục %q mà lớp API không có", khoa)
+				continue
+			}
+			if m.TrangThai != muon {
+				t.Errorf("%s: lớp API nói %q, DTO nói %q — lớp web đang đổi trạng thái",
+					khoa, muon, m.TrangThai)
+			}
+			if m.TrangThai == string(provider.ChuaDo) {
+				soChuaDo++
+			}
 		}
 	}
-	for _, tt := range []string{
-		string(provider.LamDuoc), string(provider.KhongLamDuoc), string(provider.ChuaDo),
-	} {
-		if dem[tt] == 0 {
-			t.Errorf("DTO không mang ra trạng thái %q nào — ba trạng thái đang bị dẹp "+
-				"thành hai ở lớp web", tt)
-		}
+	if soMuc != len(mongDoi) {
+		t.Errorf("DTO mang %d mục, lớp API có %d — lớp web đang nuốt hoặc nhân bản mục",
+			soMuc, len(mongDoi))
 	}
-	if d.SoChuaDo != dem[string(provider.ChuaDo)] {
+	if d.SoChuaDo != soChuaDo {
 		t.Errorf("so_chua_do = %d nhưng đếm được %d — mỗi mặt cộng một kiểu thì "+
-			"con số trên màn hình không tin được", d.SoChuaDo, dem[string(provider.ChuaDo)])
+			"con số trên màn hình không tin được", d.SoChuaDo, soChuaDo)
 	}
 }
 

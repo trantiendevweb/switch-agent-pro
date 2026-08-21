@@ -81,11 +81,21 @@ const credTarget = "gemini:antigravity"
 // dùng chung; bỏ qua nó là điều ĐÚNG với provider này.
 func (antigravity) HasToken(string) bool { return coCredential(credTarget) }
 
-// Identity: CHƯA ĐỌC ĐƯỢC. Sau khi đăng nhập bằng `agy`, không file nào trong
-// ~/.gemini bị cập nhật email (google_accounts.json vẫn mang dấu thời gian của
-// lần đăng nhập Gemini CLI cũ). Trả rỗng thay vì đoán — hiện nhầm email còn tệ
-// hơn không hiện gì.
-func (antigravity) Identity(string) string { return "" }
+// Identity đọc email từ NHẬT KÝ của chính `agy` trong thư mục hồ sơ — xem
+// danhtinh_antigravity.go để biết vì sao nguồn đó phân biệt được với cái bẫy
+// google_accounts.json, và phần nào còn nợ.
+//
+// Cổng `coCredential` đứng trước là cố ý: đăng xuất thì mục
+// `gemini:antigravity` biến mất khỏi Credential Manager, nhưng nhật ký cũ vẫn
+// nằm nguyên trên đĩa. Không có cổng này thì một hồ sơ đã đăng xuất vẫn khoe
+// email — đúng kiểu "hiện nhầm còn tệ hơn không hiện gì" mà ô V2 dựng ra để
+// chặn. Cổng chỉ HỎI mục có tồn tại không, không mở bí mật ra.
+func (antigravity) Identity(configDir string) string {
+	if !coCredential(credTarget) {
+		return ""
+	}
+	return danhTinhTuNhatKyAgy(configDir)
+}
 
 // TokenExpiry: KHÔNG ĐỌC — và đây là một KẾT LUẬN, không phải một khoảng trống.
 //
@@ -145,6 +155,24 @@ func (antigravity) ArgsTuDuyetQuyen() ([]string, bool) {
 // worktree: không có cờ 1/3 đúng, có cờ 4/4 đúng.
 func (antigravity) ArgsThuMuc(dir string) []string { return []string{"--add-dir", dir} }
 
+// ArgsHoSo: KHÔNG CẦN — đã mở cả cây hồ sơ ra tra, 21/08/2026, chứ không chỉ
+// "chưa gặp".
+//
+// Ba file cấu hình duy nhất tìm được trong một hồ sơ `agy`:
+//
+//	.gemini/settings.json                    security.auth.selectedType = oauth-personal
+//	.gemini/antigravity-cli/settings.json    trustedWorkspaces = [...]
+//	.gemini/config/config.json               userSettings.remoteControlHostname
+//
+// Không cái nào có cờ dòng lệnh tương ứng trong `agy --help`, và cũng không cần:
+// `agy` đọc thẳng ba file đó từ HOME được truyền vào. Riêng `trustedWorkspaces`
+// trông giống việc của `--add-dir`, nhưng thư mục làm việc thật đã do ArgsThuMuc
+// truyền vào từng lượt — đọc lại danh sách cũ trong file là ép agent vào
+// workspace của lượt trước.
+//
+// Đáng ghi: `agy --help` CÓ `--model`, nhưng trong hồ sơ KHÔNG có thiết lập model
+// nào để mà chuyển. Nên ô này đóng ở "không có gì để suy", không phải "không có
+// cờ để dùng".
 func (antigravity) ArgsHoSo(string) []string { return nil }
 
 // ModelArgs: `--model <model>` — ĐÃ CHẠY THẬT 21/08/2026, bản CLI 1.1.16.
@@ -193,7 +221,12 @@ func (antigravity) NangLuc() []NangLuc {
 			"và trả đúng \"Go\" với --dangerously-skip-permissions"),
 		Duoc(NLThuMuc, "`agy --help`: --add-dir. Chạy thật trong git worktree: không có cờ thì "+
 			"1/3 đúng (hai lượt kia báo \"chưa có repository nào được mở\"), có cờ thì 4/4 đúng"),
-		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong ~/.gemini phải chuyển thành cờ"),
+		Khong(NLCoTuHoSo, "KHÔNG CẦN — đã mở cả cây hồ sơ ra tra (đo 21/08): chỉ có ba file "+
+			"cấu hình — settings.json (kiểu xác thực), antigravity-cli/settings.json "+
+			"(trustedWorkspaces), config/config.json (remoteControlHostname). Không cái nào "+
+			"cần chuyển thành cờ, và `agy` tự đọc chúng từ HOME được truyền vào. "+
+			"trustedWorkspaces KHÔNG dùng làm --add-dir: thư mục thật do ArgsThuMuc truyền "+
+			"từng lượt, đọc lại danh sách cũ là ép agent vào workspace của lượt trước"),
 		Duoc(NLKetQuaCoCauTruc, "docKetQuaAntigravity đọc bản ghi NDJSON của `--output-format "+
 			"stream-json`"),
 		Khong(NLTachTaiKhoan, "KHÔNG — token nằm trong Windows Credential Manager dưới khoá TÊN "+
@@ -205,8 +238,13 @@ func (antigravity) NangLuc() []NangLuc {
 			"về cả blob chứ không có cách hỏi riêng mốc hết hạn. Mở chính thứ cần bảo vệ để đổi "+
 			"lấy MỘT dấu thời gian là đánh đổi tồi — cùng dạng với grok.go. Hệ quả nói thẳng: "+
 			"cảnh báo token-sắp-hết-hạn trước khi bung hạm đội không bao giờ kêu cho provider này"),
-		Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC: sau khi đăng nhập bằng `agy`, không file nào trong "+
-			"~/.gemini bị cập nhật email (google_accounts.json vẫn mang dấu thời gian của lần "+
-			"đăng nhập Gemini CLI cũ)"),
+		Duoc(NLDanhTinh, "email đọc từ NHẬT KÝ của chính `agy` "+
+			"(<hồ sơ>/.gemini/antigravity-cli/log/cli-*.log, dòng `applyAuthResult: email=` / "+
+			"`authenticated successfully as`), KHÔNG phải từ google_accounts.json. Đo 21/08: "+
+			"google_accounts.json là file của GEMINI CLI, đứng im ở 18/08 10:09 qua cả ba lượt "+
+			"`agy` ngày 21/08 — đọc nó là ra email CÓ THẬT nhưng SAI NGƯỜI. Nhật ký phân biệt "+
+			"được vì nó vẫn in email trong HAI thư mục KHÔNG HỀ CÓ google_accounts.json: HOME "+
+			"giả, và hồ sơ thật ~/.ai-accounts/antigravity/may. Còn nợ: đăng nhập lại bằng tài "+
+			"khoản khác ở HOME khác thì hồ sơ này hiện email cũ tới lượt `agy` kế tiếp"),
 	}
 }

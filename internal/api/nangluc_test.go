@@ -99,17 +99,49 @@ func TestBaTrangThaiDiRaToiHopDong(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Ba hằng phải KHÁC NHAU. Gộp bắt đầu từ đây: cho hai trạng thái cùng một
+	// chuỗi thì mọi lớp phía sau gộp theo mà không ai thấy.
+	if provider.LamDuoc == provider.KhongLamDuoc ||
+		provider.LamDuoc == provider.ChuaDo ||
+		provider.KhongLamDuoc == provider.ChuaDo {
+		t.Fatalf("ba trạng thái phải khác nhau: %q %q %q",
+			provider.LamDuoc, provider.KhongLamDuoc, provider.ChuaDo)
+	}
+
 	dem := map[provider.TrangThaiNangLuc]int{}
 	for _, p := range ds {
 		for _, m := range p.Muc {
+			// Không có trạng thái LẠ và không có trạng thái RỖNG. Rỗng đi ra tới
+			// web sẽ hiện thành ô trắng, đọc như "không có gì đáng nói".
+			switch m.TrangThai {
+			case provider.LamDuoc, provider.KhongLamDuoc, provider.ChuaDo:
+			default:
+				t.Errorf("%s/%s mang trạng thái lạ %q", p.Provider, m.Khoa, m.TrangThai)
+			}
 			dem[m.TrangThai]++
 		}
 	}
-	for _, tt := range []provider.TrangThaiNangLuc{
-		provider.LamDuoc, provider.KhongLamDuoc, provider.ChuaDo,
-	} {
+
+	// LamDuoc và KhongLamDuoc phải LUÔN có: một provider không làm được gì cả,
+	// hoặc làm được tất cả, đều là dấu hiệu bảng khai hỏng.
+	for _, tt := range []provider.TrangThaiNangLuc{provider.LamDuoc, provider.KhongLamDuoc} {
 		if dem[tt] == 0 {
 			t.Errorf("hợp đồng không mang ra trạng thái %q nào", tt)
 		}
+	}
+
+	// ChuaDo thì CÓ THỂ bằng 0 — và ngày 21/08 nó ĐÃ về 0 thật.
+	//
+	// Bản cũ đòi cả ba trạng thái phải xuất hiện trong dữ liệu SẢN PHẨM. Cách
+	// viết đó biến bài kiểm thành ra: "chỉ xanh chừng nào dự án còn nợ". Đóng
+	// hết ô ChuaDo là nó đỏ, dù lớp đóng gói không hỏng gì cả — tức nó phạt
+	// đúng cái việc mà cả cuốn sổ nợ này tồn tại để thúc đẩy.
+	//
+	// Việc "ba trạng thái không bị dẹp thành hai" nay được canh ở đúng chỗ rủi
+	// ro nằm: lớp DTO của mặt web. Xem TestDTOKhongDepTrangThaiNaoThanhTrangThaiKhac
+	// trong internal/dash — nó đối chiếu từng mục giữa lớp API và lớp web, nên
+	// bắt được việc gộp KỂ CẢ khi không còn ô ChuaDo nào.
+	if dem[provider.ChuaDo] == 0 {
+		t.Logf("không còn ô ChuaDo nào — sổ nợ đo lường đã sạch")
 	}
 }

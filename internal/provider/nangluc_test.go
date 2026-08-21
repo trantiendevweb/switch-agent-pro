@@ -79,18 +79,51 @@ func TestMoiDongKhaiDeuCoBangChung(t *testing.T) {
 // máy dev không cài. Test này giữ cho việc phân biệt "không có" với "chưa đo"
 // không bị ai gộp lại cho gọn.
 func TestDungDuCaBaTrangThai(t *testing.T) {
+	// Ba hàm dựng phải cho ra BA trạng thái KHÁC NHAU. Đây là chỗ việc gộp bắt
+	// đầu: cho `Khong` và `Chua` cùng trả một giá trị thì mọi lớp phía sau gộp
+	// theo mà không ai thấy, và Grok — provider KHÔNG có rào duyệt quyền, chuyện
+	// an ninh — trông y hệt một provider chưa ai đo.
+	d, k, c := Duoc("x", "b"), Khong("x", "b"), Chua("x", "b")
+	if d.TrangThai == k.TrangThai || d.TrangThai == c.TrangThai || k.TrangThai == c.TrangThai {
+		t.Fatalf("ba hàm dựng phải cho ba trạng thái khác nhau, được %q %q %q",
+			d.TrangThai, k.TrangThai, c.TrangThai)
+	}
+
 	dem := map[TrangThaiNangLuc]int{}
 	for _, name := range Names() {
 		ad, _ := Get(name)
 		for _, nl := range ad.NangLuc() {
+			switch nl.TrangThai {
+			case LamDuoc, KhongLamDuoc, ChuaDo:
+			default:
+				t.Errorf("%s/%s khai trạng thái lạ %q", name, nl.Khoa, nl.TrangThai)
+			}
 			dem[nl.TrangThai]++
 		}
 	}
-	for _, tt := range []TrangThaiNangLuc{LamDuoc, KhongLamDuoc, ChuaDo} {
+
+	// LamDuoc và KhongLamDuoc phải LUÔN có mặt: một bảng khai mà không provider
+	// nào "không làm được" thứ gì là bảng khai đang nói dối theo chiều lạc quan.
+	for _, tt := range []TrangThaiNangLuc{LamDuoc, KhongLamDuoc} {
 		if dem[tt] == 0 {
-			t.Errorf("không adapter nào khai %q — nếu \"không làm được\" và \"chưa đo\" đang bị "+
-				"gộp làm một thì kiểu ba trạng thái mất hết ý nghĩa", tt)
+			t.Errorf("không adapter nào khai %q — bảng khai đang dẹp trạng thái", tt)
 		}
+	}
+
+	// ChuaDo ĐƯỢC PHÉP bằng 0, và ngày 21/08 nó đã về 0 thật.
+	//
+	// Bản cũ đòi phải có ít nhất một ô ChuaDo trong dữ liệu sản phẩm. Cách viết
+	// đó khiến bài kiểm CHỈ XANH CHỪNG NÀO DỰ ÁN CÒN NỢ — đóng hết ô nợ là nó đỏ,
+	// dù không có gì bị gộp. Nó phạt đúng cái việc mà `docs/SO-NO-DO-LUONG.md`
+	// tồn tại để thúc đẩy.
+	//
+	// Ý định thật của bài kiểm nay được canh bằng phép so ba hàm dựng ở trên
+	// (không phụ thuộc dữ liệu), và bằng
+	// TestDTOKhongDepTrangThaiNaoThanhTrangThaiKhac trong internal/dash — nó đối
+	// chiếu từng mục giữa lớp API và lớp web nên bắt được việc gộp kể cả khi
+	// không còn ô ChuaDo nào.
+	if dem[ChuaDo] == 0 {
+		t.Logf("không adapter nào còn khai ChuaDo — sổ nợ đo lường đã sạch")
 	}
 }
 
@@ -106,26 +139,26 @@ func TestDungDuCaBaTrangThai(t *testing.T) {
 // được tài khoản. Bảng khai của nó thì lấy từ ngoài vào để test bẻ cong.
 type adapterGia struct{ khai []NangLuc }
 
-func (adapterGia) Name() string                             { return "gia" }
-func (adapterGia) EnvVar() string                           { return "GIA_CONFIG_DIR" }
-func (adapterGia) Command() (string, error)                 { return "gia", nil }
-func (adapterGia) HeadlessArgs(p string) []string           { return []string{"-p", p} }
-func (adapterGia) ModelArgs(m string) []string              { return []string{"--model", m} }
-func (adapterGia) ArgsTuDuyetQuyen() ([]string, bool)       { return []string{"--yolo"}, true }
-func (adapterGia) ArgsThuMuc(d string) []string             { return []string{"--dir", d} }
-func (adapterGia) ArgsHoSo(string) []string                 { return nil }
-func (adapterGia) DocKetQua(string) (KetQua, bool)          { return KetQua{}, false }
-func (adapterGia) PrivateFiles() []string                   { return []string{"token.json"} }
-func (adapterGia) SharedKeys() []string                     { return nil }
-func (adapterGia) BaseDir() string                          { return "gia" }
-func (adapterGia) IdentitySource() string                   { return "" }
-func (adapterGia) Identity(string) string                   { return "" }
-func (adapterGia) HasToken(string) bool                     { return false }
-func (adapterGia) TokenExpiry(string) (time.Time, bool)     { return time.Time{}, false }
-func (adapterGia) TachDuocTaiKhoan() bool                   { return true }
-func (adapterGia) Version() (string, error)                 { return "gia 0.0.1", nil }
-func (adapterGia) Verify() []Check                          { return nil }
-func (a adapterGia) NangLuc() []NangLuc                     { return a.khai }
+func (adapterGia) Name() string                         { return "gia" }
+func (adapterGia) EnvVar() string                       { return "GIA_CONFIG_DIR" }
+func (adapterGia) Command() (string, error)             { return "gia", nil }
+func (adapterGia) HeadlessArgs(p string) []string       { return []string{"-p", p} }
+func (adapterGia) ModelArgs(m string) []string          { return []string{"--model", m} }
+func (adapterGia) ArgsTuDuyetQuyen() ([]string, bool)   { return []string{"--yolo"}, true }
+func (adapterGia) ArgsThuMuc(d string) []string         { return []string{"--dir", d} }
+func (adapterGia) ArgsHoSo(string) []string             { return nil }
+func (adapterGia) DocKetQua(string) (KetQua, bool)      { return KetQua{}, false }
+func (adapterGia) PrivateFiles() []string               { return []string{"token.json"} }
+func (adapterGia) SharedKeys() []string                 { return nil }
+func (adapterGia) BaseDir() string                      { return "gia" }
+func (adapterGia) IdentitySource() string               { return "" }
+func (adapterGia) Identity(string) string               { return "" }
+func (adapterGia) HasToken(string) bool                 { return false }
+func (adapterGia) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
+func (adapterGia) TachDuocTaiKhoan() bool               { return true }
+func (adapterGia) Version() (string, error)             { return "gia 0.0.1", nil }
+func (adapterGia) Verify() []Check                      { return nil }
+func (a adapterGia) NangLuc() []NangLuc                 { return a.khai }
 
 // khaiDung là bảng khai KHỚP với hành vi của adapterGia — điểm xuất phát để mỗi
 // test chỉ bẻ cong đúng một dòng.

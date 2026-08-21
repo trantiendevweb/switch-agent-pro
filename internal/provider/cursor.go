@@ -362,6 +362,14 @@ func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--trust"}, 
 // đối (fleet truyền `workDir`) nên không đụng nhánh "tên đã lưu".
 func (cursor) ArgsThuMuc(dir string) []string { return []string{"--workspace", dir} }
 
+// ArgsHoSo: KHÔNG CẦN, và ở đây là vì hồ sơ RỖNG chứ không phải vì chưa nhìn.
+//
+// Đo 21/08/2026: `%APPDATA%\Cursor` có ĐÚNG MỘT file — `auth.json`, 893 byte —
+// và file đó có ĐÚNG HAI khoá: `accessToken`, `refreshToken`. Không có thiết lập
+// nào trong hồ sơ, nên không có gì để chuyển thành cờ. (Cùng phép tra đã đóng ô
+// V3 về danh tính; xem danhTinhTuJWT.)
+//
+// Model KHÔNG nằm ở đây: nó đi tường minh qua `--model` (xem ModelArgs).
 func (cursor) ArgsHoSo(string) []string { return nil }
 
 // ModelArgs: `--model <model>` — ĐÃ CHẠY THẬT 21/08/2026 trên bản 2026.08.11.
@@ -398,7 +406,9 @@ func (cursor) NangLuc() []NangLuc {
 			"nó chỉ hỏi \"có --cwd hay -C không\" (đúng là không) rồi kết luận provider không "+
 			"có cờ đổi thư mục, trong khi cùng bản --help đó có --workspace. Chọn --workspace "+
 			"chứ không phải --add-dir vì --add-dir chỉ THÊM một gốc workspace nữa"),
-		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong Cursor\\auth.json phải chuyển thành cờ"),
+		Khong(NLCoTuHoSo, "KHÔNG CẦN — đã tra cả thư mục hồ sơ (đo 21/08): %APPDATA%\\Cursor có "+
+			"ĐÚNG MỘT file auth.json, và file đó có ĐÚNG HAI khoá accessToken/refreshToken. "+
+			"Không có thiết lập nào để mà chuyển thành cờ; model đi qua --model"),
 		Duoc(NLKetQuaCoCauTruc, "`--output-format stream-json` (đo 21/08, CHẠY THẬT): dòng cuối "+
 			"{\"type\":\"result\"} mang is_error, subtype, result, request_id và usage "+
 			"(inputTokens/outputTokens — camelCase, KHÁC Claude). Không có total_cost_usd nên "+
