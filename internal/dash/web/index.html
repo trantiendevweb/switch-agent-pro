@@ -273,17 +273,53 @@
   .nl .lech{margin:6px 13px;border:1px solid rgba(255,93,121,.4);
     background:rgba(255,93,121,.08);border-radius:8px;padding:7px 9px;
     font-size:11.5px;color:var(--error);line-height:1.45}
-  .nl-ct{padding:2px 14px 13px;font-size:11.5px;color:var(--lo);line-height:1.9}
-  .nl-ct b{color:var(--mid);font-weight:600}
+  .nl-ct,.rk-ct{padding:2px 14px 13px;font-size:11.5px;color:var(--lo);line-height:1.9}
+  .nl-ct b,.rk-ct b{color:var(--mid);font-weight:600}
   /* Chú giải dùng ĐÚNG chấm CSS của bảng chứ không phải một ký tự hình tròn:
      design system cấm ký tự làm icon (uxui_test.go), và chấm chép tay thì sửa
-     token màu xong chú giải giữ màu cũ, im lặng. */
-  .nl-ct .ch{display:inline-block;width:7px;height:7px;border-radius:50%;
+     token màu xong chú giải giữ màu cũ, im lặng.
+     Hai bảng chú giải (năng lực, sức khoẻ route) dùng CHUNG luật vẽ chấm này —
+     chép sang một bộ selector thứ hai là mở đúng cái khe lệch im lặng mà cả
+     file token.css sinh ra để bịt. */
+  .nl-ct .ch,.rk-ct .ch{display:inline-block;width:7px;height:7px;border-radius:50%;
     background:var(--c);margin:0 3px 0 9px;vertical-align:baseline}
-  .nl-ct .ch:first-child{margin-left:0}
+  .nl-ct .ch:first-child,.rk-ct .ch:first-child{margin-left:0}
   .nl-ct .ch.duoc{--c:var(--run)}
   .nl-ct .ch.khong{--c:var(--idle)}
   .nl-ct .ch.chua{--c:var(--pending)}
+
+  /* ---- Sức khoẻ route: ba trạng thái, KHÔNG được gộp ----
+     "Chết" và "sống nhưng model khai không có" trông giống nhau (đều là không
+     gọi được) nhưng cách sửa ngược nhau: cái đầu là đợi hoặc đổi route, cái sau
+     là sửa một dòng trong .sagent/project.toml. Đo 20/08: route deepseek trả
+     HTTP 503 ba lần lúc 16:54-16:56 rồi tự hồi phục — nếu hai thứ đó chung một
+     màu đỏ thì lần đó đọc như "cấu hình sai" và người ta đi sửa nhầm chỗ.
+     Đúng ba trạng thái này cũng là ba dấu mà `sagent route kiem` in ra ở
+     terminal — hai mặt nói cùng một câu, chỉ khác cách vẽ. */
+  #rk{max-height:230px;overflow:auto;padding:0 14px 4px}
+  #rk .mr{padding:4px 0;border-bottom:1px solid var(--line)}
+  #rk .mr:last-child{border-bottom:0}
+  #rk .d{display:flex;gap:10px;align-items:center;color:var(--mid);font-size:12px}
+  /* Chấm CSS chứ không phải ký tự: ký tự đổi hình theo phông máy và không đổi
+     màu theo trạng thái — design system của dự án cấm. */
+  #rk .cham{width:7px;height:7px;border-radius:50%;flex:none;background:var(--c)}
+  #rk .rt{font-family:var(--font-mono);font-size:11.5px;color:var(--hi);flex:none;min-width:82px}
+  #rk .nhan{color:var(--c);min-width:0}
+  /* Thời gian trả lời là dữ liệu máy: mono + tabular-nums để cột số không nhảy
+     khi 90ms thành 1240ms. */
+  #rk .mat{margin-left:auto;flex:none;font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--lo)}
+  #rk .d.duoc{--c:var(--run)}
+  #rk .d.song{--c:var(--pending)}
+  #rk .d.chet{--c:var(--error)}
+  #rk .ghi{padding:1px 0 0 17px;font-size:11.5px;color:var(--lo);line-height:1.5}
+  /* Lý do hỏng là NGUYÊN VĂN của nhà cung cấp, trong đó có request id — thứ duy
+     nhất dùng được khi phải đi hỏi họ. Cho xuống dòng đủ, đừng cắt bằng ellipsis. */
+  #rk .ly{padding:1px 0 0 17px;font-size:11.5px;color:var(--error);line-height:1.5;
+    white-space:pre-wrap;word-break:break-word}
+  .rk-ct .ch.duoc{--c:var(--run)}
+  .rk-ct .ch.song{--c:var(--pending)}
+  .rk-ct .ch.chet{--c:var(--error)}
 
   /* Dưới 720px: một cột, và ngăn kéo phủ full màn — trên điện thoại một tấm
      panel 430px vừa che gần hết màn vừa để hở một dải nền vô dụng. */
@@ -570,6 +606,28 @@
           <button class="go" type="submit">Gửi</button>
         </form>
         <div id="ai-out" class="empty">Chưa hỏi gì.</div>
+
+        <!-- Sức khoẻ route — action "route.kiem", cùng nguồn với `sagent route kiem`.
+             Đặt ngay dưới form hỏi vì nó trả lời câu đứng TRƯỚC câu hỏi: route
+             mình sắp chọn có gọi được không. Trước khối này, mặt web chỉ có ô
+             chọn route liệt kê tên — tên vẫn hiện đủ kể cả khi key sai hoặc
+             model khai không tồn tại, nên cách duy nhất để biết là bấm Gửi rồi
+             hỏng. Nút KHÔNG tự chạy: xem chú thích ở napRouteKiem. -->
+        <div class="ls-dau">
+          <span>Sức khoẻ route <b id="rk-dem"></b></span>
+          <button type="button" class="btn" id="rk-nap">Kiểm route</button>
+        </div>
+        <div id="rk" class="empty">Chưa kiểm. Phép kiểm đi bằng <code>GET /models</code> nên không tốn token.</div>
+        <div class="rk-ct">
+          <span class="ch duoc"></span> dùng được
+          <span class="ch song"></span> sống, nhưng model khai không có
+          <span class="ch chet"></span> không dùng được.
+          Ba thứ này <b>khác nhau</b>: cái giữa sửa bằng một dòng trong
+          <code>.sagent/project.toml</code>, cái cuối thì phải đợi hoặc đổi route.
+          Phép kiểm này <b>không biết hạn mức còn hay hết</b> — cái đó chỉ lộ ra khi gọi thật.
+          Xem ở terminal: <code>sagent route kiem</code>
+        </div>
+
         <div class="ls-dau">
           <span>Sổ lời gọi</span>
           <button type="button" class="btn" id="ai-ls-nap">Làm mới</button>
@@ -843,6 +901,82 @@ function gioNgan(iso){ const d = new Date(iso); return isNaN(d) ? String(iso) :
   String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + ' ' +
   String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
 $('ai-ls-nap').onclick = napAILichSu;
+
+// Sức khoẻ route — action "route.kiem", cùng nguồn với `sagent route kiem`.
+//
+// KHÔNG tự chạy lúc mở trang, khác napRoute/napTele/napDB ở cuối file. Lệnh này
+// chạm MẠNG THẬT: mỗi lần bấm là một request GET /models đi tới TỪNG nhà cung
+// cấp. Trang tự làm việc đó lúc tải, cộng với hai ba tab đang mở, là biến
+// dashboard thành máy ping — đúng lý do nút "Quét tiến trình mồ côi" bên ô Máy
+// cũng phải do người dùng bấm.
+//
+// Nó không tốn token (đi bằng /models chứ không gửi prompt), nên nút nói rõ thế
+// ở khối chú giải: một phép kiểm bị nghi là có tính tiền thì người ta thôi chạy,
+// mà health check không ai chạy thì bằng không có.
+//
+// Ba trạng thái giữ RIÊNG, không gộp — xem chú thích CSS ở #rk.
+function rkDong(cha, lop, chu){
+  const el = document.createElement('div');
+  el.className = lop;
+  el.textContent = chu;   // textContent: chữ này do nhà cung cấp trả về, không diễn thành HTML
+  cha.appendChild(el);
+}
+async function napRouteKiem(){
+  const box = $('rk'), nut = $('rk-nap');
+  nut.disabled = true;
+  box.className = 'empty';
+  box.textContent = 'đang hỏi từng route…';
+  $('rk-dem').textContent = '';
+  try{
+    const d = await api('/api/route/kiem');
+    const ds = d.muc || [];
+    if(!ds.length){
+      box.textContent = 'Chưa khai route nào trong .sagent/project.toml.';
+      return;
+    }
+    box.className = '';
+    box.innerHTML = '';
+    for(const s of ds){
+      let lop = 'chet', nhan = 'không dùng được';
+      if(s.dung){ lop = 'duoc'; nhan = 'dùng được'; }
+      else if(s.song){ lop = 'song'; nhan = 'sống, nhưng model khai không có'; }
+
+      const mr = document.createElement('div');
+      mr.className = 'mr';
+      const hang = document.createElement('div');
+      hang.className = 'd ' + lop;
+      hang.innerHTML =
+        '<i class="cham" role="img" aria-label="' + esc(nhan) + '"></i>' +
+        '<span class="rt">' + esc(s.ten) + '</span>' +
+        '<span class="nhan">' + esc(nhan) + '</span>' +
+        '<span class="mat">' + (s.matMs|0) + 'ms</span>';
+      mr.appendChild(hang);
+
+      if(s.song && (s.soModel|0) > 0){
+        rkDong(mr, 'ghi', 'model "' + (s.model || '') + '" · nhà cung cấp liệt kê ' + (s.soModel|0) + ' model');
+      }
+      // Im lặng KHÁC phủ nhận: endpoint không cài /models thì không được kết
+      // luận model khai sai, chỉ được nói là chưa kiểm được tên model.
+      if(s.khongRo){
+        rkDong(mr, 'ghi', 'endpoint không liệt kê model — không kiểm được tên model, chỉ biết là route sống');
+      }
+      for(const g of (s.gan || [])) rkDong(mr, 'ghi', 'có thể bạn muốn: ' + g);
+      if(s.loi) rkDong(mr, 'ly', ((s.status|0) > 0 ? 'HTTP ' + (s.status|0) + ': ' : '') + s.loi);
+      box.appendChild(mr);
+    }
+    // Đếm theo `dung`, không theo `song`: route sống mà model khai sai thì mọi
+    // lượt gọi vẫn hỏng, nên nó thuộc phía "không dùng được" của con số này.
+    const hong = ds.filter(s => !s.dung).length;
+    $('rk-dem').textContent = hong ? hong + '/' + ds.length + ' không dùng được'
+                                   : ds.length + ' route, dùng được hết';
+  }catch(e){
+    box.className = 'empty';
+    box.textContent = 'không kiểm được: ' + e.message;
+  }finally{
+    nut.disabled = false;
+  }
+}
+$('rk-nap').onclick = napRouteKiem;
 
 // Báo tin Telegram: mặt web CHỈ xem trạng thái và gửi thử.
 //
