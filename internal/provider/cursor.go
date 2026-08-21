@@ -87,24 +87,53 @@ func (cursor) HasToken(configDir string) bool {
 	return err == nil && fi.Size() > 0
 }
 
-// Identity đọc email từ auth.json — nhưng ĐO 21/08/2026 thì KHÔNG CÓ email ở đó.
+// Identity trả claim `sub` trong JWT của auth.json — KHÔNG phải email.
 //
-// File auth.json thật có ĐÚNG hai khoá, `accessToken` và `refreshToken` (xem
-// TokenExpiry). Không `email`, không `userEmail`, không `user_email`. Trong
-// payload JWT cũng không: `sub` là một mã đục dạng `google-oauth|<id>`, không
-// phải địa chỉ thư. Nên trên hồ sơ ĐANG ĐĂNG NHẬP THẬT, hàm này trả `""`.
+// ĐO LẠI 21/08/2026, giải payload JWT thật trên hồ sơ ĐANG ĐĂNG NHẬP. Đây là
+// phép đo mà lượt trước còn nợ: lượt đó mới ngó tầng ngoài rồi kết luận "không
+// đọc được", nên hạ khai xuống ChuaDo. Giải payload ra thì thấy ngược lại — có
+// một trường danh tính, chỉ là nó không phải địa chỉ thư.
 //
-// Vòng lặp khoá dưới đây GIỮ LẠI có chủ đích: nó không tốn gì, và ngày một bản
-// CLI mới ghi thêm trường email thì nó đọc được ngay. Nhưng bảng năng lực đã
-// hạ NLDanhTinh xuống ChuaDo — khai xanh cho một hàm luôn trả rỗng là đúng thứ
-// mà `KiemNangLuc` sinh ra để chặn, chỉ tiếc là phép dò của NLDanhTinh một
-// chiều nên nó không bắt được ca này.
+// HÌNH DẠNG THẬT, đo chứ không đoán. Thư mục `%APPDATA%\Cursor` chỉ có ĐÚNG MỘT
+// file là `auth.json` (893 byte) — không còn file nào khác để mà tìm danh tính.
+// Tầng ngoài có ĐÚNG HAI khoá `accessToken`/`refreshToken`, không `email`,
+// không `userEmail`, không `user_email`. Payload hai JWT giống hệt nhau, có
+// ĐÚNG TÁM claim:
 //
-// Đường còn lại chưa đo: `cursor-agent status` IN ĐƯỢC email (đã thấy khi đo
-// NLTachTaiKhoan). Đọc danh tính bằng cách chạy CLI con là một đánh đổi khác
-// hẳn đọc file — chưa đo nên chưa làm.
+//	iss         https://authentication.cursor.sh
+//	aud         https://cursor.com
+//	sub         google-oauth2|user_01<...>          <- trường danh tính DUY NHẤT
+//	scope       openid profile email offline_access
+//	type        session
+//	randomness  <uuid cụt>
+//	time        1787022539
+//	exp         1792206539
 //
-// CHỈ đọc trường định danh, không bao giờ trả về hay ghi log phần token.
+// BẪY ĐÃ TRÁNH: claim `scope` CÓ CHỮ "email", nhưng đó là phạm vi OAuth đã xin,
+// KHÔNG phải một claim email. Không có claim `email` trong payload. Đọc lướt
+// thấy chữ "email" rồi khai là đọc được email thì lại sai đúng kiểu cũ.
+//
+// VÌ SAO TRẢ `sub` MÀ VẪN KHAI Duoc — tiền lệ là `grok.go`: Identity ở đó trả
+// `baseURL · defaultModel` thay cho email và vẫn khai `Duoc(NLDanhTinh)`, vì
+// câu năng lực này hỏi *"đọc được danh tính để hiển thị"*, không hỏi *"đọc được
+// email"*. `sub` là subject của OIDC: bền, mỗi tài khoản một giá trị, nên nó
+// trả lời đúng câu người vận hành cần khi chạy nhiều tài khoản Cursor song song
+// (`NLTachTaiKhoan` = Duoc): *hồ sơ này là tài khoản nào*. Rỗng thì không trả
+// lời được gì.
+//
+// KHÁC ca Antigravity ở V2 (*"hiện nhầm email còn tệ hơn không hiện gì"*): chỗ
+// đó nguy hiểm vì `google_accounts.json` cho ra một email CÓ THẬT nhưng SAI
+// NGƯỜI — nhìn đúng định dạng nên không ai nghi. `google-oauth2|user_01…` thì
+// không thể bị nhầm là địa chỉ thư, và nó là danh tính của CHÍNH hồ sơ đang
+// đọc. Trông xấu, nhưng không nói dối.
+//
+// CHỈ đọc trường định danh, không bao giờ trả về hay ghi log phần token. `sub`
+// là mã tài khoản, không phải bí mật xác thực.
+//
+// Đường còn lại vẫn chưa đo: `cursor-agent status` IN ĐƯỢC email (đã thấy khi
+// đo NLTachTaiKhoan). Đọc danh tính bằng cách chạy CLI con là một đánh đổi khác
+// hẳn đọc file — tốn một tiến trình mỗi lần vẽ card — nên chưa đo, chưa làm.
+// Ngày nào đo xong thì đây là chỗ đổi `sub` lấy email thật.
 func (cursor) Identity(configDir string) string {
 	b, err := os.ReadFile(authFile(configDir))
 	if err != nil {
@@ -114,12 +143,46 @@ func (cursor) Identity(configDir string) string {
 	if json.Unmarshal(b, &m) != nil {
 		return ""
 	}
+	// Tầng ngoài: bản 2026.08.11 KHÔNG ghi ba trường này (đã đo). Giữ vòng lặp
+	// vì nó không tốn gì và ngày một bản CLI mới ghi thêm thì đọc được ngay —
+	// và email thật thì luôn hơn `sub` đục.
 	for _, k := range []string{"email", "userEmail", "user_email"} {
 		if v, ok := m[k].(string); ok && v != "" {
 			return v
 		}
 	}
+	// Tầng trong: claim của JWT. accessToken trước vì hai token hôm nay giống
+	// hệt nhau từng claim, nhưng access mới là cái mô tả phiên đang dùng.
+	for _, k := range []string{"accessToken", "refreshToken"} {
+		tok, _ := m[k].(string)
+		if id := danhTinhTuJWT(tok); id != "" {
+			return id
+		}
+	}
 	return ""
+}
+
+// danhTinhTuJWT lấy danh tính trong payload một JWT: ưu tiên claim `email` nếu
+// nhà cung cấp có ghi, không thì `sub`.
+//
+// Thứ tự đó là cố ý: hôm nay Cursor chỉ có `sub`, nhưng nếu bản sau thêm
+// `email` thì card tự đổi sang email mà không phải sửa hàm này.
+func danhTinhTuJWT(tok string) string {
+	raw, ok := payloadJWT(tok)
+	if !ok {
+		return ""
+	}
+	var claims struct {
+		Email string `json:"email"`
+		Sub   string `json:"sub"`
+	}
+	if json.Unmarshal(raw, &claims) != nil {
+		return ""
+	}
+	if claims.Email != "" {
+		return claims.Email
+	}
+	return claims.Sub
 }
 
 // TokenExpiry đọc claim `exp` trong JWT của `Cursor\auth.json` — ĐÃ ĐO
@@ -192,12 +255,8 @@ func (cursor) TokenExpiry(configDir string) (time.Time, bool) {
 // Trả false thay vì một mốc bịa ra ở mọi ngõ hỏng — cảnh báo sai giờ còn tệ hơn
 // không cảnh báo.
 func hanTuJWT(tok string) (time.Time, bool) {
-	parts := strings.Split(tok, ".")
-	if len(parts) < 2 {
-		return time.Time{}, false
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
+	raw, ok := payloadJWT(tok)
+	if !ok {
 		return time.Time{}, false
 	}
 	var claims struct {
@@ -207,6 +266,23 @@ func hanTuJWT(tok string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return time.Unix(claims.Exp, 0), true
+}
+
+// payloadJWT giải phần payload (đoạn giữa) của một JWT ra JSON thô.
+//
+// Tách riêng khỏi hanTuJWT vì nay có HAI người đọc payload — hạn token và danh
+// tính — và cả hai phải hỏng theo cùng một kiểu: trả false ở mọi ngõ hỏng thay
+// vì bịa ra giá trị.
+func payloadJWT(tok string) ([]byte, bool) {
+	parts := strings.Split(tok, ".")
+	if len(parts) < 2 {
+		return nil, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, false
+	}
+	return raw, true
 }
 
 func (c cursor) Verify() []Check {
@@ -248,13 +324,43 @@ func (cursor) TachDuocTaiKhoan() bool { return true }
 // nhau, và mặc định phải là cái thứ nhất.
 func (cursor) ArgsTuDuyetQuyen() ([]string, bool) { return []string{"--trust"}, true }
 
-// ArgsThuMuc: `cursor-agent` KHÔNG có cờ đổi thư mục — `--help` bản 2026.08.11
-// không có `--cwd` lẫn `-C`. Nó làm việc trong thư mục của tiến trình.
+// ArgsThuMuc: `--workspace <path>` — ĐÃ CHẠY THẬT 21/08/2026 trên bản
+// 2026.08.11-e8db854, có ĐỐI CHỨNG.
 //
-// Trả nil ở đây là ĐÚNG và đủ: `fleet` đã chạy tiến trình con với `workDir` là
-// worktree của phiên (`profile.StartDetached`), nên Cursor vào đúng chỗ mà không
-// cần cờ nào. Đây là "đã đo, provider không có thứ đó", KHÁC "chưa ai đo".
-func (cursor) ArgsThuMuc(dir string) []string { return nil }
+// SỬA MỘT KẾT LUẬN SAI (ô C6). Bình luận cũ ở đây viết: *"cursor-agent KHÔNG có
+// cờ đổi thư mục — --help bản 2026.08.11 không có --cwd lẫn -C"*, rồi trả nil và
+// khai `Khong(NLThuMuc)`. Vế đầu ĐÚNG mà kết luận SAI, vì câu hỏi đã đặt hẹp:
+// hỏi *"có --cwd hay -C không"* thay vì *"có cách nào khai thư mục làm việc
+// không"*. Đọc hết `--help` của ĐÚNG bản đó thì có:
+//
+//	--workspace <path-or-name>  Workspace directory or saved workspace name to
+//	                            use (defaults to current working directory)
+//
+// PHÉP ĐO, có đối chứng nên cờ chứ không phải thứ gì khác mới là nguyên nhân.
+// Tạo `%TEMP%\do-thumuc-cursor\VAN-TAY-9F3A2B.txt`, rồi chạy từ cwd
+// `C:\Users\Administrator` (KHÔNG phải thư mục đó):
+//
+//	có --workspace <dir>  -> agent liệt kê "VAN-TAY-9F3A2B.txt"       <- thấy
+//	không có cờ           -> "no", và tự khai cwd C:\Users\Administrator
+//
+// Tức cờ ĐƯỢC NHẬN và CÓ HIỆU LỰC, không bị nuốt im lặng.
+//
+// VÌ SAO `--workspace` CHỨ KHÔNG PHẢI `--add-dir` (bản này có cả hai):
+// `--add-dir` là *"Add an additional workspace root"* — THÊM một gốc nữa, trong
+// khi hợp đồng của hàm này là khai TƯỜNG MINH thư mục làm việc. Claude và
+// Antigravity dùng `--add-dir` vì CLI của chúng không có cờ đặt thẳng; Cursor
+// có, nên dùng cái đúng nghĩa hơn.
+//
+// VÌ SAO KHÔNG CÒN LÀ "không cần": lý lẽ cũ — *"fleet đã chạy tiến trình con với
+// workDir rồi"* — bỏ qua đúng cái mà hợp đồng ArgsThuMuc (adapter.go:59-66) sinh
+// ra để chặn: fleet chạy agent trong GIT WORKTREE, mà ở worktree `.git` là FILE
+// con trỏ chứ không phải thư mục, nên provider dò workspace bị hụt dù cwd đã
+// đúng. Đó là ca đã đo trên Antigravity: cùng lệnh cùng cờ, ở repo thật 3/3, ở
+// worktree chỉ 1/3. cwd đúng KHÔNG bảo đảm workspace đúng.
+//
+// `--workspace` nhận path HOẶC tên workspace đã lưu. Luôn truyền đường dẫn tuyệt
+// đối (fleet truyền `workDir`) nên không đụng nhánh "tên đã lưu".
+func (cursor) ArgsThuMuc(dir string) []string { return []string{"--workspace", dir} }
 
 func (cursor) ArgsHoSo(string) []string { return nil }
 
@@ -286,8 +392,12 @@ func (cursor) NangLuc() []NangLuc {
 			"tức cờ được nhận và có hiệu lực, không bị nuốt im lặng"),
 		Duoc(NLTuDuyetQuyen, "`--trust` (đo 21/08, CHẠY THẬT trên 2026.08.11): một mình đã đủ "+
 			"để agent ghi file trong workspace. Không cần --force/--yolo — cố ý giữ nấc hẹp nhất"),
-		Khong(NLThuMuc, "cursor-agent KHÔNG có cờ đổi thư mục: --help (2026.08.11) không có "+
-			"--cwd lẫn -C. Không cần: fleet đã chạy tiến trình con với workDir là worktree của phiên"),
+		Duoc(NLThuMuc, "`--workspace <path>` (đo 21/08, CHẠY THẬT trên 2026.08.11, CÓ ĐỐI "+
+			"CHỨNG): chạy từ cwd khác hẳn, có cờ thì agent thấy file vân tay trong thư mục "+
+			"đích, bỏ cờ thì không thấy và tự khai cwd cũ. Lời khai cũ Khong(NLThuMuc) là SAI: "+
+			"nó chỉ hỏi \"có --cwd hay -C không\" (đúng là không) rồi kết luận provider không "+
+			"có cờ đổi thư mục, trong khi cùng bản --help đó có --workspace. Chọn --workspace "+
+			"chứ không phải --add-dir vì --add-dir chỉ THÊM một gốc workspace nữa"),
 		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong Cursor\\auth.json phải chuyển thành cờ"),
 		Duoc(NLKetQuaCoCauTruc, "`--output-format stream-json` (đo 21/08, CHẠY THẬT): dòng cuối "+
 			"{\"type\":\"result\"} mang is_error, subtype, result, request_id và usage "+
@@ -303,11 +413,14 @@ func (cursor) NangLuc() []NangLuc {
 			"(2026-08-18T03:08:59Z): cửa sổ ĐÚNG 60 ngày. Đọc refresh theo tiền lệ claude.go. "+
 			"CHƯA ĐO: có xoay vòng khi refresh hay không — qua 3 ngày dùng, mtime auth.json vẫn "+
 			"là giây đăng nhập nên CLI chưa ghi lại file này lần nào"),
-		Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC (đo 21/08 trên hồ sơ đăng nhập thật): Cursor\\auth.json "+
-			"có ĐÚNG hai khoá accessToken/refreshToken, không có email/userEmail/user_email; "+
-			"payload JWT cũng chỉ có `sub` dạng mã đục `google-oauth|<id>`. Dòng khai cũ nói "+
-			"đọc được ba trường đó là SAI — Identity() trả rỗng trên chính máy đã đăng nhập. "+
-			"`cursor-agent status` in được email nhưng đọc bằng cách chạy CLI con là đánh đổi "+
-			"khác, chưa đo"),
+		Duoc(NLDanhTinh, "claim `sub` trong JWT của %APPDATA%\\Cursor\\auth.json — mã tài khoản "+
+			"dạng `google-oauth2|user_01…`, KHÔNG phải email (đo 21/08 bằng cách giải payload "+
+			"JWT thật trên hồ sơ đăng nhập). Thư mục Cursor chỉ có đúng file auth.json; tầng "+
+			"ngoài chỉ hai khoá accessToken/refreshToken, không email/userEmail/user_email; "+
+			"payload có 8 claim và `sub` là trường danh tính duy nhất. LƯU Ý claim `scope` có "+
+			"chữ \"email\" nhưng đó là phạm vi OAuth, KHÔNG phải claim email. Khai Duoc theo "+
+			"tiền lệ grok.go (Identity trả baseURL·defaultModel thay cho email): câu hỏi là "+
+			"\"đọc được danh tính để hiển thị\", không phải \"đọc được email\". CHƯA ĐO: "+
+			"`cursor-agent status` in được email, nhưng đọc bằng cách chạy CLI con là đánh đổi khác"),
 	}
 }
