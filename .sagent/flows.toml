@@ -741,6 +741,11 @@ Bắt buộc:
       tu_duyet_quyen = true
       timeout_sec = 1800
       on_failure = "continue"
+      # HOP DONG DAU RA, them 21/08. Truoc do buoc nay KHONG co phai_co: agent
+      # tra ve mot cau cut van duoc ghi `done`, y het lo hong cua `soi` o luot
+      # #47. Chuoi "COMMIT" lay tu chinh khuon tra loi bat buoc o cuoi prompt
+      # duoi day, khong phai mot bo chung nam cung trong ma.
+      phai_co = ["COMMIT"]
       prompt = """Làm PHẦN 2 (tài liệu) trong kế hoạch dưới. CHỈ phần 2.
 
 {{steps.ke-hoach.output}}
@@ -803,6 +808,41 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
       on_failure = "continue"
 
     [[flow.doi-4.step]]
+      id = "bang-chung"
+      vai_tro = "tester"
+      # VI SAO CO (do 21/08, luot #50): buoc `soi` la node `model` - loi goi API
+      # thang, KHONG co shell, khong chay duoc lenh nao. Nhung prompt cua no lai
+      # bat "phai tu chay bon lenh git ben duoi". Nguoi soi tra ve dung cau that
+      # tha: "KHONG THE XAC DINH - khong chay duoc git tren moi truong nay".
+      #
+      # Goc: `soi` von la type="agent" chay bang CLI grok (chay duoc git). CLI do
+      # hong vinh vien 410 nen doi sang node `model`, ma PROMPT GIU NGUYEN. Tu do
+      # nguoi soi duoc giao mot viec ma moi truong cua no khong cho phep lam, va
+      # loi nam im 19 tieng vi tu #47 toi #50 khong luot doi-4 nao chay.
+      #
+      # Buoc nay chay git HO no, roi `soi` doc ket qua qua doc_duoc. Giu duoc uu
+      # diem cua node model (khong phu thuoc CLI grok da hong) ma nguoi soi van
+      # co bang chung that de doc.
+      type = "shell"
+      needs = ["kiem-2"]
+      # `&` chu KHONG phai `&&`: mot lenh hong thi cac lenh sau VAN chay. Dung
+      # `&&` thi mot nhanh rong lam mat luon bang chung cua nhanh kia.
+      #
+      # GAN NHAN tung phan: mot chuoi RONG khong phan biet duoc "nhanh khong co
+      # commit nao" voi "lenh khong chay". Co nhan thi phan trong van nhin thay
+      # duoc, va dong [HET BANG CHUNG] o cuoi chung minh lenh da chay het.
+      #
+      # KHONG CAT BOT: diff day du, khong `--stat` khong. Neu sau nay diff qua
+      # to lam node model nghen, thi CHO NAY la cho dat gioi han - va phai ghi
+      # ro da cat gi, dung cat im lang.
+      run = ["cmd", "/c", "echo [TNS] commit: & git log --oneline main..sagent/tns-1 & echo [TNS] file doi: & git diff --stat main...sagent/tns-1 & echo [TNS] diff: & git diff main...sagent/tns-1 & echo [MAY] commit: & git log --oneline main..sagent/may-1 & echo [MAY] file doi: & git diff --stat main...sagent/may-1 & echo [MAY] diff: & git diff main...sagent/may-1 & echo [HET BANG CHUNG]"]
+      timeout_sec = 300
+      # Hong o day thi `soi` se doc duoc chuoi rong, phan "khong xac dinh duoc",
+      # roi phai_co chan lai va dung luot chay. Ket cuc giong nhau ma thong bao
+      # ro hon, nen khong can stop ngay tai day.
+      on_failure = "continue"
+
+    [[flow.doi-4.step]]
       id = "soi"
       vai_tro = "soi"
       # ĐO ĐƯỢC 20/08: CLI grok hỏng VĨNH VIỄN — HTTP 410 "Live search is
@@ -817,35 +857,41 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
       # Nhờ vậy một nhà cung cấp sập thì người soi tự chuyển sang nhà kia thay vì
       # biến mất.
       type = "model"
-      needs = ["kiem-2", "code-doc"]
+      needs = ["kiem-2", "code-doc", "bang-chung"]
       # Người soi CHỈ được đọc kết quả máy chấm, không được đọc lời hai người
       # thợ tự khai (code-go, code-doc, sua). Soi mà đọc lời tự khai thì nó bị
       # mồi — nhắc lại lập luận của người làm thay vì tự đi tìm. Muốn biết hai
       # nhánh có gì thì phải tự chạy bốn lệnh git bên dưới, đó mới là bằng
       # chứng. `needs` vẫn giữ code-doc: phải CHỜ nó xong rồi mới soi được
       # nhánh của nó, chỉ là không đọc lời nó kể.
-      doc_duoc = ["kiem-2"]
+      doc_duoc = ["kiem-2", "bang-chung"]
       timeout_sec = 900
-      on_failure = "continue"
+      # DOI TU "continue" -> "stop" ngay 21/08. Luot #50 cho thay giu continue
+      # nghia la: nguoi soi hong, canh bao duoc GHI LAI dang hoang, va buoc `gop`
+      # VAN chay tron nhanh. Do dung kich ban ma phai_co sinh ra de ngan -
+      # "viec tron nhanh dien ra ma KHONG AI SOI" - chi khac la nay no khong im
+      # lang nua. Ghi lai la tien bo, nhung khong phai la chan.
+      on_failure = "stop"
       # HOP DONG DAU RA: khong co ket luan thi buoc nay CHUA LAM, khong phai
       # "da soi va khong co y kien" — hai cau do khac han nhau.
       # Tu ket luan lay tu CHINH prompt ben duoi, khong phai mot bo chung
       # nam cung trong ma. Xem internal/flow/phaico.go.
       phai_co = ["NEN TRON", "CAN SUA THEM", "VUT"]
       prompt = """Bạn là người soi độc lập, KHÁC HÃNG với hai người vừa làm.
-CHỈ ĐỌC — không sửa, không commit, không tạo file.
+CHỈ ĐỌC — bạn KHÔNG chạy được lệnh nào, và KHÔNG CẦN chạy.
 
-MÁY NÀY LÀ WINDOWS, shell là cmd.exe. KHÔNG có ls/cat/grep/pwd. Chỉ dùng git.
-Một lệnh trượt HAI lần thì ĐỔI CÁCH, đừng gọi lại lần thứ ba.
-
-Đọc bằng đúng bốn lệnh:
-    git log --oneline main..sagent/tns-1
-    git diff main...sagent/tns-1
-    git log --oneline main..sagent/may-1
-    git diff main...sagent/may-1
+Bằng chứng git đã được chạy sẵn và đưa nguyên văn xuống dưới. Đó là TOÀN BỘ thứ
+bạn có. Đừng nói "không chạy được git" — bạn không phải chạy. Và đừng suy ra thứ
+không nằm trong bằng chứng đó.
 
 Nhánh nào KHÔNG có commit nào thì phán VUT và nói thẳng người đó chưa làm gì.
 Đừng phán NEN TRON cho một nhánh rỗng — không có gì để trộn cả.
+
+Nếu phần bằng chứng bên dưới TRỐNG hoặc không đọc được, phán VUT cho cả hai và
+ghi rõ ở dòng LOI là không nhận được bằng chứng. Đừng đoán thay.
+
+Bằng chứng git — `git log` + `git diff` của cả hai nhánh:
+{{steps.bang-chung.output}}
 
 Máy chấm nói gì:
 {{steps.kiem-2.output}}
