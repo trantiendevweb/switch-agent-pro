@@ -80,7 +80,28 @@ $chuaLen = @($tapTin | Where-Object { $_.Attributes -notmatch 'ReparsePoint' })
 $chuaLenMB = 0
 if ($chuaLen.Count -gt 0) {
     $chuaLenMB = [math]::Round((($chuaLen | Measure-Object -Property Length -Sum).Sum / 1MB), 1)
-    $loi.Add("$($chuaLen.Count)/$($tapTin.Count) file .enc CHUA len may ($chuaLenMB MB van nam tren o dia nay).")
+}
+
+# CAU HOI DUNG LA "BACKUP MOI CO ROI MAY KHONG", khong phai "co file nao chua
+# len khong".
+#
+# Do 21/08 sau khi dung lai dong bo: 18/20 file da len, 2 file con lai la
+# knowledge-os cua 09/08 va 10/08 - chung VON DA o tren may tu truoc (la
+# placeholder trong thu muc cu) nen chua bao gio nam trong nhom rui ro. Luat cu
+# "co file nao chua len la bao dong" se reo chuong luc 05:00 vi hai file do,
+# moi ngay, mai mai. Bao dong gia hang ngay thi nguoi ta thoi doc bao dong - va
+# luc do bai canh nay bang khong.
+#
+# Nen: file MOI NHAT chua len = duong ong DUT -> bao dong that.
+# File cu chua len = ghi ra de biet, KHONG bao dong.
+$cuChuaLen = 0
+if ($tapTin.Count -gt 0) {
+    $moiNhatTatCa = $tapTin | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($moiNhatTatCa.Attributes -notmatch 'ReparsePoint') {
+        $loi.Add("File .enc MOI NHAT ($($moiNhatTatCa.Name)) CHUA len may - duong ong backup dang dut. Tong $($chuaLen.Count)/$($tapTin.Count) file chua len, $chuaLenMB MB.")
+    } else {
+        $cuChuaLen = $chuaLen.Count
+    }
 }
 
 if ($tapTin.Count -eq 0) {
@@ -100,7 +121,11 @@ if ($tapTin.Count -gt 0) {
 
 # --- 4. Ket luan ------------------------------------------------------------
 if ($loi.Count -eq 0) {
-    Write-Output "OK: ca $($tapTin.Count) file .enc ($tongMB MB) deu da len may."
+    if ($cuChuaLen -gt 0) {
+        Write-Output "OK: backup moi nhat da len may. ($cuChuaLen file cu chua len, $chuaLenMB MB - khong phai su co, xem ghi chu trong script.)"
+    } else {
+        Write-Output "OK: ca $($tapTin.Count) file .enc ($tongMB MB) deu da len may."
+    }
     exit 0
 }
 
