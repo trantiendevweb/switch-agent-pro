@@ -3020,4 +3020,35 @@ Codex không in giá nên không quy ra tiền được — đúng cái ô `ChiP
   4. **An toàn tiến trình**: Chỉ đọc log khi phiên đã dừng hoàn toàn.
 - **Đã sửa hay chưa**: **ĐÃ ĐÓNG Ô NỢ C4.**
 
+## 21/08 — C2: Đo CLI Grok thật bằng bài canh định kỳ và xác nhận hiện trạng lỗi HTTP 410 (giảm rủi ro ô nợ C2)
+
+- **Đo lúc nào**: 21/08/2026. Ô CAM số 2 của `docs/SO-NO-DO-LUONG.md`.
+- **Mục tiêu / Vấn đề**:
+  - Grok CLI (`@vibe-kit/grok-cli`) không có cờ cam kết xuất JSON (như `--json` của Codex hay `--output-format stream-json` của Claude/Cursor). Định dạng NDJSON (`{"role":"user",...}\n{"role":"assistant",...}`) mà `docKetQuaGrok` dựa vào chỉ là thứ nó tự in ra và ta quan sát được ở lần chạy #29.
+  - Rủi ro được ghi trong ô nợ **C2**: Nếu nhà cung cấp đổi cách in dù chỉ một lần, `docDuoc=false` sẽ làm phiên Grok lặng lẽ tụt về `lost` và làm tê liệt lá chắn chống chạy quẩn (`internal/provider/quan.go`).
+  - Biện pháp giảm thiểu rủi ro: Xây dựng bài canh định kỳ `TestE2EGrokDocDuocOutputThat` trong `internal/provider/ketqua_grok_e2e_test.go` (bật bằng `$env:SAGENT_E2E_GROK="1"` trên Windows PowerShell hoặc `SAGENT_E2E_GROK=1 go test ./internal/provider/`), dựng lệnh bằng chính adapter (`ad.Command()`, `ad.HeadlessArgs()`, `ad.ModelArgs("grok-4.5")`, `ad.ArgsThuMuc()`) để gọi CLI thật và đối chiếu kết quả.
+- **Lệnh chạy đo thật trên Windows PowerShell**:
+  ```powershell
+  # Dựng bằng chính adapter grok:
+  & "$env:APPDATA\npm\grok.cmd" --max-tool-rounds 60 -p "Tra loi dung mot tu: ALPHA" -m grok-4.5 -d "$env:TEMP"
+  ```
+- **Output THẬT nguyên văn thu được hôm nay (21/08/2026)**:
+  ```json
+  {"role":"user","content":"Tra loi dung mot tu: ALPHA"}
+  {"role":"assistant","content":"Sorry, I encountered an error: Grok API error: 410 Live search is deprecated. Please switch to the Agent Tools API: https://***.***.x.ai/***/***/***/***"}
+  ```
+- **Phân tích kết quả đo thực tế**:
+  1. **Định dạng in ra**: Output vẫn giữ dạng 2 dòng NDJSON (`role: user` rồi `role: assistant`). Bộ đọc `docKetQuaGrok` bóc tách được dòng này, gán `k.TraLoi` bằng nội dung thông điệp và trả về `docDuoc = true`. Cấu trúc dòng NDJSON chưa bị nhà cung cấp đổi thành văn bản thô.
+  2. **Hiện trạng lỗi HTTP 410 của CLI Grok**:
+     - Lời gọi CLI thật trả về lỗi: `Grok API error: 410 Live search is deprecated. Please switch to the Agent Tools API: ...`.
+     - Phép đo xác nhận đúng hiện trạng đã phát hiện ngày 20/08 (lượt #46, #47 trong `.sagent/flows.toml:862` và `docs/DO-LUONG.md:2582`): CLI Grok hiện tại (`@vibe-kit/grok-cli` v1.0.1) gọi vào tính năng Live Search cũ của xAI đã bị khai tử (HTTP 410 Gone). Do đó, ở chế độ headless CLI không thể thực thi tool hoặc trả về câu trả lời hoàn chỉnh của người dùng (không trả ra `"ALPHA"`).
+     - Đây là lỗi từ phía nhà cung cấp upstream đối với CLI Grok, không phải lỗi của bộ adapter sagent.
+  3. **Lá chắn và giải pháp giảm thiểu rủi ro**:
+     - Đã có bài canh định kỳ `TestE2EGrokDocDuocOutputThat` trong `internal/provider/ketqua_grok_e2e_test.go` (bật bằng `SAGENT_E2E_GROK=1`). Bài canh đo được gì ghi nấy, trung thực ghi nhận lỗi 410 thay vì che giấu để khoe xanh.
+     - Về luồng xử lý thực tế: Flow `doi-4` đã chuyển bước `soi` sang `type = "model"` (gọi API trực tiếp qua `internal/flow/step.go:395`), giúp việc chạy luồng không bị tắc nghẽn bởi CLI Grok.
+  4. **Tình trạng năng lực `NLKetQuaCoCauTruc`**:
+     - Bảng năng lực `internal/provider/grok.go:246` khai `Duoc(NLKetQuaCoCauTruc)` vì bộ đọc `docKetQuaGrok` đọc đúng cấu trúc NDJSON khi nhận được dữ liệu.
+     - Tuy nhiên, phép đo hôm nay ghi nhận rõ ràng: dù bóc tách được cấu trúc (`docDuoc=true`), nội dung thu được đang là lỗi 410 do CLI Grok upstream hỏng Live Search. Khi nào xAI khôi phục hoặc CLI Grok cập nhật phiên bản mới, bài canh định kỳ `SAGENT_E2E_GROK=1` sẽ là chốt kiểm chứng lại xem cấu trúc NDJSON có còn giữ nguyên hay không.
+
+
 
