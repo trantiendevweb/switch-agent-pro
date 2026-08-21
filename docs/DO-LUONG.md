@@ -2540,3 +2540,130 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   chứa: **một clone không giữ gì cả, và nó là bản mới nhất**. "Đã sửa cho lần
   hỏng trước" và "đã đo cho lần hỏng sau" là hai chuyện khác nhau — khoảng cách
   giữa chúng vừa đủ để nuốt thêm một tài khoản.
+
+
+## 21/08 — Đ4: hạn token. Cursor đọc được thật; Antigravity là câu trả lời KHÔNG
+
+**Ô nợ**: `docs/SO-NO-DO-LUONG.md` mục **Đ4** (mức ĐỎ) — Antigravity và Cursor
+`TokenExpiry` cùng trả `false`, nên cảnh báo *"token sắp hết hạn"* trước khi bung
+hạm đội (`internal/api/api.go`) **không bao giờ chạy** cho hai provider này.
+
+### Rào chắn cũ sai vì TÌM NHẦM THƯ MỤC, không vì thiếu phép đo
+
+Lời khai cũ: *"auth.json CÓ THỂ mang dấu thời gian hết hạn, nhưng chưa dựng được
+cảnh token sắp hết hạn để xác nhận đọc đúng trường nào"*. Kiểm lại:
+
+```
+C:\Users\Administrator\.cursor\auth.json                 -> KHÔNG TỒN TẠI
+C:\Users\Administrator\AppData\Roaming\Cursor\auth.json  -> CÓ, 893 byte
+```
+
+Chỗ thứ hai đúng là chỗ mà `cursor.go` đã tự chỉ từ đầu: `EnvVar() == "APPDATA"`,
+`PrivateFiles() == [Cursor\auth.json]`. Ô này mở không phải vì phép đo khó, mà
+vì đi tìm sai chỗ. Cùng một kiểu với Đ3 (*"máy này không cài cursor-agent"* trong
+khi máy có).
+
+### Hình dạng file — đo, không đoán
+
+`%APPDATA%\Cursor\auth.json` có **ĐÚNG HAI khoá**:
+
+```
+accessToken   str, 424 ký tự, JWT alg HS256
+refreshToken  str, 424 ký tự, JWT alg HS256
+```
+
+**Không có trường dấu-thời-gian nào ở tầng ngoài.** Nên lời dặn của chính mã —
+*"đừng đoán tên trường"* — hoá ra còn đúng hơn ý định ban đầu: **không có trường
+nào để mà đoán**. Mốc nằm trong payload JWT, y hệt Codex.
+
+Claim đọc được (giải mã payload, KHÔNG kiểm chữ ký). `accessToken` và
+`refreshToken` giống hệt nhau từng claim một:
+
+| claim | giá trị | nghĩa |
+|---|---|---|
+| `iss` | `https://authentication.cursor.sh` | |
+| `aud` | `https://cursor.com` | |
+| `scope` | `openid profile email offline_access` | |
+| `type` | `session` | |
+| `sub` | `google-oauth|<id>` | mã đục, **không phải email** |
+| `time` | `1787022539` | 2026-08-18T03:08:59Z — lúc đăng nhập |
+| `exp` | `1792206539` | 2026-10-17T03:08:59Z |
+
+`exp − time = 5 184 000 s` = **đúng 60 ngày**.
+
+### Chạy thật sau khi sửa mã
+
+```
+HasToken=true
+TokenExpiry ok=true  exp=2026-10-17T03:08:59Z  con=1364h  (≈ 56,8 ngày)
+Identity=""
+```
+
+Trước bản vá, cùng hồ sơ đó trả `ok=false` — tức **không phân biệt được với "chưa
+đăng nhập"**.
+
+### Đọc REFRESH token, không phải access token
+
+Hôm nay hai mốc **bằng nhau**, nên phép đo thật *không* phân biệt được hai lựa
+chọn — bài kiểm `TestCursorDocRefreshChuKhongPhaiAccess` phân biệt hộ, bằng hai
+JWT giả có `exp` khác nhau. Lý do chọn refresh là bài học đã trả giá ở
+`claude.go`: trả hạn access token làm cổng kiểm **chặn oan** lượt chạy #39 trong
+khi tài khoản vẫn dùng được.
+
+### CÒN CHƯA ĐO: token có xoay vòng khi refresh không
+
+Đây mới là thứ cảnh báo hạm đội thật sự sợ (xem mục 20/08 *"nhà cung cấp XOAY
+VÒNG refresh token"*). Bằng chứng **gián tiếp**, không phải phép đo trực tiếp:
+
+```
+%APPDATA%\Cursor\auth.json   mtime 2026-08-18 10:08:58 (+07)  <- đúng giây đăng nhập
+~\.cursor\cli-config.json    mtime 2026-08-21 00:46:44 (+07)
+~\.cursor\statsig-cache.json mtime 2026-08-21 00:51:08 (+07)
+```
+
+Hai file dưới bị ghi lại bởi chính các lượt chạy thật của ô Đ3 ngày 21/08. File
+token thì **không**. Tức qua ba ngày dùng, `cursor-agent` không đụng vào nó. Đó
+là dấu hiệu, không phải bằng chứng — chưa ép nó refresh nên chưa biết lúc refresh
+thì sao.
+
+### Antigravity: đổi `Chua` → `Khong`, không đo gì cả
+
+Token nằm trong Windows Credential Manager dưới khoá `gemini:antigravity`.
+`CredRead` trả về **cả blob**, không có cách hỏi riêng mốc hết hạn. Mở chính thứ
+cần bảo vệ để đổi lấy **một dấu thời gian** là đánh đổi tồi — nên câu trả lời là
+**không**, chứ không phải **chưa**. Theo tiền lệ `Khong(NLHanToken)` của Grok,
+khác một chỗ đáng nói: ở Grok hạn **không tồn tại** (API key, không OAuth); ở đây
+hạn **có**, nhưng sau một cánh cửa ta cố ý không mở.
+
+### Cảnh báo hạm đội đổi ra sao
+
+Chốt trong `internal/api/api.go` chỉ chạy khi `TokenExpiry` trả `ok=true`:
+
+- **Cursor** — nay **có** chạy. Cửa sổ 60 ngày dài hơn mọi lượt chạy nên nhánh
+  *"còn dưới 2 tiếng"* gần như sẽ không kêu; **đó là đúng, không phải hỏng**. Cái
+  đổi thật là nó thôi im lặng vì KHÔNG BIẾT và bắt đầu im lặng vì ĐÃ BIẾT còn
+  hạn. `ProfileList` cũng điền được `HanToi`/`HetHan`.
+- **Antigravity** — **vẫn không** chạy, và điều đó không đổi. Khác biệt duy nhất
+  là bảng năng lực nay khai thẳng *"không đọc được hạn"* thay vì để trống.
+
+### Ô nợ MỚI lộ ra: Cursor khai `Duoc(NLDanhTinh)` mà `Identity()` luôn rỗng
+
+Không tìm nó — nó rơi ra khi mở `auth.json` thật. Bảng khai cũ nói đọc được
+`email`/`userEmail`/`user_email` trong `Cursor\auth.json`; file thật **không có
+khoá nào trong ba khoá đó**, và `sub` trong JWT là mã đục `google-oauth|<id>`.
+Chạy trên hồ sơ đang đăng nhập: `Identity=""`.
+
+**Vì sao conformance không bắt được**: phép dò `NLDanhTinh` trong `nangluc.go` là
+**một chiều** (`haiChieu: false`) — chỉ kết luận được chiều *"khai chưa đo mà lại
+trả giá trị thật"*. Chiều *"khai làm được mà luôn trả rỗng"* **không có ai canh**.
+Cùng lỗ hổng đó đang che cho `NLCoTuHoSo`, `NLKetQuaCoCauTruc` và `NLHanToken`.
+Đã hạ lời khai xuống `Chua(NLDanhTinh, ...)` kèm nguyên văn phép đo; ghi thành ô
+**V3** trong sổ nợ. `cursor-agent status` in được email, nên năng lực này có
+thật — chỉ là không đọc được từ file.
+
+### Bài học
+
+Hai nửa của một ô nợ có thể đóng bằng hai cách **ngược nhau**, và ép cả hai vào
+một cách là hỏng. Nửa Cursor đóng bằng **đo**; nửa Antigravity đóng bằng **kết
+luận không đo**. Trước lượt này cả hai cùng mang chữ `ChuaDo` nên nhìn giống
+nhau — mà một cái là việc chưa làm, một cái là việc đã quyết định không làm.

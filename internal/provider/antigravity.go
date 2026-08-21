@@ -87,9 +87,22 @@ func (antigravity) HasToken(string) bool { return coCredential(credTarget) }
 // hơn không hiện gì.
 func (antigravity) Identity(string) string { return "" }
 
-// TokenExpiry: CHƯA ĐO. Token nằm trong Credential Manager, và đọc nội dung nó
-// nghĩa là chạm vào chính thứ cần bảo vệ chỉ để lấy một dấu thời gian. Chưa đủ
-// lý do.
+// TokenExpiry: KHÔNG ĐỌC — và đây là một KẾT LUẬN, không phải một khoảng trống.
+//
+// Token của Antigravity nằm trong Windows Credential Manager dưới khoá
+// `gemini:antigravity` (xem NLTachTaiKhoan). Đọc được hạn nghĩa là phải MỞ chính
+// bí mật đó ra: CredRead trả về cả blob, không có cách hỏi riêng "khoá này hết
+// hạn lúc nào". Đánh đổi là chạm vào đúng thứ cần bảo vệ để đổi lấy MỘT dấu thời
+// gian — đánh đổi tồi, nên câu trả lời là không, chứ không phải chưa.
+//
+// Cùng dạng với grok.go: ở đó API key KHÔNG CÓ hạn đọc được từ file, ở đây hạn
+// CÓ nhưng nằm sau một cánh cửa ta cố ý không mở. Cả hai đều là chuyện đã ngã
+// ngũ, nên khai `Khong(NLHanToken)` chứ không phải `Chua`.
+//
+// Cái giá phải nói ra: cảnh báo "token sắp hết hạn" trước khi bung hạm đội
+// (internal/api/api.go, nhánh `TokenExpiry(...) ok`) sẽ KHÔNG BAO GIỜ kêu cho
+// Antigravity. Sự im lặng đó không có nghĩa là an toàn — nó có nghĩa là không
+// biết, và giờ bảng năng lực nói thẳng điều đó thay vì để trống.
 func (antigravity) TokenExpiry(string) (time.Time, bool) { return time.Time{}, false }
 
 func (a antigravity) Verify() []Check {
@@ -160,8 +173,11 @@ func (antigravity) NangLuc() []NangLuc {
 			"CỐ ĐỊNH `gemini:antigravity`, không theo thư mục config. Đo: chạy trong HOME giả "+
 			"(đổi cả USERPROFILE + APPDATA + LOCALAPPDATA) VẪN dùng đúng danh tính đã đăng nhập. "+
 			"Mỗi máy một tài khoản Antigravity"),
-		Chua(NLHanToken, "CHƯA ĐO: token nằm trong Credential Manager, đọc nội dung nó nghĩa là "+
-			"chạm vào chính thứ cần bảo vệ chỉ để lấy một dấu thời gian — chưa đủ lý do"),
+		Khong(NLHanToken, "KHÔNG ĐỌC, và đây là kết luận chứ không phải khoảng trống: token "+
+			"nằm trong Windows Credential Manager dưới khoá `gemini:antigravity`, CredRead trả "+
+			"về cả blob chứ không có cách hỏi riêng mốc hết hạn. Mở chính thứ cần bảo vệ để đổi "+
+			"lấy MỘT dấu thời gian là đánh đổi tồi — cùng dạng với grok.go. Hệ quả nói thẳng: "+
+			"cảnh báo token-sắp-hết-hạn trước khi bung hạm đội không bao giờ kêu cho provider này"),
 		Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC: sau khi đăng nhập bằng `agy`, không file nào trong "+
 			"~/.gemini bị cập nhật email (google_accounts.json vẫn mang dấu thời gian của lần "+
 			"đăng nhập Gemini CLI cũ)"),
