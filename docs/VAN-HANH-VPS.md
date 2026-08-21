@@ -237,19 +237,33 @@ một phiên hỏng, **không phải** để thay bằng chứng.
 
 ---
 
-## E. Rủi ro còn treo — **CHƯA XỬ LÝ**
+## E. Rủi ro còn treo — **ĐÃ ĐO LẠI 21/08 lúc ~14:20**
 
-Bốn mục dưới đây đều **chưa được xử lý** tính tới 21/08/2026. Ghi ra để không ai tưởng
-là đã xong.
+> ⚠ **Bảng cũ có BỐN dòng đều ghi "chưa xử lý". Đo lại thì HAI trong bốn dòng đó
+> đã sai** — không phải vì ai vá lén, mà vì sổ chép lại một trạng thái cũ rồi
+> không ai đo lại. Sổ ghi **khẳng định** về một thứ nó đã thôi không đo nữa, và
+> đó là kiểu sai nguy hiểm hơn cả bỏ trống.
 
-| Rủi ro | Trạng thái | Vì sao khó thấy |
+| Rủi ro | Trạng thái (đo 21/08 ~14:20) | Bằng chứng |
 |---|---|---|
-| **Backup không thật sự rời khỏi máy** | ❌ Chưa xử lý | Hai task tạo file `.enc` vào thư mục OneDrive **cục bộ**, nhưng **`OneDrive.exe` không chạy** → **564 MB backup nằm CÙNG Ổ ĐĨA với dữ liệu gốc**. Mọi tín hiệu đều xanh: `LastTaskResult = 0`, file vẫn sinh ra đều. **Đây là kiểu hỏng tệ nhất — hỏng mà mọi đèn đều xanh.** |
-| **Hai task backup dùng `LogonType=Interactive`** | ❌ Chưa xử lý | Sau reboot mà **không ai RDP vào** thì task **không chạy**, và **không có gì báo**. Kết hợp với A3 (máy còn reboot) thì đây là lỗ thật, không phải lý thuyết. |
-| **Brute-force chưa chặn** | ❌ Chưa chặn — **chủ dự án đã quyết định như vậy** | Đây là quyết định có chủ đích, không phải sót. Hệ quả phải chấp nhận: **máy sẽ còn reboot** (xem A3). |
-| **`RunAsPPL` chưa bật** | ❌ Chưa xử lý | `lsass` **không được bảo vệ** trước công cụ trộm credential. |
+| **Backup không thật sự rời khỏi máy** | ❌ **CÓ THẬT, và nặng hơn sổ ghi** | `OneDrive.exe` **không chạy**. `C:\Users\Administrator\OneDrive` có **19 file `.enc`, tổng 782.8 MB** (sổ cũ ghi 564 MB). Máy chỉ có **một** ổ vật lý — `VMware Virtual disk`, 300 GB — và `C:` là ổ logic duy nhất. Nên "off-host backup" đang nằm **cùng ổ đĩa với dữ liệu gốc**: ổ chết là mất cả hai. Mọi đèn vẫn xanh (`LastTaskResult = 0`, file vẫn sinh đều). |
+| **`RunAsPPL` chưa bật** | ❌ **CÓ THẬT** | `HKLM:\SYSTEM\CurrentControlSet\Control\Lsa` **không có** giá trị `RunAsPPL`. `lsass` không được bảo vệ trước công cụ trộm credential. |
+| ~~Hai task backup dùng `LogonType=Interactive`~~ | ✅ **SỔ SAI — thực tế là `S4U`** | Cả ba task đều `LogonType=S4U`, `RunLevel=Highest`: *KNOWLEDGE OS daily backup*, *Tainguyenseo website off-host backup*, *TNS OS off-host backup*. `S4U` **chạy được khi không ai đăng nhập**, nên lo ngại "reboot xong không ai RDP thì task không chạy" **không còn đúng**. Đối chứng: `knowledge-os-20260821-140001.enc` sinh lúc **14:00**, tức **sau** lần reboot 12:06. |
+| ~~Brute-force chưa chặn~~ | ✅ **SỔ SAI — đang chặn thật** | Task **`TNS Chan Bruteforce`** chạy **mỗi 5 phút** (`chan-bruteforce-rdp.ps1 -PhutNhinLai 30 -NguongSai 20`), lần cuối **14:20:20**, `Result=0`. Rule tường lửa cùng tên **`Enabled=True, Action=Block`**, đang chặn **53 IP**. |
 
----
+**Nhưng đừng đọc dòng cuối thành "đã yên".** Trong **một giờ** gần nhất vẫn có
+**1.867 lượt đăng nhập thất bại** (event `4625`). So với mốc **~3.900 lượt/giờ**
+đo sáng 21/08 thì việc chặn có tác dụng thật — nhưng cuộc tấn công **vẫn đang
+diễn ra**, và kết luận ở mục A3 (**máy sẽ còn reboot**) **không đổi**.
+
+**Việc còn phải làm, xếp theo hậu quả:**
+
+1. **Đưa backup ra khỏi ổ này.** Đây là rủi ro mất dữ liệu thật, và là rủi ro
+   *duy nhất* trong bảng không có bất kỳ lớp phòng vệ nào. Bật `OneDrive.exe`,
+   hoặc đẩy `.enc` sang một đích ngoài máy — nhưng **phải nghiệm thu bằng cách
+   đọc lại từ đích đó**, không phải bằng việc thấy file xuất hiện. Cả hai lần
+   trước đều hỏng đúng ở chỗ "thấy file là tin".
+2. **Bật `RunAsPPL`** (cần khởi động lại máy).
 
 ## F. Nguyên tắc chẩn đoán của dự án này
 
