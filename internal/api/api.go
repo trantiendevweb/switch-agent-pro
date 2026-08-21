@@ -1010,6 +1010,18 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 		} else {
 			args = append(append([]string{}, co...), args...)
 		}
+	} else {
+		// Thiếu cờ thì phiên vẫn chạy, vẫn đọc mã, vẫn kết thúc "xong" — chỉ là
+		// không ghi được file nào. Đo 21/08/2026: hai lượt #167 (claude:tns) và
+		// #169 (claude:phu) về worktree sạch, 0 commit, không một dòng lỗi; mất
+		// hai lượt hạn mức và 15 phút mới truy ra. Im lặng mà sai là đúng thứ dự
+		// án này lập ra để chống, nên NÓI TRƯỚC KHI CHẠY.
+		//
+		// CẢNH BÁO thôi, không chặn: giao việc chỉ-đọc (tóm tắt, rà soát, phân
+		// tích) là cách dùng hợp lệ và phổ biến.
+		a.bus.Warnf("Không có --tu-duyet-quyen: phiên CHỈ ĐỌC, không sửa được file nào — " +
+			"giao việc sửa mã thì nó vẫn báo \"xong\" với 0 commit mà không báo lỗi " +
+			"(mất 2 lượt ngày 21/08). Thêm --tu-duyet-quyen nếu lượt này cần ghi file.")
 	}
 
 	return fleet.FanOut(a.db, a.bus, ad, req.Addr.Account, fleet.Opts{
