@@ -478,22 +478,96 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   chạy **bình thường** đã có trong sổ. Chính `internal/provider/quan.go:45-46`
   dặn: *"Khi nào đo được thì chỉnh theo số, đừng chỉnh theo cảm giác"*.
 
-## C6. Cursor CHƯA ĐO cách khai thư mục làm việc
+## ~~C6~~ ✅ ĐÃ ĐÓNG 21/08 — nhưng đóng NGƯỢC chiều sổ tưởng: Cursor **có** cờ đổi thư mục
 
-> ⚠ **ĐÃ LẠC HẬU (đối chiếu mã 21/08)**: đóng trong commit `bacc137`, và đóng
-> theo chiều **KhongLamDuoc**: `--help` bản 2026.08.11 không có `--cwd` lẫn `-C`,
-> nên `internal/provider/cursor.go:158` trả `nil` một cách CÓ CĂN CỨ và bảng khai
-> `Khong(NLThuMuc)` ở `:190`. Không cần cờ: `fleet` đã chạy tiến trình con với
-> `workDir` là worktree của phiên. "Đã đo, không có" khác hẳn "chưa ai đo".
+> ⚠ **CẢNH BÁO CHO NGƯỜI ĐỌC SỔ**: ghi chú *"ĐÃ LẠC HẬU"* trước đây ở đầu mục này
+> nói ô đóng ở commit `bacc137` theo chiều **KhongLamDuoc** — *"`--help` bản
+> 2026.08.11 không có `--cwd` lẫn `-C`, nên `ArgsThuMuc` trả `nil` CÓ CĂN CỨ"*.
+> **Câu đó SAI**, và sai theo kiểu tệ nhất: nó tự xưng là một **kết luận đã đo**.
+> Mở `--help` của **đúng bản đó** ra đọc hết thì có cờ đổi thư mục thật.
 
-- **Ở đâu**: `internal/provider/cursor.go:143-144` (`ArgsThuMuc` trả `nil`),
-  `internal/provider/cursor.go:165`.
-- **Nó nói gì**: *"CHƯA ĐO: máy này không cài cursor-agent"*.
-- **HẬU QUẢ NẾU ĐOÁN SAI**: giống Đ2 nhưng nhẹ hơn một bậc, vì bảng khai **thành
-  thật** (`ChuaDo`, không phải `LamDuoc`) nên ít nhất `sagent nang-luc` nói ra
-  được. Hậu quả thực tế vẫn là agent chạy sai thư mục: theo số đo của Antigravity
-  (`internal/provider/antigravity.go:132-133`), không có cờ thì **1/3 đúng**. Với
-  Cursor ta thậm chí không biết cờ tên gì để mà thiếu.
+- **Ở đâu**: `internal/provider/cursor.go:363` (`ArgsThuMuc`),
+  `internal/provider/cursor.go:395` (dòng khai `NLThuMuc`).
+- **Bài kiểm mới**: `internal/provider/danhtinh_cursor_test.go`
+  (`TestCursorArgsThuMucDungWorkspace`, `TestCursorKhongDungAddDirChoThuMuc`,
+  `TestCursorKhaiThuMucKhopVoiHam`).
+
+### Câu hỏi đặt hẹp, nên kết luận sai
+
+Phép đo cũ hỏi: *"có `--cwd` hay `-C` không?"* → **không**. Rồi nhảy thẳng sang
+*"provider này không có cờ đổi thư mục"*. Vế đầu **đúng**; bước nhảy **sai**. Câu
+đáng hỏi là *"có cách nào khai thư mục làm việc không?"* — và `--help` của
+`cursor-agent 2026.08.11-e8db854` có:
+
+```
+--workspace <path-or-name>  Workspace directory or saved workspace name to use
+                            (defaults to current working directory)
+--add-dir <path>            Add an additional workspace root directory
+```
+
+### Phép đo, CÓ ĐỐI CHỨNG
+
+Tạo `%TEMP%\do-thumuc-cursor\VAN-TAY-9F3A2B.txt`, rồi chạy từ cwd
+`C:\Users\Administrator` — **không** phải thư mục đó:
+
+```
+có --workspace <dir>  -> agent liệt kê "VAN-TAY-9F3A2B.txt"        <- thấy
+không có cờ           -> "no", và tự khai cwd C:\Users\Administrator
+```
+
+Có đối chứng nên kết luận được rằng **chính cái cờ** gây ra khác biệt, không phải
+thứ gì khác. Cờ **được nhận và có hiệu lực**, không bị nuốt im lặng.
+
+**Chọn `--workspace` chứ không phải `--add-dir`** dù bản này có cả hai:
+`--add-dir` là *"Add an **additional** workspace root"* — thêm một gốc nữa, trong
+khi hợp đồng `ArgsThuMuc` (`internal/provider/adapter.go:59-66`) đòi khai **tường
+minh** thư mục làm việc. Claude và Antigravity phải dùng `--add-dir` vì CLI của
+chúng không có cờ đặt thẳng; Cursor có, nên dùng cái đúng nghĩa hơn.
+
+### Vì sao lý lẽ "không cần" cũng sai
+
+Sổ cũ chống chế: *"Không cần: fleet đã chạy tiến trình con với `workDir` là
+worktree của phiên"*. Lý lẽ đó bỏ qua **đúng cái** mà hợp đồng `ArgsThuMuc` sinh
+ra để chặn — và hợp đồng nói thẳng ngay tại chỗ: fleet chạy agent trong **git
+worktree**, mà ở worktree `.git` là **FILE con trỏ** chứ không phải thư mục, nên
+provider dò workspace bị **hụt dù cwd đã đúng**. Đó không phải lo xa: đã đo trên
+Antigravity — cùng lệnh cùng cờ, ở repo thật **3/3**, ở worktree chỉ **1/3**;
+thêm cờ thì **4/4**. **cwd đúng KHÔNG bảo đảm workspace đúng.**
+
+Và Cursor là provider chạy trong worktree nhiều nhất. Nên `nil` ở đây không phải
+"vô hại vì không cần" — nó là cái bẫy 1/3 đang mở, chỉ chưa ai đo trúng.
+
+### Hậu quả thật của lời khai sai
+
+Mục *"Vì sao cần sổ này"* xếp `LamDuoc` sai nguy hiểm hơn `ChuaDo`. `KhongLamDuoc`
+**cùng hạng nguy hiểm đó** và ô này là ví dụ: `KhongLamDuoc` tự xưng là **một kết
+luận** (*"đã đo, provider không có thứ đó"*), nên **không ai đi đo lại** — khác
+`ChuaDo`, thứ tự nó mời người sau đến đo. Một `ChuaDo` sai thì tốn công; một
+`KhongLamDuoc` sai thì **đóng vĩnh viễn** một năng lực có thật.
+
+Cụ thể ở đây: `sagent nang-luc` **nói dối theo chiều thiếu** — báo Cursor không
+đổi được thư mục, trong khi nó đổi được. Người vận hành đọc bảng rồi tự đi tìm
+đường vòng cho một vấn đề đã có cờ giải sẵn.
+
+### Chỗ dễ vấp cho người sửa sau
+
+Phép dò `NLThuMuc` (`internal/provider/nangluc.go:145-148`) là **HAI CHIỀU**
+(`haiChieu: true`), nên `KiemNangLuc` **bắt buộc** hàm và lời khai đi cùng nhau:
+đổi `ArgsThuMuc` mà quên dòng khai (hoặc ngược lại) là đỏ ngay. Nhưng nó chỉ bắt
+được **lệch giữa hai vế trong repo** — nó **không** biết CLI thật có cờ gì. Cả
+hai vế cùng sai một cách nhất quán, như suốt từ `bacc137` tới nay, thì nó vẫn
+xanh. Chỉ có đọc `--help` thật mới bắt được.
+
+### Bài học nền, nay có ví dụ thứ hai
+
+Ô này vốn đã mang sẵn một bài học: *"một dòng CHƯA ĐO không tự hết hạn"* — bảng cũ
+ghi *"máy này không cài cursor-agent"* trong khi `Get-Command` cho ra đường dẫn
+thật. Nay thêm vế mạnh hơn, và là vế mà chính ô này vừa dính:
+
+**một dòng ĐÃ ĐO cũng không tự hết hạn — và nó còn nguy hơn, vì nó không tự nhận
+là khoảng trống.** Đọc `--help` sót một dòng vào năm ngoái thì hôm nay vẫn sót,
+trừ khi có người mở lại file thật. Đúng cách ô V3 vừa được đóng: không tin lời
+khai, không tin tiêu đề commit — mở file thật ra đọc.
 
 ---
 
@@ -536,42 +610,104 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   tài khoản Antigravity**. Nên "nhầm tài khoản" ở đây là nhầm giữa danh tính hiện
   tại và một danh tính cũ, không phải nhầm giữa hai tài khoản đang dùng song song.
 
-## V3. Cursor khai `Duoc(NLDanhTinh)` mà `Identity()` LUÔN trả rỗng
+## ~~V3~~ ✅ ĐÃ ĐÓNG 21/08 — `Identity()` đọc được thật, lời khai `Duoc` nay có căn cứ
 
-> **Ô MỚI, lộ ra 21/08 trong lúc đóng Đ4** — không tìm nó, nó tự rơi ra khi mở
-> `auth.json` thật để đo hạn token. Đã sửa lời khai trong cùng lượt; ô này ghi
-> lại vì phần **đo cách đọc danh tính** vẫn còn nợ.
+> **Đã trả**: ô này mở ra vì lời khai `Duoc(NLDanhTinh)` không khớp một hàm luôn
+> trả rỗng. Lượt trước vá bằng cách **hạ lời khai** xuống `ChuaDo` — khớp được
+> hai vế, nhưng phần **đo cách đọc danh tính** vẫn còn nợ, và sổ ghi rõ là còn
+> nợ. Lượt này trả nốt phần đo đó, và phép đo lật lại kết luận cũ: **có** trường
+> danh tính trong file. Nên ô đóng theo chiều ngược với dự kiến — sửa **hàm** cho
+> đúng lời khai, chứ không hạ lời khai cho vừa hàm.
 
-- **Ở đâu**: `internal/provider/cursor.go` — `Identity()` và dòng khai
-  `NLDanhTinh` trong `NangLuc()`.
-- **Nó nói gì (trước bản vá)**: `Duoc(NLDanhTinh, "trường email/userEmail/`
-  `user_email trong Cursor\auth.json")` — một dòng **xanh**.
-- **Phép đo lật lại lời khai đó**: `%APPDATA%\Cursor\auth.json` thật có **ĐÚNG
-  HAI khoá**, `accessToken` và `refreshToken`. Không `email`, không `userEmail`,
-  không `user_email`. Payload JWT cũng không: `sub` là mã đục dạng
-  `google-oauth|<id>`, không phải địa chỉ thư. Chạy trên hồ sơ ĐANG ĐĂNG NHẬP:
-  `Identity=""`.
-- **HẬU QUẢ**: nhẹ về hiển thị (card Cursor không có email), nhưng **nặng về
-  lòng tin vào bảng**. Đây đúng là thứ mục *"Vì sao cần sổ này"* xếp nguy hiểm
-  hơn `ChuaDo`: một ô khai **LÀM ĐƯỢC** mà lõi không chặn và người vận hành
-  tưởng đã kiểm. So với **V2**: Antigravity cũng không đọc được email, nhưng nó
-  khai thẳng `ChuaDo` — trung thực. Ô này thì nói dối theo hướng khoe.
-- **VÌ SAO CONFORMANCE KHÔNG BẮT ĐƯỢC** *(chỗ đáng nhớ nhất của ô này)*: phép dò
-  `NLDanhTinh` trong `internal/provider/nangluc.go` là **một chiều**
-  (`haiChieu: false`) — nó chỉ kết luận được chiều *"khai chưa đo mà lại trả giá
-  trị thật"*. Chiều ngược lại, *"khai làm được mà luôn trả rỗng"*, **không có ai
-  canh**. `KiemNangLuc` xanh suốt trong khi lời khai sai. Cùng lỗ hổng đó đang
-  che cho `NLCoTuHoSo`, `NLKetQuaCoCauTruc` và `NLHanToken` — cả bốn đều một
-  chiều. Lý do một chiều là **đúng** (cần hồ sơ thật mới dò được), nên bịt lỗ
-  không phải bằng cách đổi phép dò, mà bằng một bài kiểm chạy trên hồ sơ thật.
-- **Đã làm ở lượt này**: hạ lời khai xuống
-  `Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC (đo 21/08 …)")` kèm nguyên văn phép đo. Vòng
-  lặp khoá trong `Identity()` **giữ lại** có chủ đích — không tốn gì, và ngày một
-  bản CLI mới ghi thêm trường email thì nó đọc được ngay.
-- **CÒN NỢ**: `cursor-agent status` **in được** email (đã thấy khi đo
-  `NLTachTaiKhoan`). Tức năng lực này **có thật**, chỉ là không đọc được từ file.
-  Đọc danh tính bằng cách chạy CLI con là một đánh đổi khác hẳn đọc file — tốn
-  một tiến trình mỗi lần vẽ card — nên chưa đo, chưa làm.
+- **Ở đâu**: `internal/provider/cursor.go:137` (`Identity`),
+  `internal/provider/cursor.go:170` (`danhTinhTuJWT`),
+  `internal/provider/cursor.go:416` (dòng khai `NLDanhTinh`).
+- **Bài kiểm mới**: `internal/provider/danhtinh_cursor_test.go`.
+
+### Phép đo đã còn nợ, nay làm xong
+
+Mở `%APPDATA%\Cursor\auth.json` thật trên hồ sơ **đang đăng nhập** và **giải
+payload JWT** ra (lượt trước mới ngó tầng ngoài rồi dừng):
+
+- Thư mục `%APPDATA%\Cursor` có **ĐÚNG MỘT file**: `auth.json`, 893 byte. Không
+  còn chỗ nào khác để mà tìm danh tính — điều này chốt luôn phạm vi.
+- Tầng ngoài: **ĐÚNG HAI khoá** `accessToken`/`refreshToken`. Không `email`,
+  không `userEmail`, không `user_email`. **Phần này lượt trước nói đúng.**
+- Payload hai JWT giống hệt nhau, có **ĐÚNG TÁM claim**:
+
+  ```
+  iss         https://authentication.cursor.sh
+  aud         https://cursor.com
+  sub         google-oauth2|user_01<...>          <- trường danh tính DUY NHẤT
+  scope       openid profile email offline_access
+  type        session
+  randomness  <uuid cụt>
+  time        1787022539
+  exp         1792206539
+  ```
+
+**Chỗ lượt trước sai**: sổ cũ viết *"payload JWT cũng chỉ có `sub` dạng mã đục,
+không phải địa chỉ thư"* → rồi kết luận **CHƯA ĐỌC ĐƯỢC**. Vế mô tả đúng, bước
+kết luận sai. Câu mà năng lực này hỏi là *"đọc được danh tính để hiển thị"*,
+không phải *"đọc được email"*. `sub` là subject của OIDC: bền, mỗi tài khoản một
+giá trị — nó **là** danh tính, chỉ là không ở dạng email.
+
+### Vì sao trả `sub` mà khai `Duoc` là hợp lệ
+
+Tiền lệ có sẵn trong chính repo: `internal/provider/grok.go` — `Identity` ở đó
+trả `baseURL · defaultModel` thay cho email và vẫn khai `Duoc(NLDanhTinh)`, kèm
+ghi chú *"provider này không có khái niệm tài khoản người dùng"*. Tức bảng năng
+lực **đã** chấp nhận danh tính phi-email từ trước.
+
+Với Cursor thì còn thẳng hơn Grok: Cursor **có** khái niệm tài khoản, và
+`NLTachTaiKhoan` = `Duoc` nghĩa là người vận hành chạy nhiều tài khoản Cursor
+song song. Câu họ cần trả lời khi nhìn card là *hồ sơ này là tài khoản nào* —
+`sub` trả lời đúng câu đó, `""` không trả lời gì.
+
+**Không mâu thuẫn với V2** (*"hiện nhầm email còn tệ hơn không hiện gì"*): chỗ
+Antigravity nguy hiểm vì `google_accounts.json` cho ra một email **có thật nhưng
+sai người**, nhìn đúng định dạng nên không ai nghi. `google-oauth2|user_01…`
+không thể bị nhầm là địa chỉ thư, và nó là danh tính của **chính** hồ sơ đang
+đọc. Trông xấu, nhưng không nói dối — và đó mới là ranh giới V2 vạch ra.
+
+### BẪY đã tránh, ghi lại vì suýt lặp đúng lỗi cũ
+
+Claim `scope` **có chữ "email"** (`openid profile email offline_access`). Đó là
+**phạm vi OAuth đã xin**, KHÔNG phải một claim email — payload không có claim
+`email`. Đọc lướt thấy chữ "email" rồi khai "đọc được email" chính là **đúng kiểu
+sai** đã sinh ra ô này. Đã ghim bằng `TestCursorKhongNhamScopeLaEmail`.
+
+### Đã bịt lỗ "phép dò một chiều"
+
+Đây mới là phần đáng giữ của ô này. Phép dò `NLDanhTinh` trong
+`internal/provider/nangluc.go:168` là **một chiều** (`haiChieu: false`): nó chỉ
+kết luận được chiều *"khai chưa đo mà lại trả giá trị thật"*. Chiều ngược lại —
+*"khai làm được mà luôn trả rỗng"* — **không có ai canh**, nên `KiemNangLuc` xanh
+suốt trong khi lời khai sai. Cùng lỗ đó đang che cho `NLCoTuHoSo`,
+`NLKetQuaCoCauTruc` và `NLHanToken`.
+
+Sổ đã chốt cách bịt: **không** đổi phép dò (một chiều là **đúng** — cần hồ sơ
+thật mới dò được), mà bằng một bài kiểm chạy trên hồ sơ thật. Nay có:
+`TestCursorKhaiDanhTinhKhopVoiHam` dựng một `auth.json` **đúng hình dạng file
+thật** rồi bắt hai vế khớp nhau **cả hai chiều** — khai `Duoc` mà trả rỗng thì
+đỏ, mà khai thấp hơn `Duoc` trong khi đọc được cũng đỏ.
+
+Không nhét token thật vào repo: chữ ký JWT không được kiểm nên token giả là đủ,
+và một token thật trong mã nguồn là một rò rỉ. `subGia` giữ **đúng dạng** của
+`sub` thật nhưng id là bịa.
+
+**Đã kiểm trên hồ sơ thật**: chạy `Identity()` lên `%APPDATA%` thật cho ra
+`google-oauth2|user_01M09…` — không còn rỗng. (Bài kiểm tạm đó **không** commit:
+nó phụ thuộc máy.)
+
+### CÒN NỢ (thu hẹp, không mất)
+
+`cursor-agent status` **in được email** (đã thấy khi đo `NLTachTaiKhoan`). Tức
+vẫn còn một đường đọc ra **email thật**, đẹp hơn `sub` đục. Nhưng đọc danh tính
+bằng cách **chạy CLI con** là đánh đổi khác hẳn đọc file — tốn một tiến trình mỗi
+lần vẽ card — nên **chưa đo, chưa làm**. `Identity()` đã dọn sẵn chỗ: nó ưu tiên
+`email` (tầng ngoài, rồi claim JWT) trước `sub`, nên ngày nào có email thì card
+tự đổi mà không phải sửa hàm.
 
 ---
 
