@@ -2542,6 +2542,58 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
   giữa chúng vừa đủ để nuốt thêm một tài khoản.
 
 
+
+## 21/08 — ĐÃ ĐO: cổng kiểm `phai_co` chặn thật, cả hai chiều
+
+**Ô còn treo trước đó**: `phai_co` được thêm vào `flows.toml` lúc **20/08 20:18**,
+tức **36 phút SAU** lượt `doi-4` gần nhất (#47, 19:42). Nên tới sáng 21/08 nó mới
+chỉ **đúng trên cấu hình** — chưa lượt chạy nào đi qua nó. Nói "đã vá" lúc đó là
+nói quá.
+
+**Vì sao không đo bằng `doi-4`**: chạy khan (`--kho`) báo thẳng
+`✗ antigravity:may — chưa đăng nhập (kéo theo bước: code-doc)`. Bước `soi` nằm
+**sau** `code-doc`, nên lượt chạy sẽ chết trước khi tới cổng cần đo. Đo bằng
+`doi-4` lúc này là đốt 5 phiên agent để không đo được gì.
+
+**Đo bằng gì**: một flow tối giản `kiem-cong`, hai bước `model` chạy trên route
+mặc định (~1s/bước), đo **hai chiều** — chiều chặn và chiều đối chứng.
+
+**Lượt #48 — hỏng phép đo, giữ lại vì nó dạy một điều**: hai bước để **song
+song**. Bước xấu hỏng làm cả luồng dừng, và bước đối chứng đang bay bị huỷ giữa
+chừng: `Post "https://modelapi.vn/v1/chat/completions": context canceled`. Đo
+được đúng một chiều, chiều kia mất trắng. **Bài học: muốn đo đối chứng thì bước
+đối chứng phải chạy XONG TRƯỚC** — thêm `needs` chứ đừng để song song.
+
+**Lượt #49 — đo được, cả hai chiều** (`sagent flow tom-tat 49`):
+
+```
+AI LÀM GÌ
+  · phai-xong (model) — done
+      OK
+BƯỚC NÀO HỎNG, VÌ SAO
+  · phai-hong (model) — failed
+      chạy xong nhưng KHÔNG có kết luận nào trong "BUA_MOT_CHUOI_KHONG_AI_NOI_ZZQ9"
+      — bước này coi như CHƯA LÀM, không phải đã làm và không có ý kiến
+```
+
+- `phai-xong` **done** → cổng kiểm **không chặn nhầm** bước lành.
+- `phai-hong` **failed** → cổng kiểm **chặn thật** bước không giao ra kết luận.
+
+Đây đúng là lỗ hổng của #47: khi đó bước `soi` trả về một câu xin lỗi của nhà
+cung cấp, CLI thoát mã 0, bản ghi không có trường lỗi nào, nên bước được ghi
+**DONE** và việc trộn nhánh diễn ra mà **không ai soi**. Nay nó dừng lượt chạy.
+
+**Flow `kiem-cong` đã được GỠ khỏi `flows.toml` sau khi đo.** Nó hỏng theo thiết
+kế, nên để lại thì mỗi lần chạy là một cảnh báo Telegram giả. Muốn đo lại thì
+dựng lại theo đúng mô tả trên — rẻ, khoảng 2 giây.
+
+**Còn CHƯA đo**: `phai_co` trên chính bước `soi` của `doi-4` với đầu ra thật của
+người soi. Đo được cổng kiểm trong engine **không** đồng nghĩa đã đo được ba
+chuỗi `["NEN TRON", "CAN SUA THEM", "VUT"]` có khớp cách grok/deepseek thật sự
+viết câu trả lời hay không. Muốn đóng nốt thì phải đăng nhập `antigravity:may`.
+
+---
+
 ## 21/08 — Đ4: hạn token. Cursor đọc được thật; Antigravity là câu trả lời KHÔNG
 
 **Ô nợ**: `docs/SO-NO-DO-LUONG.md` mục **Đ4** (mức ĐỎ) — Antigravity và Cursor
