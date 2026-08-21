@@ -140,6 +140,7 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"session.list":  "/api/state",
 		"session.stop":  "/api/stop",
 		"session.sweep": "/api/quet",
+		"session.nhat-ky": "/api/nhat-ky",
 		"db.admin":      "/api/db",
 		"fleet.start":   "/api/fleet",
 		"profile.run":   "/api/run",

@@ -683,6 +683,39 @@ func dsChet() []any {
 	return out
 }
 
+// Phien lấy MỘT phiên theo số, bất kể nó đang chạy hay đã kết thúc.
+//
+// Cần riêng hàm này vì `sagent nhat-ky <id>` hỏi đúng một phiên, và phiên đáng
+// hỏi nhất là phiên ĐÃ CHẾT — lúc đó `Running()` không còn thấy nó, còn
+// `PhienChet(limit)` thì có trần, nên phiên đủ cũ sẽ rơi ra ngoài. Không có
+// đường hỏi thẳng theo số thì cột `log` của sổ chỉ tra được bằng tay.
+//
+// KHÔNG đi qua bộ phân loại chết như Running(): đây là phép ĐỌC, và phép đọc
+// không được có tác dụng phụ lên trạng thái.
+func (d *DB) Phien(id int64) (Session, error) {
+	ds, err := d.locPhien(`id=?`, id)
+	if err != nil {
+		return Session{}, err
+	}
+	if len(ds) == 0 {
+		return Session{}, fmt.Errorf("không có phiên #%d trong sổ", id)
+	}
+	return ds[0], nil
+}
+
+// PhienGanDay trả về các phiên MỚI NHẤT TRƯỚC, không lọc theo trạng thái.
+//
+// Khác `Running()` (chỉ phiên sống) và `PhienChet()` (chỉ phiên chết): bảng
+// nhật ký phải liệt kê CẢ HAI trong một danh sách theo thời gian, vì câu người
+// vận hành hỏi là "lượt vừa rồi có những phiên nào" chứ không phải "phiên nào
+// còn sống".
+func (d *DB) PhienGanDay(limit int) ([]Session, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	return d.locPhien(`1=1 ORDER BY id DESC LIMIT ?`, limit)
+}
+
 func (d *DB) locPhien(where string, args ...any) ([]Session, error) {
 	rows, err := d.db.Query(`SELECT `+cotPhien+` FROM sessions WHERE `+where, args...)
 	if err != nil {

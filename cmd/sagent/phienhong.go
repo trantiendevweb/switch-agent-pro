@@ -64,5 +64,12 @@ func dongPhienHong(s store.Session, now time.Time) string {
 	if s.StateLyDo != "" {
 		d += "\n        " + s.StateLyDo
 	}
+	// Chỉ đường tới NHẬT KÝ. Đây là bảng của phiên ĐÃ CHẾT, tức đúng chỗ câu
+	// hỏi "vì sao" được hỏi — mà `StateLyDo` chỉ nói được một dòng, và với
+	// `lost` thì nó rỗng. Không có dòng này thì người đọc dừng lại ở "chết,
+	// chưa rõ vì sao" mà không biết còn chỗ nào để đọc tiếp.
+	if l := dongNhatKyPhien(s); l != "" {
+		d += "\n" + l
+	}
 	return d
 }

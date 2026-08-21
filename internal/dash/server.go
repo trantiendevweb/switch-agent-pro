@@ -27,6 +27,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/aiapi"
 	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/config"
+	"github.com/trantiendevweb/switch-agent-pro/internal/nhatky"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
@@ -76,6 +77,7 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/route/kiem", s.guard(s.handleRouteKiem))
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 	m.HandleFunc("/api/nang-luc", s.guard(s.handleNangLuc))
+	m.HandleFunc("/api/nhat-ky", s.guard(s.handleNhatKy))
 
 	m.HandleFunc("/api/flows", s.guard(s.handleFlows))
 	m.HandleFunc("/api/run", s.guard(s.handleRun))
@@ -1062,6 +1064,80 @@ func (s *Server) handleNangLuc(w http.ResponseWriter, r *http.Request) {
 	// so_chua_do là con số người vận hành cần liếc: nó đếm những chỗ hệ thống
 	// đang phải đoán. Để mặt web tự cộng thì mỗi mặt cộng một kiểu.
 	writeJSON(w, map[string]any{"provider": out, "so_chua_do": soChuaDo})
+}
+
+// handleNhatKy — action "session.nhat-ky". Nhật ký của phiên fleet.
+//
+// KHÔNG có id  → liệt kê các phiên gần đây kèm đường dẫn và dung lượng.
+// Có ?id=<số>  → trả về nội dung nhật ký của đúng phiên đó.
+//
+// Vì sao mặt web ĐƯỢC đọc nội dung, khác hẳn `/api/ai/lich-su` (cố ý không mang
+// prompt lẫn câu trả lời): đây chính là thứ người ta cần đọc. Câu hỏi "phiên
+// #167 báo xong mà 0 commit — vì sao" không trả lời được bằng metadata; phải
+// đọc chữ agent in ra. Bắt mở terminal cho việc đó là vi phạm đúng luật ngang
+// quyền mà dự án lập ra để giữ.
+//
+// Trần `n` giống mọi endpoint đọc khác: mặc định 200 dòng cuối, tối đa 5000.
+// Không có trần thì một nhật ký 200 MB thành một câu trả lời HTTP 200 MB.
+func (s *Server) handleNhatKy(w http.ResponseWriter, r *http.Request) {
+	type mucDTO struct {
+		ID      int64  `json:"id"`
+		Addr    string `json:"addr"`
+		State   string `json:"trang_thai"`
+		LyDo    string `json:"ly_do,omitempty"`
+		Luc     string `json:"luc"`
+		Duong   string `json:"duong_dan,omitempty"`
+		Co      int64  `json:"co_byte"`
+		ConFile bool   `json:"con_file"`
+	}
+	dto := func(m api.MucNhatKy) mucDTO {
+		return mucDTO{m.ID, m.Addr, m.State, m.LyDo, m.Started.Format(time.RFC3339),
+			m.Duong, m.Co, m.ConFile}
+	}
+
+	if v := strings.TrimSpace(r.URL.Query().Get("id")); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			writeErr(w, fmt.Errorf("id không phải số: %q", v))
+			return
+		}
+		dong := 200
+		if n, err := strconv.Atoi(r.URL.Query().Get("n")); err == nil && n > 0 && n <= 5000 {
+			dong = n
+		}
+		m, noiDung, err := s.api.SessionNhatKyDoc(id, dong)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"muc": dto(m), "noi_dung": noiDung, "so_dong": dong})
+		return
+	}
+
+	n := 20
+	if v, err := strconv.Atoi(r.URL.Query().Get("n")); err == nil && v > 0 && v <= 200 {
+		n = v
+	}
+	ds, err := s.api.SessionNhatKyDS(n)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	out := make([]mucDTO, 0, len(ds))
+	var mat int
+	for _, m := range ds {
+		if !m.ConFile {
+			mat++
+		}
+		out = append(out, dto(m))
+	}
+	// so_mat_nhat_ky là con số đáng liếc: nó đếm những phiên KHÔNG còn đọc lại
+	// được. Lớn dần nghĩa là ngân sách đĩa đang cắt sâu hơn mức người ta cần.
+	writeJSON(w, map[string]any{
+		"muc": out, "so_mat_nhat_ky": mat,
+		"thu_muc": nhatky.Root(), "tran_so_file": nhatky.SoFileToiDa,
+		"tran_byte": nhatky.TongByteToiDa,
+	})
 }
 
 // handleDB — action "db.admin", CHỈ phần đọc.

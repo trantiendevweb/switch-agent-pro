@@ -28,6 +28,7 @@ import (
 	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
 	"github.com/trantiendevweb/switch-agent-pro/internal/jsonutil"
+	"github.com/trantiendevweb/switch-agent-pro/internal/nhatky"
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
@@ -66,6 +67,12 @@ var Actions = []string{
 	"profile.so",
 	"session.list",
 	"session.stop",
+	// NHẬT KÝ PHIÊN. Nằm trong hợp đồng chứ không phải một mẹo `cat` file: cho
+	// tới 21/08 thì mọi thứ agent nói và làm BỐC HƠI khi phiên kết thúc, và
+	// `session.list` chỉ trả lời được "chết hay chưa" chứ không trả lời được
+	// "vì sao". Hai phiên (#167, #169) báo `xong` với 0 commit, một phiên
+	// (#172) sửa 4 file rồi chết vì hết hạn mức — cả ba đều không để lại gì.
+	"session.nhat-ky",
 	"fleet.start",
 	"clones.create",
 	"clones.clean",
@@ -619,6 +626,83 @@ func (a *API) SessionList() ([]store.Session, error) {
 // Trạng thái ở đây đã được phanLoaiPhienChet quyết, không mặt nào suy lại.
 func (a *API) SessionHong(limit int) ([]store.Session, error) {
 	return a.db.PhienChet(limit)
+}
+
+// MucNhatKy là MỘT dòng trong bảng nhật ký: phiên nào, nhật ký ở đâu, còn đọc
+// được không.
+//
+// `Co` và `ConFile` tách riêng vì chúng trả lời hai câu khác nhau. "Không có
+// file" nghĩa là phiên chạy trước bản này, hoặc nhật ký đã bị dọn theo ngân
+// sách — nói ra được thì người đọc thôi đi tìm. "File 0 byte" thì ngược lại:
+// nhật ký CÓ, agent chết trước khi in được gì, và đó là một manh mối.
+type MucNhatKy struct {
+	ID      int64
+	Addr    string
+	State   string
+	LyDo    string
+	Started time.Time
+	Duong   string
+	Co      int64
+	ConFile bool
+}
+
+// SessionNhatKyDS liệt kê nhật ký của các phiên gần đây, mới nhất trước.
+//
+// Lấy CẢ phiên sống lẫn phiên chết trong một danh sách: người vận hành hỏi
+// "lượt vừa rồi có những phiên nào", không hỏi "phiên nào còn sống".
+func (a *API) SessionNhatKyDS(limit int) ([]MucNhatKy, error) {
+	list, err := a.db.PhienGanDay(limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]MucNhatKy, 0, len(list))
+	for _, s := range list {
+		m := MucNhatKy{
+			ID: s.ID, Addr: s.Addr(), State: s.State, LyDo: s.StateLyDo,
+			Started: s.Started, Duong: s.Log,
+		}
+		if s.Log != "" {
+			if st, err := os.Stat(s.Log); err == nil {
+				m.ConFile, m.Co = true, st.Size()
+			}
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
+// SessionNhatKyDoc đọc nhật ký của MỘT phiên.
+//
+// `dong` là số dòng CUỐI muốn lấy; <=0 là lấy hết. Mặc định của mọi mặt phải là
+// một số hữu hạn — xem nhatky.Don để biết vì sao trần dung lượng không chặn
+// được từng file lúc đang ghi.
+//
+// KHÔNG cắt khối tiêu đề: đây là đường của NGƯỜI ĐỌC, mà khối tiêu đề (địa chỉ,
+// thư mục, lệnh đã dựng) chính là phần trả lời được "vì sao phiên này không làm
+// gì cả". Đường của MÁY (readLogs, nạp output sang bước flow sau) thì cắt.
+func (a *API) SessionNhatKyDoc(id int64, dong int) (MucNhatKy, string, error) {
+	s, err := a.db.Phien(id)
+	if err != nil {
+		return MucNhatKy{}, "", err
+	}
+	m := MucNhatKy{
+		ID: s.ID, Addr: s.Addr(), State: s.State, LyDo: s.StateLyDo,
+		Started: s.Started, Duong: s.Log,
+	}
+	if s.Log == "" {
+		return m, "", fmt.Errorf("phiên #%d không có nhật ký — phiên chạy trước bản có tính năng này, "+
+			"hoặc không phải phiên fleet", id)
+	}
+	raw, err := os.ReadFile(s.Log)
+	if err != nil {
+		// Nói rõ CẢ hai khả năng: bị dọn theo ngân sách, hay không đọc được.
+		// Trộn hai thứ này lại thì người dùng đi sửa nhầm chỗ.
+		return m, "", fmt.Errorf("không đọc được nhật ký %s: %w\n"+
+			"     (thư mục nhật ký giữ tối đa %d file / %d MB — lượt cũ có thể đã bị dọn)",
+			s.Log, err, nhatky.SoFileToiDa, nhatky.TongByteToiDa>>20)
+	}
+	m.ConFile, m.Co = true, int64(len(raw))
+	return m, nhatky.Duoi(string(raw), dong), nil
 }
 
 // phanLoaiPhienChet là ĐIỂM QUYẾT ĐỊNH DUY NHẤT: một phiên vừa được phát hiện
@@ -1464,7 +1548,12 @@ func readLogs(paths []string) string {
 		if len(paths) > 1 {
 			fmt.Fprintf(&sb, "===== agent %d =====\n", i+1)
 		}
-		sb.Write(data)
+		// CẮT khối tiêu đề của sagent. Đây là đường của MÁY: kết quả này thành
+		// output của bước agent và được nạp thẳng vào prompt của bước SAU. Để
+		// nguyên thì lời ghi chú nội bộ (đường dẫn hồ sơ, dòng lệnh) trở thành
+		// một phần "câu trả lời của agent" mà bước sau đọc như dữ liệu thật.
+		// Đường của NGƯỜI (SessionNhatKyDoc) thì giữ nguyên khối đó.
+		sb.WriteString(nhatky.BoDau(string(data)))
 		sb.WriteString("\n")
 	}
 	return strings.TrimSpace(sb.String())
