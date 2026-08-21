@@ -322,13 +322,13 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] **Đối chiếu 2 chiều sổ ↔ đĩa**: kiểm tra đồng bộ giữa hồ sơ trong SQLite và thư mục thực tế trên ổ đĩa (`~/.ai-accounts`), tự động phát hiện mục mồ côi hoặc thư mục chưa đăng ký.
 - [x] **Xoá an toàn (Safe delete)**: chỉ cho phép xoá thư mục cấu hình do sổ đăng ký sở hữu; tái sử dụng `link.IsLink` để không bao giờ đi xuyên junction làm mất dữ liệu thư mục gốc.
 - [x] **API lõi & CLI cho sổ**: bổ sung action mới vào `api.Actions` và hỗ trợ lệnh CLI `sagent profile list --so`, `sagent route list` để tra cứu danh sách từ sổ SQLite.
-- [ ] **Claude Harness Adapter chính thức** (nâng cấp từ `provider/claude.go` hiện tại + conformance test + capability report chuẩn) — *Chưa làm vì*: Claude Code hiện vẫn đang hoạt động tốt qua adapter v1 hiện hành; việc nâng lên chuẩn Harness Adapter riêng biệt sẽ được thực hiện đồng bộ khi quy chuẩn hoá toàn bộ hệ adapter.
+- [x] **Claude Harness Adapter chính thức**: bổ sung kiểu năng lực 3 trạng thái (làm được / không làm được / chưa đo) vào interface `provider.Adapter`, khai báo trung thực cho cả 5 adapter (Claude, Codex, Cursor, Antigravity, Grok), xây dựng bộ conformance test dùng chung chống khai báo sai lệch, và công bố báo cáo năng lực qua `api.Actions`, lệnh CLI `sagent capability` / `sagent nang-luc`, cùng endpoint/giao diện dashboard.
 - [ ] **1 direct-API vertical slice hoàn chỉnh** (kết nối trực tiếp Anthropic API, stream response, ghi nhận usage/error không lộ key) — *Chưa làm vì*: hiện mới có client OpenAI-compatible cơ bản ở Pha 4 (`internal/aiapi`); lát cắt dọc API hoàn chỉnh kèm streaming chuẩn cần xử lý cẩn trọng để không mất thông tin `usage` (giữ nguyên theo quyết định ở Pha 4).
 - [ ] **Verb `verify` và `route test` đầy đủ** — *Chưa làm vì*: các lệnh xem và quản lý cơ bản (`profile list --so`, `route list`, `session run/list/stop`) đã hoạt động; phần kiểm tra tính hợp lệ sâu (`verify`) và thử nghiệm route tự động (`route test`) đang chờ tích hợp bộ kiểm tra kết nối mạng và khóa API thực tế.
 - **DoD:** CI Windows xanh; đổi Claude subscription không đăng nhập lại; API route
   stream + ghi usage/error không lộ key; xoá session không đụng credential/project gốc;
   fault injection không tạo JSON/DB dở; **hết Python**.
-- **Trạng thái:** Đã hoàn thành sổ đăng ký SQLite (migration v8), đối chiếu 2 chiều sổ ↔ đĩa, xoá an toàn chỉ khi sổ sở hữu, và lệnh CLI/API tương ứng (`profile list --so`, `route list`); phần Claude Harness Adapter chính thức, direct-API vertical slice hoàn chỉnh và verb verify/test đầy đủ được giữ lại để làm đồng bộ sau.
+- **Trạng thái:** Đã hoàn thành sổ đăng ký SQLite (migration v8), đối chiếu 2 chiều sổ ↔ đĩa, xoá an toàn chỉ khi sổ sở hữu, lệnh CLI/API tương ứng (`profile list --so`, `route list`), và Claude Harness Adapter chính thức (kèm bảng năng lực 3 trạng thái, conformance test, báo cáo CLI/API/Dashboard); 2 hạng mục còn lại (direct-API vertical slice hoàn chỉnh và verb verify/route test) tiếp tục giữ nguyên lý do còn treo để hoàn thiện sau.
 
 ### Pha 2 — Chạy song song + Project/Workspace  🟡 một phần
 🎯 Biến công cụ profile thành **runtime manager** đa project.
