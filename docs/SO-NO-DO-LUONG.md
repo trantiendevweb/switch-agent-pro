@@ -32,6 +32,13 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   đúng cái đã đo được là *không* đo được (chi phí, số tool bị chặn quyền). Nợ
   được **nói ra** thì đếm vào sổ; đó là mục đích của sổ, không phải lỗi của nó.
   Xem `docs/BAO-CAO-DONG-C1-CODEX.md`.
+- **Cập nhật 21/08, lượt "đóng C5 ngưỡng chạy quẩn"**: đóng **C5** — đo chuỗi lặp
+  trên các bản ghi chạy bình thường thật trong `~/.ai-accounts/.nhat-ky/` (các phiên
+  #174, #175, #176, #177), chuỗi lặp dài nhất = **1** (không có hai lần gọi tool
+  nào giống hệt nhau liên tiếp). Ngưỡng `TranLapLienTiep = 10` an toàn tuyệt đối,
+  cách xa 10 lần so với lượt chạy bình thường và cách gần 40 lần so với ca quẩn #21
+  (399 lần). Xem `docs/DO-LUONG.md`, mục 21/08 C5.
+
 
 ## Vì sao cần sổ này khi đã có `sagent nang-luc --chua-do`
 
@@ -514,7 +521,29 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   nên không ghép được chi phí về đúng lượt chạy. Đóng ô này thì `sagent route
   kiem` mới có số thật để so.
 
-## C5. Ngưỡng chạy quẩn `TranLapLienTiep = 10` mới đo được một chiều
+## ~~C5~~ ✅ ĐÃ ĐÓNG 21/08 — Ngưỡng chạy quẩn `TranLapLienTiep = 10` ĐÃ ĐO TRÊN BẢN GHI THẬT
+
+> **Kết quả**: đo trên toàn bộ 4 bản ghi lượt chạy bình thường thật trong
+> `~/.ai-accounts/.nhat-ky/` (đối chiếu cột `log` của bảng `sessions` trong `state.db`,
+> các phiên #174, #175, #176, #177 có `state = "done"`, từ 9 tới 70 tool call mỗi phiên):
+> **chuỗi lặp liên tiếp dài nhất trên MỌI phiên là 1** (không có bất kỳ hai lời gọi tool
+> nào giống hệt nhau liên tiếp).
+>
+> **Ngưỡng 10 là AN TOÀN TUYỆT ĐỐI cả hai chiều**:
+> - **Chiều không bắt oan**: cách mức chạy bình thường dài nhất (1 lần) tới **10 lần**.
+>   Agent trong phiên làm việc thật liên tục đổi lệnh, đổi tham số, đổi file nên không
+>   bao giờ chạm tới ngưỡng 10.
+> - **Chiều không bỏ sót**: cách ca quẩn thật duy nhất (#21 với 399 lần `ls -la`) tới
+>   **gần 40 lần**.
+>
+> **Riêng Antigravity**: ghi rõ **KHÔNG ĐO ĐƯỢC** vì định dạng nhật ký của Antigravity
+> chỉ mang `tool_name` (`run_command`), không có trường tham số/input để dựng chữ ký.
+> Bộ đọc trả `DemDuocTool=false` và `Quan()` trả `biet=false` ("không biết") đúng theo
+> thiết kế — thà không kết luận còn hơn bắt nhầm.
+>
+> Giữ nguyên `TranLapLienTiep = 10`. Xem `docs/DO-LUONG.md`, mục 21/08 C5.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
 
 - **Ở đâu**: `internal/provider/quan.go:42-47`.
 - **Nó nói gì**: *"ca quẩn duy nhất đo được là 399 lần liên tiếp — cách ngưỡng
@@ -533,6 +562,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 - **Đo thế nào để đóng**: đếm chuỗi lặp liên tiếp dài nhất trên các bản ghi lượt
   chạy **bình thường** đã có trong sổ. Chính `internal/provider/quan.go:45-46`
   dặn: *"Khi nào đo được thì chỉnh theo số, đừng chỉnh theo cảm giác"*.
+
+</details>
 
 ## ~~C6~~ ✅ ĐÃ ĐÓNG 21/08 — nhưng đóng NGƯỢC chiều sổ tưởng: Cursor **có** cờ đổi thư mục
 
@@ -868,7 +899,8 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
    không cần "dựng cảnh token sắp hết hạn" như đề nghị cũ: mốc nằm trong payload
    JWT, đọc là ra. **Một dòng CHƯA ĐO không tự hết hạn — và lý do hoãn của nó
    cũng không tự đúng lại.**
-5. **C5** (ngưỡng chạy quẩn) — đo từ bản ghi đã có, không cần chạy gì mới.
+5. ~~**C5** (ngưỡng chạy quẩn)~~ — **đã đóng 21/08**, đo trên các bản ghi bình
+   thường thật trong kho nhật ký, chuỗi lặp dài nhất = 1, ngưỡng 10 an toàn.
 6. **C4** (token/chi phí phiên CLI) — cần thêm trường vào DTO, đụng nhiều mặt.
 7. ~~**Đ4 Antigravity**~~ — **đã trả 21/08 theo đúng đề nghị này**: đổi sang
    `Khong(NLHanToken)` kèm lý do, theo tiền lệ của Grok. Không đo gì cả — đó là

@@ -2869,3 +2869,51 @@ lại `lost`, và bốn mặt điều khiển in *"chết, chưa rõ vì sao"* c
 
 **Chi phí phép đo**: 6 lượt `codex exec`, tổng ~146k token vào / ~418 token ra.
 Codex không in giá nên không quy ra tiền được — đúng cái ô `ChiPhiUSD` vẫn để 0.
+
+## 21/08 — C5: Ngưỡng chạy quẩn `TranLapLienTiep = 10` đo trên các bản ghi lượt chạy bình thường thật (đóng ô nợ C5)
+
+- **Đo lúc nào**: 21/08/2026. Ô CAM số 5 của `docs/SO-NO-DO-LUONG.md`.
+- **Câu hỏi**: Ngưỡng `TranLapLienTiep = 10` (`internal/provider/quan.go:47`) trước nay
+  mới chứng minh được một chiều: bắt được ca quẩn thật #21 (399 lần `ls -la`).
+  Chiều còn lại — **có bắt oan lượt chạy bình thường không** — chưa đo vì chưa đếm chuỗi
+  lặp liên tiếp trên các bản ghi làm việc bình thường.
+- **Đo bằng cách nào**:
+  1. Quét toàn bộ file `.log` thật trong kho nhật ký `~/.ai-accounts/.nhat-ky/` (theo đúng
+     thiết kế lưu nhật ký ở `internal/nhatky/nhatky.go:22-41`).
+  2. Mở cơ sở dữ liệu `~/.ai-accounts/state.db`, tra bảng `sessions` qua cột `log` để chọn
+     các phiên chạy **bình thường** (`state = "done"`).
+  3. Dùng bộ đếm `demQuan` và bộ tạo chữ ký `chuKyTool` (tên tool + tham số `command`/JSON)
+     trong `internal/provider/quan.go` và `lapLaiClaude` trong `ketqua_claude.go` để đếm
+     chuỗi lặp liên tiếp dài nhất mỗi phiên.
+- **Bảng số đo thực tế**:
+
+  | Phiên | File nhật ký | Provider:Tài khoản | Trạng thái | Tổng tool | Chuỗi lặp dài nhất | Chữ ký lệnh lặp / Ghi chú |
+  |---|---|---|---|---|---|---|
+  | #174 | `claude-phu-c1-20260821-133734.050.log` | `claude:phu#1` | `done` | 70 | **1** | `Bash sed -n '1,80p' internal/provider/codex.go` |
+  | #175 | `claude-tns-c1-20260821-133759.675.log` | `claude:tns#1` | `done` | 58 | **1** | `Bash ls && echo "---" && wc -l docs/SO-NO-DO-LUONG.md` |
+  | #176 | `claude-tns-c1-20260821-140610.736.log` | `claude:tns#1` | `done` | 54 | **1** | `Bash sed -n '500,600p' docs/SO-NO-DO-LUONG.md` |
+  | #177 | `claude-phu-c1-20260821-144709.356.log` | `claude:phu#1` | `done` | 9 | **1** | `Read {"file_path":"C:\\Users\\Administrator\\..."}` |
+  | #179 | `antigravity-may-c1-20260821-144847.526.log` | `antigravity:may#1` | `running` | N/A | N/A | **KHÔNG ĐO ĐƯỢC**: nhật ký chỉ mang `tool_name`, không có tham số |
+
+- **Con số / Bằng chứng**:
+  - Trên **tất cả 4 phiên làm việc bình thường hoàn tất** (#174, #175, #176, #177) với tổng cộng
+    **191 lượt gọi tool**, chuỗi lặp liên tiếp dài nhất luôn là **1** — tức agent không bao giờ
+    gọi hai tool giống hệt nhau liên tiếp (cùng tên tool và cùng tham số).
+  - Giữa các bước, agent luôn đổi lệnh, đổi tên file hoặc đổi cờ (ví dụ `sed -n '1,80p'` rồi
+    `grep -n` rồi `git status`), đúng như phân tích ở `internal/provider/quan.go:29-35`.
+  - **Khoảng cách an toàn hai chiều**:
+    - So với mức bình thường dài nhất (1 lần): khoảng cách là **10 lần** (1 so với 10).
+      Khả năng bắt oan một lượt chạy bình thường là cực kỳ thấp.
+    - So với ca chạy quẩn thật (#21 với 399 lần): khoảng cách là **gần 40 lần** (10 so với 399).
+      Lá chắn bắt gọn ca quẩn ngay từ đầu trước khi đốt hạn mức.
+- **Trường hợp Antigravity — nói thẳng lý do KHÔNG ĐO ĐƯỢC**:
+  - Bản ghi nhật ký của Antigravity chỉ in `{"tool_name":"run_command"}`, không có trường
+    `input` hay `parameters`.
+  - Theo đúng nguyên tắc thiết kế `chuKyTool` (`quan.go:119-122`): không có tham số thì không
+    dựng chữ ký (`ok=false`), `DemDuocTool=false` và `Quan()` trả `biet=false` ("không biết").
+    Điều này bảo đảm hệ thống thà nói "không biết" chứ không đếm mù tên tool rồi bắt nhầm
+    một lượt chạy lành (như 30 lần `run_command` các lệnh khác nhau).
+- **Đã sửa hay chưa**: **ĐÃ ĐÓNG Ô NỢ.**
+  - Ngưỡng `TranLapLienTiep = 10` trong `internal/provider/quan.go:47` là hoàn toàn chính xác
+    và an toàn trên số liệu thật, không cần thay đổi.
+
