@@ -543,6 +543,22 @@ type sessionDTO struct {
 	// trống đó chứ không được lấp bằng chữ suy ra.
 	LyDo         string `json:"lyDo,omitempty"`
 	HanMucDenLai int64  `json:"hanMucDenLai,omitempty"` // unix giây, 0 = không rõ
+
+	// Token/chi phí THẬT của phiên, đọc từ chính nhật ký của nó qua
+	// provider.DocKetQua — xem doDuocCuaPhien.
+	//
+	// VẮNG MẶT nghĩa là CHƯA ĐO, và đó là lý do cả ba trường đều `omitempty` còn
+	// chi phí là con trỏ. Với Codex/Cursor thì bản ghi KHÔNG có trường giá, nên
+	// một `costUsd: 0` gửi ra sẽ đọc thành "lượt này miễn phí" — nói dối theo
+	// hướng dễ chịu nhất. Còn Claude thì khai `total_cost_usd: 0` thật cho lượt
+	// hỏng ngay từ đầu, nên số 0 ấy PHẢI đi ra được. Chỉ con trỏ mới tách được
+	// hai ca đó: nil = không có ô, &0 = đo được và bằng 0.
+	//
+	// Mặt web đọc trường vắng là chỗ trống rồi ghi "chưa đo" — đúng luật đã ghim
+	// ở mat2d_test.go (TestTokenCostCuaPhienGhiChuaDo).
+	TokenVao  int      `json:"tokensIn,omitempty"`
+	TokenRa   int      `json:"tokensOut,omitempty"`
+	ChiPhiUSD *float64 `json:"costUsd,omitempty"`
 }
 
 // uiDTO là phần `[ui]` của cấu hình, đưa ra cho mọi mặt web đọc chung.
@@ -581,8 +597,56 @@ func uiCuaCauHinh(c config.Config) uiDTO {
 }
 
 func phienDTO(s store.Session) sessionDTO {
-	return sessionDTO{s.ID, s.Addr(), s.PID, s.Worktree, s.Log, s.Started.Unix(),
-		s.State, s.StateLyDo, s.HanMucDenLai}
+	d := sessionDTO{
+		ID: s.ID, Addr: s.Addr(), PID: s.PID, Worktree: s.Worktree, Log: s.Log,
+		Started: s.Started.Unix(), State: s.State, LyDo: s.StateLyDo,
+		HanMucDenLai: s.HanMucDenLai,
+	}
+	k, ok := doDuocCuaPhien(s)
+	if !ok {
+		return d // chưa đo được gì: để cả ba ô trống, KHÔNG lấp số 0
+	}
+	d.TokenVao, d.TokenRa = k.TokenVao, k.TokenRa
+	if k.ChiPhiDaDo {
+		c := k.ChiPhiUSD
+		d.ChiPhiUSD = &c
+	}
+	return d
+}
+
+// doDuocCuaPhien đọc token/chi phí THẬT của một phiên CLI từ chính nhật ký của
+// nó. ok=false nghĩa là CHƯA ĐO ĐƯỢC — bên gọi phải để ô trống, không lấp số 0.
+//
+// Đây là đúng đường mà phanLoaiPhienChet (internal/api) đã đi để lấy `state` và
+// `lyDo`: mở file `s.Log`, đưa cho adapter của provider tự đọc. Không có nhánh
+// `if provider == "claude"` nào ở đây, và cũng không có bảng đơn giá nào — con
+// số duy nhất được phép ra là con số nhà cung cấp tự khai trong bản ghi.
+//
+// CHỈ ĐỌC PHIÊN ĐÃ KẾT THÚC. Nhật ký của phiên đang chạy là file agent CÒN ĐANG
+// GHI: dòng cuối có thể mới ra được nửa, và với Claude thì chính dòng cuối
+// (`{"type":"result"}`) mới mang usage. Đọc dở thì hoặc trả về số của một lượt
+// chưa xong, hoặc lỗi phân tích JSON — cả hai đều tệ hơn là chưa nói gì. Danh
+// sách trạng thái ở đây là DANH SÁCH TRẮNG chứ không phải `!= running`: thêm một
+// trạng thái "đang khởi động" trong tương lai thì nó rơi vào nhánh im lặng, chứ
+// không lặng lẽ được đem đi đọc.
+func doDuocCuaPhien(s store.Session) (provider.KetQua, bool) {
+	if s.Log == "" {
+		return provider.KetQua{}, false
+	}
+	if !store.LaTuKetThuc(s.State) && s.State != store.StateStopped {
+		return provider.KetQua{}, false
+	}
+	ad, co := provider.Get(s.Provider)
+	if !co {
+		return provider.KetQua{}, false
+	}
+	raw, err := os.ReadFile(s.Log)
+	if err != nil {
+		// Nhật ký đã bị dọn theo ngân sách, hoặc ổ không đọc được. Không đo được
+		// thì thôi — /api/state vẫn phải trả về đủ phiên.
+		return provider.KetQua{}, false
+	}
+	return ad.DocKetQua(string(raw))
 }
 
 // ---------------------------- endpoint ----------------------------

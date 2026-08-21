@@ -295,3 +295,25 @@ func TestCodexHeadlessCoCoJSON(t *testing.T) {
 		t.Error("CoConThieu không bổ sung --json cho đường fleet")
 	}
 }
+
+// Codex đo được TOKEN nhưng KHÔNG đo được CHI PHÍ, và bản ghi phải nói ra cả hai
+// vế đó — không phải bằng cách trả 0 cho cả hai.
+//
+// Đây là bài giữ cho `ChiPhiDaDo` khỏi bị bật bừa khi ai đó sửa bộ đọc: bật lên
+// là mọi lượt Codex hiện ra "tốn 0đ" trên bốn mặt điều khiển, và không có gì đỏ
+// nếu không có bài này.
+func TestCodexKhongCoTruongGiaThiChiPhiVanLaChuaDo(t *testing.T) {
+	k, ok := docKetQuaCodex(logCodexXong)
+	if !ok {
+		t.Fatal("không đọc được bản ghi THẬT của `codex exec --json`")
+	}
+	if k.ChiPhiDaDo {
+		t.Error("bản ghi Codex KHÔNG có trường giá nào mà vẫn khai là đã đo chi phí — " +
+			"số 0 này sẽ ra tới mặt web thành một hoá đơn 0đ")
+	}
+	// Và token thì NGƯỢC LẠI: có thật, đọc được. Hai ô của cùng một lượt chạy có
+	// thể ở hai trạng thái khác nhau, nên chúng cần hai câu trả lời khác nhau.
+	if k.TokenVao == 0 || k.TokenRa == 0 {
+		t.Errorf("token của Codex phải đo được: vào %d, ra %d", k.TokenVao, k.TokenRa)
+	}
+}

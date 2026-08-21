@@ -66,3 +66,48 @@ func TestKhongCoDongResultThiNoiKhongDocDuoc(t *testing.T) {
 		t.Fatal("khong co dong result ma van bao doc duoc")
 	}
 }
+
+// So 0 THAT khac so 0 CHUA DO — va ChiPhiDaDo la cho duy nhat noi ra duoc.
+//
+// `ketQuaHongXacThuc` la ban ghi that cua mot luot chet ngay tu dau, va Claude
+// khai thang `"total_cost_usd":0`. Neu chi nhin ChiPhiUSD thi luot nay khong
+// phan biet duoc voi mot luot Codex (ban ghi KHONG co truong gia nao). Hai ca
+// do can hai cach hien khac han: mot ben la "ton 0đ", mot ben la "chua do".
+func TestClaudeKhaiSoKhongThiVanLaDaDo(t *testing.T) {
+	k := doc(t, ketQuaThatXong)
+	if !k.ChiPhiDaDo {
+		t.Error("ban ghi CO total_cost_usd ma ChiPhiDaDo=false — so that bi coi la chua do")
+	}
+	if k.ChiPhiUSD != 0.08446 {
+		t.Errorf("chi phi = %v, muon 0.08446", k.ChiPhiUSD)
+	}
+
+	h := doc(t, ketQuaHongXacThuc)
+	if !h.ChiPhiDaDo {
+		t.Error(`luot hong khai "total_cost_usd":0 — do la so 0 THAT, phai ChiPhiDaDo=true`)
+	}
+	if h.ChiPhiUSD != 0 {
+		t.Errorf("chi phi = %v, muon 0", h.ChiPhiUSD)
+	}
+}
+
+// CLI bo truong gia di thi phai tut ve CHUA DO, khong duoc bao mien phi.
+//
+// Bo doc khong duoc phep dua vao viec Claude 2.1.x luon in total_cost_usd: doc
+// vao mot float64 thuong thi truong vang va truong bang 0 ra cung mot ket qua,
+// va ChiPhiDaDo hoa thanh loi khai bua cho MOI luot.
+func TestClaudeThieuTruongGiaThiChuaDo(t *testing.T) {
+	const khongGia = `{"type":"result","is_error":false,"subtype":"success","num_turns":1,` +
+		`"result":"OK","usage":{"input_tokens":2,"output_tokens":4}}`
+	k := doc(t, khongGia)
+	if k.ChiPhiDaDo {
+		t.Error("ban ghi KHONG co total_cost_usd ma van bao da do chi phi")
+	}
+	if k.ChiPhiUSD != 0 {
+		t.Errorf("chi phi = %v, muon 0", k.ChiPhiUSD)
+	}
+	// Van phai doc duoc phan con lai — thieu gia khong lam hong ca ban ghi.
+	if k.TokenVao != 2 || k.TokenRa != 4 {
+		t.Errorf("token = %d/%d, muon 2/4", k.TokenVao, k.TokenRa)
+	}
+}

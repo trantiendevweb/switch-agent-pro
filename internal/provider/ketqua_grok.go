@@ -34,7 +34,9 @@ import (
 // HeadlessArgs ở grok.go) — định dạng trên là thứ nó tự in ra và ta quan sát
 // được, không phải hợp đồng nó cam kết. Nó đổi cách in là hàm này trả
 // docDuoc=false, và mọi kết luận quay về "không biết" chứ không đoán bừa.
-// Không có trường chi phí/token nào trong bản ghi, nên ChiPhiUSD và token để 0.
+// Không có trường chi phí/token nào trong bản ghi, nên ChiPhiUSD và token để 0,
+// và `ChiPhiDaDo` ở nguyên false — số 0 ở đây là "chưa ai đo", không phải "lượt
+// này không tốn gì" (xem ketqua.go).
 func docKetQuaGrok(raw string) (KetQua, bool) {
 	var d demQuan
 	var traLoi string
