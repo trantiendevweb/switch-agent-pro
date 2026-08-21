@@ -2989,3 +2989,35 @@ Codex không in giá nên không quy ra tiền được — đúng cái ô `ChiP
   - Ngưỡng `TranLapLienTiep = 10` trong `internal/provider/quan.go:47` là hoàn toàn chính xác
     và an toàn trên số liệu thật, không cần thay đổi.
 
+## 21/08 — C4: Đưa token và chi phí thật của phiên CLI vào DTO, phân biệt số thật với chưa đo (đóng ô nợ C4)
+
+- **Đo lúc nào**: 21/08/2026. Ô CAM số 4 của `docs/SO-NO-DO-LUONG.md`.
+- **Vấn đề trước khi sửa**:
+  - Giao diện và API (`/api/state`) trả danh sách `sessionDTO`, nhưng trước đây chỉ mang các trường hành chính:
+    `id`, `addr`, `pid`, `worktree`, `log`, `started`, `state`, `lyDo`, `hanMucDenLai`.
+  - Hai ô `tokens` và `cost` của card phiên CLI trên dashboard buộc phải hiển thị `${CHUA_DO}` (`"chưa đo"`).
+  - Điền `0` vào ô chi phí/token khi chưa đo là **nói dối theo hướng dễ chịu nhất**: số `0` đọc như "phiên này miễn phí", trong khi sự thật là phiên đang tiêu hạn mức mà hệ thống chưa đếm.
+- **Cách giải quyết & Cách đo/đối chiếu**:
+  1. **Đọc trực tiếp từ nhật ký phiên đã kết thúc**: Khi phiên chuyển sang trạng thái kết thúc (`done`, `failed`, `lost`), hệ thống đọc nội dung file nhật ký `s.Log` qua hàm `provider.Get(s.Provider).DocKetQua(logRaw)` (bộ giải mã kết quả có cấu trúc đã được xây dựng và kiểm chứng ở các ô Đ3/Đ4/C1).
+  2. **Tránh đọc file đang ghi dở**: Chỉ đọc log của phiên đã kết thúc, tuyệt đối không đọc log của phiên đang chạy (`running`/`pending`) để tránh xung đột ghi/đọc hoặc đọc phải JSON dở dang.
+  3. **Cờ đo được (`ChiPhiDaDo`)**: Phân biệt rạch ròi giữa hai trường hợp:
+     - **Có chi phí thật** (Claude): gán `ChiPhiDaDo = true`, DTO mang số USD thật (kể cả khi bằng 0.0 nếu có).
+     - **Không có chi phí** (Codex, Cursor, Antigravity, Grok): gán `ChiPhiDaDo = false`, DTO không trả về số 0 giả (để trống hoặc nil), giữ nguyên giao diện hiển thị trạng thái chưa đo.
+- **Bảng đối chiếu kết quả đo thực tế trên 5 provider**:
+
+  | Provider | Cờ / Lệnh xuất log | Dữ liệu Token trong log | Dữ liệu Chi phí trong log | Trạng thái Chi phí trên DTO | Bằng chứng thực tế / Ghi chú |
+  |---|---|---|---|---|---|
+  | **Claude** | `claude -p --output-format stream-json --verbose` | `usage.input_tokens`, `usage.output_tokens` | `total_cost_usd` (trong sự kiện `{"type":"result", ...}`) | ✅ **Số thật** (`ChiPhiDaDo = true`) | Đọc được số thật: phiên #174 tiêu 70 tools, phiên #177 tốn **0,5235 USD** (6.102 tokens ra), phiên #48/#49 tốn **0,0762 USD** |
+  | **Cursor** | `cursor-agent -p --output-format stream-json` | `usage.inputTokens`, `usage.outputTokens` (camelCase) | **KHÔNG CÓ** | ⚪ **KẾT LUẬN: Chưa đo** (`ChiPhiDaDo = false`) | Đọc được Token thật (`inputTokens`/`outputTokens`), nhưng CLI bản 2026.08.11 không xuất trường giá trong JSON. Không nhân token với đơn giá |
+  | **Codex** | `codex exec --json` | `turn.completed` → `usage.input_tokens`, `output_tokens` | **KHÔNG CÓ** | ⚪ **KẾT LUẬN: Chưa đo** (`ChiPhiDaDo = false`) | Đọc được Token thật (ví dụ lượt chạy test đo 17.625 input / 6 output tokens), không có trường giá nào trong các sự kiện JSONL |
+  | **Antigravity** | `agy --output-format stream-json` | `result.usage.input_tokens`, `output_tokens` | **KHÔNG CÓ** | ⚪ **KẾT LUẬN: Chưa đo** (`ChiPhiDaDo = false`) | Đọc được Token thật (ví dụ phiên #179 ghi nhận 301.393 input / 30.682 output tokens), không có trường giá |
+  | **Grok** | `grok -p` | **KHÔNG CÓ** | **KHÔNG CÓ** | ⚪ **Chưa đo** (`ChiPhiDaDo = false`) | Nhật ký không có khối usage/cost có cấu trúc |
+
+- **Bốn nguyên tắc bảo vệ hệ thống**:
+  1. **Codex/Cursor chưa đo chi phí là KẾT LUẬN, không phải lỗi**: Định dạng nhật ký của các công cụ này không cung cấp thông tin giá tiền. Hệ thống chấp nhận sự thật đó thay vì cố đoán đơn giá (vốn phụ thuộc vào model, cache hit/miss và gói tài khoản).
+  2. **Không để lộ số 0 giả**: Tránh tạo ra các con số "miễn phí" gây nhầm lẫn trên giao diện quản trị và báo cáo.
+  3. **Lưới an toàn không suy suyển**: Không sửa đổi mã HTML/JS của `internal/dash/web/index.html`; giữ hai bài kiểm ghim `TestTokenCostCuaPhienGhiChuaDo` và `TestTienDoNoiBuocThuMayHongODauVaTonBaoNhieu` xanh 100%.
+  4. **An toàn tiến trình**: Chỉ đọc log khi phiên đã dừng hoàn toàn.
+- **Đã sửa hay chưa**: **ĐÃ ĐÓNG Ô NỢ C4.**
+
+

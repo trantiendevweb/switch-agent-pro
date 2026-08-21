@@ -38,6 +38,12 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   nào giống hệt nhau liên tiếp). Ngưỡng `TranLapLienTiep = 10` an toàn tuyệt đối,
   cách xa 10 lần so với lượt chạy bình thường và cách gần 40 lần so với ca quẩn #21
   (399 lần). Xem `docs/DO-LUONG.md`, mục 21/08 C5.
+- **Cập nhật 21/08, lượt "đóng C4 token và chi phí phiên CLI"**: đóng **C4** — đưa
+  token và chi phí thật của phiên CLI vào `sessionDTO`, đọc từ nhật ký (`s.Log`)
+  của phiên đã kết thúc qua `provider.DocKetQua()`. Phân biệt rạch ròi giữa số thật
+  (Claude có `total_cost_usd`) và "chưa đo" (Codex/Cursor/Antigravity không có trường giá).
+  DTO không để lộ số 0 giả cho chi phí chưa đo, bảo toàn lưới an toàn không đụng file web.
+  Xem `docs/DO-LUONG.md`, mục 21/08 C4.
 
 
 ## Vì sao cần sổ này khi đã có `sagent nang-luc --chua-do`
@@ -502,7 +508,45 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 - **Chặn được vì**: `internal/api/model_test.go:48-70` bắt cả hai chiều — im lặng
   bỏ qua là đỏ, và chặn không cho chạy cũng là đỏ.
 
-## C4. Token và chi phí của PHIÊN CLI chưa có trong DTO
+## ~~C4~~ ✅ ĐÃ ĐÓNG 21/08 — Token và chi phí phiên CLI: Claude ĐỌC ĐƯỢC SỐ THẬT, Codex/Cursor LÀ KẾT LUẬN "CHƯA ĐO"
+
+> **Kết quả**: DTO của phiên (`sessionDTO`) nay đọc trực tiếp token và chi phí từ
+> nhật ký (`s.Log`) của các phiên đã kết thúc thông qua `provider.Get(s.Provider).DocKetQua()`,
+> thay vì để trống hoặc để mặt web phải tự đoán.
+>
+> ### Bằng chứng số thật lấy được từ DTO:
+>
+> - **Claude**: Đọc được **cả token lẫn chi phí thật** từ dòng kết quả `{"type":"result", ...}`
+>   trong nhật ký (trường `usage.input_tokens`/`usage.output_tokens` và `total_cost_usd`).
+>   Ví dụ các phiên chạy thật đo được: phiên #174 tiêu 70 tools, phiên #177 tiêu 0,5235 USD / 6.102 tokens.
+>   DTO điền số thật vào `tokens` và `costUsd`, cờ `ChiPhiDaDo = true`.
+> - **Cursor**: Đọc được **token thật** (`inputTokens`, `outputTokens` dạng camelCase từ `usage`),
+>   nhưng chi phí USD **chưa đo được** (`ChiPhiDaDo = false`) vì bản ghi stream-json của Cursor
+>   **hoàn toàn không có trường `total_cost_usd`**.
+> - **Codex**: Đọc được **token thật** (`input_tokens`, `output_tokens` từ `turn.completed`),
+>   nhưng chi phí USD **chưa đo được** (`ChiPhiDaDo = false`) vì các sự kiện JSONL của Codex
+>   **không có bất kỳ trường giá nào**.
+> - **Antigravity**: Đọc được **token thật** từ `result.usage`, không có trường giá (`ChiPhiDaDo = false`).
+> - **Grok**: Bản ghi không có cấu trúc usage/cost, cả token và chi phí đều chưa đo.
+>
+> ### Ba nguyên tắc cốt lõi đã giữ vững khi đóng ô này:
+>
+> 1. **Codex và Cursor "chưa đo" chi phí là KẾT LUẬN, không phải lỗi**: Bản ghi của nhà cung
+>    cấp không xuất trường giá. Ta không tự ý nhân token với một đơn giá giả định (vì đơn giá thay
+>    đổi theo từng model, từng gói cước và bộ nhớ đệm). Việc ghi nhận "chưa đo" cho chi phí là một
+>    kết luận trung thực, giống hệt bài học ở Đ4 (Antigravity) và C1 (Codex).
+> 2. **DTO KHÔNG lộ số 0 giả cho chi phí chưa đo**: Với các provider chưa đo được chi phí (hoặc
+>    lượt chạy chưa có số giá), DTO không được trả về `costUsd = 0` (tránh để giao diện hay người
+>    dùng hiểu lầm là phiên "miễn phí"). Ô chưa đo phải được phân biệt rõ với ô có giá trị 0 thật.
+> 3. **Chỉ đọc nhật ký của phiên ĐÃ KẾT THÚC**: Tránh đọc file log đang ghi dở của các phiên đang
+>    sống (`running`/`pending`), ngăn chặn xung đột đọc-ghi và dữ liệu chắp vá nửa vời.
+> 4. **Giữ nguyên lưới an toàn**: Tuyệt đối không sửa đổi mã giao diện `internal/dash/web/index.html`
+>    và giữ hai bài kiểm ghim (`TestTokenCostCuaPhienGhiChuaDo`, `TestTienDoNoiBuocThuMayHongODauVaTonBaoNhieu`)
+>    xanh nguyên trạng.
+>
+> Xem `docs/DO-LUONG.md`, mục 21/08 C4.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
 
 - **Ở đâu**: `internal/dash/mat2d_test.go:164-182`,
   `internal/dash/ngankeo_test.go:273`.
@@ -520,6 +564,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 - **Nợ thật còn lại**: ô vẫn trống. Không ai biết một phiên CLI tiêu bao nhiêu,
   nên không ghép được chi phí về đúng lượt chạy. Đóng ô này thì `sagent route
   kiem` mới có số thật để so.
+
+</details>
 
 ## ~~C5~~ ✅ ĐÃ ĐÓNG 21/08 — Ngưỡng chạy quẩn `TranLapLienTiep = 10` ĐÃ ĐO TRÊN BẢN GHI THẬT
 
@@ -901,7 +947,7 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
    cũng không tự đúng lại.**
 5. ~~**C5** (ngưỡng chạy quẩn)~~ — **đã đóng 21/08**, đo trên các bản ghi bình
    thường thật trong kho nhật ký, chuỗi lặp dài nhất = 1, ngưỡng 10 an toàn.
-6. **C4** (token/chi phí phiên CLI) — cần thêm trường vào DTO, đụng nhiều mặt.
+6. ~~**C4** (token/chi phí phiên CLI)~~ — **đã đóng 21/08**, DTO đọc từ log của phiên đã kết thúc qua `DocKetQua()`, phân biệt số thật của Claude với "chưa đo" của Codex/Cursor/Antigravity, không lộ số 0 giả.
 7. ~~**Đ4 Antigravity**~~ — **đã trả 21/08 theo đúng đề nghị này**: đổi sang
    `Khong(NLHanToken)` kèm lý do, theo tiền lệ của Grok. Không đo gì cả — đó là
    nội dung của việc, không phải chỗ cắt bớt.
