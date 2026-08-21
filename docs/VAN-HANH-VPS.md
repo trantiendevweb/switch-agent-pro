@@ -246,7 +246,7 @@ một phiên hỏng, **không phải** để thay bằng chứng.
 
 | Rủi ro | Trạng thái (đo 21/08 ~14:20) | Bằng chứng |
 |---|---|---|
-| **Backup không thật sự rời khỏi máy** | ❌ **CÓ THẬT — đã tìm ra nguyên nhân gốc 21/08** | **`OneDrive.exe` KHÔNG CÒN TRÊN MÁY.** Không ở `Program Files`, không ở `Program Files (x86)`, không ở `%LOCALAPPDATA%\Microsoft\OneDrive`, không phải gói Appx. Nhưng registry **vẫn giữ** bản ghi cài đặt (`OneDriveSetup 26.139.0720.0003`) và **vẫn liên kết tài khoản** `anhvudk113@gmail.com` → `C:\Users\Administrator\OneDrive`. Nên thư mục đó **trông y hệt** một thư mục đồng bộ, mà **không có client nào để đẩy lên**. `run-tns-os-backup.ps1:34` ghi `.enc` vào đúng thư mục đó và **không có đích dự phòng nào** — không rclone, không copy đi đâu khác. Kết quả: **19 file, 782.8 MB** nằm cùng ổ với dữ liệu gốc, trên **một** ổ vật lý duy nhất (`VMware Virtual disk` 300 GB, `C:` là ổ logic duy nhất). Mọi tín hiệu xanh: `LastTaskResult = 0`, file vẫn sinh đều. |
+| ~~Backup không thật sự rời khỏi máy~~ | ✅ **ĐÃ XỬ LÝ 21/08 20:47 — có số đo** | **Nguyên nhân gốc**: `OneDrive.exe` đã bị gỡ khỏi máy, mà thư mục `OneDrive` vẫn giữ **reparse point mồ côi** (thẻ `0x9000701a`, cloud placeholder) của lần cài cũ — trong khi `SyncRootManager` trong registry đã bị xoá. Client mới thấy chỗ đã có chủ nên báo *'We can't add your OneDrive folder'*; `OneDrive.exe /reset` **không** gỡ được dấu này. **Cách sửa**: đổi tên thư mục cũ sang `OneDrive.cu-20260821` cho client dựng gốc đồng bộ sạch, đăng nhập lại, rồi chép 17 file `.enc` cục bộ sang. **Nghiệm thu bằng ĐỐI CHIẾU, không bằng biểu tượng**: lấy 17 file vốn chỉ nằm trên đĩa, đối chiếu với danh sách file đã có `ReparsePoint` trong thư mục mới → **thiếu 0**. 782.4 MB nay đã ở trên mây. |
 | **`RunAsPPL` chưa bật** | ❌ **CÓ THẬT** | `HKLM:\SYSTEM\CurrentControlSet\Control\Lsa` **không có** giá trị `RunAsPPL`. `lsass` không được bảo vệ trước công cụ trộm credential. |
 | ~~Hai task backup dùng `LogonType=Interactive`~~ | ✅ **SỔ SAI — thực tế là `S4U`** | Cả ba task đều `LogonType=S4U`, `RunLevel=Highest`: *KNOWLEDGE OS daily backup*, *Tainguyenseo website off-host backup*, *TNS OS off-host backup*. `S4U` **chạy được khi không ai đăng nhập**, nên lo ngại "reboot xong không ai RDP thì task không chạy" **không còn đúng**. Đối chứng: `knowledge-os-20260821-140001.enc` sinh lúc **14:00**, tức **sau** lần reboot 12:06. |
 | ~~Brute-force chưa chặn~~ | ✅ **SỔ SAI — đang chặn thật** | Task **`TNS Chan Bruteforce`** chạy **mỗi 5 phút** (`chan-bruteforce-rdp.ps1 -PhutNhinLai 30 -NguongSai 20`), lần cuối **14:20:20**, `Result=0`. Rule tường lửa cùng tên **`Enabled=True, Action=Block`**, đang chặn **53 IP**. |
@@ -258,16 +258,16 @@ diễn ra**, và kết luận ở mục A3 (**máy sẽ còn reboot**) **không 
 
 **Việc còn phải làm, xếp theo hậu quả:**
 
-1. **Đưa backup ra khỏi ổ này.** Rủi ro mất dữ liệu thật, và là rủi ro *duy nhất*
-   trong bảng không có bất kỳ lớp phòng vệ nào. **Không thể sửa bằng "bật lại
-   OneDrive"** — file thực thi không còn trên máy, nên phải **cài lại client rồi
-   đăng nhập**, hoặc **đổi đích** trong `run-tns-os-backup.ps1` sang một nơi
-   ngoài máy (rclone/S3/máy khác). Cả hai đường đều cần chủ dự án quyết, vì đều
-   cần thông tin đăng nhập.
+1. ✅ **XONG 21/08.** Xem dòng đầu bảng trên. Ba điều đáng giữ lại từ lượt này:
 
-   **Nghiệm thu phải bằng cách ĐỌC LẠI từ đích đó**, không phải bằng việc thấy
-   file xuất hiện. Đây đúng chỗ đã hỏng: suốt thời gian qua file vẫn sinh ra đều
-   và mọi đèn vẫn xanh.
+   - **`/reset` không gỡ được reparse point mồ côi.** Đừng mất thời gian lặp lại nó.
+     Dấu nằm ở tầng hệ thống tệp, không nằm ở cấu hình client.
+   - **Phải kiểm Known Folder Move TRƯỚC khi đổi tên thư mục `OneDrive`.** Lần này
+     `Desktop`/`Documents`/`Pictures`/`Downloads` đều trỏ về `C:\Users\<user>\...` nên
+     đổi tên vô hại. Nếu chúng trỏ vào trong OneDrive thì đổi tên là mất màn hình nền.
+   - **Giữ thư mục cũ cho tới khi đếm đủ.** `OneDrive.cu-20260821` vẫn còn; chỉ xoá
+     sau khi đối chiếu xong. Trong một việc mà mọi đèn xanh đều từng nói dối, bản gốc
+     là thứ rẻ nhất mua được.
 
 2. ✅ **ĐÃ LÀM 21/08 — nó đã ĐỎ.** `tools/canh-backup.ps1` kiểm hai thứ:
    `OneDrive.exe` có tồn tại/có chạy không, và file `.enc` mới nhất có quá
