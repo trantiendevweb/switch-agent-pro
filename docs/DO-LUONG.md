@@ -2543,6 +2543,78 @@ trong commit `4fa396f`. Giữ lại cả hai vòng để thấy sai ở đâu.
 
 
 
+
+## 21/08 — ĐÃ ĐO: `phai_co` trên bước `soi` THẬT. Và nó lôi ra người soi đã bị vô hiệu hoá
+
+**Đây là phép đo còn treo** sau lượt #48/#49: đo được cổng kiểm trong engine
+**không** đồng nghĩa đã đo được ba chuỗi `["NEN TRON", "CAN SUA THEM", "VUT"]`
+có khớp cách người soi thật viết câu trả lời hay không.
+
+**Lượt #50 — `doi-4` chạy đủ 5 phiên agent, lần đầu kể từ #47.** Kết quả bước `soi`:
+
+```
+✗ doi-4.soi: chạy xong nhưng KHÔNG có kết luận nào trong
+   "NEN TRON" hoặc "CAN SUA THEM" hoặc "VUT"
+   — bước này coi như CHƯA LÀM, không phải đã làm và không có ý kiến
+⚠ doi-4.soi hỏng nhưng on_failure=continue — đi tiếp
+```
+
+**Đây là BẮT ĐÚNG, không phải bắt oan.** Nguyên văn đầu ra của người soi:
+
+```
+TNS: KHONG THE XAC DINH — khong chay duoc git tren moi truong nay
+MAY: KHONG THE XAC DINH — khong chay duoc git tren moi truong nay
+LOI: khong the chay lenh git, khong co output de phan tich
+GIAM CHAN: khong xac dinh duoc
+```
+
+### Cái mà phép đo lôi ra: người soi KHÔNG THỂ soi, về mặt cấu trúc
+
+Bước `soi` của `doi-4` là **`type = "model"`** — một lời gọi API thẳng, **không có
+shell, không có công cụ, không chạy được lệnh nào**. Nhưng prompt của chính nó
+bắt: *"nhánh có gì thì phải tự chạy bốn lệnh git bên dưới, đó mới là bằng chứng"*,
+rồi liệt kê `git log --oneline main..sagent/tns-1`, `git diff main...sagent/tns-1`,
+và hai lệnh nữa.
+
+Người soi đã trả lời **trung thực**: không chạy được git nên không kết luận được.
+
+**Nguồn gốc là một bản vá đúng gây hậu quả không ai lường:** bước `soi` vốn là
+`type = "agent"` chạy bằng CLI grok — chạy được git. CLI đó hỏng vĩnh viễn
+(HTTP 410, xem mục *"Grok API 410"*), nên nó được đổi sang node `model` để đi
+đường API. Đổi loại node thì **prompt giữ nguyên**. Từ đó tới nay người soi được
+giao một việc mà môi trường của nó không cho phép làm.
+
+**Vì sao chưa ai thấy**: lượt #47 (20/08 19:42) bước `soi` nhận HTTP 410 và được
+ghi **DONE** — `phai_co` khi ấy chưa có. Nhìn bảng thì thấy "đã soi". Từ #47 tới
+#50 **không có lượt `doi-4` nào chạy**, nên lỗi này nằm im 19 tiếng.
+
+### Hai kết luận, đừng gộp làm một
+
+1. **`phai_co` ĐÃ ĐO XONG, cả ba chiều**: chặn bước không giao kết luận (#49
+   `phai-hong`, #50 `soi`), không chặn nhầm bước lành (#49 `phai-xong`), và ba
+   chuỗi của `doi-4` **khớp thực tế** — chúng bắt được đúng ca cần bắt trên đầu
+   ra thật.
+2. **`phai_co` KHÔNG CHẶN ĐƯỢC việc trộn nhánh**, vì `soi` khai
+   `on_failure = "continue"`. Lượt #50 bước `gop` **vẫn chạy** sau khi người soi
+   hỏng. Đây đúng kịch bản mà `phai_co` sinh ra để ngăn — *"việc trộn nhánh diễn
+   ra mà KHÔNG AI SOI"* — chỉ khác một điểm: nay nó **được ghi lại** thay vì im
+   lặng. Ghi lại là tiến bộ thật, nhưng **không phải là chặn**.
+
+   Công bằng với `gop`: nó tự đếm git và nói thẳng *"bước soi không để lại kết
+   quả — không có nhãn nào của người soi để đối chiếu"*, không giả vờ đã có ý
+   kiến. Lớp phòng vệ thứ hai này hoạt động.
+
+### Còn phải quyết (thuộc cấu hình flow của chủ dự án, không tự sửa)
+
+- Trả `soi` về `type = "agent"` bằng một tài khoản chạy được git, **hoặc** viết
+  lại prompt cho hợp một node `model` (đưa sẵn `git diff` vào `doc_duoc` thay vì
+  bảo nó tự chạy).
+- Xem lại `on_failure = "continue"` ở `soi`: giữ thì phải chấp nhận trộn khi
+  chưa ai soi.
+- Bước `code-doc` **không có** `phai_co` — antigravity trả cụt vẫn được ghi `done`.
+
+---
+
 ## 21/08 — ĐÃ ĐO: cổng kiểm `phai_co` chặn thật, cả hai chiều
 
 **Ô còn treo trước đó**: `phai_co` được thêm vào `flows.toml` lúc **20/08 20:18**,
