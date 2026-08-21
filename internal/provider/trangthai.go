@@ -71,6 +71,21 @@ func PhanLoaiChet(k KetQua, docDuoc bool) (trangThai, lyDo string, hanMucDenLai 
 		return ChetChanQuyen, ly, k.HanMucDenLai
 	case k.CoLoi && k.LoiAPI != "":
 		return ChetLoiAPI, ly, k.HanMucDenLai
+	// Nhà cung cấp TỰ NÓI lượt chạy kết thúc bằng lỗi API, chỉ là không kèm
+	// `api_error_status`. Đo 21/08 ở ô Đ5, đúng ca bản THUA cuộc đua refresh:
+	//
+	//	is_error=true  terminal_reason="api_error"  api_error_status=null
+	//	subtype="success"  result="Failed to authenticate: OAuth session
+	//	                           expired and could not be refreshed"
+	//
+	// Không có nhánh này thì PhanLoaiChet trả rỗng và phiên ở lại `lost`, tức
+	// bốn mặt điều khiển in "chết, chưa rõ vì sao" cho đúng cái chết có lý do
+	// RÕ NHẤT mà hệ thống đọc được — câu lỗi nằm nguyên văn trong bản ghi.
+	//
+	// Vẫn giữ luật KHÔNG DÒ CHUỖI: `terminal_reason` là một trường có tên và
+	// giá trị của nó là enum của nhà cung cấp, không phải câu chữ cho người đọc.
+	case k.CoLoi && k.KetCuc == "api_error":
+		return ChetLoiAPI, ly, k.HanMucDenLai
 	}
 	// Hỏng theo kiểu khác (chạy quẩn, không trả lời gì, hết vòng tool). Đo được
 	// là nó HỎNG, nhưng ba trạng thái trên không cái nào tả đúng — nên không
