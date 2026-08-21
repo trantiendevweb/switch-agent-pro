@@ -42,19 +42,45 @@ $coExe = $false
 foreach ($d in $duong) { if ($d -and (Test-Path $d)) { $coExe = $true } }
 
 if (-not $coExe) {
-    $loi.Add('OneDrive.exe KHONG CO tren may. Backup khong the roi khoi o dia. Phai cai lai client roi dang nhap, hoac doi dich trong run-tns-os-backup.ps1.')
+    $loi.Add('OneDrive.exe KHONG CO tren may. Backup khong the roi khoi o dia.')
 } elseif (-not (Get-Process -Name OneDrive -ErrorAction SilentlyContinue)) {
-    $loi.Add('OneDrive.exe co tren may nhung KHONG CHAY. Backup dang dung lai tren o dia.')
+    $loi.Add('OneDrive.exe co tren may nhung KHONG CHAY.')
 }
 
-# --- 2. File .enc moi nhat co qua cu khong ----------------------------------
-# Kiem ca truong hop thu muc bien mat: khong bat loi thi script chet lang le va
-# task lai bao xanh - dung cai benh no sinh ra de chua.
+# --- 2. Dang nhap con hieu luc khong ----------------------------------------
+# CO EXE + CO CHAY VAN CHUA DU. Do 21/08 20:17: client vua cai lai, tien trinh
+# chay binh thuong, nhung dang dung doi mat khau va KHONG day gi len ca. Ban dau
+# bai canh nay chi kiem exe + tien trinh nen no bao "OK" trong dung tinh huong
+# do - tu no mac lai dung cai benh no sinh ra de chua.
+$khoa = 'HKCU:\Software\Microsoft\OneDrive\Accounts\Personal'
+if (Test-Path $khoa) {
+    $tk = Get-ItemProperty -Path $khoa -ErrorAction SilentlyContinue
+    if ($tk.LastSignInResult -and $tk.LastSignInResult -ne 0) {
+        $loi.Add("OneDrive dang LOI DANG NHAP (LastSignInResult=$($tk.LastSignInResult), tai khoan $($tk.UserEmail)). Bam 'Re-enter credentials' va dang nhap lai.")
+    } elseif ($tk.SignInErrorStateStartTimestamp) {
+        $loi.Add("OneDrive dang o trang thai loi dang nhap (tai khoan $($tk.UserEmail)).")
+    }
+}
+
+# --- 3. File .enc da THAT SU len may chua -----------------------------------
+# Day moi la cau hoi that: "du lieu da roi khoi may chua", chu khong phai "co
+# tien trinh nao dang chay khong".
+#
+# File nam trong thu muc OneDrive va DA duoc dam may biet den thi mang thuoc
+# tinh ReparsePoint (placeholder cloud). File chi co Archive tron la file CHUA
+# he duoc day len - no chi dang nam tren o dia nay.
 if (-not (Test-Path $thuMuc)) {
     $loi.Add("Khong thay thu muc backup: $thuMuc")
     $tapTin = @()
 } else {
     $tapTin = @(Get-ChildItem -LiteralPath $thuMuc -Recurse -Filter '*.enc' -ErrorAction SilentlyContinue)
+}
+
+$chuaLen = @($tapTin | Where-Object { $_.Attributes -notmatch 'ReparsePoint' })
+$chuaLenMB = 0
+if ($chuaLen.Count -gt 0) {
+    $chuaLenMB = [math]::Round((($chuaLen | Measure-Object -Property Length -Sum).Sum / 1MB), 1)
+    $loi.Add("$($chuaLen.Count)/$($tapTin.Count) file .enc CHUA len may ($chuaLenMB MB van nam tren o dia nay).")
 }
 
 if ($tapTin.Count -eq 0) {
@@ -72,9 +98,9 @@ if ($tapTin.Count -gt 0) {
     $tongMB = [math]::Round((($tapTin | Measure-Object -Property Length -Sum).Sum / 1MB), 1)
 }
 
-# --- 3. Ket luan ------------------------------------------------------------
+# --- 4. Ket luan ------------------------------------------------------------
 if ($loi.Count -eq 0) {
-    Write-Output "OK: backup binh thuong. $($tapTin.Count) file .enc, $tongMB MB."
+    Write-Output "OK: ca $($tapTin.Count) file .enc ($tongMB MB) deu da len may."
     exit 0
 }
 
@@ -83,7 +109,7 @@ $dong.Add('CANH BAO BACKUP - du lieu KHONG roi khoi may')
 $dong.Add('')
 foreach ($l in $loi) { $dong.Add("- $l") }
 $dong.Add('')
-$dong.Add("Dang ket lai: $($tapTin.Count) file .enc, $tongMB MB, cung o dia voi du lieu goc.")
+$dong.Add("Tong: $($tapTin.Count) file .enc, $tongMB MB. Chua len may: $($chuaLen.Count) file, $chuaLenMB MB.")
 $dong.Add("May chi co MOT o vat ly, nen o chet la mat ca hai ban.")
 $dong.Add('')
 $dong.Add('Tra cuu: docs/VAN-HANH-VPS.md muc E.')
