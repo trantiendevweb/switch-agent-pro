@@ -246,7 +246,7 @@ một phiên hỏng, **không phải** để thay bằng chứng.
 
 | Rủi ro | Trạng thái (đo 21/08 ~14:20) | Bằng chứng |
 |---|---|---|
-| **Backup không thật sự rời khỏi máy** | ❌ **CÓ THẬT, và nặng hơn sổ ghi** | `OneDrive.exe` **không chạy**. `C:\Users\Administrator\OneDrive` có **19 file `.enc`, tổng 782.8 MB** (sổ cũ ghi 564 MB). Máy chỉ có **một** ổ vật lý — `VMware Virtual disk`, 300 GB — và `C:` là ổ logic duy nhất. Nên "off-host backup" đang nằm **cùng ổ đĩa với dữ liệu gốc**: ổ chết là mất cả hai. Mọi đèn vẫn xanh (`LastTaskResult = 0`, file vẫn sinh đều). |
+| **Backup không thật sự rời khỏi máy** | ❌ **CÓ THẬT — đã tìm ra nguyên nhân gốc 21/08** | **`OneDrive.exe` KHÔNG CÒN TRÊN MÁY.** Không ở `Program Files`, không ở `Program Files (x86)`, không ở `%LOCALAPPDATA%\Microsoft\OneDrive`, không phải gói Appx. Nhưng registry **vẫn giữ** bản ghi cài đặt (`OneDriveSetup 26.139.0720.0003`) và **vẫn liên kết tài khoản** `anhvudk113@gmail.com` → `C:\Users\Administrator\OneDrive`. Nên thư mục đó **trông y hệt** một thư mục đồng bộ, mà **không có client nào để đẩy lên**. `run-tns-os-backup.ps1:34` ghi `.enc` vào đúng thư mục đó và **không có đích dự phòng nào** — không rclone, không copy đi đâu khác. Kết quả: **19 file, 782.8 MB** nằm cùng ổ với dữ liệu gốc, trên **một** ổ vật lý duy nhất (`VMware Virtual disk` 300 GB, `C:` là ổ logic duy nhất). Mọi tín hiệu xanh: `LastTaskResult = 0`, file vẫn sinh đều. |
 | **`RunAsPPL` chưa bật** | ❌ **CÓ THẬT** | `HKLM:\SYSTEM\CurrentControlSet\Control\Lsa` **không có** giá trị `RunAsPPL`. `lsass` không được bảo vệ trước công cụ trộm credential. |
 | ~~Hai task backup dùng `LogonType=Interactive`~~ | ✅ **SỔ SAI — thực tế là `S4U`** | Cả ba task đều `LogonType=S4U`, `RunLevel=Highest`: *KNOWLEDGE OS daily backup*, *Tainguyenseo website off-host backup*, *TNS OS off-host backup*. `S4U` **chạy được khi không ai đăng nhập**, nên lo ngại "reboot xong không ai RDP thì task không chạy" **không còn đúng**. Đối chứng: `knowledge-os-20260821-140001.enc` sinh lúc **14:00**, tức **sau** lần reboot 12:06. |
 | ~~Brute-force chưa chặn~~ | ✅ **SỔ SAI — đang chặn thật** | Task **`TNS Chan Bruteforce`** chạy **mỗi 5 phút** (`chan-bruteforce-rdp.ps1 -PhutNhinLai 30 -NguongSai 20`), lần cuối **14:20:20**, `Result=0`. Rule tường lửa cùng tên **`Enabled=True, Action=Block`**, đang chặn **53 IP**. |
@@ -258,12 +258,23 @@ diễn ra**, và kết luận ở mục A3 (**máy sẽ còn reboot**) **không 
 
 **Việc còn phải làm, xếp theo hậu quả:**
 
-1. **Đưa backup ra khỏi ổ này.** Đây là rủi ro mất dữ liệu thật, và là rủi ro
-   *duy nhất* trong bảng không có bất kỳ lớp phòng vệ nào. Bật `OneDrive.exe`,
-   hoặc đẩy `.enc` sang một đích ngoài máy — nhưng **phải nghiệm thu bằng cách
-   đọc lại từ đích đó**, không phải bằng việc thấy file xuất hiện. Cả hai lần
-   trước đều hỏng đúng ở chỗ "thấy file là tin".
-2. **Bật `RunAsPPL`** (cần khởi động lại máy).
+1. **Đưa backup ra khỏi ổ này.** Rủi ro mất dữ liệu thật, và là rủi ro *duy nhất*
+   trong bảng không có bất kỳ lớp phòng vệ nào. **Không thể sửa bằng "bật lại
+   OneDrive"** — file thực thi không còn trên máy, nên phải **cài lại client rồi
+   đăng nhập**, hoặc **đổi đích** trong `run-tns-os-backup.ps1` sang một nơi
+   ngoài máy (rclone/S3/máy khác). Cả hai đường đều cần chủ dự án quyết, vì đều
+   cần thông tin đăng nhập.
+
+   **Nghiệm thu phải bằng cách ĐỌC LẠI từ đích đó**, không phải bằng việc thấy
+   file xuất hiện. Đây đúng chỗ đã hỏng: suốt thời gian qua file vẫn sinh ra đều
+   và mọi đèn vẫn xanh.
+
+2. **Trong lúc chưa quyết đích: ít nhất làm cho nó ĐỎ.** Hiện không có gì báo khi
+   backup không rời máy. Một phép kiểm rẻ — so `LastWriteTime` của file `.enc`
+   mới nhất với thời điểm hiện tại, hoặc kiểm `OneDrive.exe` có tồn tại không —
+   đủ để biến "hỏng mà đèn xanh" thành "hỏng và đèn đỏ". Không cần thông tin
+   đăng nhập nào.
+3. **Bật `RunAsPPL`** (cần khởi động lại máy).
 
 ## F. Nguyên tắc chẩn đoán của dự án này
 
