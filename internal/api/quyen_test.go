@@ -19,6 +19,11 @@ func (g giaAdapter) Name() string                       { return g.ten }
 func (g giaAdapter) HeadlessArgs(p string) []string     { return []string{"-p", p} }
 func (g giaAdapter) ArgsTuDuyetQuyen() ([]string, bool) { return g.co, g.daDo }
 
+// nil = CHƯA ĐO cách chọn model. Từ 21/08 KHÔNG provider thật nào còn trả nil
+// nữa (xem model_test.go), nên nhánh cảnh báo trong `argsChoBuoc` chỉ còn giữ
+// được bằng một adapter giả — nếu không thì nhánh đó thành mã chết không ai kiểm.
+func (giaAdapter) ModelArgs(string) []string { return nil }
+
 // Không bật cờ thì TUYỆT ĐỐI không được có cờ nguy hiểm trong dòng lệnh.
 func TestKhongBatThiKhongCoCoNguyHiem(t *testing.T) {
 	ad := giaAdapter{ten: "thu", co: []string{"--dangerously-skip-permissions"}, daDo: true}

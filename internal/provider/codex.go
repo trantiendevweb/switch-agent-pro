@@ -251,10 +251,30 @@ func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
 
 func (codex) ArgsHoSo(string) []string { return nil }
 
-// ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
-// nil = chua biet, KHONG phai "khong co model" — ben goi se canh bao thay vi
-// im lang bo qua lua chon cua nguoi dung.
-func (codex) ModelArgs(string) []string { return nil }
+// ModelArgs: `-m <model>` — DA CHAY THAT 21/08/2026, ban 0.147.0.
+//
+// Bang chung o day KHAC Antigravity va dang doc ky, vi Codex KHONG chan tu
+// phia may minh: chay `codex exec -m khong-ton-tai-9x` thi CLI van nhan co,
+// van in `model: khong-ton-tai-9x` o dau ban ghi, chi canh bao "Model metadata
+// ... not found. Defaulting to fallback metadata". Cai chan den tu MAY CHU:
+// HTTP 400 `The 'khong-ton-tai-9x' model is not supported when using Codex with
+// a ChatGPT account`. Tuc gia tri co DI HET duong xuong than yeu cau API — no
+// khong bi nuot o tang dong lenh.
+//
+// Nua con lai (co that su GHI DE cau hinh, chu khong chi duoc in ra):
+// `~/.codex/config.toml` khai `model = "gpt-5.6-sol"`. Chay khong co co thi dau
+// ban ghi la `model: gpt-5.6-sol`; chay `-m gpt-5.4-mini` thi thanh
+// `model: gpt-5.4-mini` va luot chay xong that (12.291 token). Day dung la
+// chieu ma grok.go da bac mot lan — "provider tu doc model tu ho so" KHONG
+// duoc mac dinh tin — nen phai do rieng, va o day ket qua la co THANG ho so.
+//
+// VI SAO `-m` CHU KHONG PHAI `--model`, va vi sao dieu do quan trong: `-m` la
+// co cua LENH CON `exec`, ma `argsChoBuoc` lai chen ModelArgs VAO TRUOC
+// HeadlessArgs, nen dong that la `codex -m <model> exec --json <prompt>` — co
+// dung TRUOC lenh con. Da chay dung dang do: dau ban ghi tra `model:
+// gpt-5.4-mini`. Neu ban sau cua Codex bo co nay khoi tang goc thi day la cho
+// vo dau tien.
+func (codex) ModelArgs(model string) []string { return []string{"-m", model} }
 
 // DocKetQua đọc JSONL của `codex exec --json` — ĐÃ ĐO THẬT 21/08/2026, xem
 // ketqua_codex.go để biết lược đồ, bốn cái bẫy, và danh sách thứ VẪN chưa đo
@@ -269,8 +289,11 @@ func (codex) NangLuc() []NangLuc {
 		Duoc(NLHeadless, "`codex exec --json \"<prompt>\"` = \"Run Codex non-interactively\" (0.147.0) — "+
 			"lệnh con, KHÁC hẳn cờ -p của Claude. Stdin PHẢI nối vào NUL: thấy stdin là ống "+
 			"dẫn thì codex đợi prompt nối thêm và TREO vô hạn (đo 21/08: treo 5 phút, 0 byte)"),
-		Chua(NLChonModel, "CHƯA ĐO cách chọn model từ dòng lệnh; nil ở ModelArgs nghĩa là chưa "+
-			"biết, không phải \"không có model\""),
+		Duoc(NLChonModel, "`-m <model>` (đo 21/08, CHẠY THẬT, bản 0.147.0). Codex KHÔNG chặn "+
+			"tên model sai ở phía máy mình — CLI nhận cờ rồi MÁY CHỦ trả 400 \"model is not "+
+			"supported\", tức giá trị đi hết xuống thân yêu cầu API. Và cờ GHI ĐÈ hồ sơ: "+
+			"config.toml khai `gpt-5.6-sol`, chạy `-m gpt-5.4-mini` thì đầu bản ghi đổi theo "+
+			"và lượt chạy xong thật (12.291 token)"),
 		Duoc(NLTuDuyetQuyen, "`--approve-for-me` (đo 21/08, CHẠY THẬT): tự duyệt nhưng VẪN "+
 			"trong sandbox workspace-write. `--sandbox workspace-write` một mình KHÔNG đủ — "+
 			"\"writing is blocked by read-only sandbox; rejected by user approval settings\", "+

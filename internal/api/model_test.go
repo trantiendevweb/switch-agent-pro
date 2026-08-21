@@ -50,11 +50,17 @@ func TestKhongKhaiModelThiKhongThemCo(t *testing.T) {
 // Im lang bo qua la kieu hong te nhat o day: nguoi dung khai model = sonnet de
 // tiet kiem, thay lenh chay binh thuong, tuong minh vua tiet kiem duoc — ma that
 // ra van dot model dat nhat. Ho chi biet khi doc hoa don.
+//
+// BAI TRUOC DUNG PROVIDER THAT (`antigravity`) LAM VAT THU, va do la cho sai:
+// ngay 21/08 antigravity va codex deu do xong `--model`/`-m`, nen khong con
+// provider that nao tra nil — bai kiem do gay, KHONG phai vi nhanh canh bao
+// hong, ma vi no het vat thu. Nhanh canh bao thi VAN phai song: no la thu duy
+// nhat dung giua nguoi dung va mot hoa don chay model mac dinh, cho provider
+// tiep theo duoc them vao ma chua ai do. Nen vat thu bay gio la adapter GIA.
 func TestProviderChuaDoModelThiPhaiCanhBao(t *testing.T) {
-	ad, co := provider.Get("antigravity")
-	if !co {
-		t.Fatal("khong co provider antigravity")
-	}
+	// daDo=false + co=nil: khong dinh vao nhanh canh bao "khong co rao quyen"
+	// (nhanh do GHI DE len canhBao), nen cai doc duoc chac chan la canh bao model.
+	ad := giaAdapter{ten: "chua-do-model"}
 	args, canhBao, err := argsChoBuoc(ad, "sonnet", "lam viec di", false)
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +74,72 @@ func TestProviderChuaDoModelThiPhaiCanhBao(t *testing.T) {
 	// Van phai chay duoc, chi la chay model mac dinh.
 	if len(args) == 0 {
 		t.Fatal("chua do model thi van phai chay duoc, khong duoc chan")
+	}
+}
+
+// Antigravity va Codex: DA DO 21/08, nen phai truyen co XUONG THAT va KHONG
+// duoc canh bao nua. Canh bao thua cung la mot kieu sai: no day nguoi doc di
+// kiem mot van de khong ton tai.
+//
+// Bang chung dung sau hai dong nay nam o comment cua ModelArgs trong
+// internal/provider/antigravity.go va internal/provider/codex.go.
+func TestAntigravityVaCodexTruyenDuocModel(t *testing.T) {
+	for _, tt := range []struct{ ten, co string }{
+		{"antigravity", "--model sonnet"},
+		{"codex", "-m sonnet"},
+	} {
+		t.Run(tt.ten, func(t *testing.T) {
+			ad, co := provider.Get(tt.ten)
+			if !co {
+				t.Fatalf("khong co provider %s", tt.ten)
+			}
+			args, canhBao, err := argsChoBuoc(ad, "sonnet", "lam viec di", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if canhBao != "" {
+				t.Fatalf("%s da do cach chon model, khong duoc canh bao nua: %s", tt.ten, canhBao)
+			}
+			got := strings.Join(args, " ")
+			if !strings.Contains(got, tt.co) {
+				t.Fatalf("khong truyen model xuong CLI: %s", got)
+			}
+			if !strings.Contains(got, "lam viec di") {
+				t.Fatalf("mat prompt khi them co model: %s", got)
+			}
+		})
+	}
+}
+
+// CHO DE GAY NHAT CUA CODEX: `-m` la co cua LENH CON `exec`, ma argsChoBuoc lai
+// CHEN model args VAO TRUOC HeadlessArgs. Dong that vi the la
+// `codex -m <model> exec --json <prompt>` — co dung TRUOC lenh con.
+//
+// Da chay that 21/08 (ban 0.147.0) dung dang do va Codex nhan: dau ban ghi in
+// `model: gpt-5.4-mini` thay vi `gpt-5.6-sol` cua config.toml. Bai kiem nay
+// khoa lai THU TU do: ngay nao ai doi argsChoBuoc sang append-vao-sau, dong
+// lenh thanh `codex exec --json <prompt> -m <model>` va `-m` roi vao vi tri
+// doi so cua prompt.
+func TestCodexDatCoModelTruocLenhCon(t *testing.T) {
+	ad, _ := provider.Get("codex")
+	args, _, err := argsChoBuoc(ad, "gpt-5.4-mini", "lam viec di", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	viTri := func(s string) int {
+		for i, a := range args {
+			if a == s {
+				return i
+			}
+		}
+		return -1
+	}
+	iM, iExec := viTri("-m"), viTri("exec")
+	if iM < 0 || iExec < 0 {
+		t.Fatalf("thieu -m hoac exec: %v", args)
+	}
+	if iM > iExec {
+		t.Fatalf("-m phai dung TRUOC `exec` (da do that o dang do): %v", args)
 	}
 }
 

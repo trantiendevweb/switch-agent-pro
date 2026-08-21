@@ -3052,3 +3052,125 @@ Codex không in giá nên không quy ra tiền được — đúng cái ô `ChiP
 
 
 
+
+## 21/08 — C3: chọn model từ dòng lệnh cho Antigravity và Codex (đóng ô nợ C3)
+
+**Vì sao đo**: `internal/api/model_test.go:9-12` ghi con số của lượt chạy #34 —
+**9,40 USD cả lượt, riêng bước `code-go` 8,18 USD** — vì mọi bước đều chạy model
+mạnh nhất, kể cả bước chỉ viết tài liệu. Trước lượt này, khai `model = "..."`
+cho một bước Antigravity/Codex chỉ đổi lấy **một dòng cảnh báo**; bước vẫn chạy
+model mặc định. Với Codex, "mặc định" có tên: `~/.codex/config.toml` khai
+`model = "gpt-5.6-sol"`, và chính file đó viết *"MODEL MẶC ĐỊNH = mạnh nhất, có
+lý do"*.
+
+**Điều kiện mới có hôm nay**: tài khoản Antigravity vừa đăng nhập lại
+(`ttseotop1@gmail.com`, CLI **1.1.16**). Trước 21/08 ô này không đo nổi vì chưa
+đăng nhập. Codex: **0.147.0**.
+
+### Bằng chứng 1 — tên model bịa. Hai provider trả lời KHÁC HẲN nhau
+
+Tiền lệ Cursor (`bacc137`) đặt ra khuôn: bằng chứng mạnh nhất không phải `--help`
+liệt kê cờ gì, mà là **CLI từ chối một tên model sai và liệt kê model hợp lệ**.
+Khuôn đó đúng với một provider và **sai với provider kia**:
+
+- **Antigravity — chặn ở phía máy mình, chưa tốn token nào**:
+
+  ```
+  $ agy -p "..." --model khong-ton-tai-9x --dangerously-skip-permissions
+  Error: invalid model selection (--model "khong-ton-tai-9x" --effort ""):
+         model khong-ton-tai-9x is not recognized as a known model or custom model in settings
+  Available models: Gemini 3.7 Flash (High) … GPT-OSS 120B (Medium)   [14 dòng]
+  → thoát mã 1
+  ```
+
+- **Codex — KHÔNG chặn gì ở tầng CLI**. Nhận cờ, in `model: khong-ton-tai-9x` ở
+  đầu bản ghi, chỉ càu nhàu *"Model metadata for `khong-ton-tai-9x` not found.
+  Defaulting to fallback metadata"*, rồi **máy chủ** mới chặn:
+
+  ```
+  ERROR: {"type":"error","status":400,"error":{"type":"invalid_request_error",
+          "message":"The 'khong-ton-tai-9x' model is not supported when using Codex with a ChatGPT account."}}
+  ```
+
+  Đây vẫn là bằng chứng, thậm chí đi xa hơn: giá trị **đã đi hết đường xuống thân
+  yêu cầu API**. Nhưng một lượt đo chỉ tìm đúng khuôn "CLI từ chối" sẽ kết luận
+  nhầm rằng Codex nuốt cờ.
+
+### Bằng chứng 2 — cờ có ĐỊNH TUYẾN không, hay chỉ được đem đi KIỂM TRA?
+
+Từ chối tên sai mới chứng minh cờ **được đọc**. Chưa chứng minh model thật sự đổi.
+Hai phép đo riêng:
+
+**Antigravity — cùng một prompt (`"tra loi dung mot tu: ok"`), ba model:**
+
+| `--model` | `input_tokens` | `output_tokens` |
+|---|---|---|
+| `gemini-3.7-flash-low` | 13.747 | 30 |
+| `claude-opus-4-6-thinking` | 15.764 | 27 |
+| `gpt-oss-120b-medium` | 11.174 | 64 |
+
+Cùng prompt, cùng repo, cùng CLI — biến duy nhất là `--model`. Ba bộ tách từ khác
+nhau đọc cùng một đầu vào ⇒ cờ đổi model thật.
+
+**Codex — cờ ghi đè hồ sơ:**
+
+| dòng lệnh | dòng `model:` ở đầu bản ghi |
+|---|---|
+| `codex exec "…"` (không cờ) | `gpt-5.6-sol` ← từ `config.toml` |
+| `codex exec -m gpt-5.4-mini "…"` | `gpt-5.4-mini`, chạy xong thật, 12.291 token |
+
+Đây đúng là chiều mà `internal/provider/grok.go:236-238` đã bác một lần —
+*"provider tự đọc model từ hồ sơ"* không được mặc định tin. Ở đây kết quả ngược
+với Grok: **cờ thắng hồ sơ**.
+
+### Một phép đo ĐÃ BẮT ĐẦU SAI — giữ lại vì người sau sẽ thử đúng cách đó
+
+Cách hiển nhiên để kiểm "có đúng model không" là hỏi thẳng agent. Đã thử:
+
+```
+$ agy -p "Tra loi DUNG MOT TU: ban do Google hay Anthropic tao ra?" \
+      --model claude-opus-4-6-thinking
+{"status":"SUCCESS","response":"Google\n", …}
+```
+
+Tin câu đó thì kết luận sẽ là *cờ bị nuốt → khai `KhongLamDuoc`* — **sai hoàn
+toàn**, và sai theo hướng **đắt hơn hiện trạng** (bỏ luôn khả năng hạ model).
+**Tự khai danh tính không phải phép đo**: lời nhắc hệ thống của Antigravity đè
+lên câu trả lời. Số token thì không biết nói dối.
+
+### Cái bẫy THỨ TỰ CỜ — đo chứ không suy từ `--help`
+
+`argsChoBuoc` (`internal/api/api.go:1397`) **chèn `ModelArgs` vào TRƯỚC**
+`HeadlessArgs`. Với Codex, `-m` lại là cờ của **lệnh con** `exec`, nên dòng thật là:
+
+```
+codex -m gpt-5.4-mini exec --json "<prompt>"     → đầu bản ghi: model: gpt-5.4-mini  ✓
+```
+
+Suy từ `--help` thì đây là chỗ hỏng (cờ của lệnh con đứng trước lệnh con). Đã chạy
+đúng dạng đó và Codex nhận. Antigravity cũng đã chạy đúng dạng chèn-trước
+(`agy --model gemini-3.7-flash-low --output-format stream-json -p "<prompt>"` →
+13.742 token, đúng chữ ký của model đó), chứ không phải chỉ dạng cờ-đứng-sau lúc
+thử tay.
+
+### Đã đổi trong mã
+
+- `internal/provider/antigravity.go:177` — `ModelArgs` → `--model <model>`;
+  `:188` khai `Duoc(NLChonModel)`.
+- `internal/provider/codex.go:277` — `ModelArgs` → `-m <model>`; `:292` khai
+  `Duoc(NLChonModel)`.
+- `internal/api/quyen_test.go` — `giaAdapter.ModelArgs` trả `nil`, làm vật thử
+  cho nhánh cảnh báo.
+- `internal/api/model_test.go` — `TestProviderChuaDoModelThiPhaiCanhBao` đổi vật
+  thử từ provider thật sang adapter giả; thêm
+  `TestAntigravityVaCodexTruyenDuocModel` và `TestCodexDatCoModelTruocLenhCon`.
+
+**Đếm lại cột `ChuaDo` sau lượt này: còn 5** (antigravity 2, claude 1, codex 1,
+cursor 1, grok 0). Cột `NLChonModel` **sạch trên cả năm provider**.
+
+### Nợ MỚI lượt này lôi ra (chưa trả)
+
+Trong `argsChoBuoc`, nhánh *"provider KHÔNG có rào quyền nào"* **gán đè** lên biến
+`canhBao`. Một provider vừa không-có-rào-quyền vừa chưa-đo-model sẽ **mất câu cảnh
+báo về model**. Hôm nay không provider nào rơi vào cả hai ô cùng lúc, nên nó chưa
+cắn được ai — ghi lại đúng vì đó là lý do duy nhất nó chưa cắn.
