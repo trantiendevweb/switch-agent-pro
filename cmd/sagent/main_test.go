@@ -131,3 +131,34 @@ func TestCoLenhNangLucGoDuoc(t *testing.T) {
 		t.Fatalf("lệnh `nang-luc` gắn nhầm action %q", c.action)
 	}
 }
+
+// Cot danh tinh KHONG duoc doc "rong" thanh "chua dang nhap".
+//
+// Antigravity tra danh tinh rong MOT CACH CO Y (antigravity.go:88). Ghep rong
+// voi "chua dang nhap" lam dong `sagent ds` tu mau thuan: cot danh tinh in
+// "(chua dang nhap)" ngay canh cot token in "san sang".
+//
+// Ngay 21/08 dung dong do lam mat mot vong dieu tra. Chu du an noi "bua toi
+// dang nhap antigravity roi ma", con man hinh thi bao chua - hai ben deu dung,
+// vi do la HAI CAU HOI KHAC NHAU: doc duoc danh tinh khong, va co token khong.
+func TestNhanDanhTinhKhongLanLonHaiCauHoi(t *testing.T) {
+	for _, c := range []struct {
+		ten     string
+		id      string
+		coToken bool
+		muon    string
+	}{
+		{"doc duoc danh tinh thi in nguyen", "ai@example.com", true, "ai@example.com"},
+		{"co token ma khong doc duoc danh tinh", "", true, "(chưa đọc được danh tính)"},
+		{"khong token that", "", false, "(chưa đăng nhập)"},
+		// Truong hop nay khong nen xay ra, nhung neu xay ra thi danh tinh doc
+		// duoc van la thong tin that - dung nuot no di.
+		{"co danh tinh ma mat token", "ai@example.com", false, "ai@example.com"},
+	} {
+		t.Run(c.ten, func(t *testing.T) {
+			if got := nhanDanhTinh(c.id, c.coToken); got != c.muon {
+				t.Errorf("nhanDanhTinh(%q, %v) = %q, muon %q", c.id, c.coToken, got, c.muon)
+			}
+		})
+	}
+}

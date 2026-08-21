@@ -203,6 +203,31 @@ func printEvents(bus *events.Bus) func() {
 	return func() { cancel(); <-done }
 }
 
+// nhanDanhTinh chọn chữ cho cột danh tính.
+//
+// VÌ SAO KHÔNG chỉ kiểm `id == ""`: Antigravity trả danh tính RỖNG một cách CỐ Ý
+// (`internal/provider/antigravity.go:88` — sau khi đăng nhập, không file nào
+// trong ~/.gemini mang email mới, nên trả rỗng còn hơn đoán). Ghép "rỗng" với
+// "chưa đăng nhập" làm dòng đó TỰ MÂU THUẪN: cột danh tính in "(chưa đăng nhập)"
+// ngay cạnh cột token in "sẵn sàng".
+//
+// Ngày 21/08 đúng dòng này làm mất một vòng điều tra: `antigravity:may` hiện
+// "(chưa đăng nhập)" nên bị đọc thành chưa đăng nhập, trong khi câu hỏi quyết
+// định là Credential Manager có khoá `gemini:antigravity` hay không — và lúc đó
+// nó THẬT SỰ không có, nên kết luận tình cờ đúng vì một lý do sai. Sau khi đăng
+// nhập lại, khoá có mặt mà dòng vẫn in y hệt.
+//
+// "Không đọc được danh tính" và "không có token" là HAI chuyện khác nhau.
+func nhanDanhTinh(id string, coToken bool) string {
+	if id != "" {
+		return id
+	}
+	if coToken {
+		return "(chưa đọc được danh tính)"
+	}
+	return "(chưa đăng nhập)"
+}
+
 // ---------------------------- hồ sơ ----------------------------
 
 func cmdList(args []string) {
@@ -220,10 +245,7 @@ func cmdList(args []string) {
 	fmt.Println("  Tài khoản AI trên máy này")
 	fmt.Println()
 	for i, p := range list {
-		id, tok, mark := p.Identity, "chưa đăng nhập", " "
-		if id == "" {
-			id = "(chưa đăng nhập)"
-		}
+		id, tok, mark := nhanDanhTinh(p.Identity, p.HasToken), "chưa đăng nhập", " "
 		if p.HasToken {
 			tok = "sẵn sàng"
 		}

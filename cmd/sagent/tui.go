@@ -153,10 +153,7 @@ func printMenu(list []api.Profile, running, hong []store.Session) {
 	fmt.Println("  Tài khoản AI trên máy này")
 	fmt.Println()
 	for i, p := range list {
-		id := p.Identity
-		if id == "" {
-			id = "(chưa đăng nhập)"
-		}
+		id := nhanDanhTinh(p.Identity, p.HasToken)
 		tok := "chưa đăng nhập"
 		if p.HasToken {
 			tok = "sẵn sàng"
