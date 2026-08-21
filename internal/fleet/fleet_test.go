@@ -262,7 +262,10 @@ func TestFanOutKhongNoiChepTokenKhiAdapterKhongCoFileRieng(t *testing.T) {
 }
 
 // Provider CÓ file riêng: câu cảnh báo cũ phải còn nguyên — token thật sự bị
-// nhân ra N bản và hành vi refresh đồng thời thì CHƯA ĐO.
+// nhân ra N bản, và ĐÃ ĐO 20/08 rằng nhà cung cấp XOAY VÒNG refresh token, nên
+// MỘT bản refresh là các bản kia chết. (Cuộc đua N tiến trình cùng refresh một
+// lúc thì vẫn chưa đo — nhưng phép đo 20/08 cho thấy không cần tới cuộc đua đó
+// mới hỏng.)
 func TestFanOutVanCanhBaoChepTokenKhiAdapterCoFileRieng(t *testing.T) {
 	db, bus, a := setup(t)
 	ch, huy := bus.Subscribe(256)

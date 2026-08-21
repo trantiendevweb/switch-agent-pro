@@ -23,9 +23,16 @@ import (
 // Bước 3 là chỗ hỏng, và bài này canh đúng nó: `Clone` không được hồi sinh một
 // token cũ đè lên bản mới hơn.
 //
-// Chú ý phạm vi: bài này KHÔNG khẳng định nhà cung cấp có xoay vòng refresh
-// token hay không — cái đó vẫn CHƯA ĐO. Nó chỉ khẳng định công refresh không bị
-// đánh rơi, và đó là điều đúng bất kể nhà cung cấp làm gì.
+// Chú ý phạm vi: bài này KHÔNG dựa vào chuyện nhà cung cấp có xoay vòng refresh
+// token hay không. Nó chỉ khẳng định công refresh không bị đánh rơi, và đó là
+// điều đúng bất kể nhà cung cấp làm gì.
+//
+// ĐÃ ĐO 20/08/2026 (docs/DO-LUONG.md, mục "ĐÃ ĐO: nhà cung cấp XOAY VÒNG refresh
+// token"): nhà cung cấp CÓ xoay vòng — ép bản clone refresh thì refresh token
+// đổi `5d708911` → `1aa28b8c`, và bản cũ trả đúng câu "OAuth session expired and
+// could not be refreshed". Nên bước 3 ở trên không chỉ là "hồi sinh token cũ":
+// nó hồi sinh một token đã CHẾT. Bài này vì thế còn quan trọng hơn lúc viết,
+// không phải phòng xa quá mức.
 
 func TestCloneKhongHoiSinhTokenCu(t *testing.T) {
 	_, fakeBase := fakeHome(t)

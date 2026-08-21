@@ -159,11 +159,13 @@ func (cursor) ArgsThuMuc(dir string) []string { return nil }
 
 func (cursor) ArgsHoSo(string) []string { return nil }
 
-// ModelArgs: `--model <model>` — có trong `--help` bản 2026.08.11 (help nêu ví
-// dụ: gpt-5, sonnet-4-thinking). CHƯA chạy thật để xác nhận nó ĐỔI model đúng,
-// nên bảng năng lực vẫn khai ChuaDo — nhưng cờ thì trả về, vì truyền nó là
-// chuyện vô hại: sai tên model thì CLI báo lỗi ngay chứ không âm thầm chạy
-// model khác.
+// ModelArgs: `--model <model>` — ĐÃ CHẠY THẬT 21/08/2026 trên bản 2026.08.11.
+//
+// Truyền một tên model không tồn tại thì CLI TỪ CHỐI dòng lệnh và liệt kê model
+// hợp lệ ("Cannot use this model: … Available models: auto, gpt-5.3-codex,
+// composer-2.5, claude-opus-5-thinking-high, …"). Tức cờ ĐƯỢC NHẬN và CÓ HIỆU
+// LỰC, không bị nuốt im lặng — nên bảng năng lực khai `Duoc(NLChonModel)`.
+// Xem docs/DO-LUONG.md, mục 21/08 "Đ3: Cursor".
 func (cursor) ModelArgs(model string) []string { return []string{"--model", model} }
 
 // DocKetQua: đọc dòng `{"type":"result"}` của `--output-format stream-json` —
