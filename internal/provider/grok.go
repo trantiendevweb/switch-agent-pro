@@ -243,8 +243,15 @@ func (grok) NangLuc() []NangLuc {
 		Duoc(NLCoTuHoSo, "đọc defaultModel trong .grok/user-settings.json của CHÍNH hồ sơ đang "+
 			"chạy rồi ép thành `-m`; không ép thì mọi bước Grok hỏng lặng lẽ vì grok in lỗi 503 "+
 			"ra như một câu trả lời bình thường và bước vẫn tính là xong"),
+		// ĐÃ ĐO LẠI 21/08 BẰNG CLI THẬT (grok-cli 1.0.1, xem
+		// ketqua_grok_e2e_test.go): định dạng NDJSON VẪN CÒN, docDuoc=true. Nhưng
+		// câu trả lời đọc ra lại là chính lỗi HTTP 410 — đọc được BẢN GHI không
+		// có nghĩa CLI còn chạy được. Hai chuyện khác nhau, đừng gộp.
 		Duoc(NLKetQuaCoCauTruc, "docKetQuaGrok đọc bản ghi NDJSON — lá chắn chống chạy quẩn sinh "+
-			"ra vì Grok mà trước đó không bao giờ chạy được cho Grok"),
+			"ra vì Grok mà trước đó không bao giờ chạy được cho Grok. Đo 21/08 bằng CLI THẬT "+
+			"(grok-cli 1.0.1, mã thoát 0): đọc được cả hai dòng NDJSON. CẢNH BÁO: câu trả lời "+
+			"đọc ra lại là lỗi \"410 Live search is deprecated\" — Grok in lỗi API như một câu "+
+			"trả lời bình thường nên CoLoi=false và PhanLoaiChet xếp lượt hỏng đó là `done`"),
 		Duoc(NLTachTaiKhoan, "apiKey + baseURL nằm trong .grok/user-settings.json dưới "+
 			"USERPROFILE; chạy trong HOME giả thì CLI báo \"API key required\""),
 		Khong(NLHanToken, "API key KHÔNG có hạn dùng đọc được từ file — đây là provider duy nhất "+
