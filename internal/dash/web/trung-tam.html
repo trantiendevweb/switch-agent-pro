@@ -1646,7 +1646,10 @@ function capNhatVongSo(){
   const chay = ss.filter(s => s.state === 'running').length;
   const tran = (hamDoi && hamDoi.maxParallel) || 4;
   let tok = 0;
-  ss.forEach(s => { tok += (s.tokens || 0); });
+  // Tên trường phải KHỚP sessionDTO trong internal/dash/server.go: `tokensIn`,
+  // `tokensOut`, `costUsd`. Đọc tên không tồn tại thì `|| 0` nuốt luôn lỗi và ô
+  // này im lặng đứng ở 0 mãi mãi — xem ghi chú ở capNhatHudSo.
+  ss.forEach(s => { tok += (s.tokensIn || 0) + (s.tokensOut || 0); });
   if(tok > tokenDinh) tokenDinh = tok;
   const xong = flowSteps.filter(s => s.state === 'done').length;
   const ti = {
@@ -2040,8 +2043,16 @@ function capNhatHudSo(){
   const chay = ss.filter(s => s.state === 'running').length;
   let tok = 0, tien = 0;
   ss.forEach(s=>{
-    tok  += (s.tokens || 0);
-    tien += (s.costUSD || s.cost || 0);
+    // ĐỌC ĐÚNG TÊN TRƯỜNG CỦA sessionDTO. Bản cũ đọc `s.tokens`, `s.costUSD`,
+    // `s.cost` — KHÔNG cái nào tồn tại, nên hai ô này đứng ở "—" VĨNH VIỄN, kể
+    // cả khi số đã có. `|| 0` làm lỗi im lặng: không NaN, không undefined, chỉ
+    // là một dấu gạch trông y hệt "chưa đo được".
+    //
+    // Mục C4 của docs/SO-NO-DO-LUONG.md đã nêu ĐÚNG cái bẫy này, kể cả đúng hai
+    // cái tên `s.cost` và `s.tokens`. Mặt 2D (index.html) đọc đúng từ đầu; chỉ
+    // mặt 3D lệch — và lệch suốt vì không có gì đối chiếu hai mặt với DTO.
+    tok  += (s.tokensIn || 0) + (s.tokensOut || 0);
+    tien += (s.costUsd || 0);
   });
   const xong = flowSteps.filter(s => s.state === 'done').length;
   $('so-phien').textContent = String(chay);
