@@ -269,11 +269,22 @@ diễn ra**, và kết luận ở mục A3 (**máy sẽ còn reboot**) **không 
    file xuất hiện. Đây đúng chỗ đã hỏng: suốt thời gian qua file vẫn sinh ra đều
    và mọi đèn vẫn xanh.
 
-2. **Trong lúc chưa quyết đích: ít nhất làm cho nó ĐỎ.** Hiện không có gì báo khi
-   backup không rời máy. Một phép kiểm rẻ — so `LastWriteTime` của file `.enc`
-   mới nhất với thời điểm hiện tại, hoặc kiểm `OneDrive.exe` có tồn tại không —
-   đủ để biến "hỏng mà đèn xanh" thành "hỏng và đèn đỏ". Không cần thông tin
-   đăng nhập nào.
+2. ✅ **ĐÃ LÀM 21/08 — nó đã ĐỎ.** `tools/canh-backup.ps1` kiểm hai thứ:
+   `OneDrive.exe` có tồn tại/có chạy không, và file `.enc` mới nhất có quá
+   `-NguongGio` (mặc định 30) không. Có vấn đề thì **báo Telegram qua đúng đường
+   `sagent tele` đã cấu hình** (không dựng thông tin đăng nhập mới) và **thoát
+   khác 0**.
+
+   Chạy định kỳ bằng task **`TNS canh backup roi may`** — hằng ngày 05:00, sau
+   nhịp backup 04:00, `LogonType=S4U` nên chạy cả khi không ai đăng nhập.
+
+   Xem thử ngay, không gửi tin: `.\tools\canh-backup.ps1 -Kho`
+
+   Chạy thật lúc 21/08 16:16 → `LastTaskResult = 1`, tin đã gửi. **Đây là lần
+   đầu tình trạng này phát ra tín hiệu** — trước đó nó im lặng suốt.
+
+   Bài canh này **không sửa được gốc**. Nó chỉ bảo đảm lần sau không ai phải
+   tình cờ phát hiện.
 3. **Bật `RunAsPPL`** (cần khởi động lại máy).
 
 ## F. Nguyên tắc chẩn đoán của dự án này

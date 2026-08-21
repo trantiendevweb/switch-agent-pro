@@ -198,7 +198,8 @@ Yêu cầu bắt buộc:
    được điều đó thì đừng bảo là đã xong.
 2. Chạy `go build ./...` và `go test ./...`, phải xanh.
 3. XONG THÌ COMMIT lên nhánh hiện tại:
-   git add -A && git commit -m "<mô tả ngắn>"
+   git add -A
+   git commit -m "<mô tả ngắn>"
    Không commit thì người soi ở worktree khác KHÔNG thấy việc bạn làm.
 4. Trả lời: tên nhánh, các file đã sửa, và những gì CHƯA làm được (nói thẳng)."""
 
@@ -219,7 +220,8 @@ Yêu cầu bắt buộc:
 1. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra.
 2. Chạy `go build ./...` và `go test ./...`, phải xanh.
 3. XONG THÌ COMMIT lên nhánh hiện tại:
-   git add -A && git commit -m "<mô tả ngắn>"
+   git add -A
+   git commit -m "<mô tả ngắn>"
    Không commit thì người soi KHÔNG thấy việc bạn làm.
 4. Trả lời: tên nhánh, các file đã sửa, và những gì CHƯA làm được (nói thẳng)."""
 
@@ -305,7 +307,8 @@ Báo cáo phải trả lời đúng ba câu, không lan man:
 `day la file do agent tao de thu co che`
 
 Rồi COMMIT lên nhánh hiện tại:
-    git add -A && git commit -m "thu co che: them THU-CO-CHE.md"
+    git add -A
+   git commit -m "thu co che: them THU-CO-CHE.md"
 
 Trả lời đúng hai dòng:
 NHANH: <tên nhánh hiện tại, lấy bằng git branch --show-current>
@@ -496,7 +499,7 @@ Trả về nguyên văn phần markdown để dán vào tài liệu, không lờ
       timeout_sec = 2400
       on_failure = "continue"
       prompt = """Bạn làm việc trong một git worktree riêng, nhánh sagent/tns-1.
-MÁY NÀY LÀ WINDOWS, shell là cmd.exe: KHÔNG có ls/cat/grep. Dùng dir/type/findstr,
+MÁY NÀY LÀ WINDOWS. KHÔNG có ls/cat/grep. Dùng dir/type/findstr,
 hoặc tốt nhất là chỉ dùng `git` và `go` vì chúng chạy giống nhau mọi nền.
 
 VIỆC: {{viec_go}}
@@ -506,7 +509,8 @@ Luật bắt buộc, không có ngoại lệ:
 2. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra — không chứng minh
    được điều đó thì đừng bảo là xong.
 3. Chạy `go build ./...` và `go test ./...`, phải XANH.
-4. XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn tiếng Việt>"
+4. XONG THÌ COMMIT: git add -A
+   git commit -m "<mô tả ngắn tiếng Việt>"
    KHÔNG commit thì người soi ở worktree khác không thấy gì, và coi như bạn chưa làm.
 5. Trả lời đúng khuôn:
    NHANH: <git branch --show-current>
@@ -533,7 +537,8 @@ song song với bạn, đụng vào là hỏng việc cả hai.
 Luật:
 1. Viết cho người KHÔNG RÀNH KỸ THUẬT. Không thuật ngữ chưa giải thích.
 2. Mọi lệnh bạn viết ra phải chạy được trên Windows PowerShell, đã kiểm.
-3. XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn>"
+3. XONG THÌ COMMIT: git add -A
+   git commit -m "<mô tả ngắn>"
 4. Trả lời đúng khuôn:
    NHANH: <git branch --show-current>
    COMMIT: <git rev-parse --short HEAD>
@@ -727,7 +732,8 @@ Bắt buộc:
 2. Viết test cho thứ bạn sửa. Test phải ĐỎ khi gỡ phần sửa ra — nói rõ bạn đã
    chứng minh điều đó bằng cách nào.
 3. go build ./... và go test ./... phải XANH.
-4. XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn tiếng Việt>"
+4. XONG THÌ COMMIT: git add -A
+   git commit -m "<mô tả ngắn tiếng Việt>"
    Không commit thì người soi ở worktree khác không thấy gì, coi như chưa làm.
 5. Trả lời: NHANH, COMMIT, DA LAM, CHUA LAM (nói thẳng chỗ chưa xong)."""
 
@@ -741,6 +747,20 @@ Bắt buộc:
       tu_duyet_quyen = true
       timeout_sec = 1800
       on_failure = "continue"
+      # BAY DA CAN, do 21/08 luot #52: buoc nay tung chay
+      #   git add -A && git commit -m "..."
+      # va nhan "The token '&&' is not a valid statement separator in this
+      # version" — vi shell THAT cua antigravity la PowerShell 5.1, KHONG phai
+      # cmd.exe nhu prompt cu khai. Viec da lam xong ma commit truot, nen nhanh
+      # may-1 con thay doi chua commit con phien thi ve ERROR.
+      #
+      # Truy duoc la nho nhat ky phien song sot (goi internal/nhatky). Truoc ban
+      # va do, phien dong la mat sach, va day dung la ca "bao xong ma 0 commit".
+      #
+      # Nay MOI prompt trong file tach `git add -A` va `git commit` thanh HAI
+      # dong roi: chay duoc tren cmd, PowerShell lan bash. Dung `&&` trong prompt
+      # la dat cuoc vao shell cua provider — cuoc do vua thua mot lan.
+      #
       # HOP DONG DAU RA, them 21/08. Truoc do buoc nay KHONG co phai_co: agent
       # tra ve mot cau cut van duoc ghi `done`, y het lo hong cua `soi` o luot
       # #47. Chuoi "COMMIT" lay tu chinh khuon tra loi bat buoc o cuoi prompt
@@ -756,7 +776,8 @@ song song với bạn.
 Viết cho người KHÔNG rành kỹ thuật. Mọi lệnh phải chạy được trên Windows
 PowerShell. Thứ nào bạn không kiểm được thì ghi thẳng là chưa kiểm, đừng đoán.
 
-XONG THÌ COMMIT: git add -A && git commit -m "<mô tả ngắn>"
+XONG THÌ COMMIT: git add -A
+   git commit -m "<mô tả ngắn>"
 Trả lời: NHANH, COMMIT, FILE, CHUA LAM."""
 
     [[flow.doi-4.step]]
