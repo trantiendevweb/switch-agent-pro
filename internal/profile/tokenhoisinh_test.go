@@ -27,6 +27,12 @@ import (
 // là điều đúng bất kể nhà cung cấp làm gì. Hai câu hỏi về nhà cung cấp thì đã
 // đo xong ở chỗ khác: xoay vòng refresh token (20/08) và cuộc đua N-clone cùng
 // refresh (21/08, xem `duarefresh_test.go`).
+//
+// Số đo 20/08 (docs/DO-LUONG.md): nhà cung cấp CÓ xoay vòng — ép bản clone
+// refresh thì refresh token đổi `5d708911` → `1aa28b8c`, và bản cũ trả đúng câu
+// "OAuth session expired and could not be refreshed". Nên bước 3 ở trên không
+// chỉ là "hồi sinh token cũ": nó hồi sinh một token đã CHẾT. Bài này vì thế còn
+// quan trọng hơn lúc viết, không phải phòng xa quá mức.
 
 func TestCloneKhongHoiSinhTokenCu(t *testing.T) {
 	_, fakeBase := fakeHome(t)

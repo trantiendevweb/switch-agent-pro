@@ -262,7 +262,8 @@ func TestFanOutKhongNoiChepTokenKhiAdapterKhongCoFileRieng(t *testing.T) {
 }
 
 // Provider CÓ file riêng: câu cảnh báo cũ phải còn nguyên — token thật sự bị
-// nhân ra N bản.
+// nhân ra N bản, và ĐÃ ĐO 20/08 rằng nhà cung cấp XOAY VÒNG refresh token, nên
+// MỘT bản refresh là các bản kia chết.
 //
 // Đo 21/08 (ô Đ5) đã đóng nốt nửa còn lại: hai clone cùng refresh một lúc thì
 // ĐÚNG MỘT bản thắng, bản thua nhận "OAuth session expired and could not be

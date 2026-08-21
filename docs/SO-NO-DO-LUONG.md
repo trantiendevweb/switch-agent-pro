@@ -11,6 +11,13 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   ô nợ đều được đặt tên bằng cùng một từ và đều tra được bằng một câu lệnh.
 - **`internal/aiapi/` không có ô nào** (đã kiểm riêng), nên sổ này không phải né
   vùng người khác đang sửa.
+- **Cập nhật 21/08, lượt "dọn sổ nợ"**: đóng **N1** (sửa bình luận trong mã) và
+  **Đ3** (đối chiếu mã thật, không chỉ tiêu đề commit). Sổ này từng lệch với mã
+  vì nó được sửa lúc **00:44** còn commit `bacc137` vào lúc **00:54** — sổ viết
+  trước, mã đổi sau. Bài học đi kèm: **tiêu đề commit không phải bằng chứng**;
+  bằng chứng là hàm trả về gì và bảng năng lực khai gì. Lần này đã mở
+  `internal/provider/cursor.go` và hai chốt trong `internal/api/api.go` ra đọc
+  trước khi tin tiêu đề. Xem `docs/BAO-CAO-DON-SO-NO.md`.
 
 ## Vì sao cần sổ này khi đã có `sagent nang-luc --chua-do`
 
@@ -103,7 +110,41 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 </details>
 
-## Đ3. Cursor CHƯA ĐO cờ tự-duyệt-quyền
+## ~~Đ3~~ ✅ ĐÃ ĐÓNG 21/08 — Cursor cờ tự-duyệt-quyền: ĐÃ CHẠY THẬT
+
+> **Kết quả**: `--trust` MỘT MÌNH đã đủ để agent ghi file trong workspace —
+> không cần `--force`/`--yolo`. Giữ nấc hẹp nhất, cùng lối chọn với `--approve-for-me`
+> của Codex ở Đ1. Đã đổi mã. Xem `docs/DO-LUONG.md`, mục 21/08 *"Đ3: Cursor"*.
+>
+> **Bằng chứng đã đối chiếu với mã, không chỉ với tiêu đề commit** (kiểm ngày
+> 21/08, sau khi thấy sổ sửa lúc 00:44 còn commit `bacc137` lúc 00:54):
+>
+> - `internal/provider/cursor.go:150` — `ArgsTuDuyetQuyen()` trả
+>   `([]string{"--trust"}, true)`, tức `daDo == true`. Không còn `(nil, false)`.
+> - `internal/provider/cursor.go:188-189` — bảng năng lực khai
+>   `Duoc(NLTuDuyetQuyen, "--trust (đo 21/08, CHẠY THẬT trên 2026.08.11) …")`.
+>   Bảng khai và hàm thật **khớp nhau**, nên `internal/api/tuduyetquyen_test.go:61-72`
+>   không có gì để bắt.
+> - Hai chốt ở `internal/api/api.go:1002-1005` và `internal/api/api.go:1320-1322`
+>   giờ **cho Cursor qua một cách hợp lệ**: chúng chặn theo `daDo`, và `daDo` đã
+>   là `true` vì có phép đo thật đứng sau, không phải vì ai đó khai bừa.
+> - `git show bacc137 --stat`: 4 file, +234/−16 — `cursor.go`, `ketqua_cursor.go`,
+>   `ketqua_cursor_test.go`, `DO-LUONG.md`. Có mã, có bài kiểm, có phép đo.
+>
+> **Sai lầm nền của ô này** (đáng giữ lại): bảng năng lực cũ ghi *"máy này không
+> cài cursor-agent"*, nhưng `Get-Command cursor-agent` cho ra đường dẫn thật, bản
+> 2026.08.11. Ghi chú đúng vào lúc viết, sai vào lúc đọc — **một dòng CHƯA ĐO
+> không tự hết hạn**.
+>
+> **Cùng commit đó còn đóng thật ba ô nữa của Cursor**, nhưng sổ này chưa viết
+> lại chúng vì lượt làm việc được giao đúng ô Đ3: **C1** (`DocKetQua` →
+> `docKetQuaCursor`, `cursor.go:173` + `Duoc(NLKetQuaCoCauTruc)` ở `:193`),
+> **C3** (`ModelArgs` → `--model`, `cursor.go:169` + `Duoc(NLChonModel)` ở `:184`),
+> **C6** (`ArgsThuMuc` → `Khong(NLThuMuc)`, `cursor.go:158` + `:190`).
+> Xem ghi chú "⚠ ĐÃ LẠC HẬU" ở đầu ba mục đó.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/provider/cursor.go:140-141` (`ArgsTuDuyetQuyen` trả
   `(nil, false)`), `internal/provider/cursor.go:164` (`Chua(NLTuDuyetQuyen, ...)`).
@@ -123,6 +164,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 - **Chặn được vì**: `internal/api/tuduyetquyen_test.go:61-72` bắt bảng khai lệch
   với `ArgsTuDuyetQuyen()` thật; `internal/api/quyen_test.go:48-52` bắt việc chạy
   tiếp khi chưa đo. Xoá hai bài đó là mở lại cửa.
+
+</details>
 
 ## Đ4. Antigravity và Cursor CHƯA ĐO hạn token
 
@@ -202,6 +245,11 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 ## C1. Codex và Cursor CHƯA ĐO cách đọc kết quả có cấu trúc
 
+> ⚠ **ĐÃ LẠC HẬU MỘT NỬA (đối chiếu mã 21/08)**: phần **Cursor** đã đóng trong
+> commit `bacc137` — `internal/provider/cursor.go:173` gọi `docKetQuaCursor`, và
+> bảng khai `Duoc(NLKetQuaCoCauTruc)` ở `:193`. Phần **Codex** vẫn mở đúng như mô
+> tả dưới. Mục này chưa viết lại vì lượt làm việc được giao đúng ô Đ3 và N1.
+
 - **Ở đâu**: `internal/provider/codex.go:226,248` và
   `internal/provider/cursor.go:148,167` — cả hai `DocKetQua` trả
   `(KetQua{}, false)`.
@@ -247,6 +295,11 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   thì ta biết vào **ngày đó**, không phải ba tuần sau.
 
 ## C3. Ba provider CHƯA ĐO cách chọn model từ dòng lệnh
+
+> ⚠ **ĐÃ LẠC HẬU MỘT PHẦN (đối chiếu mã 21/08)**: **Cursor** đã đóng trong commit
+> `bacc137` — `internal/provider/cursor.go:169` trả `--model <model>`, bảng khai
+> `Duoc(NLChonModel)` ở `:184`, bằng chứng là CLI TỪ CHỐI tên model sai và liệt kê
+> model hợp lệ. Còn lại **hai** provider (Antigravity, Codex), không phải ba.
 
 - **Ở đâu**: `internal/provider/antigravity.go:137-140,151`,
   `internal/provider/codex.go:227-230,241`,
@@ -311,6 +364,12 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 ## C6. Cursor CHƯA ĐO cách khai thư mục làm việc
 
+> ⚠ **ĐÃ LẠC HẬU (đối chiếu mã 21/08)**: đóng trong commit `bacc137`, và đóng
+> theo chiều **KhongLamDuoc**: `--help` bản 2026.08.11 không có `--cwd` lẫn `-C`,
+> nên `internal/provider/cursor.go:158` trả `nil` một cách CÓ CĂN CỨ và bảng khai
+> `Khong(NLThuMuc)` ở `:190`. Không cần cờ: `fleet` đã chạy tiến trình con với
+> `workDir` là worktree của phiên. "Đã đo, không có" khác hẳn "chưa ai đo".
+
 - **Ở đâu**: `internal/provider/cursor.go:143-144` (`ArgsThuMuc` trả `nil`),
   `internal/provider/cursor.go:165`.
 - **Nó nói gì**: *"CHƯA ĐO: máy này không cài cursor-agent"*.
@@ -365,7 +424,29 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 # ⚪ NỢ NGƯỢC — đã đo rồi mà sổ chưa xoá
 
-## N1. Một bình luận vẫn nói rotation "CHƯA ĐO", nhưng đã đo từ 20/08
+## ~~N1~~ ✅ ĐÃ ĐÓNG 21/08 — bình luận rotation đã sửa cho khớp phép đo 20/08
+
+> **Đã trả**: `internal/profile/tokenhoisinh_test.go:26-35` không còn câu *"cái
+> đó vẫn CHƯA ĐO"*. Bình luận mới giữ nguyên phạm vi thật của bài kiểm (nó không
+> **dựa vào** rotation), rồi ghi thẳng phép đo 20/08 kèm vân tay
+> `5d708911` → `1aa28b8c` và nguyên văn *"OAuth session expired and could not be
+> refreshed"* — và nói ra hệ quả mà người đọc cần: bước 3 hồi sinh một token đã
+> **chết**, nên bản sửa `Clone` → `SyncBackTokens` là cần thiết, không phải
+> phòng xa quá mức.
+>
+> **Sửa thêm một chỗ cùng loại** tìm được bằng chính câu lệnh quét:
+> `internal/fleet/fleet_test.go:264-268`. Bình luận đầu bài viện lý do *"hành vi
+> refresh đồng thời thì CHƯA ĐO"* để giữ câu cảnh báo, trong khi thân bài
+> (dòng 284-289) đã đòi câu cảnh báo phải chứa chữ **XOAY VÒNG** — tức đầu bài và
+> thân bài nói ngược nhau. Nay đầu bài nói đúng cái đã đo, và vẫn ghi rõ phần
+> **chưa** đo (cuộc đua N tiến trình cùng refresh — ô Đ5) thay vì gộp hai thứ đó
+> làm một.
+>
+> Ô Đ5 vẫn **mở**: đóng N1 là đóng chuyện *rotation có xảy ra không*, không phải
+> chuyện *N bản cùng refresh thì ai thắng*.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/profile/tokenhoisinh_test.go:26-28`.
 - **Nó nói gì**: *"bài này KHÔNG khẳng định nhà cung cấp có xoay vòng refresh
@@ -386,6 +467,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 - **Cách trả**: sửa hai câu đó thành "đã đo 20/08, nhà cung cấp XOAY VÒNG; bài này
   vẫn đúng bất kể điều đó, vì nó chỉ khẳng định công refresh không bị đánh rơi".
   **Sổ này không sửa** — luật của lượt làm việc này là chỉ tạo đúng một file.
+
+</details>
 
 ---
 
@@ -432,9 +515,11 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
    câu hỏi cũ: phép đo lôi ra hai lỗi thật trong `SyncBackTokens` và
    `PhanLoaiChet`. Nửa còn lại của cái bẫy đã cắn một lần thì cắn theo một kiểu
    khác hẳn nửa đầu.
-3. **N1** (xoá dòng nợ ngược) — sửa hai câu bình luận, không phải đo gì.
-4. **Đ4 Cursor**, **Đ3**, **C6** — cùng một rào chắn: máy dev chưa cài
-   `cursor-agent`. Cài một lần là đóng được ba ô.
+3. ~~**N1**~~ — **đã trả 21/08**, chỉ sửa bình luận, không phải đo gì.
+4. **Đ4 Cursor** — rào chắn cũ (*"máy dev chưa cài cursor-agent"*) **sai**: máy
+   CÓ `cursor-agent` bản 2026.08.11. ~~Đ3~~ và ~~C6~~ đã đóng nhờ đúng phát hiện
+   đó (commit `bacc137`), nên ô Cursor còn lại chỉ là hạn token: cần dựng được
+   cảnh token sắp hết hạn rồi đọc `auth.json` xem trường nào đổi.
 5. **C5** (ngưỡng chạy quẩn) — đo từ bản ghi đã có, không cần chạy gì mới.
 6. **C4** (token/chi phí phiên CLI) — cần thêm trường vào DTO, đụng nhiều mặt.
 7. **Đ4 Antigravity** — cân nhắc **không đóng**, đổi sang `KhongLamDuoc` kèm lý
@@ -446,4 +531,10 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
   có nhiều mục "còn treo"; sổ chỉ nhắc tới khi một dòng Go trỏ vào.
 - **Không đo gì mới.** Mọi con số ở đây chép lại từ phép đo đã ghi trong mã hoặc
   trong `docs/DO-LUONG.md`. Không có suy luận nào được nâng lên thành phép đo.
-- **Không sửa file nào khác.** Ô N1 nhìn thấy được nhưng để nguyên tại chỗ.
+- **Bản quét gốc không sửa file nào khác** — luật của lượt lập sổ là chỉ tạo
+  đúng một file, nên ô N1 nhìn thấy được mà để nguyên tại chỗ. **Lượt 21/08 sau
+  đó đã trả N1 trong mã** (`internal/profile/tokenhoisinh_test.go`,
+  `internal/fleet/fleet_test.go`); giới hạn trên chỉ còn đúng với bản quét đầu.
+- **Ba ô C1/C3/C6 mới chỉ được gắn nhãn "đã lạc hậu", chưa viết lại theo khuôn
+  đóng.** Nội dung mô tả bên dưới các nhãn đó vẫn là văn bản cũ, còn nói Cursor
+  chưa đo — đọc nhãn trước, đừng đọc thẳng gạch đầu dòng.
