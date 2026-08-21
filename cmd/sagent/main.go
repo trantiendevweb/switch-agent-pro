@@ -765,6 +765,9 @@ func cmdHelp() {
     sagent fleet <provider:tên> --copies N [--worktree] -- <lệnh>
                                 bật N phiên song song trên MỘT tài khoản
                                 --worktree: mỗi phiên một git worktree riêng
+                                --tu-duyet-quyen: cho agent GHI FILE. Thiếu cờ
+                                này phiên CHỈ ĐỌC — giao việc sửa mã thì nó vẫn
+                                báo "xong" với 0 commit mà không báo lỗi
     sagent clone <provider:tên> --copies N
                                 chỉ tạo thư mục cấu hình, không chạy
     sagent status               phiên nào đang chạy
@@ -825,7 +828,7 @@ func cmdHelp() {
 
   Ví dụ:
 
-    sagent fleet claude:phu --copies 4 --worktree -- -p "sửa lỗi trong repo"
+    sagent fleet claude:phu --copies 4 --worktree --tu-duyet-quyen -- -p "sửa lỗi trong repo"
 
 `)
 }
