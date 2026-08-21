@@ -1,0 +1,5 @@
+# master-plan.html là ĐẦU RA của tools/sinhkehoach, và bộ sinh luôn viết LF.
+# Repo này bật core.autocrlf=true, nên nếu không ghim ở đây thì mỗi lần checkout
+# git sẽ đổi file thành CRLF — file trên đĩa khác bản sinh ở TỪNG dòng, và
+# internal/dash/kehoach_sinh_test.go đỏ trên máy vừa clone dù không ai sửa gì.
+master-plan.html text eol=lf

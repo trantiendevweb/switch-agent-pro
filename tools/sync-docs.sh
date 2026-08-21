@@ -11,10 +11,14 @@ python tools/md2html.py docs/MASTER-PLAN.md master-plan.html "Switch-Agent-Pro �
 
 mkdir -p internal/dash/web/docs
 cp plan.html        internal/dash/web/docs/index.html
-cp master-plan.html internal/dash/web/docs/master-plan.html
 cp docs/MASTER-PLAN.md internal/dash/web/docs/MASTER-PLAN.md
 
-# Bản nhúng khác bản gốc hai chỗ, và đều bắt buộc:
+# master-plan.html của bản NHÚNG không chép từ gốc nữa: nó do bộ sinh Go dựng
+# thẳng từ bản .md vừa chép, và internal/dash/kehoach_sinh_test.go so từng byte.
+# Chép đè bản Python vào đây là để test đỏ ngay lượt sau.
+go run ./tools/sinhkehoach/cmd/sinhkehoach
+
+# index.html vẫn là bản chép, nên vẫn phải vá tay hai chỗ, và đều bắt buộc:
 #   1. nav trỏ về dashboard thay vì file rời;
 #   2. font lấy từ web/vendor chứ KHÔNG từ Google Fonts — asset nhúng phải vẽ
 #      được khi máy rời mạng (internal/dash/offline_asset_test.go giữ điều đó).
@@ -43,9 +47,6 @@ def thut(khoi, dem):
 for p, dem, olds in [
   ('internal/dash/web/docs/index.html', u'  ',
    [('<a href="index.html">3D</a>', '<a href="/">Dashboard ↗</a>')]),
-  ('internal/dash/web/docs/master-plan.html', u'',
-   [('<a href="plan.html">Plan</a><a href="index.html">3D</a>',
-     '<a href="./">Plan</a><a href="/">Dashboard ↗</a>')]),
 ]:
     s = io.open(p, encoding='utf-8').read()
     for a, b in olds:
@@ -57,4 +58,4 @@ for p, dem, olds in [
     io.open(p, 'w', encoding='utf-8', newline='').write(s)
 PY
 
-echo "  ✓ đã đồng bộ docs vào bản nhúng — nhớ build lại: go build -o sagent ./cmd/sagent"
+echo "  da dong bo docs vao ban nhung — nho build lai: go build -o sagent ./cmd/sagent"
