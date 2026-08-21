@@ -202,13 +202,38 @@ Chạy `sagent fleet --copies 1` hai lần **không** tạo ra hai worktree đ�
 (Đây là bẫy khác với worktree dở dang do bước trước chết — cái đó và lệnh dọn
 `sagent clean` nằm ở [`KHAC-PHUC-SU-CO.md`](KHAC-PHUC-SU-CO.md) §4.)
 
-### D3. Nhật ký phiên fleet KHÔNG truy được sau khi phiên kết thúc
+### D3. ~~Nhật ký phiên fleet KHÔNG truy được sau khi phiên kết thúc~~ — ✅ ĐÃ VÁ 21/08
 
-Phiên đóng là nhật ký mất. Không có cách lấy lại.
+> **Bẫy này đã được gỡ**, bản vá vào `main` lúc 21/08 chiều (merge `417c133`, gốc
+> `a8bd2e6`). Mô tả cũ giữ lại bên dưới vì nó vẫn đúng với **mọi phiên chạy bằng
+> bản `sagent` trước bản vá** — nhật ký của các phiên đó đã mất thật, không lấy lại được.
 
-**Vì vậy: mọi phiên fleet phải được YÊU CẦU ghi báo cáo thành FILE trong repo rồi COMMIT.**
-Bằng chứng phải nằm trong `git`, không nằm trong bộ nhớ phiên. Không commit thì coi như
-phiên đó không có bằng chứng gì cả.
+**Nay nhật ký nằm ở `~/.ai-accounts/.nhat-ky/`**, ngang hàng `state.db` — tức là **sống lâu
+hơn cả worktree lẫn thư mục clone**, và nằm ngoài repo của người dùng.
+
+```powershell
+sagent nhat-ky            # các phiên gần đây, còn đọc lại được không
+sagent nhat-ky <số phiên> # đọc lại một phiên ĐÃ KẾT THÚC
+```
+
+Ba chỗ hỏng cũ đã được đóng, ghi ra để không ai dựng lại:
+
+1. Đường dẫn log cũ là `<thư mục clone>/fleet.log` — **chỉ phụ thuộc số bản clone**. Đọc
+   `state.db` thật: **20 phiên gần nhất chỉ ứng với 6 đường dẫn log**. Sáu phiên
+   `claude:tns#1` cùng trỏ vào **một** file; `sagent nhat-ky 167` trả về nội dung của
+   phiên **#173** đang chạy. Bằng chứng của #167 **không còn tồn tại**.
+2. `os.Create` **cắt trắng** file mỗi lần bật phiên mới.
+3. `sagent clean` **xoá nguyên thư mục clone** — lệnh dọn dẹp sau một lượt hỏng chính là
+   lệnh phá tang chứng.
+
+Tên file nay mang **địa chỉ + mốc thời gian tới mili giây**, không mang số phiên — vì số
+phiên chỉ được cấp **sau** khi tiến trình đã bật, và đổi tên một file đang mở thì hỏng trên
+Windows. Ánh xạ "số phiên → đường dẫn" nằm ở cột `log` của sổ.
+
+**Dù vậy, thói quen cũ vẫn giữ nguyên: mọi phiên fleet vẫn phải được YÊU CẦU ghi báo cáo
+thành FILE trong repo rồi COMMIT.** Nhật ký nói *agent đã nói gì*; `git` nói *mã đã đổi gì*.
+Hai thứ đó khác nhau, và khi lệch nhau thì **tin `git`** (mục F). Nhật ký là để truy nguyên
+một phiên hỏng, **không phải** để thay bằng chứng.
 
 ---
 
