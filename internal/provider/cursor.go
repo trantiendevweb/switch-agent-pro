@@ -1,11 +1,13 @@
 package provider
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -85,7 +87,22 @@ func (cursor) HasToken(configDir string) bool {
 	return err == nil && fi.Size() > 0
 }
 
-// Identity đọc email từ auth.json.
+// Identity đọc email từ auth.json — nhưng ĐO 21/08/2026 thì KHÔNG CÓ email ở đó.
+//
+// File auth.json thật có ĐÚNG hai khoá, `accessToken` và `refreshToken` (xem
+// TokenExpiry). Không `email`, không `userEmail`, không `user_email`. Trong
+// payload JWT cũng không: `sub` là một mã đục dạng `google-oauth|<id>`, không
+// phải địa chỉ thư. Nên trên hồ sơ ĐANG ĐĂNG NHẬP THẬT, hàm này trả `""`.
+//
+// Vòng lặp khoá dưới đây GIỮ LẠI có chủ đích: nó không tốn gì, và ngày một bản
+// CLI mới ghi thêm trường email thì nó đọc được ngay. Nhưng bảng năng lực đã
+// hạ NLDanhTinh xuống ChuaDo — khai xanh cho một hàm luôn trả rỗng là đúng thứ
+// mà `KiemNangLuc` sinh ra để chặn, chỉ tiếc là phép dò của NLDanhTinh một
+// chiều nên nó không bắt được ca này.
+//
+// Đường còn lại chưa đo: `cursor-agent status` IN ĐƯỢC email (đã thấy khi đo
+// NLTachTaiKhoan). Đọc danh tính bằng cách chạy CLI con là một đánh đổi khác
+// hẳn đọc file — chưa đo nên chưa làm.
 //
 // CHỈ đọc trường định danh, không bao giờ trả về hay ghi log phần token.
 func (cursor) Identity(configDir string) string {
@@ -105,10 +122,92 @@ func (cursor) Identity(configDir string) string {
 	return ""
 }
 
-// TokenExpiry: CHƯA ĐO. auth.json có thể mang dấu thời gian hết hạn, nhưng chưa
-// dựng được cảnh token sắp hết hạn để xác nhận đọc đúng trường nào. Trả false
-// thay vì đoán — cảnh báo sai giờ còn tệ hơn không cảnh báo.
-func (cursor) TokenExpiry(configDir string) (time.Time, bool) { return time.Time{}, false }
+// TokenExpiry đọc claim `exp` trong JWT của `Cursor\auth.json` — ĐÃ ĐO
+// 21/08/2026 trên hồ sơ ĐĂNG NHẬP THẬT, bản CLI 2026.08.11-e8db854.
+//
+// Rào chắn cũ ("auth.json CÓ THỂ mang dấu thời gian, chưa biết trường nào") đứng
+// trên một chỗ tìm sai: file KHÔNG nằm ở `~/.cursor/auth.json` — chỗ đó không hề
+// tồn tại — mà ở `%APPDATA%\Cursor\auth.json`, đúng chỗ EnvVar và PrivateFiles
+// đã chỉ từ đầu.
+//
+// HÌNH DẠNG FILE, đo chứ không đoán: auth.json có ĐÚNG HAI khoá, `accessToken`
+// và `refreshToken`, cả hai là JWT alg HS256. KHÔNG có trường dấu-thời-gian nào
+// ở tầng ngoài — mốc hết hạn nằm TRONG payload của JWT, y hệt Codex. Nên "đoán
+// tên trường" là ngõ cụt ngay từ đầu: không có trường nào để đoán.
+//
+// Claim đọc được (accessToken và refreshToken giống hệt nhau từng claim một):
+//
+//	iss    https://authentication.cursor.sh
+//	aud    https://cursor.com
+//	scope  openid profile email offline_access
+//	type   session
+//	time   1787022539  = 2026-08-18T03:08:59Z   (lúc đăng nhập)
+//	exp    1792206539  = 2026-10-17T03:08:59Z   (ĐÚNG 60 ngày sau)
+//
+// Vì sao đọc REFRESH token chứ không phải access token: đúng bài học đã trả giá
+// ở claude.go — câu hỏi của người vận hành là "tài khoản này còn chạy được
+// không", và câu đó nằm ở refresh token. Ở Cursor hôm nay hai mốc BẰNG NHAU nên
+// chọn cái nào cũng ra một số; chọn refresh để ngày nhà cung cấp tách hai mốc
+// ra thì hàm này vẫn trả đúng thứ cần trả mà không phải sửa lại.
+//
+// CÒN CHƯA ĐO: token có bị XOAY VÒNG khi refresh hay không (đây mới là thứ cảnh
+// báo hạm đội thật sự sợ). Bằng chứng gián tiếp là CLI chưa hề ghi lại file này:
+// mtime của auth.json vẫn là 2026-08-18 10:08:58 (+07) — đúng giây đăng nhập —
+// trong khi `.cursor/cli-config.json` bị ghi lại lúc 2026-08-21 00:46 bởi chính
+// các lượt chạy thật của ô Đ3. Tức qua ba ngày dùng, cursor-agent không đụng vào
+// file token.
+//
+// Hệ quả với cảnh báo hạm đội: cửa sổ 60 ngày dài hơn mọi lượt chạy, nên nhánh
+// "còn dưới 2 tiếng" ở internal/api/api.go gần như sẽ không kêu cho Cursor. Đó
+// là ĐÚNG, không phải hỏng — cái thay đổi thật là nó thôi im lặng vì KHÔNG BIẾT
+// và bắt đầu im lặng vì ĐÃ BIẾT là còn hạn. Ngày token thật sự hết, `sagent ds`
+// nói được "hết hạn lúc mấy giờ" thay vì để trống.
+func (cursor) TokenExpiry(configDir string) (time.Time, bool) {
+	b, err := os.ReadFile(authFile(configDir))
+	if err != nil {
+		return time.Time{}, false
+	}
+	var t struct {
+		Access  string `json:"accessToken"`
+		Refresh string `json:"refreshToken"`
+	}
+	if json.Unmarshal(b, &t) != nil {
+		return time.Time{}, false
+	}
+	if exp, ok := hanTuJWT(t.Refresh); ok {
+		return exp, true
+	}
+	// Không có refresh: mốc duy nhất biết được là hạn access token.
+	return hanTuJWT(t.Access)
+}
+
+// hanTuJWT đọc claim `exp` (giây epoch) trong payload của một JWT.
+//
+// CỐ Ý KHÔNG kiểm chữ ký: chữ ký là HS256 bằng khoá của nhà cung cấp — ta không
+// có khoá, và cũng không cần. Ta không XÁC THỰC token, chỉ hỏi nó tự khai hết
+// hạn lúc nào; token nằm sẵn trong hồ sơ của chính người dùng nên "token giả"
+// không phải mối đe doạ ở đây. Chữ ký hỏng thì lời gọi API hỏng, không phải
+// việc của hàm này.
+//
+// Trả false thay vì một mốc bịa ra ở mọi ngõ hỏng — cảnh báo sai giờ còn tệ hơn
+// không cảnh báo.
+func hanTuJWT(tok string) (time.Time, bool) {
+	parts := strings.Split(tok, ".")
+	if len(parts) < 2 {
+		return time.Time{}, false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return time.Time{}, false
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if json.Unmarshal(raw, &claims) != nil || claims.Exp == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(claims.Exp, 0), true
+}
 
 func (c cursor) Verify() []Check {
 	var out []Check
@@ -197,9 +296,18 @@ func (cursor) NangLuc() []NangLuc {
 		Duoc(NLTachTaiKhoan, "chép ĐÚNG Cursor\\auth.json sang một APPDATA giả thì danh tính đi "+
 			"theo và `status` báo đúng email; hồ sơ mới thì \"Not logged in\". Đo từng biến một: "+
 			"chỉ APPDATA mới tách được, USERPROFILE/LOCALAPPDATA/HOME đều không"),
-		Chua(NLHanToken, "CHƯA ĐO: auth.json có thể mang dấu thời gian hết hạn, nhưng chưa dựng "+
-			"được cảnh token sắp hết hạn để xác nhận đọc đúng trường nào — cảnh báo sai giờ còn "+
-			"tệ hơn không cảnh báo"),
-		Duoc(NLDanhTinh, "trường email/userEmail/user_email trong Cursor\\auth.json"),
+		Duoc(NLHanToken, "claim `exp` trong JWT của %APPDATA%\\Cursor\\auth.json (đo 21/08 trên "+
+			"hồ sơ đăng nhập thật). File có ĐÚNG hai khoá accessToken/refreshToken, không có "+
+			"trường dấu-thời-gian tầng ngoài — mốc nằm trong payload JWT như Codex. Hai token "+
+			"cùng exp=1792206539 (2026-10-17T03:08:59Z), cấp lúc time=1787022539 "+
+			"(2026-08-18T03:08:59Z): cửa sổ ĐÚNG 60 ngày. Đọc refresh theo tiền lệ claude.go. "+
+			"CHƯA ĐO: có xoay vòng khi refresh hay không — qua 3 ngày dùng, mtime auth.json vẫn "+
+			"là giây đăng nhập nên CLI chưa ghi lại file này lần nào"),
+		Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC (đo 21/08 trên hồ sơ đăng nhập thật): Cursor\\auth.json "+
+			"có ĐÚNG hai khoá accessToken/refreshToken, không có email/userEmail/user_email; "+
+			"payload JWT cũng chỉ có `sub` dạng mã đục `google-oauth|<id>`. Dòng khai cũ nói "+
+			"đọc được ba trường đó là SAI — Identity() trả rỗng trên chính máy đã đăng nhập. "+
+			"`cursor-agent status` in được email nhưng đọc bằng cách chạy CLI con là đánh đổi "+
+			"khác, chưa đo"),
 	}
 }

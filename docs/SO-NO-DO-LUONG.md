@@ -11,6 +11,11 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   ô nợ đều được đặt tên bằng cùng một từ và đều tra được bằng một câu lệnh.
 - **`internal/aiapi/` không có ô nào** (đã kiểm riêng), nên sổ này không phải né
   vùng người khác đang sửa.
+- **Cập nhật 21/08, lượt "hạn token"**: đóng **Đ4** (Cursor đo thật, Antigravity
+  đổi sang `KhongLamDuoc`) và viết lại **nửa Cursor của C1** cho khớp mã. Lượt
+  này lôi ra một ô nợ MỚI: **V3** — Cursor khai `Duoc(NLDanhTinh)` mà
+  `Identity()` trả rỗng trên chính hồ sơ đang đăng nhập. Xem
+  `docs/BAO-CAO-DONG-D4.md`.
 - **Cập nhật 21/08, lượt "dọn sổ nợ"**: đóng **N1** (sửa bình luận trong mã) và
   **Đ3** (đối chiếu mã thật, không chỉ tiêu đề commit). Sổ này từng lệch với mã
   vì nó được sửa lúc **00:44** còn commit `bacc137` vào lúc **00:54** — sổ viết
@@ -22,7 +27,10 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
 ## Vì sao cần sổ này khi đã có `sagent nang-luc --chua-do`
 
 Lệnh đó (`cmd/sagent/nangluc.go:16`) in ra **bảng khai năng lực** — 14 ô `ChuaDo`
-của 4 adapter. Sổ này thêm ba thứ lệnh đó không có:
+của 4 adapter lúc lập sổ. **Đếm lại 21/08 sau lượt đóng Đ4: còn 9** — claude 1,
+codex 3, cursor 2, antigravity 3, grok 0. (Con số này rơi nhờ nhiều lượt cộng
+lại, không riêng lượt nào; ghi ra để lần quét sau đừng so với số cũ.) Sổ này thêm
+ba thứ lệnh đó không có:
 
 1. **Hậu quả nếu đoán sai**, tức lý do để xếp hạng việc nào đo trước.
 2. **Những ô nợ nằm ngoài bảng năng lực**: ngưỡng chạy quẩn, cuộc đua N-clone
@@ -167,7 +175,93 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 </details>
 
-## Đ4. Antigravity và Cursor CHƯA ĐO hạn token
+## ~~Đ4~~ ✅ ĐÃ ĐÓNG 21/08 — hạn token: Cursor ĐÃ ĐO THẬT, Antigravity là KẾT LUẬN
+
+> **Hai nửa của ô này đóng bằng hai cách khác nhau, và đó là điểm chính.**
+>
+> ### Nửa Cursor — ĐO THẬT, đọc được hạn
+>
+> Rào chắn cũ (*"auth.json CÓ THỂ mang dấu thời gian, chưa biết trường nào"*)
+> đứng trên một chỗ tìm sai. `~/.cursor/auth.json` **không hề tồn tại**; file
+> thật nằm ở `%APPDATA%\Cursor\auth.json` — đúng chỗ mà `EnvVar()` và
+> `PrivateFiles()` đã chỉ từ đầu (`internal/provider/cursor.go:37,66`). Ô này mở
+> ba tuần vì tìm nhầm thư mục, không phải vì thiếu phép đo.
+>
+> **Hình dạng file, đo chứ không đoán** (hồ sơ đăng nhập thật, CLI
+> `2026.08.11-e8db854`): auth.json có **ĐÚNG HAI khoá** — `accessToken` và
+> `refreshToken`, cả hai là JWT `alg:HS256`. **Không có trường dấu-thời-gian nào
+> ở tầng ngoài.** Nên lời dặn *"đừng đoán tên trường"* hoá ra còn đúng hơn cả ý
+> định ban đầu: **không có trường nào để mà đoán**. Mốc nằm trong payload JWT, y
+> hệt Codex.
+>
+> Claim đọc được — `accessToken` và `refreshToken` giống hệt nhau từng claim:
+>
+> | claim | giá trị | nghĩa |
+> |---|---|---|
+> | `iss` | `https://authentication.cursor.sh` | |
+> | `aud` | `https://cursor.com` | |
+> | `scope` | `openid profile email offline_access` | |
+> | `type` | `session` | |
+> | `time` | `1787022539` | 2026-08-18T03:08:59Z — lúc đăng nhập |
+> | `exp` | `1792206539` | 2026-10-17T03:08:59Z — **đúng 60 ngày** sau |
+>
+> **Chạy thật trên máy này sau khi sửa mã**: `HasToken=true`,
+> `TokenExpiry ok=true`, `exp=2026-10-17T03:08:59Z`, còn `1364h` (≈ 56,8 ngày).
+> Trước bản vá, cùng hồ sơ đó trả `ok=false` — tức **không phân biệt được với
+> "chưa đăng nhập"**.
+>
+> **Đọc REFRESH token, không phải access token** — ghim bằng
+> `TestCursorDocRefreshChuKhongPhaiAccess`. Hôm nay hai mốc BẰNG NHAU nên phép đo
+> thật *không* phân biệt được hai lựa chọn; bài kiểm phân biệt hộ. Lý do là bài
+> học đã trả giá ở `claude.go`: trả hạn access token làm cổng kiểm **chặn oan**
+> lượt chạy #39 trong khi tài khoản vẫn dùng được.
+>
+> **Còn chưa đo, nói thẳng**: token có **xoay vòng** khi refresh hay không — mà
+> đó mới là thứ cảnh báo hạm đội thật sự sợ. Bằng chứng gián tiếp là CLI **chưa
+> hề ghi lại file này**: `mtime` của auth.json vẫn là `2026-08-18 10:08:58 (+07)`
+> — đúng giây đăng nhập — trong khi `.cursor/cli-config.json` bị ghi lại lúc
+> `2026-08-21 00:46` bởi chính các lượt chạy thật của ô Đ3. Qua ba ngày dùng,
+> `cursor-agent` không đụng vào file token.
+>
+> ### Nửa Antigravity — KHÔNG ĐO, và đó là câu trả lời cuối
+>
+> Đổi `Chua(NLHanToken)` → **`Khong(NLHanToken)`**
+> (`internal/provider/antigravity.go`). Lý do giữ nguyên lý do cũ, chỉ đổi tư
+> cách của nó: token nằm trong Windows Credential Manager dưới khoá
+> `gemini:antigravity`, `CredRead` trả về **cả blob** chứ không có cách hỏi riêng
+> mốc hết hạn. Mở chính thứ cần bảo vệ để đổi lấy **một dấu thời gian** là đánh
+> đổi tồi. Đây là một **kết luận**, không phải khoảng trống — nên nó thôi nằm
+> trong sổ nợ.
+>
+> Khác Grok một chỗ đáng nói ra: ở `grok.go:250` hạn **KHÔNG TỒN TẠI** (API key,
+> không OAuth); ở đây hạn **CÓ**, nhưng nằm sau một cánh cửa ta cố ý không mở.
+> Cùng trạng thái `KhongLamDuoc`, khác lý do — và bằng chứng viết rõ cả hai.
+>
+> ### Cảnh báo hạm đội đổi ra sao
+>
+> Chốt ở `internal/api/api.go` chỉ chạy khi `TokenExpiry` trả `ok=true`, nên:
+>
+> - **Cursor**: nay **có** chạy. Cửa sổ 60 ngày dài hơn mọi lượt chạy nên nhánh
+>   *"còn dưới 2 tiếng"* gần như sẽ không kêu — **đó là đúng, không phải hỏng**.
+>   Cái đổi thật là nó thôi im lặng vì KHÔNG BIẾT và bắt đầu im lặng vì ĐÃ BIẾT
+>   là còn hạn. `ProfileList` (`api.go:264`) cũng điền được `HanToi`/`HetHan`,
+>   nên `sagent ds` nói được "hết hạn lúc mấy giờ" thay vì để trống.
+> - **Antigravity**: **vẫn không** chạy, và điều đó **không đổi** — đây là hệ quả
+>   phải nói ra, không phải thứ bản vá này che đi. Khác biệt duy nhất: bảng năng
+>   lực nay khai thẳng *"không đọc được hạn"* thay vì để trống, nên sự im lặng
+>   đọc được đúng nghĩa. Bằng chứng trong mã ghi hẳn câu này.
+>
+> ### Bài kiểm giữ ô
+>
+> `internal/provider/token_cursor_test.go` — 6 bài + 8 ca con. Ghim hình dạng
+> thật của file vào bình luận, ghim lựa chọn refresh-chứ-không-access, và ghim
+> **mọi ngõ hỏng phải trả `false`** (không JSON, không JWT, payload không
+> base64, thiếu claim `exp`, `exp=0`, không có file). Nửa còn lại của *"cảnh báo
+> sai giờ còn tệ hơn không cảnh báo"* nằm ở đó: `time.Time{}` trả kèm `ok=true`
+> sẽ đọc thành "hết hạn từ năm 1". JWT trong bài kiểm là **giả** — chữ ký không
+> được kiểm nên giả là đủ, và một token thật trong mã nguồn là một rò rỉ.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
 
 - **Ở đâu**:
   - `internal/provider/antigravity.go:90-93` (`TokenExpiry` trả `false`),
@@ -199,6 +293,8 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   tiền lệ đúng kiểu này: `internal/provider/grok.go:250` khai
   `Khong(NLHanToken, ...)` vì API key **không có** hạn đọc được từ file — một kết
   luận, không phải một khoảng trống.
+
+</details>
 
 ## ~~Đ5~~ ✅ ĐÃ ĐÓNG 21/08 — Cuộc đua N-clone: ĐÃ CHẠY THẬT
 
@@ -243,28 +339,48 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
 
 # 🟠 MỨC CAM — đoán sai là mất tiền hoặc mất kết luận
 
-## C1. Codex và Cursor CHƯA ĐO cách đọc kết quả có cấu trúc
+## C1. Codex CHƯA ĐO cách đọc kết quả có cấu trúc
 
-> ⚠ **ĐÃ LẠC HẬU MỘT NỬA (đối chiếu mã 21/08)**: phần **Cursor** đã đóng trong
-> commit `bacc137` — `internal/provider/cursor.go:173` gọi `docKetQuaCursor`, và
-> bảng khai `Duoc(NLKetQuaCoCauTruc)` ở `:193`. Phần **Codex** vẫn mở đúng như mô
-> tả dưới. Mục này chưa viết lại vì lượt làm việc được giao đúng ô Đ3 và N1.
+> ✅ **NỬA CURSOR ĐÃ ĐÓNG — mục này đã viết lại 21/08 cho khớp mã.** Ô nay chỉ
+> còn **Codex**; tiêu đề đã bỏ Cursor ra.
+>
+> **Đã MỞ MÃ RA ĐỌC để xác nhận, không tin tiêu đề commit** (đúng bài học của Đ3:
+> sổ sửa lúc 00:44, commit `bacc137` lúc 00:54 — sổ viết trước, mã đổi sau):
+>
+> - `internal/provider/cursor.go:272` — `DocKetQua` trả thẳng
+>   `docKetQuaCursor(raw)`. **Không còn** `(KetQua{}, false)`.
+> - `internal/provider/cursor.go:292` — bảng khai
+>   `Duoc(NLKetQuaCoCauTruc, "--output-format stream-json (đo 21/08, CHẠY THẬT)…")`.
+>   Bằng chứng ghi rõ dòng cuối `{"type":"result"}` mang `is_error`, `subtype`,
+>   `result`, `request_id` và `usage` — `inputTokens`/`outputTokens` **camelCase,
+>   KHÁC Claude**.
+> - Bộ đọc thật và bài kiểm của nó có mặt: `internal/provider/ketqua_cursor.go`,
+>   `internal/provider/ketqua_cursor_test.go`.
+>
+> *(Số dòng trên là của bản mã sau lượt đóng **Đ4**, muộn hơn `bacc137` — nội
+> dung không đổi, chỉ trôi dòng vì `cursor.go` dài thêm.)*
+>
+> **Vẫn còn thiếu, để không đọc thành đóng trọn**: bản ghi Cursor **không có**
+> `total_cost_usd`, nên chi phí của Cursor vẫn chưa đo được — xem **C4**.
+>
+> Phần **Codex** vẫn mở đúng như mô tả dưới, và **không đụng vào ở lượt này** vì
+> một phiên khác đang làm đúng nửa đó.
 
-- **Ở đâu**: `internal/provider/codex.go:226,248` và
-  `internal/provider/cursor.go:148,167` — cả hai `DocKetQua` trả
-  `(KetQua{}, false)`.
+- **Ở đâu**: `internal/provider/codex.go:226,248` — `DocKetQua` trả
+  `(KetQua{}, false)`. *(Hai dòng `cursor.go:148,167` từng đứng ở đây đã hết hiệu
+  lực — xem ghi chú đóng bên trên.)*
 - **Nó nói gì**: Codex — *"CHƯA ĐO cách đọc dữ liệu có cấu trúc; phiên Codex chết
-  vì lý do gì thì sổ để nguyên `lost` chứ không đoán"*. Cursor — *"CHƯA ĐO cách
-  đọc dữ liệu có cấu trúc của provider này"*.
-- **HẬU QUẢ NẾU ĐOÁN SAI**: hai provider này **mù toàn tập** ở mọi mặt hiển thị.
+  vì lý do gì thì sổ để nguyên `lost` chứ không đoán"*.
+- **HẬU QUẢ NẾU ĐOÁN SAI**: provider này **mù toàn tập** ở mọi mặt hiển thị.
   Không `is_error`, không `usage`, không `total_cost_usd`, không
   `permission_denials`. Cụ thể mất những gì:
-  - Mọi phiên Codex/Cursor về `lost` — `internal/provider/trangthai_test.go:128`
+  - Mọi phiên Codex về `lost` — `internal/provider/trangthai_test.go:128`
     canh đúng điều này và nó **đúng**, nhưng đó là cái đúng của người thành thật,
     không phải của người biết việc.
   - `PhanLoaiChet` không phân biệt được hết-hạn-mức với bị-chặn-quyền với
     lỗi-API. Người vận hành thấy *"chết, chưa rõ vì sao"* rồi phải tự mở log.
   - Không đếm được token/chi phí → không so được provider nào rẻ hơn cho việc gì.
+    (Cursor nay đếm được token nhưng vẫn chưa có chi phí — xem C4.)
   - **Lá chắn chống chạy quẩn không hoạt động**: `internal/provider/quan.go` cần
     `DemDuocTool`, mà `DemDuocTool` đến từ `DocKetQua`. Một agent Codex chạy quẩn
     399 lần sẽ đốt sạch hạn mức mà không ai chặn.
@@ -420,6 +536,43 @@ Nguyên văn bài học ở cuối `docs/DO-LUONG.md` (mục 20/08) là lý do s
   tài khoản Antigravity**. Nên "nhầm tài khoản" ở đây là nhầm giữa danh tính hiện
   tại và một danh tính cũ, không phải nhầm giữa hai tài khoản đang dùng song song.
 
+## V3. Cursor khai `Duoc(NLDanhTinh)` mà `Identity()` LUÔN trả rỗng
+
+> **Ô MỚI, lộ ra 21/08 trong lúc đóng Đ4** — không tìm nó, nó tự rơi ra khi mở
+> `auth.json` thật để đo hạn token. Đã sửa lời khai trong cùng lượt; ô này ghi
+> lại vì phần **đo cách đọc danh tính** vẫn còn nợ.
+
+- **Ở đâu**: `internal/provider/cursor.go` — `Identity()` và dòng khai
+  `NLDanhTinh` trong `NangLuc()`.
+- **Nó nói gì (trước bản vá)**: `Duoc(NLDanhTinh, "trường email/userEmail/`
+  `user_email trong Cursor\auth.json")` — một dòng **xanh**.
+- **Phép đo lật lại lời khai đó**: `%APPDATA%\Cursor\auth.json` thật có **ĐÚNG
+  HAI khoá**, `accessToken` và `refreshToken`. Không `email`, không `userEmail`,
+  không `user_email`. Payload JWT cũng không: `sub` là mã đục dạng
+  `google-oauth|<id>`, không phải địa chỉ thư. Chạy trên hồ sơ ĐANG ĐĂNG NHẬP:
+  `Identity=""`.
+- **HẬU QUẢ**: nhẹ về hiển thị (card Cursor không có email), nhưng **nặng về
+  lòng tin vào bảng**. Đây đúng là thứ mục *"Vì sao cần sổ này"* xếp nguy hiểm
+  hơn `ChuaDo`: một ô khai **LÀM ĐƯỢC** mà lõi không chặn và người vận hành
+  tưởng đã kiểm. So với **V2**: Antigravity cũng không đọc được email, nhưng nó
+  khai thẳng `ChuaDo` — trung thực. Ô này thì nói dối theo hướng khoe.
+- **VÌ SAO CONFORMANCE KHÔNG BẮT ĐƯỢC** *(chỗ đáng nhớ nhất của ô này)*: phép dò
+  `NLDanhTinh` trong `internal/provider/nangluc.go` là **một chiều**
+  (`haiChieu: false`) — nó chỉ kết luận được chiều *"khai chưa đo mà lại trả giá
+  trị thật"*. Chiều ngược lại, *"khai làm được mà luôn trả rỗng"*, **không có ai
+  canh**. `KiemNangLuc` xanh suốt trong khi lời khai sai. Cùng lỗ hổng đó đang
+  che cho `NLCoTuHoSo`, `NLKetQuaCoCauTruc` và `NLHanToken` — cả bốn đều một
+  chiều. Lý do một chiều là **đúng** (cần hồ sơ thật mới dò được), nên bịt lỗ
+  không phải bằng cách đổi phép dò, mà bằng một bài kiểm chạy trên hồ sơ thật.
+- **Đã làm ở lượt này**: hạ lời khai xuống
+  `Chua(NLDanhTinh, "CHƯA ĐỌC ĐƯỢC (đo 21/08 …)")` kèm nguyên văn phép đo. Vòng
+  lặp khoá trong `Identity()` **giữ lại** có chủ đích — không tốn gì, và ngày một
+  bản CLI mới ghi thêm trường email thì nó đọc được ngay.
+- **CÒN NỢ**: `cursor-agent status` **in được** email (đã thấy khi đo
+  `NLTachTaiKhoan`). Tức năng lực này **có thật**, chỉ là không đọc được từ file.
+  Đọc danh tính bằng cách chạy CLI con là một đánh đổi khác hẳn đọc file — tốn
+  một tiến trình mỗi lần vẽ card — nên chưa đo, chưa làm.
+
 ---
 
 # ⚪ NỢ NGƯỢC — đã đo rồi mà sổ chưa xoá
@@ -484,6 +637,7 @@ người sau đừng dọn nhầm.
 | `internal/api/tuduyetquyen_test.go:24,61,72` | Bảng khai nói "đã đo" mà `ArgsTuDuyetQuyen()` nói chưa = đỏ | Đ1, Đ3 |
 | `internal/api/model_test.go:48,63,70` | Chưa đo model thì phải **cảnh báo** và vẫn **chạy được** — không im lặng, không chặn | C3 |
 | `internal/provider/nangluc_test.go:78,230` | `(nil, false)` phải đọc là `ChuaDo`; conformance đối chiếu bảng khai với hành vi thật | toàn bộ mức Đỏ |
+| `internal/provider/token_cursor_test.go` | Hạn token Cursor đọc từ **refresh** chứ không phải access; và **mọi ngõ hỏng phải trả `false`**, cấm bịa ra một mốc | Đ4 |
 | `internal/provider/trangthai_test.go:128` | Provider chưa đọc được kết quả thì phiên **ở lại `lost`**, không kết luận | C1 |
 | `internal/provider/quan_test.go:212-214` | Không kết luận "chạy quẩn" từ bản ghi chưa đọc được | C1, C5 |
 | `internal/provider/bosungco_test.go:50` | Chưa đọc được kết quả có cấu trúc thì không khai bừa cờ | C1 |
@@ -516,14 +670,19 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
    `PhanLoaiChet`. Nửa còn lại của cái bẫy đã cắn một lần thì cắn theo một kiểu
    khác hẳn nửa đầu.
 3. ~~**N1**~~ — **đã trả 21/08**, chỉ sửa bình luận, không phải đo gì.
-4. **Đ4 Cursor** — rào chắn cũ (*"máy dev chưa cài cursor-agent"*) **sai**: máy
-   CÓ `cursor-agent` bản 2026.08.11. ~~Đ3~~ và ~~C6~~ đã đóng nhờ đúng phát hiện
-   đó (commit `bacc137`), nên ô Cursor còn lại chỉ là hạn token: cần dựng được
-   cảnh token sắp hết hạn rồi đọc `auth.json` xem trường nào đổi.
+4. ~~**Đ4 Cursor**~~ — **đã đóng 21/08**, và rào chắn cũ sai lần thứ hai theo
+   đúng một kiểu: lần đầu tưởng máy chưa cài `cursor-agent`, lần này tìm
+   `auth.json` **nhầm thư mục** (`~/.cursor/` thay vì `%APPDATA%\Cursor\`). Cũng
+   không cần "dựng cảnh token sắp hết hạn" như đề nghị cũ: mốc nằm trong payload
+   JWT, đọc là ra. **Một dòng CHƯA ĐO không tự hết hạn — và lý do hoãn của nó
+   cũng không tự đúng lại.**
 5. **C5** (ngưỡng chạy quẩn) — đo từ bản ghi đã có, không cần chạy gì mới.
 6. **C4** (token/chi phí phiên CLI) — cần thêm trường vào DTO, đụng nhiều mặt.
-7. **Đ4 Antigravity** — cân nhắc **không đóng**, đổi sang `KhongLamDuoc` kèm lý
-   do, theo tiền lệ `Khong(NLHanToken)` của Grok.
+7. ~~**Đ4 Antigravity**~~ — **đã trả 21/08 theo đúng đề nghị này**: đổi sang
+   `Khong(NLHanToken)` kèm lý do, theo tiền lệ của Grok. Không đo gì cả — đó là
+   nội dung của việc, không phải chỗ cắt bớt.
+8. **V3** (danh tính Cursor) — ô mới của lượt 21/08. Lời khai đã sửa; phần còn
+   nợ là đo cách đọc email qua `cursor-agent status`.
 
 # Phạm vi sổ này KHÔNG phủ
 
@@ -535,6 +694,8 @@ Hai chỗ trong mã thường (không phải test) cũng thuộc lưới này ch
   đúng một file, nên ô N1 nhìn thấy được mà để nguyên tại chỗ. **Lượt 21/08 sau
   đó đã trả N1 trong mã** (`internal/profile/tokenhoisinh_test.go`,
   `internal/fleet/fleet_test.go`); giới hạn trên chỉ còn đúng với bản quét đầu.
-- **Ba ô C1/C3/C6 mới chỉ được gắn nhãn "đã lạc hậu", chưa viết lại theo khuôn
-  đóng.** Nội dung mô tả bên dưới các nhãn đó vẫn là văn bản cũ, còn nói Cursor
-  chưa đo — đọc nhãn trước, đừng đọc thẳng gạch đầu dòng.
+- **C1 đã viết lại 21/08** (nửa Cursor đóng, tiêu đề bỏ Cursor ra, nửa Codex giữ
+  nguyên từng chữ cho phiên đang làm nó). **Hai ô C3/C6 vẫn mới chỉ được gắn nhãn
+  "đã lạc hậu", chưa viết lại theo khuôn đóng** — nội dung mô tả bên dưới các
+  nhãn đó vẫn là văn bản cũ, còn nói Cursor chưa đo. Đọc nhãn trước, đừng đọc
+  thẳng gạch đầu dòng.
