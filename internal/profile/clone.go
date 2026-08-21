@@ -323,7 +323,21 @@ func StartDetached(a provider.Adapter, dir string, args []string, logPath, workD
 	if err != nil {
 		return 0, err
 	}
-	f, err := os.Create(logPath)
+	// NỐI THÊM, không cắt trắng.
+	//
+	// `os.Create` cắt file về 0 byte. Chừng nào đường dẫn log còn phụ thuộc số
+	// bản clone (chuyện cũ: <clone>/fleet.log) thì mỗi lượt fleet xoá sạch nhật
+	// ký của lượt trước — đúng cách phiên #167 mất tang chứng vì phiên #169
+	// (đo 21/08). Giờ đường dẫn do internal/nhatky cấp và duy nhất cho từng
+	// phiên, nhưng mở bằng O_APPEND thì kể cả khi trùng tên, tệ nhất là hai
+	// lượt nối đuôi nhau — vẫn đọc được, thay vì mất hẳn một lượt.
+	//
+	// O_APPEND cũng là điều kiện để mặt gọi ghi khối tiêu đề (nhatky.Tao) TRƯỚC
+	// khi tiến trình con in chữ đầu tiên.
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return 0, err
+	}
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return 0, err
 	}

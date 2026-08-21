@@ -7,10 +7,11 @@ package fleet
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
+	"github.com/trantiendevweb/switch-agent-pro/internal/nhatky"
 	"github.com/trantiendevweb/switch-agent-pro/internal/profile"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
@@ -141,6 +142,13 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 		bus.Warnf("Cả %d phiên dùng CHUNG thư mục hiện tại — chúng có thể sửa đè file của nhau. Thêm --worktree để tách.", o.Copies)
 	}
 
+	// Dọn nhật ký cũ TRƯỚC khi bật, không phải sau: sau thì lượt nào cũng để
+	// lại đỉnh dung lượng của chính nó, và người dùng Ctrl-C giữa chừng là
+	// không bao giờ dọn. Nhật ký của phiên CÒN ĐANG CHẠY được giữ lại (xem
+	// nhatky.Don) — lượt mới không được phép xoá tang chứng của lượt cũ còn sống.
+	donNhatKy(db, bus)
+	bus.Infof("Nhật ký phiên: %s — đọc lại bằng `sagent nhat-ky <số phiên>`", nhatky.Root())
+
 	for i, dir := range dirs {
 		name := fmt.Sprintf("%s-%d", account, i+1)
 		cloneAddr := fmt.Sprintf("%s#%d", addr, i+1)
@@ -173,9 +181,30 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 			argsPhien = append(truoc, args...)
 		}
 
-		logPath := filepath.Join(dir, "fleet.log")
+		// NHẬT KÝ PHIÊN. Đường dẫn ra ngoài thư mục clone — xem internal/nhatky
+		// để biết vì sao (tóm tắt: chỗ cũ bị lượt sau cắt trắng và bị `sagent
+		// clean` xoá, nên đúng lúc cần đọc thì không còn gì).
+		logPath := nhatky.Duong(a.Name(), account, i+1, time.Now())
+		dau := nhatky.Dau{
+			ThoiDiem: time.Now(), Addr: cloneAddr, HoSo: dir,
+			ThuMuc: workDir, Lenh: argsPhien,
+		}
+		if err := nhatky.Tao(logPath, dau); err != nil {
+			// Không ghi được nhật ký thì KHÔNG bật phiên. Bật mù là quay lại
+			// đúng tình trạng ngày 21/08: phiên chạy, phiên chết, không ai biết
+			// vì sao. Thà hỏng to ở đây — câu lỗi này nói thẳng quyền ghi file.
+			bus.Failuref("phiên %d: không tạo được nhật ký %s: %v", i+1, logPath, err)
+			if workDir != "" {
+				_ = workspace.Remove(repoRoot, workDir)
+			}
+			continue
+		}
+
 		pid, err := profile.StartDetached(a, dir, argsPhien, logPath, workDir)
 		if err != nil {
+			// Chết trước khi agent kịp in chữ nào: chỉ sagent biết lý do, nên
+			// sagent phải là người ghi nó xuống.
+			_ = nhatky.GhiLoi(logPath, fmt.Sprintf("không bật được tiến trình: %v", err))
 			bus.Failuref("phiên %d: %v", i+1, err)
 			if workDir != "" {
 				_ = workspace.Remove(repoRoot, workDir)
@@ -188,6 +217,13 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 		})
 		if err != nil {
 			// Tiến trình đã chạy nhưng không ghi được sổ: nói rõ, đừng im lặng.
+			//
+			// Ghi vào NHẬT KÝ nữa, không chỉ ra bus: đây đúng là ca mà mất sổ
+			// nghĩa là mất luôn đường tìm về file — nhật ký là thứ duy nhất còn
+			// lại, nên nó phải tự nói được mình mồ côi.
+			_ = nhatky.GhiLoi(logPath, fmt.Sprintf(
+				"tiến trình chạy (PID %d) nhưng KHÔNG ghi được vào sổ: %v — "+
+					"phiên này sẽ không hiện ra ở `sagent status`", pid, err))
 			bus.Failuref("phiên %d chạy rồi (PID %d) nhưng không ghi được vào sổ: %v", i+1, pid, err)
 			continue
 		}
@@ -202,6 +238,56 @@ func FanOut(db *store.DB, bus *events.Bus, a provider.Adapter, account string, o
 		res.IDs = append(res.IDs, id)
 	}
 	return res, nil
+}
+
+// donNhatKy giữ thư mục nhật ký trong ngân sách, và NÓI RA những gì đã xoá.
+//
+// Xoá dữ liệu của người dùng trong im lặng là thứ dự án này cấm: người vận hành
+// đi tìm nhật ký của lượt tuần trước mà không thấy, thì họ phải đọc được ở đâu
+// đó rằng nó đã bị dọn theo ngân sách, chứ không phải nghi công cụ làm mất.
+//
+// Lỗi ở đây KHÔNG chặn fleet: dọn hụt thì tệ nhất là tốn đĩa, còn chặn một lượt
+// chạy vì phép dọn dẹp thì tệ hơn hẳn.
+func donNhatKy(db *store.DB, bus *events.Bus) {
+	// Nhật ký của phiên CÒN SỐNG là thứ không được đụng vào. Hỏi sổ hụt thì
+	// truyền danh sách rỗng — thà giữ ít hơn cần còn hơn xoá nhầm... nên khi
+	// không biết phiên nào đang chạy thì thôi, không dọn.
+	list, err := db.Running()
+	if err != nil {
+		return
+	}
+	var giu []string
+	for _, s := range list {
+		if s.Log != "" {
+			giu = append(giu, s.Log)
+		}
+	}
+	kq, err := nhatky.Don(giu, nhatky.SoFileToiDa, nhatky.TongByteToiDa)
+	if err != nil {
+		bus.Warnf("không dọn được nhật ký cũ ở %s: %v", nhatky.Root(), err)
+		return
+	}
+	if kq.DaXoa > 0 {
+		bus.Infof("Dọn nhật ký: xoá %d file cũ (%s), còn %d file (%s) — trần %d file / %s.",
+			kq.DaXoa, coChu(kq.ByteXoa), kq.ConLai, coChu(kq.ByteCon),
+			nhatky.SoFileToiDa, coChu(nhatky.TongByteToiDa))
+	}
+	if kq.KhongXoa > 0 {
+		bus.Warnf("%d nhật ký quá ngân sách nhưng xoá không được (file đang bị khoá?) — %s.",
+			kq.KhongXoa, nhatky.Root())
+	}
+}
+
+// coChu đọc số byte thành chữ. Chỉ ba mốc: nhật ký một phiên hiếm khi tới GB,
+// và cái trần đã chặn ở 256 MB.
+func coChu(n int64) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/float64(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(n)/float64(1<<10))
+	}
+	return fmt.Sprintf("%d B", n)
 }
 
 func itoa(n int) string { return fmt.Sprintf("%d", n) }

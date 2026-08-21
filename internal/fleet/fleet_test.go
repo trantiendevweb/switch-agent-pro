@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
+	"github.com/trantiendevweb/switch-agent-pro/internal/nhatky"
 	"github.com/trantiendevweb/switch-agent-pro/internal/process"
 	"github.com/trantiendevweb/switch-agent-pro/internal/provider"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
@@ -347,5 +348,160 @@ func TestKhongCanhBaoThuaKhiChiMotBan(t *testing.T) {
 		if strings.Contains(e.Msg, "GIỮA CHỪNG") {
 			t.Errorf("một bản mà vẫn cảnh báo chuyện nhiều bản: %q", e.Msg)
 		}
+	}
+}
+
+// ---------------------------- nhật ký phiên ----------------------------
+//
+// VẤN ĐỀ THẬT, đo 21/08/2026: phiên fleet kết thúc thì mọi thứ agent nói và làm
+// BỐC HƠI. Hai phiên (#167, #169) báo `xong` với 0 commit và worktree sạch
+// trơn; mất ~15 phút truy nguyên mới ra nguyên nhân là thiếu cờ
+// --tu-duyet-quyen. Một phiên khác (#172) sửa 4 file rồi chết vì hết hạn mức,
+// cũng không để lại dấu vết.
+//
+// Nguyên nhân đo được: đường dẫn log cũ là `<thư mục clone>/fleet.log` — chỉ
+// phụ thuộc SỐ BẢN CLONE. Lượt sau cắt trắng nhật ký lượt trước, và `sagent
+// clean` xoá nguyên thư mục.
+
+// Nhật ký phải nằm ngoài thư mục clone, và phải có khối tiêu đề đọc được.
+func TestNhatKyNamNgoaiThuMucCloneVaMangDongLenh(t *testing.T) {
+	db, bus, a := setup(t)
+
+	args := []string{"-test.run=TestHelperProcess"}
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 2}, args); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := db.Running()
+	if len(list) != 2 {
+		t.Fatalf("muốn 2 phiên, được %d", len(list))
+	}
+	for _, s := range list {
+		if s.Log == "" {
+			t.Fatalf("phiên #%d không ghi đường dẫn nhật ký vào sổ", s.ID)
+		}
+		if !strings.HasPrefix(s.Log, nhatky.Root()) {
+			t.Errorf("nhật ký phiên #%d = %q, không nằm trong %q", s.ID, s.Log, nhatky.Root())
+		}
+		// Chỗ CŨ. Nằm ở đây thì `sagent clean` xoá mất, và lượt sau ghi đè.
+		if strings.HasPrefix(s.Log, s.Dir) {
+			t.Errorf("nhật ký phiên #%d nằm trong thư mục clone %q — `sagent clean` sẽ xoá mất",
+				s.ID, s.Dir)
+		}
+		raw, err := os.ReadFile(s.Log)
+		if err != nil {
+			t.Fatalf("phiên #%d không đọc lại được nhật ký: %v", s.ID, err)
+		}
+		got := string(raw)
+		if !strings.HasPrefix(got, nhatky.MocDau) {
+			t.Errorf("nhật ký phiên #%d thiếu khối tiêu đề:\n%s", s.ID, got)
+		}
+		// Dòng lệnh ĐÃ DỰNG XONG — đây là thứ trả lời được ca #167.
+		if !strings.Contains(got, "-test.run=TestHelperProcess") {
+			t.Errorf("nhật ký phiên #%d không mang dòng lệnh đã dựng:\n%s", s.ID, got)
+		}
+		if !strings.Contains(got, s.Addr()) {
+			t.Errorf("nhật ký phiên #%d không mang địa chỉ %q:\n%s", s.ID, s.Addr(), got)
+		}
+	}
+}
+
+// ĐÂY là bài đo lại đúng ca #167/#169: hai LƯỢT fleet liên tiếp trên cùng một
+// bản clone. Cả hai nhật ký phải còn đọc được.
+func TestHaiLuotFleetKhongDeLenNhatKyCuaNhau(t *testing.T) {
+	db, bus, a := setup(t)
+	args := []string{"-test.run=TestHelperProcess"}
+
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 1}, args); err != nil {
+		t.Fatal(err)
+	}
+	dau, _ := db.Running()
+	if len(dau) != 1 {
+		t.Fatalf("lượt 1: muốn 1 phiên, được %d", len(dau))
+	}
+	logMot := dau[0].Log
+
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 1}, args); err != nil {
+		t.Fatal(err)
+	}
+	sau, _ := db.Running()
+	if len(sau) != 2 {
+		t.Fatalf("lượt 2: muốn 2 phiên đang chạy, được %d", len(sau))
+	}
+	var logHai string
+	for _, s := range sau {
+		if s.Log != logMot {
+			logHai = s.Log
+		}
+	}
+	if logHai == "" {
+		t.Fatal("hai lượt trên cùng bản clone dùng CHUNG một file nhật ký — " +
+			"lượt sau xoá tang chứng của lượt trước, đúng cách #169 xoá #167")
+	}
+	for _, p := range []string{logMot, logHai} {
+		st, err := os.Stat(p)
+		if err != nil {
+			t.Fatalf("nhật ký %q không còn đọc được: %v", p, err)
+		}
+		if st.Size() == 0 {
+			t.Fatalf("nhật ký %q bị cắt trắng", p)
+		}
+	}
+}
+
+// Nhật ký của phiên ĐANG CHẠY không được phép bị lượt sau dọn mất.
+func TestLuotSauKhongDonNhatKyCuaPhienDangChay(t *testing.T) {
+	db, bus, a := setup(t)
+	args := []string{"-test.run=TestHelperProcess"}
+
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 1}, args); err != nil {
+		t.Fatal(err)
+	}
+	dang, _ := db.Running()
+	giu := dang[0].Log
+
+	// Đẩy thư mục nhật ký vượt trần bằng cách dọn với ngân sách 0 file.
+	kq, err := nhatky.Don(logDangChay(db), 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(giu); err != nil {
+		t.Fatalf("dọn theo ngân sách đã xoá mất nhật ký của phiên đang chạy: %v (kq=%+v)", err, kq)
+	}
+}
+
+// logDangChay lặp lại đúng phép chọn mà fleet dùng, để bài test trên đo đúng
+// thứ sản phẩm làm chứ không phải một danh sách tự dựng.
+func logDangChay(db *store.DB) []string {
+	list, err := db.Running()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, s := range list {
+		if s.Log != "" {
+			out = append(out, s.Log)
+		}
+	}
+	return out
+}
+
+// Fleet phải NÓI RA chỗ đọc nhật ký. Có nhật ký mà không ai tìm ra thì bằng
+// không có — đó là nửa còn lại của vấn đề ngày 21/08.
+func TestFanOutChiDuongToiNhatKy(t *testing.T) {
+	db, bus, a := setup(t)
+	ch, huy := bus.Subscribe(256)
+	defer huy()
+
+	if _, err := FanOut(db, bus, a, "phu", Opts{Copies: 1}, []string{"-test.run=TestHelperProcess"}); err != nil {
+		t.Fatal(err)
+	}
+	var coChiDuong bool
+	for _, e := range gomEvent(ch) {
+		if strings.Contains(e.Msg, "sagent nhat-ky") && strings.Contains(e.Msg, nhatky.Root()) {
+			coChiDuong = true
+		}
+	}
+	if !coChiDuong {
+		t.Error("fleet không nói ra thư mục nhật ký lẫn lệnh đọc lại nó")
 	}
 }

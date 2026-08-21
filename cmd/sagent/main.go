@@ -69,6 +69,7 @@ func init() {
 		"nang-luc": {"provider.nang-luc", "provider nào làm được gì (làm được / không / chưa đo)", cmdNangLuc},
 		"status":   {"session.list", "phiên nào đang chạy", func(a []string) { cmdStatus() }},
 		"stop":     {"session.stop", "dừng phiên", cmdStop},
+		"nhat-ky":  {"session.nhat-ky", "đọc lại nhật ký của một phiên đã kết thúc", cmdNhatKy},
 		"quet":     {"session.sweep", "tìm tiến trình mồ côi của phiên đã chết", cmdQuet},
 		"fleet":    {"fleet.start", "bật N phiên song song", cmdFleet},
 		"clone":    {"clones.create", "tạo N thư mục cấu hình riêng", cmdClone},
@@ -433,12 +434,18 @@ func cmdStatus() {
 		fmt.Println("  Phiên đang chạy")
 		fmt.Println()
 		for _, s := range list {
-			where := s.Log
-			if s.Worktree != "" {
-				where = "worktree: " + s.Worktree
+			// Worktree và nhật ký là HAI thứ khác nhau, và bản cũ in một trong
+			// hai. `fleet --worktree` luôn đặt Worktree, nên đường dẫn nhật ký
+			// bị che đúng ở chế độ hay dùng nhất — có nhật ký mà không ai tìm ra.
+			where := s.Worktree
+			if where == "" {
+				where = "(thư mục hiện tại)"
 			}
 			fmt.Printf("   #%-3d %-18s PID %-7d %6s  %s\n",
 				s.ID, s.Addr(), s.PID, time.Since(s.Started).Truncate(time.Second), where)
+			if d := dongNhatKyPhien(s); d != "" {
+				fmt.Println(d)
+			}
 		}
 		fmt.Printf("\n  %d phiên. Dừng hết: sagent stop all\n", len(list))
 	}
@@ -772,6 +779,10 @@ func cmdHelp() {
                                 chỉ tạo thư mục cấu hình, không chạy
     sagent status               phiên nào đang chạy
     sagent stop <số|all>        dừng phiên
+    sagent nhat-ky              nhật ký các phiên gần đây (còn đọc lại được không)
+    sagent nhat-ky <số>         đọc lại một phiên đã kết thúc: agent nói gì,
+                                chạy bằng lệnh nào, chết vì lý do gì
+                                --het / --dong N: lấy cả file / N dòng cuối
     sagent clean <provider:tên> [--force]
                                 gỡ worktree + xoá clone (giữ lại worktree
                                 còn thay đổi chưa commit)
