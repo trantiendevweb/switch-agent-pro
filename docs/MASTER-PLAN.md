@@ -784,7 +784,9 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
     / `FlowApprove` mà CLI dùng — nên approval gate vẫn không thể bị bỏ qua từ
     đường web. `internal/dash/lachan_test.go:151` giữ ánh xạ `flow.approve` →
     `/api/flow/decide`, tức luật ngang quyền vẫn có răng ở tầng hợp đồng.
-  - **CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.** `grep -rn "decide" internal/dash/web/`
+  - ~~**CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.**~~ ✅ **ĐÃ VÁ 21/08** — xem 5c.
+    Mô tả dưới đây giữ lại vì nó là cách ĐO ra lỗi, vẫn dùng được lần sau.
+  - **(Hiện trạng lúc phát hiện)** `grep -rn "decide" internal/dash/web/`
     ra **0 dòng**; `grep -rni "reject\|tu-choi"` cũng không có nút nào. Người dùng
     mở dashboard thấy bước `waiting` mà **không có chỗ bấm Duyệt / Từ chối** —
     phải quay về terminal gõ `sagent flow approve <#> <bước>`.
@@ -800,11 +802,17 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 **5c · Workflow board.**  **93%** (6 xong · 1 một phần)
 - [x] `/flow.html`: chọn flow + tài khoản + biến rồi **chạy**; xem lịch sử; mở
   một lần chạy thấy **từng bước và trạng thái** (done/running/waiting/failed/skipped).
-- [~] **Duyệt / từ chối ngay trên web** — cùng đường `Approve()` với CLI, nên
-  approval gate vẫn không thể bị bỏ qua. ⚠ **HẠ TỪ `[x]` XUỐNG `[~]` ngày 21/08:**
-  đường server còn nguyên (`/api/flow/decide`), nhưng **nút bấm đã biến mất khỏi
-  mọi trang** trong một lần vẽ lại giao diện — `grep -rn "decide" internal/dash/web/`
-  ra 0 dòng. Xem mục Approval gate ở 5b để biết cách đo và lịch sử commit.
+- [x] **Duyệt / từ chối ngay trên web** — cùng đường `Approve()` với CLI, nên
+  approval gate vẫn không thể bị bỏ qua. ✅ **VÁ LẠI 21/08, cùng ngày phát hiện**:
+  nút từng biến mất trong một lần vẽ lại giao diện (`grep -rn "decide"
+  internal/dash/web/` ra **0 dòng**), nay dựng lại ở khối tiến độ lượt chạy trên
+  mặt 2D — bước mang trạng thái `waiting` thì hiện thẳng **Duyệt / Từ chối**, gọi
+  `POST /api/flow/decide {id, step, approve}`. Khoá cả hai nút ngay khi bấm: mạng
+  chậm mà bấm hai lần là gửi hai quyết định.
+  **Và ghim để không mất lần nữa**: `TestMoiHanhDongCuaNguoiDungDeuCoDuongVaoTuWeb`
+  bắt mọi endpoint hành động phải có ít nhất một trang gọi tới. Luật ngang quyền
+  cũ chỉ canh **API ↔ CLI**; đây là mảnh **UI ↔ API** còn thiếu, và chính chỗ
+  thiếu đó làm nút biến mất mà không bài kiểm nào đỏ.
 - [x] Endpoint chạy flow **trả ngay** rồi làm ở nền: bước agent có thể mất hàng
   chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.
 - [x] Đã chạy thật qua HTTP: `shell → approve → shell`, dừng đúng ở gate, duyệt

@@ -242,8 +242,16 @@ const ctx = {
     if (s.indexOf('/api/flow/detail') >= 0) return { ok: true, json: async () => ({ steps: buocGia }) };
     if (s.indexOf('/api/state') >= 0) return {
       ok: true, json: async () => ({ sessions: [
-        { id: 1, state: 'running', tokens: 12500, costUSD: 0.42 },
-        { id: 2, state: 'stopped', tokens: 3100, costUSD: 0.11 }
+        // TEN TRUONG PHAI KHOP sessionDTO trong internal/dash/server.go:
+        // tokensIn / tokensOut / costUsd.
+        //
+        // Ban cu dung `tokens` va `costUSD` - dung hai cai ten SAI ma trang 3D
+        // dang doc. Tuc fixture nay duoc viet de khop voi TRANG DANG LOI, khong
+        // khop voi hop dong. Bai kiem va ma cung chia mot gia dinh sai thi bai
+        // kiem thanh ra chung thuc cho chinh cai loi. Do la ly do o token/chi
+        // phi tren man 3D dung o dau gach rat lau ma khong bai kiem nao keu.
+        { id: 1, state: 'running', tokensIn: 10000, tokensOut: 2500, costUsd: 0.42 },
+        { id: 2, state: 'stopped', tokensIn: 2600, tokensOut: 500, costUsd: 0.11 }
       ] })
     };
     // Duong ghi (POST) cua thanh lenh — tra ve nhu that de kiem duoc lenh.

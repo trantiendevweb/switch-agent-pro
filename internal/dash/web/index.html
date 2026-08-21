@@ -213,6 +213,20 @@
     border-radius:8px;padding:8px 10px;font-size:12px;color:var(--error);line-height:1.45}
   .td .hong[hidden]{display:none}
   .td .hong b{font-family:var(--font-mono)}
+  /* Khoi CHO DUYET. Dung token trang thai "pending" vi day la trang thai CHO,
+     khong phai loi. (Khong viet ten token kem dau hai cham trong comment —
+     designsystem_test doc do thanh mot khai bao va bao do.) */
+  .td .duyet{margin-top:11px;border:1px solid rgba(246,178,61,.42);background:rgba(246,178,61,.09);
+    border-radius:8px;padding:9px 10px;font-size:12px;color:var(--pending);line-height:1.45}
+  .td .duyet[hidden]{display:none}
+  .td .duyet b{font-family:var(--font-mono)}
+  .td .duyet .nut{display:flex;gap:8px;margin-top:9px}
+  .td .duyet button{font:inherit;font-size:12px;padding:5px 13px;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line-2);background:var(--panel-2);color:var(--hi);transition:.15s var(--ease)}
+  .td .duyet button:hover:not(:disabled){border-color:var(--pending);color:var(--pending)}
+  .td .duyet button.tuchoi:hover:not(:disabled){border-color:var(--error);color:var(--error)}
+  .td .duyet button:disabled{opacity:.5;cursor:default}
+  .td .duyet button:focus-visible{outline:2px solid var(--core);outline-offset:2px}
   .td .so{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);
     display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
   .td .so .k{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--lo)}
@@ -517,6 +531,7 @@
           <div class="mach" id="td-mach"></div>
           <ol class="ds" id="td-ds"></ol>
           <div class="hong" id="td-hong" hidden></div>
+          <div class="duyet" id="td-duyet" hidden></div>
           <div class="so">
             <div><span class="k">token vào</span><span class="v" id="td-vao">0</span></div>
             <div><span class="k">token ra</span><span class="v" id="td-ra">0</span></div>
@@ -1477,6 +1492,42 @@ function veTienDo(run, buoc, now){
     h.innerHTML = 'Hỏng ở bước <b>' + esc(hong.id) + '</b>' + (hong.msg ? ' — ' + esc(hong.msg) : '');
   }else{
     h.hidden = true; h.innerHTML = '';
+  }
+
+  // BUOC CHO DUYET — phai co CHO BAM ngay tren web.
+  //
+  // VI SAO CO (21/08): /api/flow/decide van con nguyen ben server, nhung khong
+  // mat web nao goi no — `grep decide` trong internal/dash/web/ ra 0 dong. Nut
+  // tung co (c55ed0b, fcf1b39) roi mat trong mot lan ve lai giao dien, va khong
+  // test nao do vi luat ngang quyen chi canh API <-> CLI chu khong canh
+  // UI <-> API. Te hon: flow.html van in "Flow se dung o day toi khi ban bam
+  // Duyet" - mot loi hua ve cai nut khong ton tai.
+  const cho = buoc.find(b => b.state === 'waiting');
+  const dv = $('td-duyet');
+  if(cho){
+    dv.hidden = false;
+    dv.innerHTML = 'Đang chờ bạn duyệt bước <b>' + esc(cho.id) + '</b>' +
+      (cho.msg ? ' — ' + esc(cho.msg) : '') +
+      '<div class="nut">' +
+        '<button type="button" data-ok="1">Duyệt</button>' +
+        '<button type="button" class="tuchoi" data-ok="0">Từ chối</button>' +
+      '</div>';
+    dv.querySelectorAll('button').forEach(n => n.addEventListener('click', async () => {
+      const ok = n.dataset.ok === '1';
+      // Khoa CA HAI nut ngay: bam hai lan khi mang cham se gui hai quyet dinh.
+      dv.querySelectorAll('button').forEach(x => x.disabled = true);
+      try{
+        await api('/api/flow/decide', {method:'POST', headers:H,
+          body: JSON.stringify({id: run.id, step: cho.id, approve: ok})});
+        dv.hidden = true; dv.innerHTML = '';
+        refresh();
+      }catch(e){
+        showErr(e.message);
+        dv.querySelectorAll('button').forEach(x => x.disabled = false);
+      }
+    }));
+  }else{
+    dv.hidden = true; dv.innerHTML = '';
   }
 
   let vao=0, ra=0, usd=0;
