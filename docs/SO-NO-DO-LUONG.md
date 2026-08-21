@@ -44,6 +44,14 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
   (Claude có `total_cost_usd`) và "chưa đo" (Codex/Cursor/Antigravity không có trường giá).
   DTO không để lộ số 0 giả cho chi phí chưa đo, bảo toàn lưới an toàn không đụng file web.
   Xem `docs/DO-LUONG.md`, mục 21/08 C4.
+- **Cập nhật 21/08, lượt "đóng V1 + V2"**: đóng **V2** — Antigravity **ĐỌC ĐƯỢC**
+  danh tính, từ **nhật ký của chính `agy`** chứ không phải `google_accounts.json`;
+  hai phép đo trên hai thư mục **không hề có** file bẫy đó mà nhật ký vẫn in ra
+  email là bằng chứng phân biệt được. Đóng **V1** — bốn ô `ChuaDo` thành kết luận
+  `Khong`, trong đó Codex được **chạy thật** để chứng minh CLI tự đọc `config.toml`
+  của `CODEX_HOME` (ngược hẳn Grok). Số ô `ChuaDo` trong bảng năng lực: **7 → 2**
+  (chỉ còn `chon-model` của codex và antigravity). Xem
+  `docs/BAO-CAO-DONG-V1-V2.md`.
 - **Cập nhật 21/08, lượt "giảm rủi ro C2 Grok"**: đã thiết lập bài canh định kỳ gọi
   CLI thật `TestE2EGrokDocDuocOutputThat` (`SAGENT_E2E_GROK=1`) trong
   `internal/provider/ketqua_grok_e2e_test.go`. Phép đo thật hôm nay xác nhận CLI Grok
@@ -56,10 +64,19 @@ kèm **hậu quả nếu đoán sai**, xếp theo mức nguy hiểm giảm dần
 ## Vì sao cần sổ này khi đã có `sagent nang-luc --chua-do`
 
 Lệnh đó (`cmd/sagent/nangluc.go:16`) in ra **bảng khai năng lực** — 14 ô `ChuaDo`
-của 4 adapter lúc lập sổ. **Đếm lại 21/08 sau lượt đóng Đ4: còn 9** — claude 1,
-codex 3, cursor 2, antigravity 3, grok 0. (Con số này rơi nhờ nhiều lượt cộng
-lại, không riêng lượt nào; ghi ra để lần quét sau đừng so với số cũ.) Sổ này thêm
-ba thứ lệnh đó không có:
+của 4 adapter lúc lập sổ. **Đếm lại 21/08 sau lượt đóng V1+V2: còn 2** — claude 0,
+codex 1, cursor 0, antigravity 1, grok 0; cả hai ô còn lại là `chon-model`. (Con
+số này rơi nhờ nhiều lượt cộng lại, không riêng lượt nào; ghi ra để lần quét sau
+đừng so với số cũ.)
+
+> **NỢ NGƯỢC đã sửa 21/08**: dòng trên từng ghi *"còn 9 — claude 1, codex 3,
+> cursor 2, antigravity 3"*. Đếm thật trên `HEAD` ngay trước lượt V1+V2 là **7**
+> (claude 1, codex 2, cursor 1, antigravity 3). Sổ đang **cao hơn** mã hai ô —
+> đúng cái bệnh mà mục ⚪ NỢ NGƯỢC ở cuối sổ dựng ra để bắt, chỉ là lần này nó
+> nằm ngay ở phần mở đầu. **Đếm bằng `grep -c "^		Chua("` trên từng file
+> adapter, đừng chép lại con số của lượt trước.**
+
+Sổ này thêm ba thứ lệnh đó không có:
 
 1. **Hậu quả nếu đoán sai**, tức lý do để xếp hạng việc nào đo trước.
 2. **Những ô nợ nằm ngoài bảng năng lực**: ngưỡng chạy quẩn, cuộc đua N-clone
@@ -730,7 +747,47 @@ khai, không tin tiêu đề commit — mở file thật ra đọc.
 
 # 🟡 MỨC VÀNG — đoán sai chỉ mất tiện nghi
 
-## V1. Cả bốn provider CHƯA ĐO "suy cờ từ chính thư mục hồ sơ"
+## ~~V1~~ ✅ ĐÃ ĐÓNG 21/08 — bốn ô đổi từ `ChuaDo` sang KẾT LUẬN `Khong`, kèm chỗ đã tra
+
+> **Đã trả**: đã **mở thật** bốn thư mục hồ sơ ra tra, không dừng ở "chưa gặp".
+> Câu hỏi phân biệt rút từ chính ca Grok hoá ra không phải *"hồ sơ có thiết lập
+> không"* mà là ***"CLI có TỰ ĐỌC thiết lập đó không"***.
+>
+> - **Codex** — ô đáng đo nhất, vì hồ sơ **CÓ** thiết lập trông y hệt ca Grok:
+>   `$CODEX_HOME/config.toml` khai `model = "gpt-5.6-sol"` và
+>   `model_reasoning_effort = "high"`. **CHẠY THẬT**: dựng một `CODEX_HOME` tạm
+>   chỉ có `auth.json` + một `config.toml` khai model **bịa**, rồi
+>   `codex exec --json` → CLI báo *"Model metadata for `khong-co-model-nay-dau`
+>   not found"* và máy chủ trả **400** cho **đúng tên bịa đó**. Tức Codex **ĐỌC**
+>   `config.toml` của chính `CODEX_HOME` được truyền vào. **Ngược hẳn Grok**, và
+>   đó mới là điều đáng ghi.
+> - **Claude** — hồ sơ thật `~/.ai-accounts/claude/tns`: `.claude.json` có **48
+>   khoá**, bốn khoá chứa chữ "model" đều là **CACHE của máy chủ** chứ không phải
+>   lựa chọn của người dùng; `settings.json` chỉ có `env.DISABLE_AUTOUPDATER` và
+>   `tui`. Không có gì để chuyển; model đã đi qua `--model`.
+> - **Cursor** — `%APPDATA%\Cursor` có **ĐÚNG MỘT file** `auth.json` với **ĐÚNG
+>   HAI khoá** `accessToken`/`refreshToken`. Hồ sơ **rỗng thiết lập**, không phải
+>   chưa nhìn.
+> - **Antigravity** — có **ba** file cấu hình (`settings.json` kiểu xác thực,
+>   `antigravity-cli/settings.json` `trustedWorkspaces`, `config/config.json`
+>   `remoteControlHostname`), không cái nào có cờ tương ứng, và `agy` tự đọc
+>   chúng. **Bẫy đã tránh**: `trustedWorkspaces` *trông* giống việc của
+>   `--add-dir`, nhưng thư mục thật do `ArgsThuMuc` truyền **từng lượt** — đọc
+>   lại danh sách cũ là **ép agent vào workspace của lượt trước**, đúng chiều
+>   "đoán sai theo chiều thừa" mà ô này cảnh báo.
+>
+> Bốn lời khai đổi `Chua(NLCoTuHoSo, …)` → **`Khong(NLCoTuHoSo, …)`**, bằng chứng
+> ghi thẳng chỗ đã tra. `ArgsHoSo` **không đổi hành vi** (vẫn `nil`) — đổi **tư
+> cách** của cái `nil` đó từ khoảng trống thành kết luận.
+>
+> **Ghi thêm**: `agy --help` **CÓ** `--model`. Ô `chon-model` của Antigravity vẫn
+> `ChuaDo` vì lượt này không chạy thật để xác nhận cờ có hiệu lực — nhưng nay đã
+> biết chỗ bắt đầu.
+>
+> Xem `docs/BAO-CAO-DONG-V1-V2.md`, phần B.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/provider/claude.go:280`,
   `internal/provider/antigravity.go:156`, `internal/provider/codex.go:247`,
@@ -748,7 +805,73 @@ khai, không tin tiêu đề commit — mở file thật ra đọc.
   thật, chỉ là bốn provider kia chưa lộ ra nhu cầu. Ngày một bản CLI mới thêm
   thiết lập kiểu đó, ô này im lặng chuyển từ "vô hại" thành "chạy sai cấu hình".
 
-## V2. Antigravity CHƯA ĐỌC ĐƯỢC danh tính
+</details>
+
+## ~~V2~~ ✅ ĐÃ ĐÓNG 21/08 — ĐỌC ĐƯỢC danh tính, từ nhật ký của chính `agy`
+
+> **Đã trả**, và đóng theo chiều **có nguồn thật** chứ không phải hạ lời khai.
+> Ô này viết sẵn cái bẫy: banner `agy` in `ttseotop1@gmail.com`, mà
+> `google_accounts.json` cũng ghi đúng email đó — **hai giá trị trùng nhau không
+> chứng minh gì**, chúng trùng vì cùng một người từng đăng nhập Gemini CLI.
+>
+> **Lời cũ trong sổ vẫn đúng**: đo lại 21/08, `google_accounts.json` đứng im ở
+> **18/08 10:09** qua cả ba lượt `agy` ngày 21/08 (21:16, 21:17, 21:18). 24 file
+> trong `~/.gemini` đổi trong ngày, **không file nào là nó**. Lời cũ chỉ dừng
+> sớm một bước.
+>
+> **Nguồn phân biệt được**: `agy` tự ghi
+> `<hồ sơ>/.gemini/antigravity-cli/log/cli-*.log`, trong đó có
+> `applyAuthResult: email=…` và `authenticated successfully as …`.
+>
+> **HAI phép đo chứng minh nó KHÁC `google_accounts.json`** — cả hai là thư mục
+> **KHÔNG HỀ CÓ** file đó mà nhật ký **VẪN** in ra email:
+>
+> 1. **HOME giả** (đổi cả `USERPROFILE` + `APPDATA` + `LOCALAPPDATA` + `HOME`,
+>    cùng lối đã dùng đo `TachDuocTaiKhoan`) → thư mục mới dựng không có
+>    `google_accounts.json`, nhật ký vẫn ghi `email=ttseotop1@gmail.com`.
+> 2. **Hồ sơ THẬT** `~/.ai-accounts/antigravity/may` → cả cây `.gemini` của nó
+>    không có `google_accounts.json`, mà nhật ký 21/08 **14:42** ghi
+>    `consumerOAuth: authenticated successfully as …` — dòng của **chính lượt
+>    đăng nhập bằng trình duyệt hôm nay**.
+>
+> Tức email trong nhật ký đến từ **token trong Credential Manager**, không phải
+> từ file của Gemini CLI.
+>
+> **Đã loại hai nguồn khác**: `CredRead().UserName` là **hằng số `antigravity`**,
+> không phải email (`cmdkey /list:gemini:antigravity`). Và quét cả cây hồ sơ:
+> nhật ký là file **DUY NHẤT** mang chuỗi email.
+>
+> **MỘT RÀO ĐÃ ĐO RỒI BỎ** — phần đáng giữ nhất: định dùng
+> `Credential.LastWritten` làm mốc ("nhật ký cũ hơn mốc thì trả rỗng"). Đo:
+> `LastWritten` = **21:16:59**, còn nhật ký **hợp lệ** của hồ sơ `may` là
+> **20:15:39** → rào đó trả **RỖNG cho đúng cái hồ sơ đang chạy đúng**, vì
+> `LastWritten` đổi **cả khi làm mới token** lẫn khi đăng nhập lại, mà không mở
+> blob thì không tách được hai việc — và mở blob là thứ Đ4 đã cố ý từ chối. Rào
+> sai hướng thì thà không có.
+>
+> **Còn nợ, nói thẳng**: đăng nhập lại bằng tài khoản **khác** ở một HOME
+> **khác** sẽ để nhật ký cũ nằm lại trong hồ sơ này tới lượt `agy` kế tiếp. Cửa
+> sổ hẹp vì `Khong(NLTachTaiKhoan)` (mỗi máy một tài khoản), nhưng có thật — và
+> bảng năng lực nói ra thay vì giấu.
+>
+> - **Ở đâu**: `internal/provider/antigravity.go` (`Identity`), file mới
+>   `internal/provider/danhtinh_antigravity.go`.
+> - **Bài kiểm mới**: `internal/provider/danhtinh_antigravity_test.go` — 8 bài.
+>   Đáng kể nhất là `TestAntigravityKhongLayEmailTuGoogleAccounts`: dựng hồ sơ có
+>   **CẢ HAI** nguồn nói **khác nhau** rồi bắt hàm lấy nguồn do `agy` ghi. Ai
+>   "đơn giản hoá" bằng cách đọc `google_accounts.json` sẽ làm nó đỏ ngay với
+>   đúng câu chữ của ô nợ này.
+> - **Cổng `coCredential` đứng trước `Identity`** là cố ý: đăng xuất thì mục
+>   Credential Manager biến mất nhưng nhật ký cũ vẫn nằm trên đĩa — không có cổng
+>   thì hồ sơ **đã đăng xuất** vẫn khoe email.
+> - **Đã chạy trên hồ sơ thật**: `Identity()` cho ra `ttseotop1@gmail.com` trên
+>   cả `~/.ai-accounts/antigravity/may` lẫn HOME thật. (Bài kiểm tạm đó **không**
+>   commit: nó phụ thuộc máy.)
+>
+> Xem `docs/BAO-CAO-DONG-V1-V2.md`, phần A.
+
+<details><summary>Nội dung ô nợ khi còn mở</summary>
+
 
 - **Ở đâu**: `internal/provider/antigravity.go:84-88` (`Identity` trả `""`),
   `internal/provider/antigravity.go:165`.
@@ -766,6 +889,8 @@ khai, không tin tiêu đề commit — mở file thật ra đọc.
 - **Bối cảnh giảm nhẹ**: Antigravity khai `Khong(NLTachTaiKhoan)` — **mỗi máy một
   tài khoản Antigravity**. Nên "nhầm tài khoản" ở đây là nhầm giữa danh tính hiện
   tại và một danh tính cũ, không phải nhầm giữa hai tài khoản đang dùng song song.
+
+</details>
 
 ## ~~V3~~ ✅ ĐÃ ĐÓNG 21/08 — `Identity()` đọc được thật, lời khai `Duoc` nay có căn cứ
 

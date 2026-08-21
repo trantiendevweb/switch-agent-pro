@@ -249,6 +249,25 @@ func (codex) ArgsTuDuyetQuyen() ([]string, bool) {
 // mất theo kiểu agent trả lời trôi chảy về một repo KHÁC, không phải báo lỗi.
 func (codex) ArgsThuMuc(dir string) []string { return []string{"--cd", dir} }
 
+// ArgsHoSo: KHÔNG CẦN, và đây là ô ĐÁNG ĐO NHẤT trong bốn ô — vì hồ sơ Codex
+// THẬT SỰ có thiết lập trông y hệt thứ grok phải chuyển thành cờ.
+//
+// `$CODEX_HOME/config.toml` trên máy này khai `model = "gpt-5.6-sol"` và
+// `model_reasoning_effort = "high"`. Câu hỏi duy nhất đáng hỏi: `codex exec` có
+// ĐỌC file đó không, hay bỏ qua như grok bỏ qua defaultModel?
+//
+// ĐO THẬT 21/08/2026 (bản 0.147.0) — dựng một CODEX_HOME tạm chỉ có auth.json và
+// một config.toml khai `model = "khong-co-model-nay-dau"`, rồi chạy
+// `codex exec --json`:
+//
+//	item.completed: "Model metadata for `khong-co-model-nay-dau` not found..."
+//	turn.failed:    400 "The 'khong-co-model-nay-dau' model is not supported..."
+//
+// Tên model bịa đi thẳng ra tới máy chủ. Tức Codex ĐỌC config.toml của chính
+// CODEX_HOME được truyền vào — không cần ai chuyển nó thành cờ.
+//
+// Đây đúng là chỗ grok khác: grok CÓ `defaultModel` trong hồ sơ mà CLI PHỚT LỜ,
+// nên nếu không ép `-m` thì mọi bước hỏng lặng lẽ (503). Codex thì tự đọc.
 func (codex) ArgsHoSo(string) []string { return nil }
 
 // ModelArgs: CHUA DO cach chon model tu dong lenh cho provider nay.
@@ -277,7 +296,11 @@ func (codex) NangLuc() []NangLuc {
 			"và `codex exec` không có --ask-for-approval. Không cần tới cờ dangerously-bypass"),
 		Duoc(NLThuMuc, "`-C, --cd <DIR>` (đo 21/08, CHẠY THẬT): chạy trong thư mục tạm rồi bảo "+
 			"agent đọc một file chỉ có ở đó — nó đọc đúng"),
-		Chua(NLCoTuHoSo, "CHƯA ĐO: chưa gặp thiết lập nào trong ~/.codex phải chuyển thành cờ"),
+		Khong(NLCoTuHoSo, "KHÔNG CẦN — hồ sơ CÓ thiết lập model (config.toml khai model + "+
+			"model_reasoning_effort), nhưng CLI TỰ ĐỌC nó. Đo 21/08 CHẠY THẬT: dựng CODEX_HOME "+
+			"tạm với model=\"khong-co-model-nay-dau\" rồi `codex exec --json` → CLI báo "+
+			"\"Model metadata for `khong-co-model-nay-dau` not found\" và máy chủ trả 400 cho "+
+			"đúng tên bịa đó. Ngược hẳn grok: grok có defaultModel mà CLI phớt lờ nên phải ép -m"),
 		Duoc(NLKetQuaCoCauTruc, "`codex exec --json` in JSONL (đo 21/08, CHẠY THẬT 6 lượt): "+
 			"`turn.completed` mang usage.input_tokens/output_tokens, `turn.failed` mang "+
 			"error.message, `item.completed` mang agent_message và command_execution kèm "+
