@@ -205,8 +205,38 @@ func TestDoi4CatQuyenDocCuaNguoiSoi(t *testing.T) {
 	if soi == nil {
 		t.Skip("flow doi-4 không còn bước soi")
 	}
-	if len(soi.DocDuoc) != 1 || soi.DocDuoc[0] != "kiem-2" {
-		t.Fatalf("bước `soi` chỉ được đọc kết quả máy chấm `kiem-2`, được %v", soi.DocDuoc)
+	// Bài kiểm này ghim Ý ĐỊNH, không ghim một danh sách cố định: người soi
+	// không được đọc LỜI TỰ KHAI của thợ, vì đọc là bị mồi — nó sẽ nhắc lại lập
+	// luận của người làm thay vì tự đi tìm.
+	//
+	// SỬA 21/08: bản cũ đòi đúng `["kiem-2"]`. Cách viết đó chặn luôn cả bước
+	// `bang-chung` — một bước shell đổ ra `git log`/`git diff` THÔ. Output git
+	// không phải lời tự khai của ai, nên cho đọc KHÔNG phá ý định của bài kiểm;
+	// ngược lại, thiếu nó thì người soi mù hẳn: bước `soi` là node `model`, nó
+	// KHÔNG chạy được lệnh nào, và lượt #50 đã cho ra đúng câu "KHONG THE XAC
+	// DINH - khong chay duoc git tren moi truong nay".
+	//
+	// Nên luật là: cấm theo TÊN THỢ, không phải cho phép theo danh sách đóng.
+	camDoc := map[string]string{
+		"ke-hoach": "lời người điều phối",
+		"code-go":  "lời tự khai của thợ Go",
+		"code-doc": "lời tự khai của thợ tài liệu",
+		"sua":      "lời tự khai của thợ sửa",
+	}
+	for _, d := range soi.DocDuoc {
+		if vi, cam := camDoc[d]; cam {
+			t.Fatalf("bước `soi` đọc được %q (%s) — soi mà đọc lời tự khai thì bị mồi", d, vi)
+		}
+	}
+	// Và nó PHẢI đọc được kết quả máy chấm, không thì soi bằng gì.
+	coKiem2 := false
+	for _, d := range soi.DocDuoc {
+		if d == "kiem-2" {
+			coKiem2 = true
+		}
+	}
+	if !coKiem2 {
+		t.Fatalf("bước `soi` phải đọc được kết quả máy chấm `kiem-2`, được %v", soi.DocDuoc)
 	}
 	// Và lời khai phải HỢP LỆ — khai một cái tên chết thì cũng như không khai.
 	for _, p := range Validate(f) {

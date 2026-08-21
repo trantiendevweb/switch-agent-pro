@@ -832,10 +832,24 @@ nêu lý do — đừng vá bằng cách xoá test hay bỏ qua case."""
       # commit nao" voi "lenh khong chay". Co nhan thi phan trong van nhin thay
       # duoc, va dong [HET BANG CHUNG] o cuoi chung minh lenh da chay het.
       #
+      # THU TU CO CHU DICH - diff TRUOC, tom tat SAU. internal/flow/flow.go:536
+      # dat MaxInject = 6000 ky tu va khi cat thi GIU PHAN CUOI, vi "ket luan
+      # thuong o cuoi". Dung voi bao cao cua agent, SAI hoan toan voi mot git
+      # diff: phan quan trong nhat (nhanh nao co commit gi, doi file nao) nam o
+      # DAU va bi cat sach.
+      #
+      # Do that luot #51: bang chung 36.622 ky tu, `soi` chi nhan 2.733 token
+      # vao - tuc chi thay duoi diff cua may-1, chua bao gio thay commit cua
+      # tns-1. No van phan "NEN TRON" kem mo ta cua mot luot chay KHAC. Phan
+      # chac nich ve thu chua tung thay con te hon phan "khong xac dinh duoc".
+      #
+      # Nen tom tat (log + stat, ~1-2 KB) dat o CUOI de luon song sot qua nhat
+      # cat, con diff day du dat truoc va chap nhan bi cat.
+      #
       # KHONG CAT BOT: diff day du, khong `--stat` khong. Neu sau nay diff qua
       # to lam node model nghen, thi CHO NAY la cho dat gioi han - va phai ghi
       # ro da cat gi, dung cat im lang.
-      run = ["cmd", "/c", "echo [TNS] commit: & git log --oneline main..sagent/tns-1 & echo [TNS] file doi: & git diff --stat main...sagent/tns-1 & echo [TNS] diff: & git diff main...sagent/tns-1 & echo [MAY] commit: & git log --oneline main..sagent/may-1 & echo [MAY] file doi: & git diff --stat main...sagent/may-1 & echo [MAY] diff: & git diff main...sagent/may-1 & echo [HET BANG CHUNG]"]
+      run = ["cmd", "/c", "echo [DIFF DAY DU - phan nay co the bi cat] & git diff main...sagent/tns-1 & git diff main...sagent/may-1 & echo. & echo ================================ & echo [TOM TAT - luon con lai du bi cat] & echo [TNS] commit: & git log --oneline main..sagent/tns-1 & echo [TNS] file doi: & git diff --stat main...sagent/tns-1 & echo [MAY] commit: & git log --oneline main..sagent/may-1 & echo [MAY] file doi: & git diff --stat main...sagent/may-1 & echo [HET BANG CHUNG]"]
       timeout_sec = 300
       # Hong o day thi `soi` se doc duoc chuoi rong, phan "khong xac dinh duoc",
       # roi phai_co chan lai va dung luot chay. Ket cuc giong nhau ma thong bao
@@ -890,8 +904,16 @@ Nhánh nào KHÔNG có commit nào thì phán VUT và nói thẳng người đó
 Nếu phần bằng chứng bên dưới TRỐNG hoặc không đọc được, phán VUT cho cả hai và
 ghi rõ ở dòng LOI là không nhận được bằng chứng. Đừng đoán thay.
 
-Bằng chứng git — `git log` + `git diff` của cả hai nhánh:
+Bằng chứng git — `git diff` đầy đủ, rồi khối TÓM TẮT ở cuối:
 {{steps.bang-chung.output}}
+
+LƯU Ý VỀ BẰNG CHỨNG: phần diff đầy đủ có thể bị cắt mất phần ĐẦU (trần 6000 ký
+tự, giữ phần cuối). Khối `[TOM TAT]` ở CUỐI thì luôn còn nguyên — nó liệt kê
+commit và file đổi của cả hai nhánh. Khi hai phần mâu thuẫn, TIN KHỐI TÓM TẮT.
+Nhánh nào không có dòng commit nào dưới `[TNS] commit:` / `[MAY] commit:` là
+nhánh đó CHƯA LÀM GÌ — phán VUT, dù phần diff phía trên có gì đi nữa.
+Không thấy dòng `[HET BANG CHUNG]` nghĩa là lệnh gom bằng chứng chết giữa chừng:
+nói thẳng ở dòng LOI, đừng phán bừa.
 
 Máy chấm nói gì:
 {{steps.kiem-2.output}}
