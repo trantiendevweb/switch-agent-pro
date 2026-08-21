@@ -247,7 +247,7 @@ một phiên hỏng, **không phải** để thay bằng chứng.
 | Rủi ro | Trạng thái (đo 21/08 ~14:20) | Bằng chứng |
 |---|---|---|
 | ~~Backup không thật sự rời khỏi máy~~ | ✅ **ĐÃ XỬ LÝ 21/08 20:47 — có số đo** | **Nguyên nhân gốc**: `OneDrive.exe` đã bị gỡ khỏi máy, mà thư mục `OneDrive` vẫn giữ **reparse point mồ côi** (thẻ `0x9000701a`, cloud placeholder) của lần cài cũ — trong khi `SyncRootManager` trong registry đã bị xoá. Client mới thấy chỗ đã có chủ nên báo *'We can't add your OneDrive folder'*; `OneDrive.exe /reset` **không** gỡ được dấu này. **Cách sửa**: đổi tên thư mục cũ sang `OneDrive.cu-20260821` cho client dựng gốc đồng bộ sạch, đăng nhập lại, rồi chép 17 file `.enc` cục bộ sang. **Nghiệm thu bằng ĐỐI CHIẾU, không bằng biểu tượng**: lấy 17 file vốn chỉ nằm trên đĩa, đối chiếu với danh sách file đã có `ReparsePoint` trong thư mục mới → **thiếu 0**. 782.4 MB nay đã ở trên mây. |
-| **`RunAsPPL` chưa bật** | ❌ **CÓ THẬT** | `HKLM:\SYSTEM\CurrentControlSet\Control\Lsa` **không có** giá trị `RunAsPPL`. `lsass` không được bảo vệ trước công cụ trộm credential. |
+| **`RunAsPPL`** | ⏳ **ĐÃ ĐẶT 21/08, CHỜ REBOOT MỚI CÓ HIỆU LỰC** | `HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\RunAsPPL = 1` (DWord). **Chưa khởi động lại thì `lsass` vẫn chạy KHÔNG được bảo vệ** — đừng đọc dòng này thành đã xong. Máy **không có Secure Boot/UEFI** (`Confirm-SecureBootUEFI` báo `0xC0000002`), nên **không có khoá UEFI** và việc bật này **gỡ lại được**: `Remove-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' -Name RunAsPPL` rồi reboot. Lưu ý: `RunAsPPL` chống **trộm credential** từ `lsass`; nó **không** sửa việc `lsass` chết (mục A3) — hai chuyện khác nhau, đừng trông nó chữa reboot. |
 | ~~Hai task backup dùng `LogonType=Interactive`~~ | ✅ **SỔ SAI — thực tế là `S4U`** | Cả ba task đều `LogonType=S4U`, `RunLevel=Highest`: *KNOWLEDGE OS daily backup*, *Tainguyenseo website off-host backup*, *TNS OS off-host backup*. `S4U` **chạy được khi không ai đăng nhập**, nên lo ngại "reboot xong không ai RDP thì task không chạy" **không còn đúng**. Đối chứng: `knowledge-os-20260821-140001.enc` sinh lúc **14:00**, tức **sau** lần reboot 12:06. |
 | ~~Brute-force chưa chặn~~ | ✅ **SỔ SAI — đang chặn thật** | Task **`TNS Chan Bruteforce`** chạy **mỗi 5 phút** (`chan-bruteforce-rdp.ps1 -PhutNhinLai 30 -NguongSai 20`), lần cuối **14:20:20**, `Result=0`. Rule tường lửa cùng tên **`Enabled=True, Action=Block`**, đang chặn **53 IP**. |
 
@@ -285,7 +285,8 @@ diễn ra**, và kết luận ở mục A3 (**máy sẽ còn reboot**) **không 
 
    Bài canh này **không sửa được gốc**. Nó chỉ bảo đảm lần sau không ai phải
    tình cờ phát hiện.
-3. **Bật `RunAsPPL`** (cần khởi động lại máy).
+3. ✅ **Đã đặt `RunAsPPL = 1` ngày 21/08.** Còn thiếu đúng một việc: **khởi động lại máy**
+   để nó có hiệu lực. Kiểm sau khi reboot bằng chính lệnh ở bảng trên.
 
 ## F. Nguyên tắc chẩn đoán của dự án này
 
