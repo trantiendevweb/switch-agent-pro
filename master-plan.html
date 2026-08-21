@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Switch-Agent-Pro — Master Plan</title>
+<title>Master Plan</title>
 <!-- font tai kieu KHONG CHAN: hong font van doc duoc -->
 <link rel="stylesheet" media="print" onload="this.media='all'"
  href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
@@ -473,7 +473,7 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
 <li class="task done"><span class="box"></span>Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
   <code>legacy/v1-powershell/</code>; <code>design-system/switch-agent-pro/</code>; 3 trang HTML sạch tên cũ.</li>
 </ul>
-<h3>Pha 0 — Đo giả định &amp; lập hợp đồng  <strong>64%</strong> (2 xong · 5 một phần)</h3>
+<h3>Pha 0 — Đo giả định &amp; lập hợp đồng  <strong>71%</strong> (3 xong · 4 một phần)</h3>
 <p>🎯 Chứng minh cơ chế của <strong>cả hai đường</strong> trước khi khoá interface.</p>
 <ul>
 <li class="task part"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.</li>
@@ -576,24 +576,35 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
 <li><strong>CHƯA — nửa API</strong>: <code>sagent nang-luc</code> chỉ in 5 nhóm harness. Không có bảng năng
     lực nào cho nhà cung cấp API; <code>grep -rni "experimental" internal/</code> ra 0 dòng.
     Câu "route này hỗ trợ tool/vision/reasoning không" hiện không ai trả lời được.</li>
-<li class="task part"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.</li>
-<li><strong>CHƯA — không có tài liệu gộp.</strong> <code>docs/security/THREAT-MODEL.md</code> <strong>không tồn
-    tại</strong>; artifact mà mục này hứa vẫn thiếu.</li>
-<li><strong>Xong — nhưng nằm rải, và là bằng chứng chứ không phải lời hứa</strong>: cả bốn mặt
-    đều đã có phân tích tấn công + bản vá <strong>đo được</strong>, ghi trong <code>docs/DO-LUONG.md</code>:
-    subscription credential (junction-attack đi xuyên <code>os.ReadDir</code>, path-traversal
-    <strong>đã nổ thật một lần và xoá mất <code>~/.claude</code></strong>, Windows ACL: <code>0o600</code> và <code>0o644</code>
-    có ACL y hệt trên Windows) · API key (chỉ tham chiếu bằng <code>key_id</code>, <strong>không có
-    cột secret trong DB</strong>, có test chặn key rò ra lỗi) · dashboard (loopback ·
-    băm mật khẩu · chặn Host lạ chống DNS-rebind · chặn Origin lạ chống CSRF ·
-    <code>docs/DO-LUONG.md:1005</code> ghi lỗi thật <code>/login</code> từng nằm ngoài <code>guard</code>) ·
-    command exec (<code>internal/flow/flow.go</code> — node <code>shell</code> chỉ nhận <strong>argv</strong>, cố ý
-    không nhận chuỗi shell).</li>
-<li>Việc còn lại là <strong>gom lại thành một tài liệu có sườn</strong> (tài sản → kẻ tấn công →
-    đường vào → biện pháp), không phải đi đo lại từ đầu.</li>
+<li class="task done"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.
+  ✅ <strong>VIẾT XONG 21/08 — <a href="MO-HINH-DE-DOA.md"><code>docs/MO-HINH-DE-DOA.md</code></a></strong> (tên tiếng
+  Việt, thay cho <code>docs/security/THREAT-MODEL.md</code> mà artifact cũ hứa).</li>
+<li><strong>Có sườn, không phải bài luận</strong>: tài sản → <strong>sáu vị trí đứng của kẻ tấn công
+    (K1–K6)</strong> → mỗi mối đe doạ nói rõ <em>làm được gì · đứng ở đâu · hiện có gì chặn</em>,
+    kèm <code>file:dòng</code> thật. Bốn nhãn trạng thái, <strong>không có nhãn "có vẻ ổn"</strong>:
+    ✅ ĐÃ CÓ · 🟡 CÓ MỘT PHẦN · 🔴 KHÔNG CÓ GÌ · ⬜ CHƯA ĐO ĐƯỢC (kèm lý do).</li>
+<li><strong>Đo trên máy THẬT, không phải máy dev sạch</strong> (21/08 23:45): dash đang chạy
+    <code>--host 0.0.0.0 --port 8788</code> (PID 16368, bind <code>::</code>), firewall <code>sagent-dash-8788</code>
+    = <strong>Allow</strong>, <code>4625</code> <strong>157 lượt/giờ</strong> (sáng ~3.900, 14:20 là 1.867), rule chặn
+    đang giữ <strong>61 IP</strong> (14:20 là 53). Kho: <strong>4</strong> <code>.credentials.json</code> trong <code>.clones</code>,
+    <strong>2</strong> file <code>.key</code>, <strong>90</strong> worktree.</li>
+<li><strong>Nói thẳng 11 chỗ đang hở</strong>, xếp theo hậu quả. Ba dòng đầu: (1) mật khẩu dash
+    là hàng rào <strong>duy nhất VÀ cuối cùng</strong> — sau nó không còn tầng nào, mà sau cửa đó
+    là <code>POST /api/fleet</code> + <code>/api/flow/save</code> = <strong>thực thi mã tuỳ ý dưới
+    <code>Administrator</code></strong>; (2) agent chạy trong <code>~/.ai-accounts/.worktrees/…</code> tức <strong>cách
+    kho bí mật đúng ba cấp <code>..</code></strong>, không hộp cát; (3) <strong>không ghi lại lần đăng nhập
+    sai nào của dash</strong> — đang bị dò cũng không biết, trong khi RDP thì đếm được
+    tới từng lượt.</li>
+<li><strong>Không đo được thì ghi là không đo được</strong>: cổng 8788 chưa thử từ máy ngoài;
+    chưa chạy phép đo "agent có thật sự đọc được <code>api-keys/*.key</code> từ worktree
+    không" (tốn một lượt hạn mức thật); <code>lsass</code> vẫn <strong>chưa có dump</strong> nên
+    brute-force vẫn là <strong>nghi phạm</strong>.</li>
+<li><strong>Có lưới an toàn</strong>: mục K liệt kê <strong>18 bài kiểm</strong> đang ghim từng bản vá được
+    dẫn trong tài liệu — gỡ bản vá là đỏ, nên tài liệu không trôi thành văn bia.</li>
 <li><strong>Artifact:</strong> <code>docs/research/phase0/*</code> (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
-  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <code>docs/security/THREAT-MODEL.md</code>,
-  <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
+  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <strong><code>docs/MO-HINH-DE-DOA.md</code></strong> (thay
+  cho <code>docs/security/THREAT-MODEL.md</code> — cùng nội dung, tên tiếng Việt như mọi tài liệu
+  khác của dự án), <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
 <li><strong>DoD:</strong> mỗi kết luận có command/OS/output-redacted; <strong>không token thật</strong> ở đâu;
   capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.</li>
 <li>⚠ <strong>Blocker cần bạn:</strong> <strong>API key</strong> thật (local-only, redaction) cho phần API path.
@@ -604,6 +615,15 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
   là artifact của chính pha này. Đếm lại theo mã: <strong>2 xong · 5 xong một phần ·
   0 chưa làm → 4,5/7 = 64%</strong>. Ba thứ còn thiếu thật
   là: tầng redaction chung, bảng năng lực cho nửa API, và tài liệu threat model.</li>
+<li><strong>Cập nhật 21/08 tối:</strong> ô <strong>threat model</strong> đóng — <code>docs/MO-HINH-DE-DOA.md</code>. Đếm lại:
+  <strong>3 xong · 4 xong một phần · 0 chưa làm → 5/7 = 71%</strong>. Còn đúng <strong>hai</strong> thứ thiếu:
+  tầng redaction chung và bảng năng lực cho nửa API.
+  <strong>Và ô này đóng bằng một kết luận khó chịu, ghi ra đây để không ai đọc lướt:</strong>
+  gom bốn mặt lại một chỗ mới thấy thứ mà từng mặt riêng lẻ giấu được — <strong>mật khẩu
+  dashboard và cờ <code>--tu-duyet-quyen</code> gặp nhau ở <code>POST /api/fleet</code></strong>, nên một mật khẩu
+  6 ký tự trên một cổng đang phơi ra internet là <strong>thực thi mã tuỳ ý dưới
+  <code>Administrator</code></strong>. Không mặt nào trong bốn mặt tự nói ra được điều đó; <strong>chỉ có cái
+  sườn mới nói ra</strong>. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.</li>
 </ul>
 <h3>Pha 1 — Storage + Claude slice + 1 API slice  <strong>95%</strong> (9 xong · 1 một phần)</h3>
 <p>🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
@@ -811,13 +831,50 @@ dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.</
   <code>:56</code> (<code>agents</code>) — dùng ngay không cần file. Đây là <strong>bản trùng</strong> của dòng
   "3 flow mẫu dựng sẵn" đã tick bên dưới; giữ cả hai thì kế hoạch tự nói sai về
   mình, nên tick luôn. Chạy 21/08: <code>sagent flow list</code> in <strong>11 flow</strong>, gồm cả ba mẫu.</li>
-<li class="task"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
+<li class="task done"><span class="box"></span>Plugin model: TOML chỉ manifest/config tĩnh; logic động là <strong>executable riêng</strong> qua
   JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.
-  <strong>CHƯA LÀM THẬT</strong> — đã kiểm chứ không đoán: <code>grep -rni "plugin\|json-rpc" internal/
-  cmd/ --include=*.go</code> chỉ ra <strong>một</strong> dòng, và đó là chuỗi <code>"pluginUsage"</code> trong
-  <code>internal/provider/claude.go:210</code> (một khoá JSON của Claude, không liên quan).
-  Không có manifest, không có tiến trình con nói JSON-RPC, không có hộp quyền.
-  Xếp <code>[ ]</code> chứ không <code>[!]</code>: không thiếu gì bên ngoài cả.</li>
+  Làm 22/08 ở <code>internal/plugin</code> (manifest · quyen · rpc · chay · bochay), plugin mẫu
+  <code>cmd/sagent-plugin-mau</code>, node <code>plugin</code> trong <code>internal/flow</code>, lệnh <code>sagent plugin</code>
+  và <code>/api/plugins</code>. Bốn ràng buộc, và chỗ ĐO được từng cái:</li>
+<li><strong>TOML chỉ tĩnh</strong> — lược đồ không có trường nào nhận biểu thức/script/lệnh, và
+    bộ đọc <strong>TỪ CHỐI KHOÁ LẠ</strong> (<code>Doc</code> soi <code>md.Undecoded()</code>). Đây là phần đáng kể:
+    thư viện TOML mặc định <strong>bỏ qua</strong> khoá không khai, nên <code>gia_tri = "sk-..."</code> hay
+    <code>[hook] truoc_khi_chay = "..."</code> sẽ nằm im trong file — người viết tưởng nó chạy,
+    người soi tưởng nó đã được xử lý. <code>TestManifestTuChoiKhoaLa</code> bắt cả ba ca đó.</li>
+<li><strong>Executable riêng, JSON-RPC/stdio, có số phiên bản</strong> — <code>GiaoThuc = 1</code>, bắt tay
+    bằng <code>sagent.bat_tay</code> NGAY trong <code>Mo()</code>, trước khi có ai kịp gửi dữ liệu (kể cả
+    secret) cho tiến trình con. Lệch số thì <strong>dừng ở lượt bắt tay</strong>, không phải nổ
+    giữa một lượt flow đang chạy. Khung bản tin dùng CHUNG cho hai phía (<code>PhucVu</code>
+    cho plugin, <code>Client</code> cho host), nên hai bên không có đường nào lệch nhau về khung.</li>
+<li><strong>Secret chỉ là tham chiếu</strong> — manifest chỉ có <code>key_id</code>; giá trị nằm ở
+    <code>~/.ai-accounts/api-keys/&lt;id&gt;.key</code> và đọc qua đúng <code>aiapi.DocKey</code> (một bản duy
+    nhất của luật "kho ở đâu, tên thế nào là hợp lệ"). Giá trị đi qua <strong>stdio</strong> lúc
+    bắt tay — cố ý KHÔNG qua argv (mọi tiến trình trên máy đọc được dòng lệnh) và
+    KHÔNG qua biến môi trường (con cháu của plugin thừa hưởng hết).</li>
+<li><strong>Capability tối thiểu</strong> — plugin không khai thì KHÔNG có. Đo bằng cách chạy
+    <strong>cùng một binary</strong> hai lần, chỉ khác mấy dòng TOML, rồi so hai câu trả lời:
+    <code>TestKhongKhaiThuMucThiKhongThayThuMucDuAn</code>,
+    <code>TestKhongKhaiMoiTruongThiKhongThayBienCuaCha</code>,
+    <code>TestKhongKhaiSecretThiKhongNhanDuocGiaTri</code>. Cả ba đã được thử ngược (bỏ hàng
+    rào đi thì test đỏ), trừ ca secret — hàng rào thật của nó nằm ở tầng đọc
+    manifest (<code>TestKhaiSecretMaKhongKhaiQuyenThiTuChoi</code>), nhánh trong <code>docSecret</code>
+    chỉ là lớp thứ hai.
+  Bảng quyền (<code>sagent plugin quyen</code>) có <strong>HAI cột chứ không phải một</strong>: plugin KHAI
+  gì, và host <strong>CHẶN được tới đâu</strong> — ba trạng thái y như bảng năng lực provider.
+  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên hai chỗ này phải nói thẳng:</li>
+<li><code>ghi-thu-muc-lam-viec</code>: <strong>KHÔNG CHẶN ĐƯỢC</strong> (đã đo, là kết luận chứ không phải
+    khoảng trống). Thấy được đường dẫn thì ghi được; chặn ghi đòi ACL riêng cho từng
+    lần chạy, chưa làm. Cách chặn thật đang có là không cấp <code>thu-muc-lam-viec</code>.</li>
+<li><code>mang</code>: <strong>CHƯA ĐO</strong>. Host hiện KHÔNG chặn tiến trình con mở socket. Còn đường
+    WFP/AppContainer trên Windows nhưng chưa ai thử, chưa có phép đo nào trên máy
+    thật. <strong>Không khai quyền <code>mang</code> KHÔNG có nghĩa là plugin bị chặn</strong> — CLI in
+    cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.
+  Node <code>plugin</code> bật <code>implemented = true</code> vì đã chạy THẬT đầu-cuối
+  (<code>TestFlowChayPluginThat</code>: build binary → <code>flow.Runner</code> thật → tiến trình con →
+  kết quả chuyền sang bước sau), không phải vì đã viết xong mã. Nó là ĐƯỜNG THỨ BA
+  bên cạnh agent và model API, và cắm vào đúng <code>internal/flow</code> để dùng lại DAG,
+  retry, <code>on_failure</code>, <code>{{bien}}</code>, <code>doc_duoc</code>, <code>phai_co</code> — chứ không mọc thành hệ
+  thứ hai bắt người dùng học hai bộ luật cho cùng một câu "bước này hỏng thì sao".</li>
 <li class="task done"><span class="box"></span><code>internal/flow</code>: schema <code>flows.toml</code>, tầng đọc (mẫu dựng sẵn → global →
   dự án), <strong>kiểm tra DAG</strong> (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
   thứ tự chạy topo <strong>ổn định</strong>, <code>{{bien}}</code>.</li>
@@ -950,7 +1007,9 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
     / <code>FlowApprove</code> mà CLI dùng — nên approval gate vẫn không thể bị bỏ qua từ
     đường web. <code>internal/dash/lachan_test.go:151</code> giữ ánh xạ <code>flow.approve</code> →
     <code>/api/flow/decide</code>, tức luật ngang quyền vẫn có răng ở tầng hợp đồng.</li>
-<li><strong>CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.</strong> <code>grep -rn "decide" internal/dash/web/</code>
+<li><del><strong>CHƯA — KHÔNG TRANG WEB NÀO GỌI NÓ.</strong></del> ✅ <strong>ĐÃ VÁ 21/08</strong> — xem 5c.
+    Mô tả dưới đây giữ lại vì nó là cách ĐO ra lỗi, vẫn dùng được lần sau.</li>
+<li><strong>(Hiện trạng lúc phát hiện)</strong> <code>grep -rn "decide" internal/dash/web/</code>
     ra <strong>0 dòng</strong>; <code>grep -rni "reject\|tu-choi"</code> cũng không có nút nào. Người dùng
     mở dashboard thấy bước <code>waiting</code> mà <strong>không có chỗ bấm Duyệt / Từ chối</strong> —
     phải quay về terminal gõ <code>sagent flow approve &lt;#&gt; &lt;bước&gt;</code>.</li>
@@ -967,11 +1026,17 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 <ul>
 <li class="task done"><span class="box"></span><code>/flow.html</code>: chọn flow + tài khoản + biến rồi <strong>chạy</strong>; xem lịch sử; mở
   một lần chạy thấy <strong>từng bước và trạng thái</strong> (done/running/waiting/failed/skipped).</li>
-<li class="task part"><span class="box"></span><strong>Duyệt / từ chối ngay trên web</strong> — cùng đường <code>Approve()</code> với CLI, nên
-  approval gate vẫn không thể bị bỏ qua. ⚠ <strong>HẠ TỪ <code>[x]</code> XUỐNG <code>[~]</code> ngày 21/08:</strong>
-  đường server còn nguyên (<code>/api/flow/decide</code>), nhưng <strong>nút bấm đã biến mất khỏi
-  mọi trang</strong> trong một lần vẽ lại giao diện — <code>grep -rn "decide" internal/dash/web/</code>
-  ra 0 dòng. Xem mục Approval gate ở 5b để biết cách đo và lịch sử commit.</li>
+<li class="task done"><span class="box"></span><strong>Duyệt / từ chối ngay trên web</strong> — cùng đường <code>Approve()</code> với CLI, nên
+  approval gate vẫn không thể bị bỏ qua. ✅ <strong>VÁ LẠI 21/08, cùng ngày phát hiện</strong>:
+  nút từng biến mất trong một lần vẽ lại giao diện (<code>grep -rn "decide"
+  internal/dash/web/</code> ra <strong>0 dòng</strong>), nay dựng lại ở khối tiến độ lượt chạy trên
+  mặt 2D — bước mang trạng thái <code>waiting</code> thì hiện thẳng <strong>Duyệt / Từ chối</strong>, gọi
+  <code>POST /api/flow/decide {id, step, approve}</code>. Khoá cả hai nút ngay khi bấm: mạng
+  chậm mà bấm hai lần là gửi hai quyết định.
+  <strong>Và ghim để không mất lần nữa</strong>: <code>TestMoiHanhDongCuaNguoiDungDeuCoDuongVaoTuWeb</code>
+  bắt mọi endpoint hành động phải có ít nhất một trang gọi tới. Luật ngang quyền
+  cũ chỉ canh <strong>API ↔ CLI</strong>; đây là mảnh <strong>UI ↔ API</strong> còn thiếu, và chính chỗ
+  thiếu đó làm nút biến mất mà không bài kiểm nào đỏ.</li>
 <li class="task done"><span class="box"></span>Endpoint chạy flow <strong>trả ngay</strong> rồi làm ở nền: bước agent có thể mất hàng
   chục phút, không được treo request HTTP. Tiến độ đi qua luồng event.</li>
 <li class="task done"><span class="box"></span>Đã chạy thật qua HTTP: <code>shell → approve → shell</code>, dừng đúng ở gate, duyệt
@@ -1118,12 +1183,12 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 </tr>
 <tr>
 <td>Pha 0 — Đo giả định</td>
-<td>2</td>
-<td>5</td>
+<td>3</td>
+<td>4</td>
 <td>0</td>
 <td>0</td>
-<td>4,5/7</td>
-<td><strong>64%</strong></td>
+<td>5/7</td>
+<td><strong>71%</strong></td>
 </tr>
 <tr>
 <td>Pha 1 — Storage + slice</td>
