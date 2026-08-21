@@ -83,3 +83,20 @@ func TestBanGhiKhongPhaiCuaCursorThiTraFalse(t *testing.T) {
 		}
 	}
 }
+
+// Cursor cũng vậy: `usage` có token, KHÔNG có `total_cost_usd`.
+//
+// `ChiPhiUSD == 0` một mình không nói được điều đó — Claude cũng khai 0 cho lượt
+// hỏng sớm. Cái nói ra được là `ChiPhiDaDo`, và bài này giữ nó ở false.
+func TestCursorKhongCoTruongGiaThiChiPhiVanLaChuaDo(t *testing.T) {
+	k, ok := docKetQuaCursor(logCursorThat)
+	if !ok {
+		t.Fatal("không đọc được bản ghi THẬT của cursor-agent")
+	}
+	if k.ChiPhiDaDo {
+		t.Error("bản ghi Cursor KHÔNG có total_cost_usd mà vẫn khai là đã đo chi phí")
+	}
+	if k.TokenVao == 0 || k.TokenRa == 0 {
+		t.Errorf("token của Cursor phải đo được: vào %d, ra %d", k.TokenVao, k.TokenRa)
+	}
+}

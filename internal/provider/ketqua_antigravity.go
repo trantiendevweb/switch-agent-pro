@@ -16,6 +16,9 @@ import (
 // ĐO ĐƯỢC VÀ ĐÁNG NHỚ: bị chặn quyền thì `status` VẪN LÀ "SUCCESS", chỉ có
 // `response` rỗng. Nên với provider này, `status` không đủ tin — dấu hiệu thật là
 // response rỗng, cộng số bước tool kết thúc ERROR.
+//
+// `usage` có token nhưng KHÔNG có trường giá, nên `ChiPhiDaDo` ở nguyên false:
+// chi phí của Antigravity là CHƯA ĐO, không phải bằng 0 (xem ketqua.go).
 func docKetQuaAntigravity(raw string) (KetQua, bool) {
 	dong := strings.Split(raw, "\n")
 

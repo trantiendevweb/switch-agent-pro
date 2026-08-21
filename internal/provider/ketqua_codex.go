@@ -47,7 +47,10 @@ import (
 // CHƯA ĐO ĐƯỢC, nói thẳng từng cái một — đây là phần dễ bị chép ẩu nhất:
 //
 //   - ChiPhiUSD: KHÔNG có trường giá nào trong bản ghi. Để 0, y hệt Cursor. Đừng
-//     nhân token với đơn giá: đơn giá còn tuỳ model và tuỳ gói.
+//     nhân token với đơn giá: đơn giá còn tuỳ model và tuỳ gói. Và vì để 0 nên
+//     `ChiPhiDaDo` phải ở nguyên false: đó là cái duy nhất phân biệt số 0 này
+//     với số 0 mà Claude THẬT SỰ khai ra ở một lượt hỏng sớm. Mất cờ đó thì mọi
+//     mặt hiển thị đọc lượt Codex nào cũng thành "tốn 0đ".
 //   - TuChoiSo: ĐÃ ĐO VÀ KHÔNG CÓ. Chạy một lượt bảo agent ghi file mà KHÔNG có
 //     `--approve-for-me` (tức sandbox chỉ-đọc): bản ghi ra `turn.completed` bình
 //     thường, KHÔNG một dòng nào nói tới quyền — lời từ chối chỉ nằm trong văn

@@ -21,7 +21,9 @@ import (
 //     như "miễn phí", không như "chưa đọc được".
 //  2. KHÔNG có `total_cost_usd`. Cursor không nói giá, nên chi phí ở đây phải để
 //     0 và vẫn là CHƯA ĐO. Đừng suy ra tiền từ số token: đơn giá còn tuỳ model
-//     và tuỳ gói.
+//     và tuỳ gói. Cái nói ra được chữ "chưa đo" là `ChiPhiDaDo` — nó ở nguyên
+//     false ở đây, và đó là toàn bộ khác biệt giữa số 0 này với số 0 mà Claude
+//     tự khai (xem ketqua.go).
 //
 // Quét NGƯỢC từ cuối như bộ đọc của Claude: dòng `result` không nhất thiết là
 // dòng cuối cùng của file — Claude 2.1.234 đã từng thêm một dòng `task_summary`
@@ -52,9 +54,9 @@ func docKetQuaCursor(raw string) (KetQua, bool) {
 			Loai:     r.Subtype,
 			TokenVao: r.Usage.In,
 			TokenRa:  r.Usage.Out,
-			// ChiPhiUSD để 0: Cursor KHÔNG trả total_cost_usd. Đây là chưa đo
-			// được, không phải miễn phí — và mặt nào hiện số 0 thì phải hiện kèm
-			// chữ "chưa đo" như mặt 2D đang làm.
+			// ChiPhiUSD để 0 và ChiPhiDaDo để false: Cursor KHÔNG trả
+			// total_cost_usd. Đây là chưa đo được, không phải miễn phí — và mặt
+			// nào hiện số 0 thì phải hiện kèm chữ "chưa đo" như mặt 2D đang làm.
 		}
 		// `LoiAPI` là `api_error_status` — nó là THỨ PHÂN LOẠI `failed`, không
 		// phải một ô ghi chú. Nhét `request_id` vào đó thì mọi lượt Cursor đều

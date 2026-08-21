@@ -19,15 +19,21 @@ func docKetQuaClaude(raw string) (KetQua, bool) {
 			continue
 		}
 		var r struct {
-			IsError     bool    `json:"is_error"`
-			Subtype     string  `json:"subtype"`
-			StopReason  string  `json:"stop_reason"`
-			Terminal    string  `json:"terminal_reason"`
-			APIErr      *string `json:"api_error_status"`
-			NumTurns    int     `json:"num_turns"`
-			Result      string  `json:"result"`
-			CostUSD     float64 `json:"total_cost_usd"`
-			PermDenials []any   `json:"permission_denials"`
+			IsError    bool    `json:"is_error"`
+			Subtype    string  `json:"subtype"`
+			StopReason string  `json:"stop_reason"`
+			Terminal   string  `json:"terminal_reason"`
+			APIErr     *string `json:"api_error_status"`
+			NumTurns   int     `json:"num_turns"`
+			Result     string  `json:"result"`
+			// CON TRỎ, không phải float64: cần phân biệt "bản ghi khai
+			// total_cost_usd=0" (lượt hỏng ngay từ đầu — số 0 THẬT) với "bản ghi
+			// không có trường ấy". Đọc vào float64 thì cả hai ra 0 và ChiPhiDaDo
+			// hoá thành lời khai bừa. Claude 2.1.x luôn có trường này, nhưng bộ
+			// đọc không được phụ thuộc vào việc đó: CLI bỏ trường đi thì ta phải
+			// tụt về "chưa đo", chứ không phải báo miễn phí.
+			CostUSD     *float64 `json:"total_cost_usd"`
+			PermDenials []any    `json:"permission_denials"`
 			Usage       struct {
 				In  int `json:"input_tokens"`
 				Out int `json:"output_tokens"`
@@ -37,16 +43,21 @@ func docKetQuaClaude(raw string) (KetQua, bool) {
 			continue
 		}
 		k := KetQua{
-			TraLoi:    strings.TrimSpace(r.Result),
-			CoLoi:     r.IsError,
-			Loai:      r.Subtype,
-			DungViCo:  r.StopReason,
-			KetCuc:    r.Terminal,
-			SoLuotTu:  r.NumTurns,
-			TuChoiSo:  len(r.PermDenials),
-			ChiPhiUSD: r.CostUSD,
-			TokenVao:  r.Usage.In,
-			TokenRa:   r.Usage.Out,
+			TraLoi:   strings.TrimSpace(r.Result),
+			CoLoi:    r.IsError,
+			Loai:     r.Subtype,
+			DungViCo: r.StopReason,
+			KetCuc:   r.Terminal,
+			SoLuotTu: r.NumTurns,
+			TuChoiSo: len(r.PermDenials),
+			TokenVao: r.Usage.In,
+			TokenRa:  r.Usage.Out,
+		}
+		// Claude là provider DUY NHẤT đo được chi phí: `total_cost_usd` là trường
+		// có tên trong bản ghi, không phải số ta nhân ra từ token (đơn giá còn tuỳ
+		// model và tuỳ gói — xem ketqua_codex.go).
+		if r.CostUSD != nil {
+			k.ChiPhiUSD, k.ChiPhiDaDo = *r.CostUSD, true
 		}
 		if r.APIErr != nil {
 			k.LoiAPI = *r.APIErr

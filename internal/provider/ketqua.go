@@ -40,6 +40,23 @@ type KetQua struct {
 	TokenVao  int
 	TokenRa   int
 
+	// ChiPhiDaDo nói `ChiPhiUSD` là SỐ ĐO ĐƯỢC hay chỉ là giá trị mặc định của
+	// kiểu. Không có nó thì hai chuyện hoàn toàn khác nhau nhìn giống hệt nhau:
+	//
+	//   - Claude khai `"total_cost_usd":0` cho một lượt hỏng ngay từ đầu — số 0
+	//     THẬT, nhà cung cấp tự nói ra.
+	//   - Codex và Cursor KHÔNG có trường giá nào trong bản ghi (xem
+	//     ketqua_codex.go, ketqua_cursor.go). ChiPhiUSD của chúng là 0 vì CHƯA AI
+	//     ĐO, không phải vì lượt chạy miễn phí.
+	//
+	// Gộp hai ca đó lại là cách biến "chưa đo" thành một hoá đơn ghi 0đ. Mặt web
+	// đã có luật cho chuyện này rồi — ô chưa đo phải ghi chữ "chưa đo" chứ không
+	// được lấp số 0 (internal/dash/mat2d_test.go) — nhưng luật ấy chỉ thi hành
+	// được khi tầng dưới nói ra được sự khác biệt.
+	//
+	// Ai đặt cờ này: CHỈ bộ đọc nào THẬT SỰ thấy trường giá trong bản ghi.
+	ChiPhiDaDo bool
+
 	// HanMucDenLai: mốc thời gian (unix) hạn mức được cấp lại, 0 nếu không rõ.
 	HanMucDenLai int64
 
