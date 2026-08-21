@@ -120,7 +120,7 @@ func docKetQuaCodex(raw string) (KetQua, bool) {
 	if !xong {
 		return KetQua{}, false
 	}
-	k.LenhLap, k.SoLanLap, k.DemDuocTool = d.KetLuan()
+	k.LenhLap, k.SoLanLap, k.SoLoiGoiTool, k.DemDuocTool = d.KetLuan()
 	return k, true
 }
 

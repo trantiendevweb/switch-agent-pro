@@ -81,11 +81,12 @@ func docKetQuaGrok(raw string) (KetQua, bool) {
 	if !coDong {
 		return KetQua{}, false
 	}
-	lenh, soLan, demDuoc := d.KetLuan()
+	lenh, soLan, soLoiGoi, demDuoc := d.KetLuan()
 	return KetQua{
-		TraLoi:      traLoi,
-		DemDuocTool: demDuoc,
-		LenhLap:     lenh,
-		SoLanLap:    soLan,
+		TraLoi:       traLoi,
+		DemDuocTool:  demDuoc,
+		LenhLap:      lenh,
+		SoLanLap:     soLan,
+		SoLoiGoiTool: soLoiGoi,
 	}, true
 }

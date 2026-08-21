@@ -52,7 +52,7 @@ func docKetQuaClaude(raw string) (KetQua, bool) {
 			k.LoiAPI = *r.APIErr
 		}
 		k.HanMucDenLai = hanMucClaude(dong)
-		k.LenhLap, k.SoLanLap, k.DemDuocTool = lapLaiClaude(dong)
+		k.LenhLap, k.SoLanLap, k.SoLoiGoiTool, k.DemDuocTool = lapLaiClaude(dong)
 		return k, true
 	}
 	return KetQua{}, false
@@ -90,7 +90,7 @@ func hanMucClaude(dong []string) int64 {
 // đổi vỏ mà vẫn giữ khối tool_use thì vẫn đếm được. Còn nếu chính khối tool_use
 // đổi tên trường thì hàm trả docDuoc=false, và KetQua.Quan() nói KHÔNG BIẾT thay
 // vì nói "không quẩn" — hỏng về phía im lặng, không hỏng về phía vu oan.
-func lapLaiClaude(dong []string) (lenh string, soLan int, docDuoc bool) {
+func lapLaiClaude(dong []string) (lenh string, soLan, soLoiGoi int, docDuoc bool) {
 	var d demQuan
 	for _, l := range dong {
 		l = strings.TrimSpace(l)
