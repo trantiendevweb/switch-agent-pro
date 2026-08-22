@@ -644,20 +644,37 @@ gateway <code>new-api</code> (<code>X-New-Api-Version</code>), và <strong>chưa
 bằng một phản hồi thật.</li>
 </ul>
 </li>
-<li>🟡 <strong>ĐÃ ĐO, CHƯA LÀM — tool / reasoning / vision / structured-output</strong>: trước
-đây dòng này là một khoảng trống; nay nó là một <strong>kết luận có số</strong>. Đo thật
-22/08 bằng key thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
+<li>🟡 <strong>ĐÃ ĐO — 4 ô nợ phía dự án, ĐÓNG 2 trong ngày</strong>: trước đây dòng này là
+một khoảng trống; nay nó là một <strong>kết luận có số</strong>. Đo thật 22/08 bằng key
+thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
 <a href="BAO-CAO-NANGLUC-API.md"><code>docs/BAO-CAO-NANGLUC-API.md</code></a>:
 <strong>4 trên 7 năng lực bị chặn ở PHÍA DỰ ÁN, không phải ở nhà cung cấp.</strong>
-<code>goi-tool</code> (<code>aiapi.yeuCau</code> không có trường <code>tools</code>, <code>phanHoi</code> không đọc
-<code>tool_calls</code> — <strong>cả hai nhà đều làm được</strong>), <code>dau-vao-anh</code> (<code>tinNhan.Content</code>
-là <code>string</code> thuần, giao thức đòi mảng <code>{type, image_url}</code> — <strong>grok làm được</strong>),
-<code>dau-ra-co-cau-truc</code> (không có <code>response_format</code> — <strong>grok làm được</strong>),
-<code>reasoning</code> (<code>phanHoi</code> chỉ đọc <code>content</code>, phần suy luận bị vứt trước khi ai
-nhìn thấy — <strong>deepseek làm được</strong>). Chỗ phải sửa nằm trong repo này, nên ô
-này là <strong>nợ</strong>, không phải bị chặn.</li>
+<ul>
+<li>✅ <strong><code>reasoning</code> — ĐÓNG 22/08.</strong> <code>tinNhan</code> đọc <code>reasoning_content</code>, giá trị
+đi tới <code>KetQua.SuyLuan</code>, và có mặt đọc nó (cờ CLI + dashboard). Đo thật
+với deepseek: câu trả lời 91 ký tự, phần suy luận <strong>477 ký tự</strong> — phần
+từng bị vứt dài <strong>gấp 5,2 lần</strong> phần giữ lại, mà người dùng đã trả tiền
+cho cả hai.</li>
+<li>✅ <strong><code>goi-tool</code> — ĐÓNG 22/08.</strong> <code>aiapi</code> gửi được định nghĩa tool và đọc lại
+<code>tool_calls</code>. Cố ý <strong>KHÔNG</strong> chạy tool hộ người gọi: làm vậy là biến thư
+viện thành nửa vòng lặp agent, phá lời hứa &#34;mọi lời gọi đều nói ra nó tiêu
+gì&#34;, và mở một đường chạy lệnh thứ hai không qua bảng quyền plugin. Có bài
+kiểm <strong>đếm số lượt chạm mạng và đỏ nếu khác 1</strong>.
+Xem <a href="BAO-CAO-TOOLS-SUYLUAN.md"><code>docs/BAO-CAO-TOOLS-SUYLUAN.md</code></a>.</li>
+<li>🟡 <strong><code>dau-vao-anh</code> còn nợ</strong>: <code>tinNhan.Content</code> là <code>string</code> thuần, giao thức
+đòi mảng <code>{type, image_url}</code> — <strong>grok làm được</strong>, deepseek thì không
+(HTTP 400 &#34;This model does not support image&#34;).</li>
+<li>🟡 <strong><code>dau-ra-co-cau-truc</code> còn nợ</strong>: không có <code>response_format</code> — <strong>grok làm
+được</strong>, deepseek thì không (HTTP 400 &#34;This response_format type is
+unavailable now&#34;).</li>
 </ul>
 </li>
+</ul>
+</li>
+</ul>
+<p>Hai ô còn lại vẫn là <strong>nợ của dự án</strong> cho route grok, và <strong>vướng cả hai bên</strong>
+cho route deepseek — hai chuyện khác nhau, đừng gộp.</p>
+<ul>
 <li class="task done"><span class="box"></span>Junction Windows ✓ / <del>symlink Linux</del> từ Go, không admin. Đo ở
 <code>docs/DO-LUONG.md:112-122</code>: <code>sagent them claude:smoketest</code> (không quyền quản
 trị) nối <strong>17 mục dùng chung</strong>, PowerShell xác nhận <code>ReparsePoint = True</code> cho
@@ -1685,7 +1702,7 @@ một khoản nợ của mình — tô hồng, đúng chiều đắt hơn.</p>
 <tr>
 <td>API</td>
 <td>Pha 0</td>
-<td>3/4 giao thức (<strong>bị chặn</strong>, xem bảng trên) · tool · vision · structured-output · reasoning (<strong>nợ của dự án</strong>)</td>
+<td>3/4 giao thức (<strong>bị chặn</strong>, xem bảng trên) · vision · structured-output (<strong>nợ của dự án</strong>; <code>tool</code> và <code>reasoning</code> đã đóng 22/08)</td>
 </tr>
 <tr>
 <td>1 direct-API vertical slice</td>

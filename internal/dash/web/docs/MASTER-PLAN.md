@@ -459,18 +459,31 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
       gateway `new-api` (`X-New-Api-Version`), và **chưa kiểm** new-api có gửi
       `Retry-After` kèm 429 hay không. Mã đường 429 hiện được canh bằng test, chưa
       bằng một phản hồi thật.
-  - 🟡 **ĐÃ ĐO, CHƯA LÀM — tool / reasoning / vision / structured-output**: trước
-    đây dòng này là một khoảng trống; nay nó là một **kết luận có số**. Đo thật
-    22/08 bằng key thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
+  - 🟡 **ĐÃ ĐO — 4 ô nợ phía dự án, ĐÓNG 2 trong ngày**: trước đây dòng này là
+    một khoảng trống; nay nó là một **kết luận có số**. Đo thật 22/08 bằng key
+    thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
     [`docs/BAO-CAO-NANGLUC-API.md`](BAO-CAO-NANGLUC-API.md):
     **4 trên 7 năng lực bị chặn ở PHÍA DỰ ÁN, không phải ở nhà cung cấp.**
-    `goi-tool` (`aiapi.yeuCau` không có trường `tools`, `phanHoi` không đọc
-    `tool_calls` — **cả hai nhà đều làm được**), `dau-vao-anh` (`tinNhan.Content`
-    là `string` thuần, giao thức đòi mảng `{type, image_url}` — **grok làm được**),
-    `dau-ra-co-cau-truc` (không có `response_format` — **grok làm được**),
-    `reasoning` (`phanHoi` chỉ đọc `content`, phần suy luận bị vứt trước khi ai
-    nhìn thấy — **deepseek làm được**). Chỗ phải sửa nằm trong repo này, nên ô
-    này là **nợ**, không phải bị chặn.
+    - ✅ **`reasoning` — ĐÓNG 22/08.** `tinNhan` đọc `reasoning_content`, giá trị
+      đi tới `KetQua.SuyLuan`, và có mặt đọc nó (cờ CLI + dashboard). Đo thật
+      với deepseek: câu trả lời 91 ký tự, phần suy luận **477 ký tự** — phần
+      từng bị vứt dài **gấp 5,2 lần** phần giữ lại, mà người dùng đã trả tiền
+      cho cả hai.
+    - ✅ **`goi-tool` — ĐÓNG 22/08.** `aiapi` gửi được định nghĩa tool và đọc lại
+      `tool_calls`. Cố ý **KHÔNG** chạy tool hộ người gọi: làm vậy là biến thư
+      viện thành nửa vòng lặp agent, phá lời hứa "mọi lời gọi đều nói ra nó tiêu
+      gì", và mở một đường chạy lệnh thứ hai không qua bảng quyền plugin. Có bài
+      kiểm **đếm số lượt chạm mạng và đỏ nếu khác 1**.
+      Xem [`docs/BAO-CAO-TOOLS-SUYLUAN.md`](BAO-CAO-TOOLS-SUYLUAN.md).
+    - 🟡 **`dau-vao-anh` còn nợ**: `tinNhan.Content` là `string` thuần, giao thức
+      đòi mảng `{type, image_url}` — **grok làm được**, deepseek thì không
+      (HTTP 400 "This model does not support image").
+    - 🟡 **`dau-ra-co-cau-truc` còn nợ**: không có `response_format` — **grok làm
+      được**, deepseek thì không (HTTP 400 "This response_format type is
+      unavailable now").
+
+    Hai ô còn lại vẫn là **nợ của dự án** cho route grok, và **vướng cả hai bên**
+    cho route deepseek — hai chuyện khác nhau, đừng gộp.
 - [x] Junction Windows ✓ / ~~symlink Linux~~ từ Go, không admin. Đo ở
   `docs/DO-LUONG.md:112-122`: `sagent them claude:smoketest` (không quyền quản
   trị) nối **17 mục dùng chung**, PowerShell xác nhận `ReparsePoint = True` cho
@@ -1314,7 +1327,7 @@ một khoản nợ của mình — tô hồng, đúng chiều đắt hơn.
 | Ô | Ở đâu | Phần chưa xong |
 |---|---|---|
 | Subscription | Pha 0 | ACP (chưa harness nào đo qua giao thức này) · resume/cancel **ở tầng harness** (`flow resume`/`flow huy` là của bộ chạy flow, không phải cờ `--resume` của từng CLI) · trình tự chạm file theo pha login/prompt/refresh/exit |
-| API | Pha 0 | 3/4 giao thức (**bị chặn**, xem bảng trên) · tool · vision · structured-output · reasoning (**nợ của dự án**) |
+| API | Pha 0 | 3/4 giao thức (**bị chặn**, xem bảng trên) · vision · structured-output (**nợ của dự án**; `tool` và `reasoning` đã đóng 22/08) |
 | 1 direct-API vertical slice | Pha 1 | xem chi tiết tại ô đó |
 | Engine flow | Pha 3 | **route theo capability/giá** — mảnh cuối cùng; bảng năng lực API đã có từ 22/08 nhưng bộ chọn đường vẫn đi theo TÊN, chưa đọc bảng đó và chưa đọc bảng giá |
 

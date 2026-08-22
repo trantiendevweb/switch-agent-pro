@@ -25,6 +25,11 @@ require_approval_for  = ["merge", "deploy"]
 #
 # Cả khối này CÓ THỂ BỎ TRỐNG — mặc định đã là 3/3/2 và chạy được ngay.
 # Số 0 ở bất kỳ khoá nào nghĩa là TẮT chiều đó (giống `max_parallel_sessions`).
+# ĐỌC KỸ TRƯỚC KHI SỬA `max_parallel_sessions` ở trên: với bộ mặc định dưới đây,
+# con số 4 là một lời hứa mà trần provider (3) KHÔNG cho giữ. Bốn bước `agent`
+# cùng nhà cung cấp `claude` không bao giờ chạy quá 3 cùng lúc, dù bạn có bao
+# nhiêu tài khoản. Trước 22/08 chuyện đó vô hình vì cửa flow chưa áp trần; nay
+# nó là hành vi thấy được mỗi ngày. Muốn đúng 4 thì nâng `provider_mac_dinh`.
 [policy.tran]
 harness_mac_dinh  = 3   # tài nguyên máy: bao nhiêu tiến trình CLI cùng lúc
 provider_mac_dinh = 3   # trần của nhà cung cấp, tính trên TỔNG các tài khoản

@@ -3755,3 +3755,56 @@ gặp cùng một hình dạng — sau `route.kiem`, nút Duyệt/Từ chối, `
   kiểm bằng **mã thoát** (`go test ./...; echo $?`), không bằng phép lọc chữ.
   Cùng một bài học với `sagent ds`: một chỉ báo trả lời câu dễ hơn câu người đọc
   tưởng nó đang trả lời.
+
+## 22/08 — Đóng `goi-tool` bằng cách TỪ CHỐI chạy tool, và trần đồng thời cho đường flow
+
+- **`goi-tool` (phiên #205)**: `aiapi` nay gửi được định nghĩa tool và đọc lại
+  `tool_calls`. Câu hỏi ghim trong brief — *"sau khi model trả về một tool_call
+  thì AI chạy cái tool đó?"* — được trả lời bằng **KHÔNG**, kèm ba lý do:
+  1. Chạy tool hộ biến thư viện thành **nửa vòng lặp agent**, và phá lời hứa nền
+     của cả gói: *"mọi lời gọi đều nói ra nó tiêu gì"* — `Usage` của lượt nào,
+     khi một lần gõ lệnh thành sáu lượt gọi?
+  2. `sagent` **đã có** một đường chạy-thứ-gì-đó: flow, với bảng quyền plugin,
+     có duyệt, có sổ. Cho thư viện API mọc đường chạy lệnh **thứ hai** ở dưới
+     đáy, không qua bảng quyền nào, là mở cửa sau cho chính dự án này.
+  3. Tên hàm và tham số là **chữ do model sinh** — phải bị người gọi soi, không
+     phải được một hàm thư viện lặng lẽ thi hành.
+
+  Và nó **không dừng ở bình luận**: có bài kiểm **đếm số lượt chạm mạng, đỏ nếu
+  khác 1**. Nguyên văn báo cáo: *"bình luận thì mục ruỗng; con số thì không"*.
+- **Điểm mù của bảng năng lực, thu hẹp thêm một nấc**: `phepDoMaNguon` nay hỏi
+  **câu thứ ba** — `KetQua` có **chỗ chứa** giá trị không — chứ không chỉ hỏi
+  kiểu phản hồi có trường không. Áp cho cả `goi-tool` lẫn `reasoning`. Vẫn chưa
+  bịt được hết (nó không biết ai đọc `KetQua`), nhưng hẹp hơn một nấc.
+- **Trần đồng thời cho đường flow (phiên #206)** — mảnh **cuối cùng** của engine.
+  Trước bản sửa: bốn trần chỉ canh cửa `FleetStart`; `api.go:1677` truyền đúng
+  một con số vào `flow.Runner`, nên bốn bước `agent` cùng khai
+  `profile = "claude:tns"` vẫn chạy 4 phiên trên **một** tài khoản — đúng sự cố
+  đã đẻ ra bốn trần kia, chỉ khác cửa. Nguyên tắc chọn: **xin không được thì
+  CHỜ, không giết lượt chạy** — một lượt flow đêm dài bị giết vì trần tệ hơn là
+  chạy chậm. Có canh chết cứng, vì *"deadlock thì ầm ĩ và dễ thấy; đếm sai thì
+  im lặng và đắt"*.
+
+### Món nợ tài liệu #206 tự chỉ ra, và tôi đóng ngay
+
+Với bộ mặc định, `max_parallel_sessions = 4` là **một lời hứa mà trần provider
+(3) không cho giữ**: bốn bước `agent` cùng nhà cung cấp `claude` không bao giờ
+chạy quá 3 cùng lúc, dù có bao nhiêu tài khoản. Trước 22/08 chuyện đó **vô hình**
+vì cửa flow không áp trần; sau bản sửa nó thành hành vi thấy được mỗi ngày.
+#206 neo bằng một bài kiểm nhưng nói thẳng *"chỗ đúng để giải thích là tài liệu
+người dùng — mà tài liệu nằm ngoài vùng của lượt này"*. Đã ghi vào
+`.sagent/project.toml` ngay trên khối `[policy.tran]`.
+
+### Kế hoạch: sửa dòng đã cũ ngay khi vừa cập nhật
+
+`docs/MASTER-PLAN.md` ghi *"bốn năng lực tool · vision · structured-output ·
+reasoning là lỗi nằm trong repo này"* — đúng lúc phiên #203 viết, sai ngay sau
+đó, vì `reasoning` và `goi-tool` được đóng **trong lúc** #203 đang chạy. Nay còn
+**hai**: `dau-vao-anh` và `dau-ra-co-cau-truc` — và hai ô đó **không cùng loại**:
+nợ của dự án cho route **grok** (nhà cung cấp làm được), vướng **cả hai bên** cho
+route **deepseek**. Đã tách rõ, sinh lại cả hai trang, `diff` hai bản
+MASTER-PLAN rỗng.
+
+**Bài học về cách chia việc song song**: người cập nhật sổ và người sửa mã
+**không chạy cùng lúc mà sổ vẫn đúng được**. Lượt sau nên để việc cập nhật kế
+hoạch chạy MỘT MÌNH, hoặc chạy sau cùng.

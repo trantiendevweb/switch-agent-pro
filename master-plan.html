@@ -617,116 +617,131 @@ Chi tiết: <code>96 [x] · 4 [~] · 0 [ ] · 0 [!]</code>. <strong>5 ô đổi 
   bằng một phản hồi thật.</li>
 </ul>
 </li>
-<li>🟡 <strong>ĐÃ ĐO, CHƯA LÀM — tool / reasoning / vision / structured-output</strong>: trước
-    đây dòng này là một khoảng trống; nay nó là một <strong>kết luận có số</strong>. Đo thật
-    22/08 bằng key thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
+<li>
+<p>🟡 <strong>ĐÃ ĐO — 4 ô nợ phía dự án, ĐÓNG 2 trong ngày</strong>: trước đây dòng này là
+    một khoảng trống; nay nó là một <strong>kết luận có số</strong>. Đo thật 22/08 bằng key
+    thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
     <a href="BAO-CAO-NANGLUC-API.md"><code>docs/BAO-CAO-NANGLUC-API.md</code></a>:
-    <strong>4 trên 7 năng lực bị chặn ở PHÍA DỰ ÁN, không phải ở nhà cung cấp.</strong>
-    <code>goi-tool</code> (<code>aiapi.yeuCau</code> không có trường <code>tools</code>, <code>phanHoi</code> không đọc
-    <code>tool_calls</code> — <strong>cả hai nhà đều làm được</strong>), <code>dau-vao-anh</code> (<code>tinNhan.Content</code>
-    là <code>string</code> thuần, giao thức đòi mảng <code>{type, image_url}</code> — <strong>grok làm được</strong>),
-    <code>dau-ra-co-cau-truc</code> (không có <code>response_format</code> — <strong>grok làm được</strong>),
-    <code>reasoning</code> (<code>phanHoi</code> chỉ đọc <code>content</code>, phần suy luận bị vứt trước khi ai
-    nhìn thấy — <strong>deepseek làm được</strong>). Chỗ phải sửa nằm trong repo này, nên ô
-    này là <strong>nợ</strong>, không phải bị chặn.</li>
-<li class="task done"><span class="box"></span>Junction Windows ✓ / <del>symlink Linux</del> từ Go, không admin. Đo ở
+    <strong>4 trên 7 năng lực bị chặn ở PHÍA DỰ ÁN, không phải ở nhà cung cấp.</strong></p>
+<ul>
+<li>✅ <strong><code>reasoning</code> — ĐÓNG 22/08.</strong> <code>tinNhan</code> đọc <code>reasoning_content</code>, giá trị
+  đi tới <code>KetQua.SuyLuan</code>, và có mặt đọc nó (cờ CLI + dashboard). Đo thật
+  với deepseek: câu trả lời 91 ký tự, phần suy luận <strong>477 ký tự</strong> — phần
+  từng bị vứt dài <strong>gấp 5,2 lần</strong> phần giữ lại, mà người dùng đã trả tiền
+  cho cả hai.</li>
+<li>✅ <strong><code>goi-tool</code> — ĐÓNG 22/08.</strong> <code>aiapi</code> gửi được định nghĩa tool và đọc lại
+  <code>tool_calls</code>. Cố ý <strong>KHÔNG</strong> chạy tool hộ người gọi: làm vậy là biến thư
+  viện thành nửa vòng lặp agent, phá lời hứa "mọi lời gọi đều nói ra nó tiêu
+  gì", và mở một đường chạy lệnh thứ hai không qua bảng quyền plugin. Có bài
+  kiểm <strong>đếm số lượt chạm mạng và đỏ nếu khác 1</strong>.
+  Xem <a href="BAO-CAO-TOOLS-SUYLUAN.md"><code>docs/BAO-CAO-TOOLS-SUYLUAN.md</code></a>.</li>
+<li>🟡 <strong><code>dau-vao-anh</code> còn nợ</strong>: <code>tinNhan.Content</code> là <code>string</code> thuần, giao thức
+  đòi mảng <code>{type, image_url}</code> — <strong>grok làm được</strong>, deepseek thì không
+  (HTTP 400 "This model does not support image").</li>
+<li>🟡 <strong><code>dau-ra-co-cau-truc</code> còn nợ</strong>: không có <code>response_format</code> — <strong>grok làm
+  được</strong>, deepseek thì không (HTTP 400 "This response_format type is
+  unavailable now").</li>
+</ul>
+<p>Hai ô còn lại vẫn là <strong>nợ của dự án</strong> cho route grok, và <strong>vướng cả hai bên</strong>
+cho route deepseek — hai chuyện khác nhau, đừng gộp.
+- [x] Junction Windows ✓ / <del>symlink Linux</del> từ Go, không admin. Đo ở
   <code>docs/DO-LUONG.md:112-122</code>: <code>sagent them claude:smoketest</code> (không quyền quản
   trị) nối <strong>17 mục dùng chung</strong>, PowerShell xác nhận <code>ReparsePoint = True</code> cho
   mọi mục, riêng <code>.claude.json</code> là <code>False</code> (file riêng thật). <code>link.IsLink</code> qua
   <code>GetFileAttributes</code> nhận đúng. Nhánh Linux <strong>bỏ khỏi phạm vi</strong> theo quyết định
-  "CHỈ WINDOWS" ở đầu tài liệu, nên ô này không còn nợ gì.</li>
-<li class="task done"><span class="box"></span>Behavior khi stream/process ngắt, reboot, config ghi dở — cả ba đều đã đo,
-  và mỗi cái ra một kết luận khác nhau:</li>
-<li><strong>stream ngắt</strong>: <code>internal/aiapi/stream_test.go:131</code> (<code>TestManhHongKhongGietCaLuot</code>)
-    — một mảnh SSE hỏng không giết cả lượt; <code>:192</code> — stream rỗng bị coi là HỎNG
-    chứ không phải "trả lời rỗng".</li>
-<li><strong>process ngắt</strong>: <code>process.KillTree</code> (đo ở <code>docs/DO-LUONG.md</code> mục Pha 7) —
-    <code>taskkill /T</code> bỏ sót đám con khi cha đã thoát; <code>status</code> đối chiếu PID thật rồi
-    tự đánh dấu <code>lost</code>, <code>sagent quet</code> tìm tiến trình mồ côi và <strong>mặc định chỉ báo</strong>
-    vì Windows dùng lại PID.</li>
-<li><strong>reboot</strong>: <code>docs/KHAC-PHUC-SU-CO.md</code> mục 2 — lượt chạy kẹt <code>running</code> vĩnh
-    viễn vì <code>state.db</code> không kịp nhận tín hiệu. Trạng thái từng bước nằm ở SQLite
-    nên <code>flow resume</code> chạy tiếp được. <strong>Nói thẳng phần chưa đẹp</strong>: không có khâu
-    tự dọn lúc khởi động — người dùng phải gõ <code>sagent flow huy &lt;#&gt;</code>.</li>
-<li><strong>config ghi dở</strong>: <code>internal/jsonutil/jsonutil.go:28</code> <code>AtomicWrite</code> ghi file
-    tạm rồi <code>Rename</code>; <code>Backup</code> (<code>:38</code>) sao lưu trước khi đè. Phía DB thì chặn hạ
-    cấp schema + tự sao lưu bằng <code>VACUUM INTO</code> (Pha 7).</li>
-<li class="task done"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).</li>
-<li><strong>Xong cho HARNESS, và sạch</strong>: <code>internal/provider/nangluc.go:21-28</code> khai ba
-    trạng thái <code>LamDuoc</code> / <code>KhongLamDuoc</code> / <code>ChuaDo</code>, có conformance test đối
-    chiếu lời khai với hành vi thật (<code>internal/provider/nangluc_test.go:78,230</code>).
-    Chạy 21/08: <code>sagent nang-luc --chua-do</code> → <strong>"Không còn năng lực nào chưa đo."</strong>
-    — 5 provider × 9 năng lực, <strong>0 ô <code>ChuaDo</code></strong>.</li>
-<li><strong>Bốn trạng thái rút thành ba, CÓ CHỦ Ý</strong>: <code>experimental</code> bị bỏ vì nó trộn hai
-    câu khác nhau ("đã đo, hơi rung" và "chưa ai đo"). <code>KhongLamDuoc</code> là một <strong>kết
-    luận</strong> chứ không phải khoảng trống — đó là chỗ ba trạng thái đáng giá hơn hai.</li>
-<li>✅ <strong>XONG 22/08 — nửa API</strong>: <code>internal/aiapi/nangluc.go</code> (617 dòng) +
-    <code>donangluc.go</code> (493 dòng), lệnh <code>sagent nang-luc-api [--chua-do|--do]</code>,
-    <code>GET /api/nang-luc-api</code>, và khối "Năng lực route API" trên mặt web. <strong>7 năng
-    lực × 2 route</strong>, đo THẬT 22/08 bằng key thật (~4.500 token) — chứ không phải
-    một bảng khai tay. Xem <a href="BAO-CAO-NANGLUC-API.md"><code>docs/BAO-CAO-NANGLUC-API.md</code></a>.
-    Câu "route này hỗ trợ tool/vision/reasoning không" nay có người trả lời.</li>
-<li><strong>Ba trạng thái KHÔNG bị chép làm hai bản</strong>: <code>aiapi.TrangThaiNangLuc</code> là
-    <strong>type alias</strong> sang <code>provider.TrangThaiNangLuc</code> — <code>aiapi.LamDuoc</code> và
-    <code>provider.LamDuoc</code> là <strong>cùng một kiểu</strong>. Hai bản sao của một quy ước là hai
-    bản sẽ lệch nhau, và bản lệch bao giờ cũng lệch theo đúng một chiều: gộp "đã
-    đo, KHÔNG" với "chưa ai đo" thành một chữ <code>false</code>.</li>
-<li><strong>Chỗ nửa API khác nửa CLI, và đây là quyết định đáng giá nhất của nó</strong>: mỗi ô
-    trả lời <strong>HAI câu</strong> — <em>KHÁCH</em> (mã của DỰ ÁN NÀY có gửi/đọc được thứ đó không —
-    đo bằng <code>reflect</code> trên chính các kiểu của gói, <strong>miễn phí</strong>) và <em>NCC</em> (nhà cung
-    cấp có làm được không — đo bằng mạng, <strong>tốn token</strong>), cộng một cột <code>Cho</code> nói
-    <strong>vướng ở đâu</strong> (<code>khach</code> / <code>nha-cung-cap</code> / <code>ca-hai</code> / <code>chua-ro</code> / <code>khong-vuong</code>).
-    Trộn hai câu vào một ô là làm mất đúng thứ đáng giá nhất: modelapi.vn <strong>gọi
-    tool ngon lành</strong>, nhưng <code>aiapi.yeuCau</code> không có trường <code>tools</code> — một ô "không
-    làm được" trơ trọi sẽ đẩy người đọc đi đổi nhà cung cấp, sai hẳn hướng.
-    Phần KHÁCH đo bằng reflect chứ không phải bảng bool viết tay: bảng viết tay
-    là một <strong>lời khai</strong> nữa, và lời khai thì mục ruỗng.</li>
-<li><strong>Hai action chứ không một</strong> (<code>api.nang-luc</code> đọc bảng · <code>api.nang-luc-do</code> tiêu
-    tiền), và đường <code>/do</code> <strong>đòi POST</strong> — một GET tiêu tiền là một GET mà trình
-    duyệt, bộ nạp trước hay một lần bấm F5 nhầm đều gọi lại được.</li>
-<li><strong>Bốn trạng thái rút thành ba vẫn giữ nguyên ở cả hai nửa</strong>: <code>experimental</code> bị
-    bỏ vì nó trộn "đã đo, hơi rung" với "chưa ai đo" — <code>grep -rni "experimental"
-    internal/</code> vẫn ra <strong>0 dòng</strong>, và đó là chủ ý chứ không phải thiếu sót.</li>
-<li class="task done"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.
+  "CHỈ WINDOWS" ở đầu tài liệu, nên ô này không còn nợ gì.
+- [x] Behavior khi stream/process ngắt, reboot, config ghi dở — cả ba đều đã đo,
+  và mỗi cái ra một kết luận khác nhau:
+  - <strong>stream ngắt</strong>: <code>internal/aiapi/stream_test.go:131</code> (<code>TestManhHongKhongGietCaLuot</code>)
+— một mảnh SSE hỏng không giết cả lượt; <code>:192</code> — stream rỗng bị coi là HỎNG
+chứ không phải "trả lời rỗng".
+  - <strong>process ngắt</strong>: <code>process.KillTree</code> (đo ở <code>docs/DO-LUONG.md</code> mục Pha 7) —
+<code>taskkill /T</code> bỏ sót đám con khi cha đã thoát; <code>status</code> đối chiếu PID thật rồi
+tự đánh dấu <code>lost</code>, <code>sagent quet</code> tìm tiến trình mồ côi và <strong>mặc định chỉ báo</strong>
+vì Windows dùng lại PID.
+  - <strong>reboot</strong>: <code>docs/KHAC-PHUC-SU-CO.md</code> mục 2 — lượt chạy kẹt <code>running</code> vĩnh
+viễn vì <code>state.db</code> không kịp nhận tín hiệu. Trạng thái từng bước nằm ở SQLite
+nên <code>flow resume</code> chạy tiếp được. <strong>Nói thẳng phần chưa đẹp</strong>: không có khâu
+tự dọn lúc khởi động — người dùng phải gõ <code>sagent flow huy &lt;#&gt;</code>.
+  - <strong>config ghi dở</strong>: <code>internal/jsonutil/jsonutil.go:28</code> <code>AtomicWrite</code> ghi file
+tạm rồi <code>Rename</code>; <code>Backup</code> (<code>:38</code>) sao lưu trước khi đè. Phía DB thì chặn hạ
+cấp schema + tự sao lưu bằng <code>VACUUM INTO</code> (Pha 7).
+- [x] <strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).
+  - <strong>Xong cho HARNESS, và sạch</strong>: <code>internal/provider/nangluc.go:21-28</code> khai ba
+trạng thái <code>LamDuoc</code> / <code>KhongLamDuoc</code> / <code>ChuaDo</code>, có conformance test đối
+chiếu lời khai với hành vi thật (<code>internal/provider/nangluc_test.go:78,230</code>).
+Chạy 21/08: <code>sagent nang-luc --chua-do</code> → <strong>"Không còn năng lực nào chưa đo."</strong>
+— 5 provider × 9 năng lực, <strong>0 ô <code>ChuaDo</code></strong>.
+  - <strong>Bốn trạng thái rút thành ba, CÓ CHỦ Ý</strong>: <code>experimental</code> bị bỏ vì nó trộn hai
+câu khác nhau ("đã đo, hơi rung" và "chưa ai đo"). <code>KhongLamDuoc</code> là một <strong>kết
+luận</strong> chứ không phải khoảng trống — đó là chỗ ba trạng thái đáng giá hơn hai.
+  - ✅ <strong>XONG 22/08 — nửa API</strong>: <code>internal/aiapi/nangluc.go</code> (617 dòng) +
+<code>donangluc.go</code> (493 dòng), lệnh <code>sagent nang-luc-api [--chua-do|--do]</code>,
+<code>GET /api/nang-luc-api</code>, và khối "Năng lực route API" trên mặt web. <strong>7 năng
+lực × 2 route</strong>, đo THẬT 22/08 bằng key thật (~4.500 token) — chứ không phải
+một bảng khai tay. Xem <a href="BAO-CAO-NANGLUC-API.md"><code>docs/BAO-CAO-NANGLUC-API.md</code></a>.
+Câu "route này hỗ trợ tool/vision/reasoning không" nay có người trả lời.
+  - <strong>Ba trạng thái KHÔNG bị chép làm hai bản</strong>: <code>aiapi.TrangThaiNangLuc</code> là
+<strong>type alias</strong> sang <code>provider.TrangThaiNangLuc</code> — <code>aiapi.LamDuoc</code> và
+<code>provider.LamDuoc</code> là <strong>cùng một kiểu</strong>. Hai bản sao của một quy ước là hai
+bản sẽ lệch nhau, và bản lệch bao giờ cũng lệch theo đúng một chiều: gộp "đã
+đo, KHÔNG" với "chưa ai đo" thành một chữ <code>false</code>.
+  - <strong>Chỗ nửa API khác nửa CLI, và đây là quyết định đáng giá nhất của nó</strong>: mỗi ô
+trả lời <strong>HAI câu</strong> — <em>KHÁCH</em> (mã của DỰ ÁN NÀY có gửi/đọc được thứ đó không —
+đo bằng <code>reflect</code> trên chính các kiểu của gói, <strong>miễn phí</strong>) và <em>NCC</em> (nhà cung
+cấp có làm được không — đo bằng mạng, <strong>tốn token</strong>), cộng một cột <code>Cho</code> nói
+<strong>vướng ở đâu</strong> (<code>khach</code> / <code>nha-cung-cap</code> / <code>ca-hai</code> / <code>chua-ro</code> / <code>khong-vuong</code>).
+Trộn hai câu vào một ô là làm mất đúng thứ đáng giá nhất: modelapi.vn <strong>gọi
+tool ngon lành</strong>, nhưng <code>aiapi.yeuCau</code> không có trường <code>tools</code> — một ô "không
+làm được" trơ trọi sẽ đẩy người đọc đi đổi nhà cung cấp, sai hẳn hướng.
+Phần KHÁCH đo bằng reflect chứ không phải bảng bool viết tay: bảng viết tay
+là một <strong>lời khai</strong> nữa, và lời khai thì mục ruỗng.
+  - <strong>Hai action chứ không một</strong> (<code>api.nang-luc</code> đọc bảng · <code>api.nang-luc-do</code> tiêu
+tiền), và đường <code>/do</code> <strong>đòi POST</strong> — một GET tiêu tiền là một GET mà trình
+duyệt, bộ nạp trước hay một lần bấm F5 nhầm đều gọi lại được.
+  - <strong>Bốn trạng thái rút thành ba vẫn giữ nguyên ở cả hai nửa</strong>: <code>experimental</code> bị
+bỏ vì nó trộn "đã đo, hơi rung" với "chưa ai đo" — <code>grep -rni "experimental"
+internal/</code> vẫn ra <strong>0 dòng</strong>, và đó là chủ ý chứ không phải thiếu sót.
+- [x] <strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.
   ✅ <strong>VIẾT XONG 21/08 — <a href="MO-HINH-DE-DOA.md"><code>docs/MO-HINH-DE-DOA.md</code></a></strong> (tên tiếng
-  Việt, thay cho <code>docs/security/THREAT-MODEL.md</code> mà artifact cũ hứa).</li>
-<li><strong>Có sườn, không phải bài luận</strong>: tài sản → <strong>sáu vị trí đứng của kẻ tấn công
-    (K1–K6)</strong> → mỗi mối đe doạ nói rõ <em>làm được gì · đứng ở đâu · hiện có gì chặn</em>,
-    kèm <code>file:dòng</code> thật. Bốn nhãn trạng thái, <strong>không có nhãn "có vẻ ổn"</strong>:
-    ✅ ĐÃ CÓ · 🟡 CÓ MỘT PHẦN · 🔴 KHÔNG CÓ GÌ · ⬜ CHƯA ĐO ĐƯỢC (kèm lý do).</li>
-<li><strong>Đo trên máy THẬT, không phải máy dev sạch</strong> (21/08 23:45): dash đang chạy
-    <code>--host 0.0.0.0 --port 8788</code> (PID 16368, bind <code>::</code>), firewall <code>sagent-dash-8788</code>
-    = <strong>Allow</strong>, <code>4625</code> <strong>157 lượt/giờ</strong> (sáng ~3.900, 14:20 là 1.867), rule chặn
-    đang giữ <strong>61 IP</strong> (14:20 là 53). Kho: <strong>4</strong> <code>.credentials.json</code> trong <code>.clones</code>,
-    <strong>2</strong> file <code>.key</code>, <strong>90</strong> worktree.</li>
-<li><strong>Nói thẳng 11 chỗ đang hở</strong>, xếp theo hậu quả. Ba dòng đầu: (1) mật khẩu dash
-    là hàng rào <strong>duy nhất VÀ cuối cùng</strong> — sau nó không còn tầng nào, mà sau cửa đó
-    là <code>POST /api/fleet</code> + <code>/api/flow/save</code> = <strong>thực thi mã tuỳ ý dưới
-    <code>Administrator</code></strong>; (2) agent chạy trong <code>~/.ai-accounts/.worktrees/…</code> tức <strong>cách
-    kho bí mật đúng ba cấp <code>..</code></strong>, không hộp cát; (3) <strong>không ghi lại lần đăng nhập
-    sai nào của dash</strong> — đang bị dò cũng không biết, trong khi RDP thì đếm được
-    tới từng lượt.</li>
-<li><strong>Không đo được thì ghi là không đo được</strong>: cổng 8788 chưa thử từ máy ngoài;
-    chưa chạy phép đo "agent có thật sự đọc được <code>api-keys/*.key</code> từ worktree
-    không" (tốn một lượt hạn mức thật); <code>lsass</code> vẫn <strong>chưa có dump</strong> nên
-    brute-force vẫn là <strong>nghi phạm</strong>.</li>
-<li><strong>Có lưới an toàn</strong>: mục K liệt kê <strong>18 bài kiểm</strong> đang ghim từng bản vá được
-    dẫn trong tài liệu — gỡ bản vá là đỏ, nên tài liệu không trôi thành văn bia.</li>
-<li><strong>Artifact:</strong> <code>docs/research/phase0/*</code> (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
+  Việt, thay cho <code>docs/security/THREAT-MODEL.md</code> mà artifact cũ hứa).
+  - <strong>Có sườn, không phải bài luận</strong>: tài sản → <strong>sáu vị trí đứng của kẻ tấn công
+(K1–K6)</strong> → mỗi mối đe doạ nói rõ <em>làm được gì · đứng ở đâu · hiện có gì chặn</em>,
+kèm <code>file:dòng</code> thật. Bốn nhãn trạng thái, <strong>không có nhãn "có vẻ ổn"</strong>:
+✅ ĐÃ CÓ · 🟡 CÓ MỘT PHẦN · 🔴 KHÔNG CÓ GÌ · ⬜ CHƯA ĐO ĐƯỢC (kèm lý do).
+  - <strong>Đo trên máy THẬT, không phải máy dev sạch</strong> (21/08 23:45): dash đang chạy
+<code>--host 0.0.0.0 --port 8788</code> (PID 16368, bind <code>::</code>), firewall <code>sagent-dash-8788</code>
+= <strong>Allow</strong>, <code>4625</code> <strong>157 lượt/giờ</strong> (sáng ~3.900, 14:20 là 1.867), rule chặn
+đang giữ <strong>61 IP</strong> (14:20 là 53). Kho: <strong>4</strong> <code>.credentials.json</code> trong <code>.clones</code>,
+<strong>2</strong> file <code>.key</code>, <strong>90</strong> worktree.
+  - <strong>Nói thẳng 11 chỗ đang hở</strong>, xếp theo hậu quả. Ba dòng đầu: (1) mật khẩu dash
+là hàng rào <strong>duy nhất VÀ cuối cùng</strong> — sau nó không còn tầng nào, mà sau cửa đó
+là <code>POST /api/fleet</code> + <code>/api/flow/save</code> = <strong>thực thi mã tuỳ ý dưới
+<code>Administrator</code></strong>; (2) agent chạy trong <code>~/.ai-accounts/.worktrees/…</code> tức <strong>cách
+kho bí mật đúng ba cấp <code>..</code></strong>, không hộp cát; (3) <strong>không ghi lại lần đăng nhập
+sai nào của dash</strong> — đang bị dò cũng không biết, trong khi RDP thì đếm được
+tới từng lượt.
+  - <strong>Không đo được thì ghi là không đo được</strong>: cổng 8788 chưa thử từ máy ngoài;
+chưa chạy phép đo "agent có thật sự đọc được <code>api-keys/*.key</code> từ worktree
+không" (tốn một lượt hạn mức thật); <code>lsass</code> vẫn <strong>chưa có dump</strong> nên
+brute-force vẫn là <strong>nghi phạm</strong>.
+  - <strong>Có lưới an toàn</strong>: mục K liệt kê <strong>18 bài kiểm</strong> đang ghim từng bản vá được
+dẫn trong tài liệu — gỡ bản vá là đỏ, nên tài liệu không trôi thành văn bia.
+- <strong>Artifact:</strong> <code>docs/research/phase0/*</code> (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
   ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), <strong><code>docs/MO-HINH-DE-DOA.md</code></strong> (thay
   cho <code>docs/security/THREAT-MODEL.md</code> — cùng nội dung, tên tiếng Việt như mọi tài liệu
-  khác của dự án), <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.</li>
-<li><strong>DoD:</strong> mỗi kết luận có command/OS/output-redacted; <strong>không token thật</strong> ở đâu;
-  capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.</li>
-<li>⚠ <strong>Blocker cần bạn:</strong> <strong>API key</strong> thật (local-only, redaction) cho phần API path.
-  (Blocker "máy/VM Linux" đã bỏ cùng nhánh Linux — xem khối quyết định đầu tài liệu.)</li>
-<li><strong>Trạng thái (soát lại 21/08/2026):</strong> pha này từng ghi <strong>0/7</strong> trong khi phần
+  khác của dự án), <code>docs/adr/0001-domain-boundaries.md</code>, <code>docs/OPEN_SOURCE_LEDGER.md</code>.
+- <strong>DoD:</strong> mỗi kết luận có command/OS/output-redacted; <strong>không token thật</strong> ở đâu;
+  capability chưa đo = <code>unknown</code>; interface nháp suy ra từ <strong>≥2 harness và ≥2 API protocol</strong>.
+- ⚠ <strong>Blocker cần bạn:</strong> <strong>API key</strong> thật (local-only, redaction) cho phần API path.
+  (Blocker "máy/VM Linux" đã bỏ cùng nhánh Linux — xem khối quyết định đầu tài liệu.)
+- <strong>Trạng thái (soát lại 21/08/2026):</strong> pha này từng ghi <strong>0/7</strong> trong khi phần
   lớn nội dung của nó đã làm xong từ lâu — cả <code>docs/DO-LUONG.md</code> (3.400+ dòng số
   đo) lẫn <code>docs/SO-NO-DO-LUONG.md</code> (sổ nợ đo lường, nay chỉ còn đúng mục C2) đều
   là artifact của chính pha này. Đếm lại theo mã: <strong>2 xong · 5 xong một phần ·
   0 chưa làm → 4,5/7 = 64%</strong>. Ba thứ còn thiếu thật
-  là: tầng redaction chung, bảng năng lực cho nửa API, và tài liệu threat model.</li>
-<li><strong>Cập nhật 21/08 tối:</strong> ô <strong>threat model</strong> đóng — <code>docs/MO-HINH-DE-DOA.md</code>. Đếm lại:
+  là: tầng redaction chung, bảng năng lực cho nửa API, và tài liệu threat model.
+- <strong>Cập nhật 21/08 tối:</strong> ô <strong>threat model</strong> đóng — <code>docs/MO-HINH-DE-DOA.md</code>. Đếm lại:
   <strong>3 xong · 4 xong một phần · 0 chưa làm → 5/7 = 71%</strong>. Còn đúng <strong>hai</strong> thứ thiếu:
   tầng redaction chung và bảng năng lực cho nửa API.
   <strong>Và ô này đóng bằng một kết luận khó chịu, ghi ra đây để không ai đọc lướt:</strong>
@@ -734,8 +749,8 @@ Chi tiết: <code>96 [x] · 4 [~] · 0 [ ] · 0 [!]</code>. <strong>5 ô đổi 
   dashboard và cờ <code>--tu-duyet-quyen</code> gặp nhau ở <code>POST /api/fleet</code></strong>, nên một mật khẩu
   6 ký tự trên một cổng đang phơi ra internet là <strong>thực thi mã tuỳ ý dưới
   <code>Administrator</code></strong>. Không mặt nào trong bốn mặt tự nói ra được điều đó; <strong>chỉ có cái
-  sườn mới nói ra</strong>. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.</li>
-<li><strong>Cập nhật 22/08:</strong> đóng nốt <strong>hai</strong> ô mà lượt soát 21/08 chỉ đích danh là còn
+  sườn mới nói ra</strong>. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.
+- <strong>Cập nhật 22/08:</strong> đóng nốt <strong>hai</strong> ô mà lượt soát 21/08 chỉ đích danh là còn
   thiếu — <strong>tầng redaction chung</strong> (<code>internal/redaction</code>, 16 luật, 2.060 lần lộ
   danh tính → 0) và <strong>bảng năng lực cho nửa API</strong> (<code>internal/aiapi/nangluc.go</code>,
   7 năng lực × 2 route, đo thật bằng key thật). Đếm lại: <strong>5 xong · 2 xong một
@@ -747,7 +762,8 @@ Chi tiết: <code>96 [x] · 4 [~] · 0 [ ] · 0 [!]</code>. <strong>5 ô đổi 
   OpenAI, còn phần "tool · vision · structured-output · reasoning" thì lượt đo
   22/08 vừa chứng minh là <strong>lỗi nằm trong repo này</strong> — bốn năng lực đó nhà cung
   cấp làm được mà <code>aiapi.yeuCau</code>/<code>phanHoi</code> không có trường để gửi và đọc. Gộp hai
-  nửa ấy vào một chữ "chưa" là đúng cái bệnh mà bốn dấu sinh ra để chữa.</li>
+  nửa ấy vào một chữ "chưa" là đúng cái bệnh mà bốn dấu sinh ra để chữa.</p>
+</li>
 </ul>
 <h3>Pha 1 — Storage + Claude slice + 1 API slice  <strong>95%</strong> (9 xong · 1 một phần)</h3>
 <p>🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
@@ -1617,7 +1633,7 @@ một khoản nợ của mình — tô hồng, đúng chiều đắt hơn.</p>
 <tr>
 <td>API</td>
 <td>Pha 0</td>
-<td>3/4 giao thức (<strong>bị chặn</strong>, xem bảng trên) · tool · vision · structured-output · reasoning (<strong>nợ của dự án</strong>)</td>
+<td>3/4 giao thức (<strong>bị chặn</strong>, xem bảng trên) · vision · structured-output (<strong>nợ của dự án</strong>; <code>tool</code> và <code>reasoning</code> đã đóng 22/08)</td>
 </tr>
 <tr>
 <td>1 direct-API vertical slice</td>
