@@ -888,6 +888,15 @@ func (s *Server) handleAI(w http.ResponseWriter, r *http.Request) {
 		"da_thu":      kq.DaThu,
 		"route_chinh": kq.RouteChinh,
 		"loi_chinh":   kq.LoiChinh,
+		// PHẦN NGHĨ của model. Người bấm nút đã trả tiền cho nó (nó nằm trong
+		// `completion_tokens`), nên không trả về là bán một thứ rồi giấu đi.
+		//
+		// Trả cả KHỐI chứ không chỉ chuỗi: chuỗi rỗng mang HAI nghĩa ngược nhau
+		// (model không nghĩ / nhà cung cấp không trả phần nghĩ ra), và mặt web
+		// không có cách nào tự phân biệt. `DocSuyLuan` tra bảng năng lực của
+		// route ĐÃ TRẢ LỜI rồi dựng sẵn câu giải thích — cùng một câu mà CLI
+		// in ra, để hai mặt không nói hai nghĩa.
+		"suy_luan": aiapi.DocSuyLuan(kq, routes),
 	})
 }
 
@@ -948,6 +957,10 @@ func (s *Server) aiStream(w http.ResponseWriter, r *http.Request, route, prompt 
 		"thieu_usage":  kq.ThieuUsage,
 		"canh_bao":     aiapi.CanhBaoThieuUsage(kq),
 		"da_streaming": kq.DaStreaming,
+		// Phần nghĩ cũng phải về theo mẩu tổng kết — và ĐÂY mới là đường mặt
+		// web thật sự đi, vì trang luôn hỏi bằng stream. Thiếu ở đây thì tính
+		// năng coi như không có, dù nhánh JSON bên trên đã trả đủ.
+		"suy_luan": aiapi.DocSuyLuan(kq, s.api.AIRoutes()),
 	})
 }
 

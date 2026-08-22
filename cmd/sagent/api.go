@@ -18,6 +18,8 @@ import (
 //	sagent api ds                  liệt kê route đã cấu hình
 //	sagent api --lich-su [n]       sổ lời gọi: tiêu bao nhiêu, ở đâu, có chạy được không
 //	sagent api <route> "prompt"    gọi
+//	sagent api --suy-luan …        in kèm PHẦN NGHĨ của model (bạn đã trả tiền cho nó)
+//	sagent api --tool <file.json> … gửi định nghĩa tool, in lời gọi tool model đòi chạy
 func cmdAPI(args []string) {
 	if len(args) == 0 {
 		apiDs()
@@ -31,8 +33,7 @@ func cmdAPI(args []string) {
 	case "--lich-su", "lich-su", "--history":
 		apiLichSu(rest(args))
 	default:
-		ten, hoi := tachRouteVaPrompt(args)
-		apiGoi(ten, hoi)
+		apiGoi(args)
 	}
 }
 
@@ -204,15 +205,50 @@ func apiDs() {
 	fmt.Println()
 }
 
-func apiGoi(ten string, args []string) {
+// apiGoi nhận args THÔ, còn nguyên cờ.
+//
+// Thứ tự bắt buộc: RÚT CỜ TRƯỚC, tách tên route SAU. Bản đầu làm ngược lại và
+// `sagent api --suy-luan grok "câu hỏi"` hỏng theo kiểu tệ nhất — `--suy-luan`
+// không khớp tên route nào nên cả dãy bị coi là câu hỏi, và chữ "grok" đi thẳng
+// vào prompt. Lượt gọi vẫn chạy, vẫn tính tiền, chỉ là hỏi sai câu qua sai route.
+func apiGoi(args []string) {
 	// `--stream`: in chữ ra NGAY khi nhận được thay vì đợi cả câu.
 	//
 	// Đo được: một lượt grok-4.5 mất 13,6 giây (docs/DO-LUONG.md). Không có cờ
 	// này thì người dùng nhìn màn hình đứng im 13 giây — không phân biệt được
 	// "đang nghĩ" với "đã treo".
 	stream, args := boolFlag(args, "--stream")
+	// `--suy-luan`: in kèm PHẦN NGHĨ của model.
+	//
+	// VÌ SAO LÀ MỘT CỜ, KHÔNG PHẢI IN LUÔN: phần nghĩ dài hơn câu trả lời rất
+	// nhiều — đo 22/08 với deepseek-v4-flash, câu trả lời 91 ký tự còn phần
+	// nghĩ 477 ký tự, gấp 5,2 lần. In mặc định là mỗi lượt hỏi một câu ngắn lại
+	// nhận về một màn hình chữ nháp, và người ta sẽ học cách bỏ qua nó.
+	//
+	// VÌ SAO KHÔNG IN THÌ VẪN PHẢI NHẮC: người dùng ĐÃ TRẢ TIỀN cho phần nghĩ
+	// đó (nó nằm trong `completion_tokens`). Một thứ đã mua mà không ai nói là
+	// có thì coi như không có. Nên lượt nào có phần nghĩ mà không bật cờ, dòng
+	// tổng kết vẫn nói ra nó dài bao nhiêu và gõ gì để xem — xem `dongSuyLuan`.
+	xemSuyLuan, args := boolFlag(args, "--suy-luan")
+	fileTool, args := strFlag(args, "--tool", "")
+	chonTool, args := strFlag(args, "--tool-chon", aiapi.ChonToolTuDo)
+	if len(args) == 0 {
+		fail(fmt.Errorf("thiếu prompt: sagent api [<route>] \"câu hỏi\""))
+	}
+	ten, args := tachRouteVaPrompt(args)
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu prompt: sagent api %s \"câu hỏi\"", ten))
+	}
+	if stream && fileTool != "" {
+		// Không im lặng bỏ một trong hai: đường stream chưa mang `tools` đi
+		// được, nên chạy tiếp là gửi một yêu cầu không có tool rồi báo "model
+		// không đòi gọi tool nào" — sai, và sai sau khi đã tính tiền.
+		fail(fmt.Errorf("--stream và --tool chưa đi chung được: đường stream chưa mang " +
+			"định nghĩa tool. Bỏ --stream đi."))
+	}
+	if fileTool != "" {
+		apiGoiTool(ten, strings.Join(args, " "), fileTool, chonTool, xemSuyLuan)
+		return
 	}
 	a, done := open()
 	defer done()
@@ -229,6 +265,9 @@ func apiGoi(ten string, args []string) {
 	} else {
 		kq, err = a.AICall(context.Background(), ten, strings.Join(args, " "))
 	}
+	// Lấy danh sách route TRƯỚC khi đóng: `DocSuyLuan` cần nó để tra bảng năng
+	// lực của route đã trả lời. Đọc cấu hình, không chạm mạng, không tốn token.
+	routes := a.AIRoutes()
 	done()
 	if err != nil {
 		fail(err)
@@ -238,6 +277,11 @@ func apiGoi(ten string, args []string) {
 		fmt.Println(kq.NoiDung)
 	}
 	fmt.Println()
+	// Phần nghĩ in TRƯỚC dòng token, sau câu trả lời: câu trả lời là thứ người
+	// ta hỏi, phần nghĩ là thứ giải thích nó, dòng token là hoá đơn.
+	for _, d := range dongSuyLuan(aiapi.DocSuyLuan(kq, routes), xemSuyLuan) {
+		fmt.Println(d)
+	}
 	// Nhà cung cấp không trả usage ở chế độ stream thì NÓI RA. Im lặng ghi 0 là
 	// biến "chưa đo" thành "miễn phí" ngay trước mắt người trả tiền.
 	if canh := aiapi.CanhBaoThieuUsage(kq); canh != "" {

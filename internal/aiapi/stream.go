@@ -95,6 +95,7 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 	}
 
 	var chu strings.Builder
+	var nghi strings.Builder
 	var model string
 	var usage Usage
 	var coUsage bool
@@ -128,6 +129,16 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 			usage, coUsage = *m.Usage, true
 		}
 		for _, c := range m.Choices {
+			// Phần nghĩ gom RIÊNG và KHÔNG đẩy qua `nhan`: `nhan` là chỗ chữ
+			// chảy ra màn hình như câu trả lời, và bước sau của một flow nhét
+			// `{{steps.x.output}}` sang bước kế. Trộn phần nháp của model vào
+			// đó là đưa bản nháp đi làm dữ liệu đầu vào.
+			if s := c.Delta.SuyLuan; s != "" {
+				nghi.WriteString(s)
+			}
+			if s := c.Delta.SuyLuan2; s != "" {
+				nghi.WriteString(s)
+			}
 			if c.Delta.Content == "" {
 				continue
 			}
@@ -140,7 +151,8 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 	if err := sc.Err(); err != nil {
 		// Đứt giữa chừng: trả phần đã nhận KÈM lỗi. Vứt đi phần đã tốn tiền để
 		// lấy một thông điệp gọn là đổi sai chiều.
-		kq = KetQua{NoiDung: chu.String(), Model: model, Usage: usage,
+		kq = KetQua{NoiDung: chu.String(), SuyLuan: strings.TrimSpace(nghi.String()),
+			Model: model, Usage: usage,
 			Mat: time.Since(bat), Route: r.Ten, DaThu: []string{r.Ten}, ChoLai: choLai}
 		return kq, loiMay(r.Ten, resp.StatusCode, "%s: stream đứt giữa chừng sau %d ký tự: %s",
 			r.Ten, chu.Len(), err.Error())
@@ -148,6 +160,7 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 
 	kq = KetQua{
 		NoiDung:     strings.TrimSpace(chu.String()),
+		SuyLuan:     strings.TrimSpace(nghi.String()),
 		Model:       model,
 		Usage:       usage,
 		Mat:         time.Since(bat),
@@ -185,6 +198,18 @@ type manhStream struct {
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
+
+			// Phần NGHĨ cũng chảy về theo mẩu, ở một trường riêng. Hai tên vì
+			// các endpoint tương thích OpenAI đang dùng lẫn lộn — bộ đo trong
+			// donangluc.go đã phải nhận cả hai, và đường stream không có lý do
+			// gì hẹp hơn.
+			//
+			// VÌ SAO PHẢI ĐỌC Ở ĐÂY, không chỉ ở `Goi`: mặt web hỏi AI BẰNG
+			// STREAM, luôn luôn. Bỏ trống chỗ này thì mọi lượt trên dashboard
+			// đều không có phần nghĩ, và câu giải thích của `DocSuyLuan` sẽ đổ
+			// tội cho nhà cung cấp về một thứ chính ta không thèm đọc.
+			SuyLuan  string `json:"reasoning_content"`
+			SuyLuan2 string `json:"reasoning"`
 		} `json:"delta"`
 	} `json:"choices"`
 	Usage *Usage `json:"usage"`
