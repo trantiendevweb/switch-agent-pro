@@ -16,13 +16,15 @@ type routeGia struct {
 	mu      sync.Mutex
 	song    map[string]bool
 	daHoi   [][]string // từng lần được hỏi, để khẳng định ứng viên đi tới đúng
+	daCan   [][]string // từng lần được hỏi, phần `can` — xem nangluc_test.go
 	batBuoc string     // khác rỗng = luôn trả về đúng đường này
 }
 
-func (r *routeGia) ChonRoute(_ context.Context, ungVien []string) (KetQuaRoute, error) {
+func (r *routeGia) ChonRoute(_ context.Context, ungVien, can []string) (KetQuaRoute, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.daHoi = append(r.daHoi, append([]string(nil), ungVien...))
+	r.daCan = append(r.daCan, append([]string(nil), can...))
 	if r.batBuoc != "" {
 		return KetQuaRoute{Ten: r.batBuoc}, nil
 	}

@@ -1315,9 +1315,23 @@ func (a *API) FlowValidate(dir string) ([]flow.Problem, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Sổ route đọc MỘT LẦN cho cả lượt soi, không đọc lại cho từng flow: nó
+	// không đổi giữa chừng, và `AIRoutes` dựng lại lát cắt mỗi lần gọi.
+	ds := a.AIRoutes()
 	var ps []flow.Problem
 	for _, n := range flow.Names(flows) {
-		ps = append(ps, flow.Validate(flows[n])...)
+		f := flows[n]
+		ps = append(ps, flow.Validate(f)...)
+		// Phần soi CẦN BẢNG NĂNG LỰC — khoá `can` có thật không, và route đã
+		// khai có làm được không. Gói `flow` không trả lời được (nó không
+		// import aiapi và không biết route nào đã cấu hình), nên phần đó nằm ở
+		// flow_nangluc.go và được nối vào ĐÚNG ĐÂY.
+		//
+		// Nối ở FlowValidate chứ không ở chỗ gọi: `flow.validate` là một action
+		// trong hợp đồng, nên mọi mặt gọi nó — CLI, HTTP, web — thấy cùng một
+		// danh sách. Để CLI tự gọi thêm một hàm nữa là dựng lại đúng cái lỗi
+		// "có ở mọi tầng trừ tầng cuối" mà dự án đã vấp sáu lần trong một ngày.
+		ps = append(ps, VanDeCanTheoBang(f, ds)...)
 	}
 	return ps, nil
 }

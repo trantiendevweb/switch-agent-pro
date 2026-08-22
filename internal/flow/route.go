@@ -72,10 +72,21 @@ type RouteChon interface {
 	// tự đó. ungVien rỗng = để phần cắm quyết định theo cấu hình (default_route
 	// rồi tới route dự phòng), y như `sagent api "câu hỏi"`.
 	//
+	// `can` là những NĂNG LỰC đường được chọn phải có (khoá của
+	// `aiapi.MoiNangLucAPI`: "goi-tool", "dau-vao-anh"…). Rỗng = không đòi gì,
+	// chọn theo sức khoẻ như trước.
+	//
+	// Vì sao `can` là tham số chứ không phải một interface thứ hai: hai phép
+	// lọc này KHÔNG độc lập. Lọc năng lực miễn phí và chạy tại chỗ, lọc sức
+	// khoẻ tốn một lượt `GET /models` cho MỖI ứng viên — nên thứ tự bắt buộc là
+	// năng lực trước, sức khoẻ sau, và thứ tự đó chỉ giữ được khi cùng một chỗ
+	// quyết định cả hai. Tách ra thì sẽ có ngày một chỗ gọi hỏi sức khoẻ trước
+	// rồi mới loại theo năng lực — đúng cái lãng phí đã có mà không ai thấy.
+	//
 	// Không route nào dùng được thì trả về lỗi — KHÔNG trả về một cái tên đoán
 	// bừa. Bước sau sẽ đem cái tên ấy đi gọi thật và tiêu tiền vào một đường đã
 	// biết là chết.
-	ChonRoute(ctx context.Context, ungVien []string) (KetQuaRoute, error)
+	ChonRoute(ctx context.Context, ungVien, can []string) (KetQuaRoute, error)
 }
 
 // KetQuaRoute là câu trả lời của một lần chọn đường.
@@ -179,15 +190,24 @@ func BuocTrongRoute(route string) string {
 }
 
 // MoTaRoute là câu mô tả đường đi của một bước, để mọi mặt in ra giống nhau.
+//
+// Phần `can` đi KÈM trong cùng câu chứ không tách thành một dòng riêng: nó đổi
+// TẬP ỨNG VIÊN, nên một bảng in "grok → deepseek" mà giấu `can = ["dau-vao-anh"]`
+// đang nói sai — deepseek đã bị loại trước khi ai hỏi thăm nó.
 func MoTaRoute(s Step) string {
+	var d string
 	switch {
 	case s.Type == TypeRoute && len(s.Routes) > 0:
-		return strings.Join(s.Routes, " → ")
+		d = strings.Join(s.Routes, " → ")
 	case s.Type == TypeRoute:
-		return "(default_route rồi tới route dự phòng)"
+		d = "(default_route rồi tới route dự phòng)"
 	case s.Route != "":
-		return s.Route
+		d = s.Route
 	default:
 		return ""
 	}
+	if c := MoTaCan(s); c != "" {
+		d += " · chỉ đường làm được: " + c
+	}
+	return d
 }

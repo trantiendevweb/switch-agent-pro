@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/trantiendevweb/switch-agent-pro/internal/api"
 	"github.com/trantiendevweb/switch-agent-pro/internal/console"
 	"github.com/trantiendevweb/switch-agent-pro/internal/flow"
 )
@@ -105,6 +106,11 @@ func flowShow(name string) {
 	if err != nil {
 		fail(err)
 	}
+	// SỔ ROUTE lấy TRƯỚC khi đóng API: phần soi `can` ở cuối hàm cần nó để
+	// tra bảng năng lực. Không có nó thì `flow show` và `flow validate` nói KHÁC
+	// NHAU về cùng một file — và `flow show` là lệnh người ta đọc đúng lúc
+	// quyết định có chạy hay không.
+	dsRoute := a.AIRoutes()
 	done()
 
 	fmt.Printf("\n  %s — %s\n\n", f.Name, f.Desc)
@@ -170,13 +176,26 @@ func flowShow(name string) {
 		if s.Type == flow.TypeModel && s.Route != "" {
 			fmt.Printf("      đường: %s\n", s.Route)
 		}
+		// Nhu cầu năng lực in cho bước `model` RIÊNG, vì bước `route` đã có nó
+		// trong dòng "chọn đường" (MoTaRoute) — in hai lần thì bảng nói cùng
+		// một chuyện hai kiểu. Và in KỂ CẢ khi `route` rỗng: bước đi đường mặc
+		// định mà đòi `goi-tool` vẫn là một ràng buộc người đọc cần thấy.
+		if c := flow.MoTaCan(s); c != "" && s.Type == flow.TypeModel {
+			fmt.Printf("      cần đường làm được: %s\n", c)
+		}
 		for _, d := range moTaBaTruong(s.Artifact, s.Idempotent, buocGoLaiCua(s), buocChayThayCua(s)) {
 			fmt.Printf("      %s\n", d)
 		}
 	}
 
 	// Cảnh báo ngay ở đây, đừng để tới lúc chạy mới biết.
-	if ps := flow.Validate(f); len(ps) > 0 {
+	//
+	// Hai nửa, giống hệt `flow validate`: phần hình dạng (flow.Validate) và
+	// phần tra bảng năng lực (api.VanDeCanTheoBang). Chỉ gọi nửa đầu thì hai
+	// lệnh nói khác nhau về cùng một file, và người đọc sẽ tin lệnh họ đang
+	// mở chứ không đi gõ thêm một lệnh nữa.
+	ps := append(flow.Validate(f), api.VanDeCanTheoBang(f, dsRoute)...)
+	if len(ps) > 0 {
 		fmt.Println()
 		for _, p := range ps {
 			fmt.Println("  " + p.String())
