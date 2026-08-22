@@ -287,6 +287,40 @@
   .nl .lech{margin:6px 13px;border:1px solid rgba(255,93,121,.4);
     background:rgba(255,93,121,.08);border-radius:8px;padding:7px 9px;
     font-size:11.5px;color:var(--error);line-height:1.45}
+  /* ---- bảng năng lực NỬA API (ô AI API) ----
+     Dùng LẠI .nl ở trên nguyên vẹn: container mang cả hai lớp `nl nla`, nên
+     hàng, chấm, ba màu, cột tên và cột bằng chứng là MỘT bộ luật với bảng năng
+     lực provider. Chép .nl thành bộ thứ hai là mở đúng cái khe lệch im lặng mà
+     token.css sinh ra để bịt — và ở đây khe đó đắt gấp đôi, vì hai bảng đứng
+     cạnh nhau trong cùng một trang và người đọc so chúng bằng mắt.
+
+     Phần thêm dưới đây chỉ là thứ bảng bên kia KHÔNG có: mỗi ô ở đây trả lời
+     hai câu (phía dự án, phía nhà cung cấp) chứ không một. */
+  .nla .rt{display:flex;align-items:baseline;gap:8px;padding:9px 13px 5px;
+    font-family:var(--font-mono);font-size:11.5px;color:var(--hi)}
+  .nla .rt b{font-weight:600}
+  .nla .rt .v{color:var(--lo)}
+  .nla .rt .dm{margin-left:auto;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--lo)}
+  /* "Vướng đâu" viết THÀNH CHỮ chứ không chỉ là màu: người mù màu và người in
+     đen trắng phải đọc ra được, đúng luật đã áp cho cột [chặn] của bảng quyền
+     plugin. */
+  .nla .m .cho{display:block;font-family:var(--font-mono);font-size:10px;
+    letter-spacing:.04em;text-transform:uppercase;color:var(--c)}
+  /* Hai vế bằng chứng thụt vào, mỗi vế nói rõ mình là phía nào. Gộp chúng
+     thành một dòng là làm mất chỗ hỏng nằm bên nào — cả bảng dựng lên vì câu
+     đó. Dữ liệu máy (mã HTTP, số token, tên trường Go) đi mono. */
+  .nla .m .ve{display:block;font-size:11px;color:var(--lo);padding-left:9px;
+    border-left:1px solid var(--line);margin-top:3px}
+  .nla .m .ve u{font-style:normal;text-decoration:none;color:var(--mid)}
+  .nla .m .ve code{font-family:var(--font-mono);font-size:10.5px;color:var(--mid)}
+  /* Khung kết quả đo mang sẵn `nl nla` từ HTML chứ không được JS gắn lớp lúc
+     vẽ: gắn lúc vẽ thì nhánh "đang đo…" và nhánh "đo hỏng" rơi ra ngoài bộ
+     luật, và hai nhánh đó là hai nhánh người dùng nhìn lâu nhất. */
+  #nla-do-kq{margin-bottom:10px}
+  #nla-do-kq .tin{padding:6px 13px;font-size:11.5px;color:var(--mid);line-height:1.6}
+  #nla-do-kq .tin .tk{font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums;color:var(--hi)}
   .nl-ct,.rk-ct,.pl-ct{padding:2px 14px 13px;font-size:11.5px;color:var(--lo);line-height:1.9}
   .nl-ct b,.rk-ct b,.pl-ct b{color:var(--mid);font-weight:600}
   /* Chú giải dùng ĐÚNG chấm CSS của bảng chứ không phải một ký tự hình tròn:
@@ -295,6 +329,17 @@
      Hai bảng chú giải (năng lực, sức khoẻ route) dùng CHUNG luật vẽ chấm này —
      chép sang một bộ selector thứ hai là mở đúng cái khe lệch im lặng mà cả
      file token.css sinh ra để bịt. */
+  /* Bốn giá trị `cho` mượn ĐÚNG các token màu đã có, không chế màu mới:
+     vướng ở phía dự án và "chưa đo" đi màu việc-còn-phải-làm, vướng ở nhà cung
+     cấp và vướng cả hai đi màu đã-đo-và-chịu — cùng màu với ô "không có" của
+     bảng năng lực provider ngay trên, để hai bảng đọc như một.
+     Cố ý KHÔNG mượn sắc đỏ báo lỗi: không có gì hỏng ở đây, chỉ có thứ chưa làm
+     được, và tiêu sắc đỏ cho việc-còn-phải-làm là cách làm nó mất nghĩa ở
+     những khối THẬT SỰ cần nó. */
+  .nla .m .cho{--c:var(--lo)}
+  .nla .m.cho-khach .cho{--c:var(--pending)}
+  .nla .m.cho-nha-cung-cap .cho,.nla .m.cho-ca-hai .cho{--c:var(--idle)}
+  .nla .m.cho-chua-ro .cho{--c:var(--pending)}
   .nl-ct .ch,.rk-ct .ch,.pl-ct .ch{display:inline-block;width:7px;height:7px;border-radius:50%;
     background:var(--c);margin:0 3px 0 9px;vertical-align:baseline}
   .nl-ct .ch:first-child,.rk-ct .ch:first-child,.pl-ct .ch:first-child{margin-left:0}
@@ -691,6 +736,46 @@
           Phép kiểm này <b>không biết hạn mức còn hay hết</b> — cái đó chỉ lộ ra khi gọi thật.
           Xem ở terminal: <code>sagent route kiem</code>
         </div>
+
+        <!-- Năng lực route API — action "api.nang-luc", cùng nguồn với
+             `sagent nang-luc-api`. Đứng ngay dưới Sức khoẻ route vì hai khối
+             trả lời hai câu NỐI TIẾP nhau: khối trên nói "route này còn gọi
+             được không", khối này nói "gọi được rồi thì nó LÀM ĐƯỢC GÌ".
+
+             Trước khối này, mặt web không trả lời được câu nào trong bốn câu:
+             route này gọi được tool không, đọc được ảnh không, trả JSON có cấu
+             trúc không, có reasoning không. Hậu quả cụ thể: một flow dùng node
+             `model` trỏ vào route không hỗ trợ tool hỏng LÚC CHẠY, sau khi các
+             bước trước đã tiêu token — chứ không hỏng lúc validate.
+
+             Khối này TỰ NẠP lúc tải trang, khác khối Sức khoẻ route ngay trên
+             (phải bấm): bảng này không chạm mạng và không tốn token. -->
+        <div class="ls-dau">
+          <span>Năng lực route API <b id="nla-dem"></b></span>
+          <button type="button" class="btn" id="nla-nap">Làm mới</button>
+        </div>
+        <div id="nla" class="empty">đang đọc…</div>
+        <div class="nl-ct">
+          <span class="ch duoc"></span> làm được
+          <span class="ch khong"></span> đã đo, KHÔNG
+          <span class="ch chua"></span> chưa ai đo.
+          Ba thứ này <b>khác nhau</b>, và ô giữa là một <b>kết luận</b> chứ không phải
+          một khoảng trống. Mỗi ô nói luôn <b>vướng ở đâu</b>: phía dự án (sửa được trong
+          repo này) hay phía nhà cung cấp (sửa trong repo không cứu được).
+          Xem ở terminal: <code>sagent nang-luc-api</code>
+        </div>
+
+        <!-- Đo THẬT — action "api.nang-luc-do". Nút này TIÊU TIỀN, nên nó phải
+             trông khác nút "Làm mới" ở trên và phải nói giá trước khi bấm.
+             Đường đi là POST: một GET tiêu tiền là một GET mà lần bấm F5 nhầm
+             cũng gọi lại được. -->
+        <div class="warnbox">Phép đo thật <b>chạm mạng bằng key thật và tiêu token</b>
+          — 7 phép đo mỗi route, chạy tuần tự. Bảng ở trên thì không tốn gì.</div>
+        <div class="ls-dau">
+          <span>Đo thật năng lực</span>
+          <button type="button" class="btn" id="nla-do">Đo thật (tốn token)</button>
+        </div>
+        <div id="nla-do-kq" class="nl nla" hidden></div>
 
         <div class="ls-dau">
           <span>Sổ lời gọi</span>
@@ -1145,6 +1230,112 @@ async function napNangLuc(){
     $('nl-dem').textContent = (d.so_chua_do|0) ? (d.so_chua_do|0) + ' chưa đo' : 'đo đủ';
   }catch(e){ box.className='empty'; box.textContent = 'không đọc được: ' + e.message; }
 }
+
+// ------------------------------------------- bảng năng lực NỬA API
+//
+// Action "api.nang-luc" qua /api/nang-luc-api. Chỉ đọc, KHÔNG tốn token.
+//
+// Dùng LẠI NL_LOP/NL_DOC của bảng năng lực provider ngay trên. Ba trạng thái là
+// một quy ước về NGHĨA, và hai bảng tra cùng nghĩa là hai bảng sẽ lệch nhau —
+// bản lệch bao giờ cũng là bản gộp "đã đo, KHÔNG" với "chưa ai đo" thành một
+// màu xám. Lớp Go bên dưới cũng dùng chung đúng ba hằng đó (type alias sang
+// provider.TrangThaiNangLuc), nên cả đường từ mã tới màn hình chỉ có MỘT bộ ba.
+async function napNangLucAPI(){
+  const box = $('nla');
+  try{
+    const d = await api('/api/nang-luc-api');
+    const ds = d.route || [];
+    if(!ds.length){ box.className='empty'; box.textContent='Chưa cấu hình route API nào.'; return; }
+    box.className = 'nl nla';
+    box.innerHTML = '';
+    for(const rt of ds){
+      const chuaDo = rt.muc.filter(m => m.trang_thai === 'chua-do').length;
+      const dau = document.createElement('div');
+      dau.className = 'rt';
+      dau.innerHTML = '<b>' + esc(rt.ten) + '</b>' +
+        '<span class="v">' + esc(rt.model || '') + '</span>' +
+        '<span class="dm">' + (chuaDo ? chuaDo + ' chưa đo' : 'đo đủ') + '</span>';
+      box.appendChild(dau);
+
+      for(const m of rt.muc){
+        const d1 = document.createElement('div');
+        d1.className = 'm ' + (NL_LOP[m.trang_thai] || 'chua') + ' cho-' + (m.cho || 'chua-ro');
+        // Hai vế bằng chứng hiện ĐỦ, kể cả khi kết luận đã do một vế quyết
+        // định. Rút xuống còn kết luận là làm mất câu đáng giá nhất của bảng —
+        // "họ làm được, ta chưa gửi" — và người đọc sẽ đi đổi nhà cung cấp cho
+        // một chỗ hỏng nằm trong repo này.
+        d1.innerHTML =
+          '<i role="img" aria-label="' + esc(NL_DOC[m.trang_thai] || m.trang_thai) + '"></i>' +
+          '<span class="ten">' + esc(m.khoa) + '</span>' +
+          '<span class="mo">' + esc(m.mo || '') +
+            (m.trang_thai === 'lam-duoc' ? '' :
+              '<span class="cho">' + esc(m.nhan_cho || m.cho || '') + '</span>') +
+            '<span class="ve"><u>phía dự án</u> · ' + esc(m.khach) + ' — ' +
+              esc(m.bang_chung_khach) + '</span>' +
+            '<span class="ve"><u>nhà cung cấp</u> · ' + esc(m.ncc) + ' — ' +
+              esc(m.bang_chung_ncc) + '</span>' +
+          '</span>';
+        box.appendChild(d1);
+      }
+      // Lệch = bảng chọi với chính nó. Bình thường rỗng (KiemNangLucAPI giữ nó
+      // rỗng, có conformance test), nhưng nếu một bản build lọt qua thì trang
+      // phải NÓI RA: bảng năng lực sai còn tệ hơn không có bảng, vì người vận
+      // hành sẽ tin nó.
+      for(const l of (rt.lech || [])){
+        const e1 = document.createElement('div');
+        e1.className = 'lech';
+        e1.textContent = 'LỆCH: ' + l;
+        box.appendChild(e1);
+      }
+    }
+    $('nla-dem').textContent = (d.so_chua_do|0) ? (d.so_chua_do|0) + ' chưa đo' : 'đo đủ';
+  }catch(e){ box.className='empty'; box.textContent = 'không đọc được: ' + e.message; }
+}
+
+// Đo THẬT — action "api.nang-luc-do". POST, chạm mạng, tiêu token.
+//
+// Hỏi xác nhận TRƯỚC khi bấm, khác hẳn bản CLI (ở đó cờ `--do` chính là lời xác
+// nhận, và một câu hỏi giữa chừng làm lệnh không dùng được trong script). Trên
+// web thì không có cờ nào cả: nút nằm cạnh một nút "Làm mới" miễn phí, và hai
+// nút cạnh nhau thì sớm muộn có người bấm nhầm.
+async function doNangLucAPI(){
+  if(!confirm('Phép đo này gọi API THẬT bằng key thật và tiêu token — 7 phép đo mỗi route. Chạy?')) return;
+  const nut = $('nla-do'), kq = $('nla-do-kq');
+  const chu = nut.textContent;
+  nut.disabled = true; nut.textContent = 'đang đo…';
+  kq.hidden = false;
+  kq.innerHTML = '<div class="tin">đang đo… mỗi route 7 lời gọi tuần tự, có thể mất vài phút.</div>';
+  try{
+    const d = await api('/api/nang-luc-api/do', {method:'POST'});
+    const ds = d.muc || [];
+    kq.innerHTML = '';
+    const tong = document.createElement('div');
+    tong.className = 'tin';
+    tong.innerHTML = 'Đo xong ' + ds.length + ' ô, tiêu <span class="tk">' +
+      (d.tong_token|0) + '</span> token. ' +
+      'Số đo này CHƯA vào bảng: dán vào sổ bằng <code>sagent nang-luc-api --do --dan</code>.';
+    kq.appendChild(tong);
+    for(const k of ds){
+      const r1 = document.createElement('div');
+      r1.className = 'm ' + (NL_LOP[k.trang_thai] || 'chua');
+      r1.innerHTML =
+        '<i role="img" aria-label="' + esc(NL_DOC[k.trang_thai] || k.trang_thai) + '"></i>' +
+        '<span class="ten">' + esc(k.route + '/' + k.khoa) + '</span>' +
+        '<span class="mo">' + esc(k.chi) + '</span>';
+      kq.appendChild(r1);
+    }
+  }catch(e){
+    kq.innerHTML = '';
+    const t = document.createElement('div');
+    t.className = 'tin';
+    t.textContent = 'đo hỏng: ' + e.message;  // nguyên văn lỗi nhà cung cấp
+    kq.appendChild(t);
+  }finally{
+    nut.disabled = false; nut.textContent = chu;
+  }
+}
+$('nla-nap').onclick = napNangLucAPI;
+$('nla-do').onclick = doNangLucAPI;
 
 // ------------------------------------------- bảng quyền plugin
 //
@@ -1937,6 +2128,7 @@ napAILichSu();
 napDB();
 napTele();
 napNangLuc();
+napNangLucAPI();
 napPlugin();
 setInterval(refresh, 5000); // đồng hồ "đang chạy bao lâu" + phòng khi lỡ event
 </script>
