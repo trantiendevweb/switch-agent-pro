@@ -85,8 +85,24 @@ func TestBatTypeLa(t *testing.T) {
 
 // Trung thực về năng lực: loại đã thiết kế nhưng chưa chạy được phải CẢNH BÁO,
 // không phải im lặng chấp nhận.
+// Nguyên tắc trung thực năng lực: loại node khai trong thiết kế mà CHƯA chạy
+// được thì Validate phải CẢNH BÁO — không chặn (người ta viết trước, công cụ
+// theo sau), nhưng cũng không im lặng chấp nhận.
+//
+// Bài này dựng một loại GIẢ chỉ tồn tại trong lúc chạy nó, thay vì mượn một
+// node thật đang chờ. Trước đây nó mượn `merge`, và đến 22/08 — khi `merge` và
+// `route` được bật, tức là không còn loại nào `implemented = false` — bài test
+// đỏ dù hành vi nó kiểm không sai một chút nào. Bài kiểm CƠ CHẾ mà buộc vào
+// một node cụ thể thì nó sẽ đỏ vào đúng ngày node đó chạy được.
+//
+// implemented là biến gói, và không bài test nào ở gói này gọi t.Parallel, nên
+// mượn tạm rồi trả lại là an toàn.
 func TestCanhBaoTypeChuaChayDuoc(t *testing.T) {
-	f := Flow{Name: "x", Steps: []Step{{ID: "a", Type: TypeMerge}}}
+	const loaiGia = "loai-gia-chi-song-trong-bai-test-nay"
+	implemented[loaiGia] = false
+	t.Cleanup(func() { delete(implemented, loaiGia) })
+
+	f := Flow{Name: "x", Steps: []Step{{ID: "a", Type: loaiGia}}}
 	ps := Validate(f)
 	if len(errs(ps)) > 0 {
 		t.Fatalf("type hợp lệ nhưng chưa hỗ trợ thì KHÔNG nên là lỗi: %v", errs(ps))

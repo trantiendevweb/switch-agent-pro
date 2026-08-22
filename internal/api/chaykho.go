@@ -69,6 +69,46 @@ type BuocKho struct {
 	// Đây là lỗi kiểu lượt chạy #29: prompt ghi {{steps.kiem-cuoi.output}},
 	// bước đó không để lại gì, và agent nhận nguyên chữ sống làm đề bài.
 	ConSot string `json:"conSot,omitempty"`
+
+	// ---------------------------------------------------------------------
+	// BỐN TRƯỜNG DƯỚI ĐÂY TRẢ LỜI CÂU "BƯỚC NÀY CÓ THẬT SỰ CHẠY KHÔNG, VÀ NÓ
+	// ĐỂ LẠI GÌ" — thứ mà bản chạy khan trước đây KHÔNG nói được.
+	// ---------------------------------------------------------------------
+
+	// GoLaiCho là các bước mà bước NÀY làm nhiệm vụ gỡ lại cho.
+	//
+	// KHÁC RỖNG NGHĨA LÀ BƯỚC NÀY SẼ KHÔNG CHẠY trong lượt chạy suôn sẻ. Đây là
+	// lỗi tệ nhất của bản chạy khan cũ: bước gỡ lại nằm trong `needs`-graph như
+	// mọi bước khác nên nó hiện ra trong kế hoạch y hệt một bước sắp chạy, và
+	// người đọc cộng nó vào đầu việc. Bộ thực thi thì LOẠI nó khỏi lịch chạy
+	// thường (runner.execute ghi thẳng `skipped`) và chỉ gọi khi có sự cố.
+	//
+	// Là DANH SÁCH chứ không phải một cờ bool: một bước gỡ có thể được nhiều
+	// bước trỏ tới, và "gỡ cho bước nào" mới là câu người đọc cần.
+	GoLaiCho []string `json:"goLaiCho,omitempty"`
+
+	// Compensate là id bước gỡ lại của bước NÀY (khi on_failure = "compensate").
+	// Chiều ngược của GoLaiCho.
+	Compensate string `json:"compensate,omitempty"`
+
+	// Artifact là các FILE bước này hứa để lại: tên → đường dẫn tương đối.
+	//
+	// Đây là đường truyền thứ hai giữa các bước, không đi qua
+	// {{steps.x.output}}, nên nhìn sơ đồ phụ thuộc KHÔNG thấy nó.
+	Artifact map[string]string `json:"artifact,omitempty"`
+
+	// Idempotent = bước này có thể KHÔNG CHẠY trong lượt tới, vì một lượt trước
+	// đã làm xong đúng việc đó. Số agent của nó vẫn được cộng vào SoAgent: đó
+	// là mức TRẦN, còn có tiêu thật hay không chỉ biết lúc tra sổ.
+	Idempotent bool `json:"idempotent,omitempty"`
+
+	// Route là đường API bước này đi — tên khai cứng, hay danh sách ứng viên
+	// của node `route`, hay câu "để cấu hình quyết định". Rỗng = bước không đi
+	// đường API nào.
+	Route string `json:"route,omitempty"`
+
+	// Gop là các nguồn của bước `merge`, THEO ĐÚNG THỨ TỰ SẼ GỘP.
+	Gop []string `json:"gop,omitempty"`
 }
 
 // DotKho là một đợt của kế hoạch: mọi bước trong đó chạy SONG SONG.
@@ -102,6 +142,14 @@ type KeHoachKho struct {
 	// CoLap = có bước `foreach`, nên SoAgent ở trên là mức TỐI THIỂU chứ không
 	// phải con số cuối cùng.
 	CoLap bool `json:"coLap"`
+
+	// SoBuocGoLai là số bước trong kế hoạch CHỈ chạy khi có sự cố.
+	//
+	// Có ở cấp kế hoạch chứ không chỉ ở từng bước, vì câu người đọc hỏi là "kế
+	// hoạch này có mấy bước, mấy cái sẽ chạy thật" — mà bảng cũ trả lời sai câu
+	// đó theo hướng THỪA, và thừa ở đây nghĩa là người ta tưởng có một bước dọn
+	// dẹp sẽ chạy trong khi nó chỉ chạy nếu hỏng.
+	SoBuocGoLai int `json:"soBuocGoLai,omitempty"`
 }
 
 // VanDe là flow.Problem dưới dạng gửi đi được cho mặt web.
@@ -159,12 +207,20 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 	// `steps.<id>.output`, để còn chạy qua ĐÚNG bộ lọc quyền đọc mà bộ thực thi
 	// dùng (flow.LocDocDuoc). Chạy khan mà bỏ qua bộ lọc thì prompt in ra khác
 	// prompt gửi đi — đúng thứ tính năng này sinh ra để chống.
+	// Bước nào là bước GỠ LẠI — tính một lần, đúng cách bộ thực thi tính.
+	goLai := flow.BuocGoLai(f)
+
 	xong := map[string]string{}
 	for _, d := range dots {
 		dk := DotKho{So: d.So, ChoDuyet: d.ChoDuyet}
 		for _, s := range d.Buoc {
 			env := flow.WithOutputs(bien, flow.LocDocDuoc(s, xong))
-			dk.Buoc = append(dk.Buoc, a.buocKho(s, env, defaultProfile, &kh.SoAgent))
+			b := a.buocKho(s, env, defaultProfile, &kh.SoAgent, goLai[s.ID])
+			if goLai[s.ID] {
+				b.GoLaiCho = flow.BuocDuocGoLaiBoi(f, s.ID)
+				kh.SoBuocGoLai++
+			}
+			dk.Buoc = append(dk.Buoc, b)
 			if s.ForEach != "" {
 				kh.CoLap = true
 			}
@@ -178,12 +234,21 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 }
 
 // buocKho mô tả một bước, cộng dồn số agent vào tong.
-func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int) BuocKho {
+//
+// laGoLai = bước này là bước GỠ LẠI của bước khác, tức nó KHÔNG chạy trong lượt
+// suôn sẻ. Khi đó số agent của nó KHÔNG được cộng vào tổng: cả lý do người ta
+// chạy khan là xem "sắp đốt bao nhiêu hạn mức", và đếm cả một bước chỉ chạy khi
+// hỏng vào đó là trả lời sai câu đang được hỏi.
+func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int, laGoLai bool) BuocKho {
 	// VaiTro gán cho MỌI loại bước, không riêng bước agent: `kiem-1` là bước
 	// shell nhưng vẫn là việc của tester.
 	b := BuocKho{ID: s.ID, Type: s.Type, Needs: s.Needs, Worktree: s.Worktree,
 		TuDuyetQuyen: s.TuDuyetQuyen, Lap: s.ForEach, VaiTro: s.VaiTro,
-		DocDuoc: flow.MoTaDocDuoc(s)}
+		DocDuoc: flow.MoTaDocDuoc(s), Artifact: s.Artifact, Idempotent: s.Idempotent,
+		Route: flow.MoTaRoute(s)}
+	if s.OnFailure == flow.OnFailCompensate {
+		b.Compensate = s.Compensate
+	}
 	if b.Needs == nil {
 		b.Needs = []string{}
 	}
@@ -198,7 +263,9 @@ func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int) B
 		if b.SoAgent < 1 {
 			b.SoAgent = 1
 		}
-		*tong += b.SoAgent
+		if !laGoLai {
+			*tong += b.SoAgent
+		}
 		b.Prompt = flow.Expand(s.Prompt, env)
 		b.ConSot = flow.BuocConSot(s.Prompt, env)
 	case flow.TypeShell, flow.TypeTest, flow.TypeLint:
@@ -213,6 +280,36 @@ func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int) B
 			}
 		}
 		b.Prompt = dong
+	// Node `model` và `plugin` TỪNG rơi vào nhánh `default` bên dưới, tức là
+	// bảng chạy khan đọc `s.Message` của chúng — một trường luôn rỗng. Hậu quả:
+	// bước gọi model hiện ra không kèm một chữ nào của câu hỏi, đúng ở cái bảng
+	// sinh ra để trả lời "nó sẽ hỏi chúng nó cái gì".
+	case flow.TypeModel:
+		b.Model = s.Model
+		b.Prompt = flow.Expand(s.Prompt, env)
+		b.ConSot = flow.BuocConSot(s.Prompt, env)
+		if b.ConSot == "" {
+			// `route` cũng nhận {{steps.x.output}} từ bản này. Thiếu kết quả ở
+			// đó thì bước không biết đi đường nào — cùng mức nghiêm trọng với
+			// thiếu prompt, nên báo cùng một chỗ.
+			b.ConSot = flow.BuocConSot(s.Route, env)
+		}
+	case flow.TypePlugin:
+		// Với plugin thì "câu hỏi" là `vao` — dữ liệu gửi cho một chương trình,
+		// không phải chữ gửi cho một mô hình. Cùng cách phân biệt mà Step.Vao đã
+		// nói rõ, giữ nguyên ở đây.
+		b.Prompt = flow.Expand(s.Vao, env)
+		b.ConSot = flow.BuocConSot(s.Vao, env)
+	case flow.TypeMerge:
+		// Thứ tự gộp LÀ thứ tự `needs`, và đó là thứ đáng hiện nhất ở đây: hai
+		// lượt chạy giống hệt nhau chỉ ra cùng một kết quả khi thứ tự này cố
+		// định. Xem internal/flow/merge.go.
+		b.Gop = s.Needs
+		if b.Gop == nil {
+			b.Gop = []string{}
+		}
+	case flow.TypeRoute:
+		// Bước `route` không hỏi ai câu nào; `Route` ở trên đã nói đủ.
 	default:
 		b.Prompt = flow.Expand(s.Message, env)
 		b.ConSot = flow.BuocConSot(s.Message, env)

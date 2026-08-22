@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/console"
@@ -108,6 +109,10 @@ func flowShow(name string) {
 		}
 		fmt.Println()
 	}
+	// Bước nào đang làm nhiệm vụ GỠ LẠI cho bước khác — tính một lần cho cả
+	// flow, đúng cách bộ thực thi tính (flow.BuocGoLai).
+	goLai := flow.BuocGoLai(f)
+
 	fmt.Println("  Thứ tự chạy:")
 	for i, s := range order {
 		dep := ""
@@ -115,6 +120,15 @@ func flowShow(name string) {
 			dep = "  ← " + strings.Join(s.Needs, ", ")
 		}
 		fmt.Printf("   %d. %-10s [%s]%s\n", i+1, s.ID, s.Type, dep)
+		// BƯỚC GỠ LẠI: nói ra NGAY dưới tên bước, trước cả prompt.
+		//
+		// Đây là dòng quan trọng nhất trong cả bảng này. Bước gỡ lại đứng trong
+		// danh sách "Thứ tự chạy" y như mọi bước khác, nên người đọc đếm nó vào
+		// kế hoạch — trong khi bộ thực thi LOẠI nó khỏi lịch chạy thường và chỉ
+		// gọi khi có sự cố. Không có dòng này thì bảng đang nói sai.
+		if cho := flow.MoTaChoGoLai(f, s.ID); goLai[s.ID] && cho != "" {
+			fmt.Printf("      %s\n", cho)
+		}
 		switch s.Type {
 		case flow.TypeAgent, flow.TypeReview:
 			n := s.Copies
@@ -136,6 +150,20 @@ func flowShow(name string) {
 			fmt.Printf("      chạy: %s\n", strings.Join(s.Run, " "))
 		case flow.TypeApprove, flow.TypeNotify:
 			fmt.Printf("      %s\n", truncate(s.Message, 70))
+		case flow.TypeMerge:
+			// Thứ tự gộp LÀ thứ tự `needs`. In lại ở đây chứ không bắt người đọc
+			// suy từ dòng "← a, b, c" phía trên: dòng đó nói phụ thuộc, còn đây
+			// nói THỨ TỰ TRONG KẾT QUẢ — hai câu khác nhau, chỉ tình cờ cùng
+			// một danh sách.
+			fmt.Printf("      gộp đầu ra theo thứ tự: %s\n", strings.Join(s.Needs, " → "))
+		case flow.TypeRoute:
+			fmt.Printf("      chọn đường: %s\n", flow.MoTaRoute(s))
+		}
+		if s.Type == flow.TypeModel && s.Route != "" {
+			fmt.Printf("      đường: %s\n", s.Route)
+		}
+		for _, d := range moTaBaTruong(s.Artifact, s.Idempotent, buocGoLaiCua(s)) {
+			fmt.Printf("      %s\n", d)
 		}
 	}
 
@@ -175,6 +203,56 @@ func flowValidate() {
 		console.KhoiPhuc()
 		os.Exit(1) // để dùng được trong CI
 	}
+}
+
+// moTaBaTruong dựng dòng mô tả cho ba trường mà `flow show` từng KHÔNG hiện:
+// `artifact`, `idempotent` và `compensate`.
+//
+// VÌ SAO ĐÚNG BA TRƯỜNG NÀY: cả ba đổi HÀNH VI của lượt chạy theo cách không
+// suy ra được từ tên bước hay từ sơ đồ phụ thuộc.
+//
+//	artifact    bước để lại FILE cho bước sau — đường truyền thứ hai, không đi
+//	            qua {{steps.x.output}} nên nhìn sơ đồ không thấy;
+//	idempotent  bước có thể KHÔNG CHẠY lần này vì một lượt trước đã làm xong;
+//	compensate  bước hỏng thì một bước khác chạy để GỠ LẠI, rồi cả lượt dừng.
+//
+// Người đọc `flow show` đang quyết định có bấm chạy hay không. Giấu ba thứ này
+// đi thì họ quyết định trên một bản kế hoạch thiếu ba hành vi.
+//
+// Nhận ba GIÁ TRỊ chứ không nhận flow.Step: `sagent flow show` đọc từ Step, còn
+// bảng chạy khan đọc từ api.BuocKho đi qua JSON. Hai mặt phải in ra ĐÚNG một
+// câu chữ, và cách chắc chắn nhất là chúng gọi chung một hàm — chứ không phải
+// hai hàm "giống nhau" viết ở hai file.
+func moTaBaTruong(artifact map[string]string, idempotent bool, buocGoLai string) []string {
+	var out []string
+	if len(artifact) > 0 {
+		ten := make([]string, 0, len(artifact))
+		for k := range artifact {
+			ten = append(ten, k)
+		}
+		sort.Strings(ten) // map của Go trả ra ngẫu nhiên; bảng phải in giống nhau mọi lần
+		cap := make([]string, 0, len(ten))
+		for _, k := range ten {
+			cap = append(cap, k+" → "+artifact[k])
+		}
+		out = append(out, "để lại file (artifact): "+strings.Join(cap, ", "))
+	}
+	if idempotent {
+		out = append(out, "idempotent: lượt trước đã làm xong đúng việc này thì bước NÀY BỊ BỎ QUA")
+	}
+	if buocGoLai != "" {
+		out = append(out, "hỏng thì: chạy bước gỡ lại \""+buocGoLai+"\" rồi DỪNG cả lượt")
+	}
+	return out
+}
+
+// buocGoLaiCua trả về id bước gỡ lại của s, hoặc "" nếu s không dùng chính sách
+// `compensate`. Tách ra vì `Compensate` chỉ có tác dụng khi đi kèm on_failure.
+func buocGoLaiCua(s flow.Step) string {
+	if s.OnFailure == flow.OnFailCompensate {
+		return s.Compensate
+	}
+	return ""
 }
 
 func truncate(s string, n int) string {

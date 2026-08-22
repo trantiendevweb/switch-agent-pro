@@ -135,7 +135,21 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 			if b.TuDuyetQuyen {
 				dong += " · ⚠ TỰ DUYỆT MỌI QUYỀN"
 			}
+			if b.Route != "" {
+				dong += " · đường " + b.Route
+			}
 			fmt.Println(dong)
+			// BƯỚC GỠ LẠI: dòng đầu tiên dưới tên bước, trước cả quyền đọc.
+			//
+			// Bảng cũ hiện bước này y hệt một bước sắp chạy — nó nằm trong đợt,
+			// có số thứ tự, có prompt. Sự thật thì bộ thực thi ghi thẳng nó là
+			// `skipped` ngay đầu lượt và chỉ gọi khi có sự cố. Một bản kế hoạch
+			// nói THỪA một bước dọn dẹp là một bản kế hoạch khiến người đọc yên
+			// tâm nhầm.
+			if len(b.GoLaiCho) > 0 {
+				fmt.Printf("       ↩ BƯỚC GỠ LẠI — KHÔNG chạy trong lượt suôn sẻ; chỉ chạy khi %s hỏng\n",
+					strings.Join(b.GoLaiCho, " hoặc "))
+			}
 			// Quyền đọc in cho MỌI bước, kể cả bước chưa khai `doc_duoc`. In
 			// riêng bước có khai thì im lặng lại thành "mặc định là gì" — mà
 			// mặc định ở đây là MỞ HẾT, đúng thứ người đọc kế hoạch cần biết
@@ -146,6 +160,14 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 			}
 			if b.Prompt != "" {
 				fmt.Printf("       %s\n", truncate(b.Prompt, 100))
+			}
+			if len(b.Gop) > 0 {
+				fmt.Printf("       gộp đầu ra theo thứ tự: %s\n", strings.Join(b.Gop, " → "))
+			}
+			// Ba trường mà bảng chạy khan trước đây KHÔNG hề nhắc tới. Cùng câu
+			// chữ với `flow show` (moTaBaTruong) — một nguồn, hai mặt.
+			for _, d := range moTaBaTruong(b.Artifact, b.Idempotent, b.Compensate) {
+				fmt.Printf("       %s\n", d)
 			}
 			if b.ConSot != "" {
 				fmt.Printf("       ✗ đang chờ kết quả bước %q, nhưng bước đó KHÔNG xong trước nó\n", b.ConSot)
@@ -158,6 +180,13 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 		fmt.Printf("  Tổng: TỪ %d phiên agent trở lên (có bước lặp)\n", kh.SoAgent)
 	} else {
 		fmt.Printf("  Tổng: %d phiên agent\n", kh.SoAgent)
+	}
+	// Con số này KHÔNG nằm trong tổng ở trên, và nói ra chuyện đó mới là điểm
+	// của dòng này: người đọc vừa đếm số bước trong các đợt, và con số đó lớn
+	// hơn số bước sẽ chạy thật.
+	if kh.SoBuocGoLai > 0 {
+		fmt.Printf("  Trong đó %d bước là BƯỚC GỠ LẠI — không chạy nếu mọi thứ suôn sẻ, "+
+			"và KHÔNG tính vào tổng trên\n", kh.SoBuocGoLai)
 	}
 	for _, v := range kh.Van {
 		mark := "✗"

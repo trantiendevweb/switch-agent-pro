@@ -1650,6 +1650,7 @@ func (a *API) runner(defaultProfile Addr, dir string) *flow.Runner {
 		DB: a.db, Bus: a.bus,
 		Agent: agentBridge{a: a, fallback: defaultProfile},
 		Model: modelBridge{a: a},
+		Route: routeBridge{a: a}, // node `route` — xem internal/api/routenode.go
 		// Đường THỨ BA: plugin ngoài. `dir` vừa là nơi tìm .sagent/plugins, vừa là
 		// thư mục làm việc cấp cho plugin nào KHAI quyền thu-muc-lam-viec — plugin
 		// không khai thì internal/plugin không đưa đường dẫn này cho nó.

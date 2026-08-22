@@ -138,3 +138,21 @@ func VanDeDocDuoc(f Flow) []Problem {
 	}
 	return ps
 }
+
+// ChoDoc: bước s có được đọc kết quả của bước `buoc` không.
+//
+// Là phép kiểm TƯ CÁCH của `doc_duoc`, tách khỏi việc "thay bằng cái gì" —
+// output bị chặn thì thay bằng CauChan, artifact bị chặn thì thay bằng
+// CauChanArtifact, còn `merge` thì bỏ hẳn phần chữ đi và ghi một dòng nói rõ.
+// Ba chỗ, một luật; viết ba lần thì sớm muộn có một chỗ quên cập nhật.
+func ChoDoc(s Step, buoc string) bool {
+	if s.DocDuoc == nil {
+		return true // chưa khai = mở hết
+	}
+	for _, id := range s.DocDuoc {
+		if id == buoc {
+			return true
+		}
+	}
+	return false
+}
