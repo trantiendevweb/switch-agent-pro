@@ -4186,3 +4186,41 @@ chờn** và **nới lỏng nó cho dễ xanh** — hai việc trông giống h�
 worktree tạm tại đúng gốc nhánh `04f7ebc` rồi chạy ba lần (đỏ 2/3) và chỉ ra bài
 thứ hai cùng bệnh; #208 đo `-count=8` trên cây sạch (đỏ 3/8) rồi tìm ra **nguyên
 nhân** chứ không chỉ tần suất.
+
+## 22/08 — `agy --add-dir` KHÔNG gãy ở chế độ `-p`: một kết quả ÂM cứu một lời khai ĐÚNG
+
+- **Vì sao đo**: báo cáo `#210` ghi *"sự cố 4: `agy --add-dir` chết trong chế độ
+  headless"*, và nêu hệ quả nếu đúng — `internal/provider/antigravity.go:156`
+  khai `ArgsThuMuc` trả `--add-dir`, nên `NLThuMuc` sẽ đang khai `LamDuoc` cho
+  một thứ **hỏng ở đúng chế độ dự án dùng**. Nó cũng tự nói *"mới thấy đúng một
+  lần, chưa dựng lại có hệ thống"*. Đây là loại lời khai đắt nhất nếu sai.
+- **Đo lại, chạy thật trên `antigravity:may`**:
+
+  | Phép đo | Kết quả |
+  |---|---|
+  | `agy --output-format stream-json --add-dir <dir> -p "…"`, **không** `--dangerously-skip-permissions` | **SUCCESS**, 13.787 token |
+  | Cùng lệnh, hỏi nội dung file trong thư mục vừa thêm | trả **đúng nguyên văn** `noi dung thu` |
+
+  Tức `--add-dir` **chạy được** ở chế độ `-p`, và thư mục thêm vào **đọc được
+  thật** — không chỉ thoát 0. `NLThuMuc = LamDuoc` **đúng, giữ nguyên**.
+- **Nguyên nhân thật của lỗi #210 gặp**, tìm bằng cách mở nhật ký phiên đó ra
+  đọc: chuỗi lỗi nằm trong một `tool_result`, và nó nói
+
+  ```
+  permission check failed for command "agy --help": user denied permission to run command
+  ```
+
+  **Tên lệnh trong câu lỗi là `agy --help`, không phải lệnh có `--add-dir`.**
+  Đó là `agy` bị **chính lớp quyền của nó** chặn khi định **chạy một lệnh
+  shell** — vì lượt đó thiếu `--dangerously-skip-permissions`, đúng cờ mà
+  `ArgsTuDuyetQuyen` của antigravity trả về và dự án **luôn truyền** khi chạy
+  hạm đội. Không liên quan gì tới `--add-dir`.
+- **Kết luận**: **không sửa gì cả** — và đó là kết quả đúng. Nếu tin báo cáo mà
+  hạ `NLThuMuc` xuống `KhongLamDuoc`, bảng năng lực sẽ nói dối theo **chiều
+  ngược lại** với mọi lần nói dối khác của dự án này: bi quan thay vì tô hồng.
+  Sai theo chiều nào cũng là sai.
+- **Bài học về cách đọc một sự cố**: câu lỗi có **tên lệnh** trong nó. `#210`
+  chép nguyên văn câu lỗi vào báo cáo — đủ để tôi thấy tên lệnh **không khớp**
+  với lệnh nó nói là đã chạy. Nếu nó chỉ ghi *"add-dir chết ở headless"* thì
+  không cách nào lần ra. **Chép nguyên văn là thứ cứu được lượt này**, y như
+  luật "giữ nguyên văn lỗi của nhà cung cấp" mà `aiapi` đã đặt cho đường API.
