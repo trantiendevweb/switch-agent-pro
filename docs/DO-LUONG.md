@@ -3511,3 +3511,47 @@ với cây làm việc.
   nào. Sau khi vá: `go build` · `go vet` · `go test ./...` xanh cả ba.
 - **Còn CHƯA ĐO**: các gói khác có bài kiểm nào chạm kho thật không. Gói `api`
   đã bịt; chưa quét toàn repo.
+
+## 22/08 — Nút Lưu của bảng vẽ workflow XOÁ TRẮNG mọi trường nó không biết vẽ
+
+- **Đo lúc nào**: 22/08/2026, phiên #199 tìm ra khi soi `artifact` có đi qua đủ
+  bốn mặt không; người điều phối kiểm độc lập lại trước khi vá.
+- **Con số / Bằng chứng**: `internal/dash/web/flow.html` — hàm lưu **dựng lại**
+  mỗi bước từ đầu:
+
+  ```js
+  const s={id, type, needs, x, y, timeout_sec, retry, on_failure}
+  ```
+
+  Mở một flow trên bảng vẽ rồi bấm **Lưu**, **dù không sửa gì**, là xoá vĩnh
+  viễn khỏi `flows.toml`: `doc_duoc` · `phai_co` · `vai_tro` · `model` ·
+  `plugin` · `vao` · `tham_so` · `route` · `separator` · `fallback` ·
+  `tu_duyet_quyen` · và cả `artifact` / `idempotent` / `compensate` vừa thêm.
+
+  Nặng hơn một bậc: `profile`, `when`, `foreach` được `loadFlow` **đọc vào**
+  nhưng hàm lưu **không ghi ra** — sửa chúng ở cột phải rồi bấm Lưu cũng mất.
+
+  Đối chứng trên dữ liệu thật: flow `doi-4` trong `.sagent/flows.toml` có đủ
+  `vai_tro`, `profile`, `model`, `phai_co` — tức lỗ này đang ăn vào một flow
+  đang dùng, không phải một ca giả định.
+- **Vì sao nguy hiểm hơn nó trông**: `phai_co` và `doc_duoc` là **cổng an
+  toàn**. Mất chúng thì flow vẫn chạy, vẫn báo xong — chỉ là không còn ai kiểm
+  đầu ra nữa. Mất dữ liệu **im lặng**: file trên đĩa đổi, không cảnh báo,
+  người dùng chỉ phát hiện khi lượt chạy sau cư xử khác.
+- **Đã sửa hay chưa**: **ĐÃ SỬA**. `loadFlow` giữ nguyên bước máy chủ gửi
+  xuống (`__goc:s`); hàm lưu **trải bản gốc ra trước** rồi mới đè những gì bảng
+  vẽ thật sự sửa (`{...(n.__goc||{}), id, type, …}`), và ghi thêm bốn trường
+  `when` / `profile` / `foreach` / `tuDuyetQuyen` từ node.
+
+  **Đánh đổi đã biết và chấp nhận**: kiểu này thì không xoá được một trường lạ
+  bằng bảng vẽ nữa, phải sửa `flows.toml` bằng tay. Mất một đường xoá còn hơn
+  xoá thứ người ta không định xoá. Cố ý **không** làm nửa còn lại mà #199 đề
+  xuất (cho `flow.Save` trộn với bản trên đĩa) — làm cả hai phía là đổi nghĩa
+  "lưu" thành "trộn" ở hai chỗ, và sau đó không còn đường nào xoá thật.
+- **Bài canh**: `TestBangVeGiuTruongNoKhongBietVe` (`internal/dash/`). Canh
+  **hai mắt xích** của phép trải, và **không chép tay danh sách tên trường** —
+  danh sách chép tay sẽ lệch với `flow.Step` đúng vào lần thêm trường tiếp
+  theo, mà lần đó mới là lần nguy hiểm. Thay vào đó nó dùng reflection đọc thẻ
+  `json` của `flow.Step` rồi in ra những trường `flow.html` **không hề nhắc
+  tên** — hiện là **3**: `thamSo`, `docDuoc`, `phaiCo`. Đã chứng minh **ĐỎ**
+  bằng cách gỡ đúng phép trải ra rồi chạy lại.

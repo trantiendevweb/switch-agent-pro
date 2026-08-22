@@ -773,6 +773,16 @@ async function loadFlow(name){
     const d=await call('/api/flow/def?name='+encodeURIComponent(name));
     flowName=d.name; flowDesc=d.desc||''; flowVars=d.vars||{}; builtin=!!d.builtin;
     nodes=(d.steps||[]).map((s,i)=>({
+      // __goc GIỮ NGUYÊN bước như máy chủ gửi xuống, kể cả những trường bảng vẽ
+      // không biết vẽ. Hàm lưu trải nó ra trước rồi mới đè lên những gì bảng vẽ
+      // thật sự sửa.
+      //
+      // Không có nó thì bấm Lưu là XOÁ TRẮNG mọi trường lạ: doc_duoc, phai_co,
+      // vai_tro, model, plugin, vao, tham_so, route, separator, fallback,
+      // artifact, idempotent, compensate. `phai_co` và `doc_duoc` là CỔNG AN
+      // TOÀN — một cái nút Lưu gỡ cổng an toàn ra mà không nói gì là mất dữ
+      // liệu im lặng, người dùng chỉ biết khi lượt chạy sau cư xử khác.
+      __goc:s,
       id:s.id, type:s.type, needs:s.needs||[],
       prompt:s.prompt||'', run:(s.run||[]).join(' '), message:s.message||'',
       copies:s.copies||1, worktree:!!s.worktree, timeout_sec:s.timeout_sec||0,
@@ -803,8 +813,21 @@ $('#save').onclick=async()=>{
   if(!flowName){ select(null); toast('Đặt tên cho workflow ở cột phải trước','err'); return; }
   if(!nodes.length){ toast('Chưa có node nào','err'); return; }
   const steps = nodes.map(n=>{
-    const s={id:n.id, type:n.type, needs:n.needs||[], x:n.x, y:n.y,
+    // TRẢI BẢN GỐC TRƯỚC, rồi mới đè những gì bảng vẽ sửa. Dựng lại object từ
+    // đầu là cách cũ, và nó xoá trắng mọi trường bảng vẽ không biết — xem
+    // __goc trong loadFlow.
+    //
+    // Đánh đổi đã biết và chấp nhận: kiểu này thì KHÔNG xoá được một trường lạ
+    // bằng bảng vẽ nữa, phải sửa flows.toml bằng tay. Mất một đường xoá còn hơn
+    // xoá thứ người ta không định xoá.
+    const s={...(n.__goc||{}),
+             id:n.id, type:n.type, needs:n.needs||[], x:n.x, y:n.y,
              timeout_sec:n.timeout_sec||0, retry:n.retry||0, on_failure:n.on_failure||'stop'};
+    // Bốn trường này loadFlow ĐỌC VÀO và cột phải sửa được, nên phải ghi ra từ
+    // node chứ không lấy từ __goc — lấy từ __goc là người dùng sửa xong bấm Lưu
+    // mà giá trị không đổi.
+    s.when=n.when||''; s.profile=n.profile||''; s.foreach=n.foreach||'';
+    s.tuDuyetQuyen=!!n.tuDuyetQuyen;
     if(n.type==='agent'||n.type==='review'){ s.prompt=n.prompt; s.copies=n.copies||1; s.worktree=!!n.worktree; }
     else if(n.type==='shell'){ s.run=(n.run||'').trim().split(/\s+/).filter(Boolean); }
     else { s.message=n.message; }
