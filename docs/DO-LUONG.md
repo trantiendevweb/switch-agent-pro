@@ -3903,3 +3903,39 @@ từ mục (1): (1) chỉ nói đọc THẲNG bị chặn, không nói không c�
 
 Cho tới khi đo được nửa này, `thu-muc-lam-viec` **giữ nguyên `KhongChanDuoc`** —
 một hàng rào chưa biết có gỡ được hay không thì chưa được khai là hàng rào.
+
+## 22/08 — Kiểm tầng redaction trên DỮ LIỆU SẢN PHẨM, không phải trên test
+
+- **Đo lúc nào**: 22/08/2026 ~15:55, khi tình cờ thấy `sagent nhat-ky 208` in ra
+  `C:\Users\[đã-che:người-dùng]\...` trong lúc đang chẩn đoán việc khác.
+- **Vì sao đáng đo lại**: tầng redaction trộn lúc ~10:45. Từ đó tới giờ đã có
+  **năm phiên agent** chạy và ghi nhật ký thật. Đây là lần đầu có dữ liệu sản
+  phẩm sinh ra SAU bản vá để kiểm — mọi bằng chứng trước đó là từ test và từ
+  nhật ký cũ.
+- **Con số, đếm trên file `.log` thật**:
+
+  | Nhật ký | `Administrator` trong FILE | `đã-che` trong FILE |
+  |---|---|---|
+  | `...141021` (14:10, sau bản vá) | **495** | 0 |
+  | `...153457` (15:34, sau bản vá) | **73** | 0 |
+  | `...153552` (15:35, sau bản vá) | **157** | 0 |
+
+  Nhưng cùng nội dung đó **đọc qua `sagent nhat-ky`** thì ra
+  `C:\Users\[đã-che:người-dùng]\...`.
+- **Kết luận: ĐÚNG NHƯ THIẾT KẾ, và thiết kế đã được nói ra trước.**
+  `internal/nhatky/nhatky.go:204,239` gọi `redaction.Che` ở **hai cửa ra**
+  (`BoDau` và `duoi`) — nơi nội dung nhật ký **thoát ra ngoài** — chứ không ở
+  đường ghi. Bình luận trong mã nói rõ vì sao: *"mặt gọi viết sau này không quên
+  được cái nó không phải nhớ"*.
+
+  `docs/BAO-CAO-REDACTION.md` cũng đã ghi điều này ở **dòng đầu tiên** của mục
+  "Rủi ro còn lại": *"Che lúc đọc, không che lúc ghi. File trên đĩa vẫn chứa
+  nguyên văn."* Phép kiểm hôm nay **xác nhận** báo cáo đó nói đúng, trên dữ liệu
+  sản phẩm.
+- **Thứ PHẢI sửa, và đã sửa**: bảng tổng trong `docs/MASTER-PLAN.md` ghi
+  *"2.060 lần lộ danh tính → 0"* **không kèm vế "lúc đọc"**. Con số đúng nhưng
+  nói về một thứ khác với cái người đọc lướt sẽ hiểu — họ sẽ tưởng file trên đĩa
+  đã sạch. Đã thêm vế đó vào cả hai chỗ trong kế hoạch và sinh lại hai trang.
+- **Rủi ro còn lại, nhắc lại cho rõ**: ai đọc được đĩa thì tầng này không cản.
+  Nó chỉ cản nội dung **đi ra** — mà cửa đi ra đáng lo nhất là cổng 8788 đang
+  phơi ra internet, và đó đúng là cửa được che.

@@ -369,7 +369,8 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
       gán thẳng file handle cho tiến trình con rồi cha THOÁT — không còn ai đứng
       giữa dòng ghi. Hai cửa ra thật là `nhatky.Duoi` (người + dash) và
       `nhatky.BoDau` (máy → prompt bước sau); tầng che gắn vào **cả hai**, 20 dòng
-      thêm / 0 dòng xoá. Đo lại sau khi sửa: 2.060 → **0**, email 179 → **0**,
+      thêm / 0 dòng xoá. Đo lại sau khi sửa — **trên NỘI DUNG ĐI RA, không phải
+      trên file đĩa**: 2.060 → **0**, email 179 → **0**,
       chữ ký thinking giữ nguyên **489**, dòng JSON hỏng **0/6.092**.
     - **Đường máy phân loại CỐ Ý không bị đụng** (`api.phanLoaiPhienChet` đọc byte
       gốc) — có test ghim `TestPhanLoaiPhienChetVanNhinThayByteGoc`. Cắm nhầm tầng
@@ -591,7 +592,8 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   `Administrator`**. Không mặt nào trong bốn mặt tự nói ra được điều đó; **chỉ có cái
   sườn mới nói ra**. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.
 - **Cập nhật 22/08:** đóng nốt **hai** ô mà lượt soát 21/08 chỉ đích danh là còn
-  thiếu — **tầng redaction chung** (`internal/redaction`, 16 luật, 2.060 lần lộ
+  thiếu — **tầng redaction chung** (`internal/redaction`, 16 luật, che LÚC ĐỌC:
+  nội dung đi ra sạch, file trên đĩa vẫn nguyên văn — 2.060 lần lộ
   danh tính → 0) và **bảng năng lực cho nửa API** (`internal/aiapi/nangluc.go`,
   7 năng lực × 2 route, đo thật bằng key thật). Đếm lại: **5 xong · 2 xong một
   phần · 0 chưa làm → 6,0/7 = 86%**.

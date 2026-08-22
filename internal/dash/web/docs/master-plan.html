@@ -543,7 +543,8 @@ email 179 lần (75 là địa chỉ thật). Trên đúng cái máy đang bị 
 gán thẳng file handle cho tiến trình con rồi cha THOÁT — không còn ai đứng
 giữa dòng ghi. Hai cửa ra thật là <code>nhatky.Duoi</code> (người + dash) và
 <code>nhatky.BoDau</code> (máy → prompt bước sau); tầng che gắn vào <strong>cả hai</strong>, 20 dòng
-thêm / 0 dòng xoá. Đo lại sau khi sửa: 2.060 → <strong>0</strong>, email 179 → <strong>0</strong>,
+thêm / 0 dòng xoá. Đo lại sau khi sửa — <strong>trên NỘI DUNG ĐI RA, không phải
+trên file đĩa</strong>: 2.060 → <strong>0</strong>, email 179 → <strong>0</strong>,
 chữ ký thinking giữ nguyên <strong>489</strong>, dòng JSON hỏng <strong>0/6.092</strong>.</li>
 <li><strong>Đường máy phân loại CỐ Ý không bị đụng</strong> (<code>api.phanLoaiPhienChet</code> đọc byte
 gốc) — có test ghim <code>TestPhanLoaiPhienChetVanNhinThayByteGoc</code>. Cắm nhầm tầng
@@ -791,7 +792,8 @@ dashboard và cờ <code>--tu-duyet-quyen</code> gặp nhau ở <code>POST /api/
 <code>Administrator</code></strong>. Không mặt nào trong bốn mặt tự nói ra được điều đó; <strong>chỉ có cái
 sườn mới nói ra</strong>. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.</li>
 <li><strong>Cập nhật 22/08:</strong> đóng nốt <strong>hai</strong> ô mà lượt soát 21/08 chỉ đích danh là còn
-thiếu — <strong>tầng redaction chung</strong> (<code>internal/redaction</code>, 16 luật, 2.060 lần lộ
+thiếu — <strong>tầng redaction chung</strong> (<code>internal/redaction</code>, 16 luật, che LÚC ĐỌC:
+nội dung đi ra sạch, file trên đĩa vẫn nguyên văn — 2.060 lần lộ
 danh tính → 0) và <strong>bảng năng lực cho nửa API</strong> (<code>internal/aiapi/nangluc.go</code>,
 7 năng lực × 2 route, đo thật bằng key thật). Đếm lại: <strong>5 xong · 2 xong một
 phần · 0 chưa làm → 6,0/7 = 86%</strong>.
