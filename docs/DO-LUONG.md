@@ -4145,3 +4145,44 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
   dựng hẳn một worktree tạm tại **đúng gốc nhánh `04f7ebc`** (không có một dòng
   nào của nó) rồi chạy `go test ./internal/flow/` ba lần → **đỏ 2/3**. Và nó chỉ
   ra bài thứ HAI cùng bệnh: `TestCacNhanhDocLapChaySongSong`.
+
+## 22/08 — Mở `foreach` + artifact/idempotent, và ĐÓNG con chập chờn
+
+- **Trộn** `sagent/foreach-22-08` (1.930 dòng, $21,17). `main` sau khi trộn:
+  `build=0 · vet=0 · test=0`.
+
+### Cú pháp trỏ artifact của bước `foreach` — chọn DANH SÁCH, không chọn chỉ số
+
+`#199` chặn tổ hợp này và nói thẳng *"chưa rõ cú pháp trỏ nên thế nào, và đoán
+bừa một cú pháp rồi phải đổi thì đắt hơn chờ"*. Câu trả lời:
+`{{artifacts.<tên>.danh_sach}}` — một file liệt kê đường dẫn, mỗi dòng một mục.
+
+**Vì sao KHÔNG trỏ theo chỉ số** (`{{artifacts.x[0]}}`), và lý do này áp được cho
+mọi lựa chọn cú pháp khác của dự án: bộ kiểm (`flow.Validate`) muốn soi được
+`[i]` thì phải **biết N**, mà N chỉ tồn tại lúc chạy. *"Một cú pháp mà bộ kiểm
+không soi nổi là một cú pháp chỉ hỏng lúc chạy thật."* Biến thể "chỉ số động"
+còn tệ hơn: nó **giả định** hai bước lặp trên cùng một danh sách theo cùng một
+thứ tự, không gì trong engine kiểm được giả định đó, và khi nó sai thì bước sau
+nhận một đường dẫn **hợp lệ** trỏ vào **file của mục khác**.
+
+### Con chập chờn: ĐÃ ĐÓNG, và cách sửa mới là phần đáng đọc
+
+| | trước | sau |
+|---|---|---|
+| `TestNoiRaKhiDangChoTran` + `TestCacNhanhDocLapChaySongSong`, `-count=30` mỗi bài | **đỏ 16/30** (bài đầu) | **0/60** |
+
+Sửa: nới `60ms` → `400ms` ở **núm dựng cảnh**, không đụng một khẳng định nào.
+Lý do nó đỏ, và đây là chỗ dễ sửa sai: với 60ms thì bước 1-2 **xong trước khi**
+bước 3-4 kịp chạy goroutine — **không ai phải chờ**, nên không có dòng "đang chờ
+trần" nào, và bài đỏ vì **một lý do chẳng liên quan gì tới thứ nó canh**.
+
+Nguyên văn của phiên #208: *"Mọi khẳng định giữ nguyên; chỉ cái núm dựng cảnh
+được vặn cho đủ rộng."* Phân biệt đó là ranh giới giữa **sửa một bài kiểm chập
+chờn** và **nới lỏng nó cho dễ xanh** — hai việc trông giống hệt nhau trong
+`git diff`.
+
+**Ba phiên độc lập cùng chạm vào con này trong ngày**, và cả ba đều kết luận
+đúng: tôi đo 16/30 và chứng minh bằng "bài kiểm không đọc `Builtin()`"; #207 dựng
+worktree tạm tại đúng gốc nhánh `04f7ebc` rồi chạy ba lần (đỏ 2/3) và chỉ ra bài
+thứ hai cùng bệnh; #208 đo `-count=8` trên cây sạch (đỏ 3/8) rồi tìm ra **nguyên
+nhân** chứ không chỉ tần suất.
