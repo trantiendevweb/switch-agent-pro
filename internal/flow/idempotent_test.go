@@ -373,11 +373,13 @@ func TestValidateSoiIdempotent(t *testing.T) {
 		t.Fatalf("notify + idempotent phải là LỖI: %v", Validate(bao))
 	}
 
+	// `foreach` + `idempotent` KHÔNG còn bị chặn: khoá nay tính trên TỪNG lượt lặp
+	// và mỗi lượt có dòng sổ riêng (store v11). Xem TestForEachIdempotent*.
 	lap := Flow{Name: "t", Steps: []Step{
-		{ID: "a", Type: TypeAgent, Prompt: "p", ForEach: "vars.ds", Idempotent: true},
+		{ID: "a", Type: TypeAgent, Prompt: "p {{item}}", ForEach: "vars.ds", Idempotent: true},
 	}}
-	if !loiChua(Validate(lap), "foreach") {
-		t.Fatalf("foreach + idempotent phải là LỖI: %v", Validate(lap))
+	if coLoi(Validate(lap)) {
+		t.Fatalf("foreach + idempotent không được chặn nữa: %v", Validate(lap))
 	}
 
 	// shell/test/lint: CẢNH BÁO chứ không chặn — bộ chạy không nhìn thấy cây mã,

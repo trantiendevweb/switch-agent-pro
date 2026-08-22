@@ -27,6 +27,7 @@ type fakeModel struct {
 	routes  []string
 	prompts []string
 	out     string
+	nghi    string // phan NGHI, tach khoi cau tra loi
 	err     error
 }
 
@@ -34,12 +35,12 @@ func (f *fakeModel) GoiModel(_ context.Context, route, prompt string) (KetQuaAge
 	f.mu.Lock()
 	f.routes = append(f.routes, route)
 	f.prompts = append(f.prompts, prompt)
-	out, err := f.out, f.err
+	out, nghi, err := f.out, f.nghi, f.err
 	f.mu.Unlock()
 	if err != nil {
 		return KetQuaAgent{}, err
 	}
-	return KetQuaAgent{Output: out, TokenVao: 100, TokenRa: 50}, nil
+	return KetQuaAgent{Output: out, SuyLuan: nghi, TokenVao: 100, TokenRa: 50}, nil
 }
 
 func TestNodeModelGoiDuongAPIChuKhongGoiAgent(t *testing.T) {
@@ -132,5 +133,53 @@ func TestNguoiSoiCuaDoi4DungDuongAPI(t *testing.T) {
 	if strings.Contains(khoi, `profile = "grok:api"`) {
 		t.Error("nguoi soi cua doi-4 con khai profile CLI — node model di duong API, " +
 			"khong dung profile")
+	}
+}
+
+// PHẦN SUY LUẬN của bước `model` phải được LƯU, và phải KHÔNG đi vào output.
+//
+// Số đo thật ngày 22/08 với deepseek-v4-flash: câu trả lời 91 ký tự, phần nghĩ
+// 477 — gấp 5,2 lần. Bài này dựng lại đúng tỉ lệ đó bằng số ký tự thật.
+//
+// GỠ PHẦN SỬA RA THÌ TEST ĐỎ Ở ĐÂU: bỏ khối `SetStepSuyLuan` trong runStep
+// (step.go) thì cột `suy_luan` rỗng và dòng đầu đỏ. Còn nếu ai đó "sửa" bằng
+// cách nối phần nghĩ vào output thì dòng thứ hai đỏ.
+func TestNodeModelGiuPhanSuyLuanRaKhoiOutput(t *testing.T) {
+	r, _, db := newRunner(t)
+	traLoi := strings.Repeat("a", 91)
+	phanNghi := strings.Repeat("n", 477)
+	fm := &fakeModel{out: traLoi, nghi: phanNghi}
+	r.Model = fm
+
+	f := Flow{Name: "hoi", Steps: []Step{
+		{ID: "hoi", Type: TypeModel, Route: "deepseek", Prompt: "1 + 1?"},
+	}}
+	res, err := r.Start(context.Background(), f, t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.State != store.RunDone {
+		t.Fatalf("phải xong, được %q", res.State)
+	}
+	buoc, _ := db.Steps(res.RunID)
+	b := buoc["hoi"]
+
+	if b.SuyLuan != phanNghi {
+		t.Fatalf("phần suy luận bị vứt: sổ giữ %d ký tự, nhà cung cấp trả về %d",
+			len(b.SuyLuan), len(phanNghi))
+	}
+	if b.Output != traLoi {
+		t.Fatalf("output phải là ĐÚNG câu trả lời (%d ký tự), sổ giữ %d ký tự — "+
+			"phần nghĩ KHÔNG được trộn vào đường truyền sang bước sau",
+			len(traLoi), len(b.Output))
+	}
+	if strings.Contains(b.Output, "n") {
+		t.Fatal("phần nghĩ đã lẫn vào output — `phai_co` sẽ gật đầu vì đọc được ý nghĩ, " +
+			"và trần MaxInject sẽ lấy chỗ của câu trả lời")
+	}
+
+	// Và sổ phải lưu CÂU HỎI của bước model (trước đây cột `prompt` để trống).
+	if b.Prompt != "1 + 1?" {
+		t.Fatalf("sổ phải lưu câu hỏi của bước model, nó giữ %q", b.Prompt)
 	}
 }

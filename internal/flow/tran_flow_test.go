@@ -244,7 +244,16 @@ func TestBuocBiTranChanThiChoChuKhongGietLuotChay(t *testing.T) {
 // Đang chờ thì phải NÓI RA. Người vận hành đọc dòng này lúc 2 giờ sáng, và họ
 // cần đúng ba thứ: trần nào chặn, còn mấy chỗ, chờ bao lâu rồi.
 func TestNoiRaKhiDangChoTran(t *testing.T) {
-	r, _, noi := runnerCoTran(t, tranMacDinh(), nil, 60*time.Millisecond)
+	// 400ms chứ không phải 60ms, và đây KHÔNG phải nới một lời khẳng định cho dễ xanh.
+	//
+	// Bài này cần MỘT điều kiện tiên quyết: hai bước phải còn ĐANG GIỮ chỗ lúc hai
+	// bước kia đi xin. Với 60ms, trên máy đang tải thì bước 1-2 xong trước khi
+	// bước 3-4 kịp chạy goroutine — KHÔNG AI PHẢI CHỜ, nên không có dòng nào, và
+	// bài đỏ vì một lý do chẳng liên quan gì tới thứ nó canh. Đo thật 22/08: chạy
+	// `-count=8` trên cây SẠCH (trước mọi thay đổi của #200) đỏ 3/8 lần.
+	//
+	// Mọi khẳng định giữ nguyên; chỉ cái núm dựng cảnh được vặn cho đủ rộng.
+	r, _, noi := runnerCoTran(t, tranMacDinh(), nil, 400*time.Millisecond)
 	f := Flow{Name: "noi-ra", Steps: buocAgent(4, "claude:tns")}
 
 	if _, err := r.Start(context.Background(), f, t.TempDir(), nil); err != nil {

@@ -698,7 +698,12 @@ var conSotOutput = regexp.MustCompile(`\{\{steps\.([^.{}]+)\.output\}\}`)
 // Cùng lớp nguy hiểm với conSotOutput nhưng tệ hơn một bậc: một placeholder
 // output còn sót lọt vào prompt thì agent đọc ra chữ vô nghĩa; một placeholder
 // ARTIFACT còn sót lọt vào `run` thì lệnh nhận một chuỗi trông y như đường dẫn.
-var conSotArtifact = regexp.MustCompile(`\{\{artifacts\.([^.{}]+)\}\}`)
+//
+// Bắt CẢ dạng có hậu tố (`{{artifacts.x.danh_sach}}`, xem foreach_artifact.go). Nhóm
+// thứ hai cố tình rộng (`[^{}]*` chứ không phải danh sách hậu tố hợp lệ): một hậu tố
+// GÕ SAI phải rơi vào tay Validate để bị báo tên, chứ không được trượt khỏi regex rồi
+// đi thẳng vào prompt dưới dạng chữ sống.
+var conSotArtifact = regexp.MustCompile(`\{\{artifacts\.([^.{}]+)(?:\.([^{}]*))?\}\}`)
 
 // ExpandChay thay biến như Expand, rồi CHỐT các {{steps.<id>.output}} còn sót
 // lại bằng một câu nói thật thay vì để nguyên chữ sống.

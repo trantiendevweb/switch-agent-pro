@@ -410,6 +410,17 @@ func flowRunChiTiet(arg string) {
 				fmt.Printf("      │ %s\n", d)
 			}
 		}
+		// PHẦN NGHĨ của bước `model` — in RIÊNG, dưới output, và có nhãn.
+		//
+		// Không trộn vào khối output ở trên, kể cả khi chỉ là chuyện hiển thị: người
+		// đọc phải phân biệt được "model NÓI thế" với "model NGHĨ thế", vì chỉ cái
+		// thứ nhất mới đi sang bước sau và mới bị `phai_co` soi.
+		if nghi := strings.TrimRight(s.SuyLuan, "\n"); nghi != "" {
+			fmt.Println("      └ phần suy luận (KHÔNG đi sang bước sau):")
+			for _, d := range strings.Split(nghi, "\n") {
+				fmt.Printf("        · %s\n", d)
+			}
+		}
 		fmt.Println()
 	}
 	for i := range def.Steps {

@@ -256,9 +256,23 @@ func ChuanBiArtifact(runID int64, s Step) (string, error) {
 // thư mục tên `ket-qua` thì bước sau nhận đường dẫn trỏ vào thư mục và mọi lệnh
 // đọc file đều hỏng bằng một thông báo chẳng liên quan.
 func ThieuArtifact(runID int64, s Step) string {
+	thieu := thieuTrongThuMuc(s, ArtifactStepDir(runID, s.ID))
+	if thieu == "" {
+		return ""
+	}
+	return fmt.Sprintf("bước khai artifact nhưng chạy xong không có file: %s — bước phải ghi file vào {{%s}} (%s)",
+		thieu, KhoaArtifactDir, ArtifactStepDir(runID, s.ID))
+}
+
+// thieuTrongThuMuc liệt kê artifact đã khai mà KHÔNG có file thật trong `dir`.
+//
+// Tách ra vì có HAI ranh giới dùng chung một bộ luật: bước thường kiểm thư mục
+// của bước, bước `foreach` kiểm thư mục của TẪP LƯỢT LẶP. Chép luật ra hai chỗ là
+// mời hai chỗ lệch nhau, mà lệch ở đây nghĩa là một hợp đồng đầu ra không ai giữ.
+func thieuTrongThuMuc(s Step, dir string) string {
 	var thieu []string
 	for _, ten := range tenArtifactSapXep(s) {
-		p := DuongDanArtifact(runID, s.ID, s.Artifact[ten])
+		p := filepath.Join(dir, filepath.FromSlash(s.Artifact[ten]))
 		st, err := os.Stat(p)
 		switch {
 		case err != nil:
@@ -267,11 +281,7 @@ func ThieuArtifact(runID int64, s Step) string {
 			thieu = append(thieu, fmt.Sprintf("%q (%s — là THƯ MỤC, không phải file)", ten, s.Artifact[ten]))
 		}
 	}
-	if len(thieu) == 0 {
-		return ""
-	}
-	return fmt.Sprintf("bước khai artifact nhưng chạy xong không có file: %s — bước phải ghi file vào {{%s}} (%s)",
-		strings.Join(thieu, ", "), KhoaArtifactDir, ArtifactStepDir(runID, s.ID))
+	return strings.Join(thieu, ", ")
 }
 
 // tenArtifactSapXep trả về tên artifact của một bước theo thứ tự cố định.
@@ -324,14 +334,26 @@ func MoiTruongArtifact(runID int64, f Flow, s Step, states map[string]string) ma
 		if p.ID == s.ID {
 			continue // artifact của chính mình thì chưa có lúc mình đang chạy
 		}
+		// Khoá PHỤ THUỘC HÌNH DẠNG bước sản xuất, và chỉ một khoá duy nhất được phát:
+		// bước thường → `artifacts.<tên>`, bước `foreach` →
+		// `artifacts.<tên>.danh_sach`. Phát cả hai là để cả hai cú pháp cùng chạy
+		// được, và khi đó cái sai sẽ im lặng thay vì báo — xem foreach_artifact.go.
+		khoa := "artifacts." + ten
+		if p.ForEach != "" {
+			khoa += "." + HauToDanhSach
+		}
 		if !artifactChoDoc(s, p.ID) {
-			out["artifacts."+ten] = CauChanArtifact(ten, p.ID)
+			out[khoa] = CauChanArtifact(ten, p.ID)
 			continue
 		}
 		if states[p.ID] != store.StepDone {
 			continue
 		}
-		out["artifacts."+ten] = DuongDanArtifact(runID, p.ID, p.Artifact[ten])
+		if p.ForEach != "" {
+			out[khoa] = DuongDanDanhSach(runID, p.ID, ten)
+			continue
+		}
+		out[khoa] = DuongDanArtifact(runID, p.ID, p.Artifact[ten])
 	}
 	return out
 }
@@ -460,7 +482,8 @@ var loaiKhongGhiDuocFile = map[string]bool{
 //   - tên artifact không hợp lệ, hoặc hai bước khai trùng tên;
 //   - đường dẫn tuyệt đối hoặc đi ra ngoài thư mục của bước;
 //   - khai ở loại node không ghi được file;
-//   - khai chung với `foreach`;
+//   - hình dạng placeholder không khớp bước sản xuất (tên trần cho bước `foreach`,
+//     `.danh_sach` cho bước thường, hoặc một hậu tố không có thật);
 //   - `{{artifacts.x}}` mà không bước nào sản xuất `x`, hoặc trỏ vào chính mình.
 //
 // CẢNH BÁO cho những thứ chỉ là vô nghĩa:
@@ -473,6 +496,7 @@ func VanDeArtifact(f Flow) []Problem {
 
 	// 1. Phần KHAI: tên, đường dẫn, loại node, foreach, trùng tên.
 	chuCua := map[string]string{} // tên artifact → id bước đã khai
+	lapCua := map[string]bool{}   // tên artifact → bước sản xuất có `foreach` không
 	for _, s := range f.Steps {
 		if len(s.Artifact) == 0 {
 			continue
@@ -480,10 +504,6 @@ func VanDeArtifact(f Flow) []Problem {
 		if loaiKhongGhiDuocFile[s.Type] {
 			loi(s.ID, fmt.Sprintf("type %q không có đường nào ghi ra file nên không để lại artifact được "+
 				"— dùng agent/shell/test/lint/plugin, hoặc bỏ `artifact`", s.Type))
-		}
-		if s.ForEach != "" {
-			loi(s.ID, "không dùng `artifact` chung với `foreach`: mọi lượt lặp chạy SONG SONG trong cùng "+
-				"một thư mục artifact và sẽ ghi đè lên nhau, còn `{{artifacts.<tên>}}` thì chỉ trỏ được tới MỘT file")
 		}
 		for _, ten := range tenArtifactSapXep(s) {
 			if !idRe.MatchString(ten) {
@@ -498,6 +518,7 @@ func VanDeArtifact(f Flow) []Problem {
 				continue
 			}
 			chuCua[ten] = s.ID
+			lapCua[ten] = s.ForEach != ""
 		}
 	}
 
@@ -516,11 +537,11 @@ func VanDeArtifact(f Flow) []Problem {
 		daBao := map[string]bool{}
 		for _, v := range vanBanCuaBuoc(s) {
 			for _, m := range conSotArtifact.FindAllStringSubmatch(v, -1) {
-				ten := m[1]
-				if daBao[ten] {
+				ten, hauTo := m[1], m[2]
+				if daBao[ten+"|"+hauTo] {
 					continue
 				}
-				daBao[ten] = true
+				daBao[ten+"|"+hauTo] = true
 				chu, co := chuCua[ten]
 				if !co {
 					loi(s.ID, fmt.Sprintf("{{artifacts.%s}} nhưng không bước nào khai artifact %q "+
@@ -531,6 +552,29 @@ func VanDeArtifact(f Flow) []Problem {
 					loi(s.ID, fmt.Sprintf("{{artifacts.%s}} trỏ vào artifact của CHÍNH bước này "+
 						"— lúc bước chạy thì file chưa có; ghi file vào {{%s}} thay vì đọc nó",
 						ten, KhoaArtifactDir))
+					continue
+				}
+				// HÌNH DẠNG phải KHỚP với bước sản xuất. Một bước `foreach` để lại N
+				// file nên tên trần không trỏ được tới cái nào; một bước thường để lại
+				// đúng MỘT file nên không có bản kê nào để trỏ. Lệch thì DỪNG ở đây —
+				// xem foreach_artifact.go cho lý do không cho tên trần tự đổi nghĩa.
+				switch {
+				case hauTo == "" && lapCua[ten]:
+					loi(s.ID, fmt.Sprintf("{{artifacts.%s}} là artifact của bước %q có `foreach` — bước đó "+
+						"để lại MỖI LƯỢT LẶP một file nên tên trần không trỏ được tới cái nào. Dùng "+
+						"{{artifacts.%s.%s}} — nó là đường dẫn tới MỘT file liệt kê đủ N đường dẫn, một dòng "+
+						"một cái (đi được vào argv của `run` vì nó vẫn chỉ là MỘT đường dẫn)",
+						ten, chu, ten, HauToDanhSach))
+					continue
+				case hauTo == HauToDanhSach && !lapCua[ten]:
+					loi(s.ID, fmt.Sprintf("{{artifacts.%s.%s}} nhưng bước %q KHÔNG có `foreach` — nó để lại đúng "+
+						"MỘT file, không có bản kê nào để trỏ. Dùng {{artifacts.%s}}",
+						ten, hauTo, chu, ten))
+					continue
+				case hauTo != "" && hauTo != HauToDanhSach:
+					loi(s.ID, fmt.Sprintf("{{artifacts.%s.%s}}: hậu tố %q không có — chỉ có `.%s` (cho artifact "+
+						"của bước `foreach`) hoặc không hậu tố gì (cho bước thường)",
+						ten, hauTo, hauTo, HauToDanhSach))
 					continue
 				}
 				// Thứ tự đợt chỉ có nghĩa khi flow không có chu trình; có chu
