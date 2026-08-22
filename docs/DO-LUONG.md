@@ -3060,7 +3060,6 @@ từng đăng nhập Gemini CLI trên máy này. Đọc file đó có thể cho 
 thật, sai người**, và `antigravity.go` đã chốt: *hiện nhầm email còn tệ hơn không
 hiện gì*.
 
-<<<<<<< HEAD
 
 ## 21/08 — C3: chọn model từ dòng lệnh cho Antigravity và Codex (đóng ô nợ C3)
 
@@ -3183,7 +3182,6 @@ Trong `argsChoBuoc`, nhánh *"provider KHÔNG có rào quyền nào"* **gán đ�
 `canhBao`. Một provider vừa không-có-rào-quyền vừa chưa-đo-model sẽ **mất câu cảnh
 báo về model**. Hôm nay không provider nào rơi vào cả hai ô cùng lúc, nên nó chưa
 cắn được ai — ghi lại đúng vì đó là lý do duy nhất nó chưa cắn.
-=======
 ### Lời cũ trong sổ vẫn đúng — chỉ dừng sớm một bước
 
 | Thứ | Dấu thời gian |
@@ -3324,4 +3322,64 @@ trống thành kết luận.
 Số ô `ChuaDo` trong bảng năng lực: **7 → 2** (chỉ còn `chon-model` của codex và
 antigravity). Đếm bằng `grep -c '^		Chua('` trên từng file adapter, so `HEAD`
 với cây làm việc.
->>>>>>> sagent/phu-1
+
+## 22/08 — Token TỰ LÀM MỚI thật khi bật hạm đội, sau khi đã quá hạn gần 5 tiếng
+
+- **Đo lúc nào**: 22/08/2026, 10:06–10:15, lúc phóng đợt 2 của lượt chạy dài.
+- **Vì sao đo**: `docs/KE-HOACH-8-MUC.md` ghi rủi ro còn treo *"Token Claude hết
+  hạn ~8 tiếng/lần. Lượt đêm dài phải tính chuyện làm mới giữa chừng; hành vi
+  khi nhiều bản clone cùng refresh CHƯA ĐO."* Nửa sau đã đo 21/08 (ô Đ5, và nó
+  **hỏng**). Nửa đầu — một clone mỗi tài khoản — thì chưa ai đo.
+- **Trạng thái trước khi phóng**:
+
+  | Bản clone | `expiresAt` | mtime file token |
+  |---|---|---|
+  | `claude/phu/1` | 22/08 **05:16** | 22/08 00:50 |
+  | `claude/tns/1` | 22/08 **05:16** | 22/08 00:51 |
+
+  Lúc đo là **10:06**, tức cả hai đã **quá hạn 4 giờ 50 phút**. `sagent ds` vẫn
+  in *"sẵn sàng"* cho cả hai — nó trả lời câu *"có file token không"*, không
+  phải câu *"token còn dùng được không"*. Đọc dòng đó thành "chạy được" là đoán.
+
+- **Con số / Bằng chứng**: bật `sagent fleet claude:phu` (#197) lúc 10:14 và
+  `claude:tns` (#198) lúc 10:15. Đọc lại file token ngay sau đó:
+
+  | Bản clone | `expiresAt` mới | mtime mới |
+  |---|---|---|
+  | `claude/phu/1` | 22/08 **18:14** | 10:14:25 |
+  | `claude/tns/1` | 22/08 **18:15** | 10:15:05 |
+
+  Cả hai phiên sống bình thường, không phiên nào chết vì *"OAuth session expired
+  and could not be refreshed"*. Hạn mới cách hạn cũ đúng một chu kỳ ~8 tiếng.
+
+- **Kết luận, và giới hạn của nó**: với **đúng một bản clone mỗi tài khoản**,
+  refresh token quá hạn **tự chạy được**, không cần đăng nhập lại, không cần
+  can thiệp tay. Điều kiện "một clone" **không phải chi tiết phụ** — đó là toàn
+  bộ lý do nó chạy được. Ca nhiều clone cùng refresh đã đo riêng 21/08: bản thua
+  ghi đè file token **rỗng** 16ms sau bản thắng và tự giết phiên của mình.
+- **Còn CHƯA ĐO**: token hết hạn **giữa chừng** một phiên đang chạy. Đêm 22/08
+  đặt ra đúng ca đó nhưng không chạm tới: phiên #195/#196 xong lúc ~01:26, còn
+  mốc hết hạn là 05:16. Chưa có phép đo nào cho ca này, đừng suy từ mục trên.
+
+## 22/08 — Vạch xung đột git nằm im trong `DO-LUONG.md` từ commit tuyên bố "sổ này SẠCH"
+
+- **Đo lúc nào**: 22/08/2026, khi mở `docs/DO-LUONG.md` để ghi phép đo ở trên.
+- **Con số / Bằng chứng**: `docs/DO-LUONG.md` mang một khối xung đột **chưa gỡ**
+  — `<<<<<<< HEAD` ở dòng **3063**, vạch `=======` ở **3186**, `>>>>>>> sagent/phu-1`
+  ở **3327** (dòng cuối file). `git blame` chỉ về commit **`5646f5f`**, tiêu đề:
+  *"Merge sagent/phu-1: dong V2 va V1 — so no do luong nay SACH"*.
+- **Vì sao không ai thấy**: nội dung **hai vế đều đúng và không mất gì** (vế
+  HEAD là mục C3, vế `phu-1` là mục V1, mỗi mục đúng một lần), nên không có
+  triệu chứng: `go build` · `go vet` · `go test` xanh cả ba, file `.md` vẫn mở
+  ra đọc bình thường. Chỉ có ba dòng rác nằm giữa sổ đo lường.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** — xoá đúng ba dòng vạch, giữ nguyên cả hai vế
+  (3327 → 3324 dòng). Và dựng bài canh `TestRepoKhongCoVachXungDot`
+  (`internal/redaction/quet_xungdot_test.go`): quét **330 file** git đang theo
+  dõi, bắt vạch xung đột ở **đầu dòng**. Đã chứng minh nó **ĐỎ** bằng cách dựng
+  lại đúng file cũ — nó in ra cả hai dòng 3063 và 3327 rồi `FAIL`; xanh trở lại
+  sau khi vá.
+- **Bài học**: đây là *"tiêu đề commit không phải bằng chứng"* ở dạng gắt nhất —
+  lượt trộn tự khai sổ đã sạch trong khi để lại rác **ngay trong cuốn sổ đó**.
+  Lượt trộn 22/08 có kiểm vạch xung đột, nhưng chỉ trên **ba file nó biết là sẽ
+  đụng**. Vạch này nằm ở file thứ tư nên lọt. Bài canh mới không hỏi file nào
+  vừa bị đụng — nó quét cả repo.
