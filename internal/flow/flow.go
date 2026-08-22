@@ -65,6 +65,14 @@ const (
 	OnFailStop     = "stop"     // mặc định: dừng cả flow
 	OnFailContinue = "continue" // ghi nhận rồi đi tiếp
 	OnFailFallback = "fallback" // chạy bước fallback đã khai báo
+
+	// OnFailCompensate: chạy một bước GỠ LẠI (undo) rồi DỪNG.
+	//
+	// Khác `stop` ở chỗ nó dọn hiện trường trước khi dừng; khác `continue` ở chỗ
+	// nó không đi tiếp trên nền một việc dở dang. Xem compensate.go — ở đó có cả
+	// câu trả lời cho "bước gỡ lại mà cũng hỏng thì sao" và "có gỡ lại các bước
+	// đã xong trước đó không".
+	OnFailCompensate = "compensate"
 )
 
 // Vai trò của một bước — LOẠI VIỆC bước đó đại diện, không phải tài khoản chạy
@@ -254,8 +262,14 @@ type Step struct {
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
 	Retry      int    `toml:"retry,omitempty" json:"retry,omitempty"`
-	OnFailure  string `toml:"on_failure,omitempty" json:"on_failure,omitempty"` // stop | continue | fallback
+	OnFailure  string `toml:"on_failure,omitempty" json:"on_failure,omitempty"` // stop | continue | fallback | compensate
 	Fallback   string `toml:"fallback,omitempty" json:"fallback,omitempty"`
+
+	// Compensate là id bước GỠ LẠI, dùng với on_failure = "compensate".
+	//
+	// Bước được trỏ tới ở đây bị LOẠI khỏi lịch chạy thường và chỉ chạy đúng lúc
+	// bước này hỏng. Xem compensate.go.
+	Compensate string `toml:"compensate,omitempty" json:"compensate,omitempty"`
 
 	// Vị trí trên bảng vẽ. Chỉ để trình soạn thảo bày lại đúng chỗ; bộ thực thi
 	// hoàn toàn bỏ qua. Sửa file bằng tay mà không có x/y thì bảng tự xếp.
@@ -451,8 +465,11 @@ func Validate(f Flow) []Problem {
 			} else if !seen[s.Fallback] {
 				add(s.ID, fmt.Sprintf("fallback trỏ tới bước %q không tồn tại", s.Fallback))
 			}
+		case OnFailCompensate:
+			// Phần soi riêng của compensate nằm ở VanDeCompensate, gọi cuối hàm:
+			// nó cần biết cả flow (ai phụ thuộc ai), không chỉ một bước.
 		default:
-			add(s.ID, fmt.Sprintf("on_failure = %q không hợp lệ (stop | continue | fallback)", s.OnFailure))
+			add(s.ID, fmt.Sprintf("on_failure = %q không hợp lệ (stop | continue | fallback | compensate)", s.OnFailure))
 		}
 
 		for _, n := range s.Needs {
@@ -498,6 +515,9 @@ func Validate(f Flow) []Problem {
 
 	// `idempotent` — xem idempotent.go.
 	ps = append(ps, VanDeIdempotent(f)...)
+
+	// `compensate` — xem compensate.go. Cần cả flow vì nó soi cả quan hệ needs.
+	ps = append(ps, VanDeCompensate(f)...)
 
 	return ps
 }

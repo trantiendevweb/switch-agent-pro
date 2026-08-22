@@ -90,6 +90,11 @@ func TestTroGiupTienTrinh(t *testing.T) {
 		}
 		fmt.Print("lần thử 2 chạy trót lọt nhưng không ghi file nào")
 
+	// hong: thoát mã 1 kèm một câu lý do. Không đụng vào đĩa.
+	case "hong":
+		fmt.Fprintln(os.Stderr, "hỏng có chủ ý")
+		os.Exit(1)
+
 	// in <chuoi>: in đúng chuỗi được đưa ra màn hình, không đụng vào đĩa.
 	case "in":
 		fmt.Print(args[1])

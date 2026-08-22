@@ -178,6 +178,9 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		}
 	}
 
+	// Bước nào đang làm nhiệm vụ GỠ LẠI cho bước khác — tính một lần cho cả lượt.
+	goLai := BuocGoLai(f)
+
 	for {
 		if ctx.Err() != nil {
 			_ = r.DB.SetRunState(runID, store.RunCanceled)
@@ -195,9 +198,27 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		}
 
 		// Bước approve không chạy — nó dựng rào rồi trả quyền cho con người.
-		var work []Step
+		//
+		// Bước GỠ LẠI cũng không chạy ở đây, và lý do khác hẳn: nó thường không
+		// có `needs` nào, tức là một GỐC của DAG, nên để yên thì nó chạy ngay
+		// đợt đầu của MỌI lượt chạy — gỡ một việc chưa ai làm. Xem compensate.go.
+		var work, choDuyet []Step
+		daDanhDauGoLai := false
 		for _, s := range ready {
 			if s.Type == TypeApprove {
+				choDuyet = append(choDuyet, s)
+				continue
+			}
+			if goLai[s.ID] {
+				daDanhDauGoLai = true
+				// Ghi `skipped` kèm lời giải thích chứ không để trống: một ô
+				// trống trên bảng đọc là "chưa tới lượt", còn đây là "sẽ không
+				// chạy trừ khi có chuyện".
+				ly := MoTaChoGoLai(f, s.ID)
+				_ = r.DB.SetStep(runID, s.ID, store.StepSkipped, ly, 0)
+				st.set(s.ID, store.StepSkipped, "")
+				r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
+					SessionID: runID, Msg: ly})
 				continue
 			}
 			work = append(work, s)
@@ -224,8 +245,18 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 			continue // xong đợt, tính lại xem bước nào sẵn sàng
 		}
 
+		// Đợt này không có gì để chạy và cũng không có rào duyệt nào: chỉ vừa
+		// đánh dấu vài bước GỠ LẠI là `skipped`. Tính lại đợt — chúng sẽ không
+		// còn nổi lên nữa vì `skipped` tính là đã xong.
+		if len(choDuyet) == 0 {
+			if daDanhDauGoLai {
+				continue
+			}
+			break // không còn gì chạy được, và không phải vì chờ ai
+		}
+
 		// Cả đợt chỉ còn approve: dựng rào ở cái đầu tiên rồi dừng.
-		s := ready[0]
+		s := choDuyet[0]
 		_ = r.DB.SetStep(runID, s.ID, store.StepWaiting, s.Message, 0)
 		st.set(s.ID, store.StepWaiting, "")
 		_ = r.DB.SetRunState(runID, store.RunWaiting)

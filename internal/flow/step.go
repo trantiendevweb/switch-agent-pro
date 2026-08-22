@@ -102,13 +102,15 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				}
 				state, msg, out := r.runForEach(waveCtx, runID, f, s, vars, outs, arts, items)
 				st.set(s.ID, state, out)
-				if state == store.StepFailed && s.OnFailure != OnFailContinue && s.OnFailure != OnFailFallback {
-					mu.Lock()
-					if stopAt == "" {
-						stopAt, stopLy = s.ID, msg
+				if state == store.StepFailed {
+					if dung, ly := r.xuLyHong(ctx, runID, f, s, msg, vars, st); dung {
+						mu.Lock()
+						if stopAt == "" {
+							stopAt, stopLy = s.ID, ly
+						}
+						mu.Unlock()
+						cancelWave()
 					}
-					mu.Unlock()
-					cancelWave()
 				}
 				return
 			}
@@ -117,15 +119,10 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 			st.set(s.ID, state, out)
 
 			if state == store.StepFailed {
-				switch s.OnFailure {
-				case OnFailContinue:
-					r.Bus.Warnf("%s.%s hỏng nhưng on_failure=continue — đi tiếp", f.Name, s.ID)
-				case OnFailFallback:
-					r.Bus.Warnf("%s.%s hỏng — bước %s sẽ chạy thay", f.Name, s.ID, s.Fallback)
-				default:
+				if dung, ly := r.xuLyHong(ctx, runID, f, s, msg, vars, st); dung {
 					mu.Lock()
 					if stopAt == "" {
-						stopAt, stopLy = s.ID, msg
+						stopAt, stopLy = s.ID, ly
 					}
 					mu.Unlock()
 					cancelWave() // dừng các bước cùng đợt, khỏi tốn thêm
@@ -635,4 +632,98 @@ func (r *Runner) thuDungLaiViecCu(runID int64, f Flow, s Step, env map[string]st
 			"idem_tu_run": fmt.Sprint(cu.RunID),
 		}})
 	return store.StepDone, da.Output, true
+}
+
+// xuLyHong quyết định một bước hỏng có làm CẢ LƯỢT dừng lại không, và chạy bước
+// GỠ LẠI khi được yêu cầu.
+//
+// MỘT CHỖ DUY NHẤT cho cả nhánh thường lẫn nhánh `foreach`. Trước đây hai nhánh
+// tự xét `OnFailure` riêng, và chúng đã lệch nhau thật: nhánh foreach so bằng
+// với hai giá trị cụ thể, nên thêm giá trị thứ tư vào là nó lặng lẽ rơi vào
+// nhánh "dừng" mà không ai gỡ gì cả.
+//
+// ctx ở đây là ctx của CẢ LƯỢT CHẠY, không phải waveCtx: một bước cùng đợt hỏng
+// và huỷ đợt thì KHÔNG được giết bước gỡ lại đang chạy dở. Một cái undo bị cắt
+// ngang để lại hiện trường tệ hơn cả không undo — nửa gỡ thì không ai biết đang
+// ở đâu nữa. (Người dùng huỷ cả lượt thì vẫn dừng: ctx đó là ctx này.)
+func (r *Runner) xuLyHong(ctx context.Context, runID int64, f Flow, s Step, msg string,
+	vars map[string]string, st *runState) (dungLuot bool, ly string) {
+
+	switch s.OnFailure {
+	case OnFailContinue:
+		r.Bus.Warnf("%s.%s hỏng nhưng on_failure=continue — đi tiếp", f.Name, s.ID)
+		return false, ""
+
+	case OnFailFallback:
+		r.Bus.Warnf("%s.%s hỏng — bước %s sẽ chạy thay", f.Name, s.ID, s.Fallback)
+		return false, ""
+
+	case OnFailCompensate:
+		xong, lyGo := r.chayGoLai(ctx, runID, f, s, vars, st)
+		if xong {
+			// Gỡ được rồi thì VẪN DỪNG. `compensate` là "gỡ rồi dừng", không
+			// phải "gỡ rồi đi tiếp": chạy tiếp trên nền một việc vừa bị gỡ là
+			// chạy tiếp trên nền không có gì.
+			return true, fmt.Sprintf("%s — đã chạy bước gỡ lại %q", msg, s.Compensate)
+		}
+		return true, fmt.Sprintf("%s — VÀ BƯỚC GỠ LẠI %q CŨNG HỎNG (%s). "+
+			"Việc chính không xong mà cũng chưa gỡ được: cần người vào xem tay.",
+			msg, s.Compensate, lyGo)
+
+	default:
+		return true, msg
+	}
+}
+
+// chayGoLai chạy bước gỡ lại của một bước vừa hỏng.
+//
+// Bước gỡ lại chạy qua ĐÚNG runStep như mọi bước khác — nó có timeout, có retry,
+// có hợp đồng `phai_co`, có artifact, và ghi vào sổ y hệt. Cái nó KHÔNG có là
+// `on_failure`: runStep không xét trường đó (việc đó là của runWave), nên không
+// có đường nào để gỡ-lại-của-gỡ-lại xảy ra. Đó là một tính chất của chỗ cắm, chứ
+// không phải một cái cờ ai cũng tắt được.
+func (r *Runner) chayGoLai(ctx context.Context, runID int64, f Flow, hong Step,
+	vars map[string]string, st *runState) (xong bool, ly string) {
+
+	g, co := TimBuoc(f, hong.Compensate)
+	if !co {
+		ly = fmt.Sprintf("compensate trỏ tới bước %q không tồn tại", hong.Compensate)
+		r.Bus.Failuref("%s.%s: %s", f.Name, hong.ID, ly)
+		return false, ly
+	}
+	if g.ID == hong.ID {
+		ly := "bước không thể tự gỡ lại chính nó"
+		r.Bus.Failuref("%s.%s: %s", f.Name, hong.ID, ly)
+		return false, ly
+	}
+
+	r.Bus.Warnf("%s.%s hỏng — chạy bước gỡ lại %s", f.Name, hong.ID, g.ID)
+
+	states, outs := st.snapshot()
+	outs = LocDocDuoc(g, outs)
+	arts := MoiTruongArtifact(runID, f, g, states)
+	// Bước gỡ lại phải biết mình đang gỡ CÁI GÌ. Không có biến này thì một bước
+	// gỡ dùng chung cho ba bước không có cách nào phân biệt, và người viết flow
+	// phải chép ra ba bước gỡ gần như giống hệt nhau.
+	bien := make(map[string]string, len(vars)+1)
+	for k, v := range vars {
+		bien[k] = v
+	}
+	bien[KhoaBuocHong] = hong.ID
+
+	state, msg, out := r.runStep(ctx, runID, f, g, bien, outs, arts)
+	st.set(g.ID, state, out)
+	if state != store.StepDone {
+		return false, msg
+	}
+	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + g.ID,
+		SessionID: runID, Msg: fmt.Sprintf("đã gỡ lại việc của bước %s", hong.ID),
+		Detail: map[string]string{
+			"run": fmt.Sprint(runID), "step": g.ID,
+			"state": store.StepDone, "type": g.Type,
+			// Khoá này để mặt web nối được mũi tên "gỡ cho bước nào" mà không
+			// phải tách chuỗi trong câu Msg.
+			"go_lai_cho": hong.ID,
+		}})
+	return true, ""
 }
