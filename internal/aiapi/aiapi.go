@@ -53,9 +53,17 @@ type Usage struct {
 // web hay CLI mà không nghe bus thì mất sạch.
 type KetQua struct {
 	NoiDung string
-	Model   string
-	Usage   Usage // usage của route THẬT SỰ trả lời, không phải của route hỏng
-	Mat     time.Duration
+
+	// SuyLuan là phần NGHĨ của model, tách khỏi câu trả lời.
+	//
+	// Rỗng có HAI nghĩa khác nhau và người đọc phải phân biệt được: model không
+	// nghĩ, hoặc nhà cung cấp không trả phần nghĩ ra. Bảng `sagent nang-luc-api`
+	// là chỗ trả lời câu đó cho từng route — đừng suy từ chuỗi rỗng này.
+	SuyLuan string
+
+	Model string
+	Usage Usage // usage của route THẬT SỰ trả lời, không phải của route hỏng
+	Mat   time.Duration
 
 	// DaStreaming: lượt này đi đường stream. ThieuUsage: nhà cung cấp KHÔNG trả
 	// `usage`, nên Usage ở trên là số 0 vì CHƯA ĐO chứ không phải vì miễn phí.
@@ -179,6 +187,17 @@ type yeuCau struct {
 type tinNhan struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+
+	// SuyLuan là phần NGHĨ của model, nhà cung cấp trả tách khỏi câu trả lời.
+	//
+	// `omitempty` vì kiểu này dùng cho CẢ hai chiều: gửi đi thì không bao giờ
+	// mang trường này, nhận về thì có thể có.
+	//
+	// Đo 22/08 (`sagent nang-luc-api --do`): deepseek-v4-flash TRẢ
+	// `reasoning_content` dài 152 ký tự; grok-4.5 KHÔNG trả trường nào, dù lượt
+	// đó tiêu 951 token và mất 20,3 giây — model CÓ nghĩ, nhà bán lại không trả
+	// phần nghĩ ra. Nên trường này rỗng KHÔNG có nghĩa là model không suy luận.
+	SuyLuan string `json:"reasoning_content,omitempty"`
 }
 
 type phanHoi struct {
@@ -273,6 +292,7 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 	}
 	kq = KetQua{
 		NoiDung: ph.Choices[0].Message.Content,
+		SuyLuan: ph.Choices[0].Message.SuyLuan,
 		Model:   ph.Model,
 		Usage:   ph.Usage,
 		Mat:     time.Since(bat),

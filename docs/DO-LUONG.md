@@ -3675,3 +3675,62 @@ với cây làm việc.
 - **Bắt stdout chứ không tách chuỗi help thành hằng số**: tách ra là sửa mã sản
   phẩm cho vừa bài kiểm, và bài kiểm sẽ đo cái hằng số đó thay vì đo thứ người
   dùng thật sự thấy.
+
+## 22/08 — Đóng ô `reasoning`, và tìm ra ĐIỂM MÙ của chính bảng năng lực nửa API
+
+- **Đo lúc nào**: 22/08/2026, ngay sau khi trộn bảng năng lực nửa API.
+- **Ô nợ**: bảng mới in `✗ reasoning` cho `deepseek-v4-flash` kèm chẩn đoán
+  *"vướng ở phía dự án"* — nhà cung cấp **trả** `reasoning_content`, còn
+  `aiapi.phanHoi` chỉ đọc `content` nên **vứt phần nghĩ trước khi ai nhìn thấy**.
+- **Đã sửa**: thêm trường `SuyLuan` (`json:"reasoning_content,omitempty"`) vào
+  `tinNhan`, gán sang `KetQua.SuyLuan`. `omitempty` vì kiểu này dùng cho **cả
+  hai chiều** — gửi đi thì không bao giờ mang trường này.
+- **Số đo, gọi THẬT `deepseek-v4-flash` qua modelapi.vn**:
+
+  | | Độ dài |
+  |---|---|
+  | Câu trả lời (`NoiDung`) | **91 ký tự** |
+  | Phần suy luận (`SuyLuan`) | **477 ký tự** |
+
+  Usage vào 108 / ra 192 / tổng 300 token, 2,7 giây. Phần bị vứt đi **dài gấp
+  5,2 lần** phần giữ lại — và người dùng đã **trả tiền cho cả hai**.
+
+### ĐIỂM MÙ tìm ra trong lúc vá — quan trọng hơn chính bản vá
+
+Bảng năng lực dò phía dự án bằng **reflection trên kiểu thật**
+(`nangluc.go`: `coTruong(reflect.TypeOf(phanHoi{}), …)`). Thiết kế đó rất tốt:
+bảng **không bịa được** về phía mình. Nhưng nó trả lời đúng **một** câu — *"kiểu
+có trường đó không"* — và **không** trả lời câu *"có ai chép giá trị đi đâu
+không"*.
+
+**Đã chứng minh bằng cách chạy thật**: gỡ đúng một dòng gán trong `aiapi.go`
+rồi chạy lại cả hai bên:
+
+```
+$ sagent nang-luc-api deepseek
+    ✓ reasoning   … phía dự án: aiapi.phanHoi đọc được trường `reasoning_content`
+
+$ go test ./internal/aiapi/ -run TestSuyLuanDiHetDuongToiKetQua
+    --- FAIL: KetQua.SuyLuan = "" — phần suy luận nhà cung cấp TRẢ VỀ bị vứt …
+```
+
+**Bảng vẫn khoe ✓ trong khi giá trị bị vứt.** Đây là lần thứ **năm** trong ngày
+gặp cùng một hình dạng — sau `route.kiem`, nút Duyệt/Từ chối, `plugin.list`,
+`sagent help` — và lần này nạn nhân là chính công cụ dựng ra để chống nói dối.
+
+- **Bài canh**: `TestSuyLuanDiHetDuongToiKetQua` đi **hết đường** (máy chủ giả →
+  `Goi()` → `KetQua.SuyLuan`), cộng `TestKhongCoSuyLuanThiVanChayBinhThuong`
+  (không có phần nghĩ thì không được bịa ra chuỗi rỗng có vẻ đã đo) và
+  `TestTenKhoaJSONCuaSuyLuanKhongDuocDoi` (đổi tên khoá là im lặng mất tính năng).
+- **Bài canh định kỳ chạm mạng**: `TestE2ESuyLuanThatTuNhaCungCap`, bật bằng
+  `SAGENT_E2E_SUYLUAN=1`, theo đúng lệ của `TestE2EGrokDocDuocOutputThat`. Ba
+  bài trên đo với nhà cung cấp **giả**: chúng khẳng định *"nếu máy chủ trả
+  `reasoning_content` thì giá trị đi tới `KetQua`"* — đúng và cần, nhưng **không**
+  khẳng định máy chủ thật còn trả trường tên đó. Đúng chỗ ô **C2** của Grok đã
+  cắn một lần: định dạng ta **quan sát** được, không phải hợp đồng nhà cung cấp
+  cam kết.
+- **CÒN NỢ, nói thẳng**: `KetQua.SuyLuan` hiện **chưa có mặt nào đọc nó** — chưa
+  có cờ CLI, chưa có chỗ trên dashboard, node `model` của flow chưa dùng. Không
+  vá trong lượt này vì `cmd/sagent/*` và `internal/dash/*` đang thuộc một phiên
+  khác chạy song song. Đây đúng là lỗi "thiếu mặt cuối" mà mục này vừa tố cáo,
+  nên nó phải được đóng ở lượt kế, không được để trôi.
