@@ -3838,5 +3838,18 @@ hoạch chạy MỘT MÌNH, hoặc chạy sau cùng.
   nó vẫn phục vụ giao diện cũ: **không có** panel quyền plugin, panel artifact,
   panel suy luận, bảng năng lực nửa API. Bằng chứng theo đúng luật của dự án —
   **PID giữ cổng + giờ bật tiến trình**, không phải mã HTTP.
-  Muốn thấy việc hôm nay thì phải **dừng và bật lại** `sagent dash`; chưa làm vì
-  đó là thứ chủ dự án đang xem từ điện thoại.
+  **ĐÃ BẬT LẠI 22/08 15:41**, sau khi chủ dự án chốt. Dòng lệnh lấy từ chính
+  tiến trình cũ (`Win32_Process.CommandLine`), **không đoán**:
+  `sagent.exe dash --host 0.0.0.0 --port 8788`. Cổng 8788 nay do **PID 1188**
+  giữ, cùng cờ, mật khẩu không đổi nên link trên điện thoại vẫn vào được.
+
+  **Nghiệm thu bằng ĐỐI CHỨNG, không bằng mã HTTP** (mã HTTP không chứng minh
+  được server nào đang trả lời — luật mục F của `docs/VAN-HANH-VPS.md`):
+
+  | Dấu mốc của việc hôm nay | Binary đang chạy | Binary 21/08 |
+  |---|---|---|
+  | `api/plugins` | **7** | **0** |
+  | `api/flow/artifacts` | **6** | **0** |
+
+  Hai chuỗi đó chỉ có trong bản mới, nên bản đang phục vụ đúng là bản mang việc
+  hôm nay.
