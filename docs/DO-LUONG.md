@@ -4112,3 +4112,36 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
   `for i in 2 3; do go test` — nhiều khả năng đang đuổi đúng con chập chờn
   này). Sửa chồng lên là hai bên giẫm chân. Nếu #208 không đóng, đây là việc
   đầu tiên của lượt kế.
+
+## 22/08 — Đóng nốt hai ô cuối của bảng năng lực API: KHÔNG còn ô nào vướng ở phía dự án
+
+- **Trộn** `sagent/anh-json-22-08` (2.914 dòng, 4 commit, $19,10). Bảng nay:
+
+  | | goi-tool | dau-vao-anh | dau-ra-co-cau-truc | reasoning | streaming | dem-token | liet-ke-model |
+  |---|---|---|---|---|---|---|---|
+  | deepseek | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
+  | grok | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+
+  **Ba dấu ✗ còn lại đều là giới hạn của NHÀ CUNG CẤP, không phải của repo này** —
+  deepseek trả HTTP 400 cho ảnh và cho `response_format`; grok không trả
+  `reasoning_content` dù lượt đó tiêu 951 token. Sáng nay bốn ô vướng ở phía dự
+  án; nay **không còn ô nào**.
+- **Cách phiên #207 tự nghiệm thu, đáng ghi lại**: nó dựng một bộ **phép thử phá
+  hoại** — sửa đúng một dòng mã sản phẩm, chạy `go test`, rồi lùi lại.
+  **14/14 phép đều làm test đỏ.** Vòng đầu có **2 phép sống sót**, cả hai cùng
+  một hình dạng (hàm thuần đúng nhưng tầng cuối không ai canh) — đã vá rồi phá
+  lại.
+- **Hai lỗi #207 tự bắt ở CHÍNH PHÉP ĐO của nó**, và đây mới là phần đáng học:
+  1. Script dọn dẹp bằng `git checkout -- <file>` chạy lúc cây làm việc còn bẩn
+     → **nuốt mất một bản sửa chưa commit**. Đổi lệ: **commit trước, phá sau**,
+     và ghi cảnh báo vào đầu script.
+  2. Hai "phép phá" nó viết là `switch { case false: ... }` — một nhánh **không
+     bao giờ khớp**, tức **không đổi hành vi gì**. "Test vẫn xanh" ở đó **không
+     nói lên điều gì**, và nó suýt ghi vào báo cáo như một lỗ hổng. Nguyên văn
+     bài học nó tự dẫn: *"một kết luận phủ định phải loại trừ lỗi của người đo
+     trước khi được ghi"*.
+- **Nó cũng chứng minh con chập chờn có sẵn, chặt hơn phép chứng minh của tôi**:
+  ngoài việc dẫn `git diff main --name-only | grep -c internal/flow` → **0**, nó
+  dựng hẳn một worktree tạm tại **đúng gốc nhánh `04f7ebc`** (không có một dòng
+  nào của nó) rồi chạy `go test ./internal/flow/` ba lần → **đỏ 2/3**. Và nó chỉ
+  ra bài thứ HAI cùng bệnh: `TestCacNhanhDocLapChaySongSong`.
