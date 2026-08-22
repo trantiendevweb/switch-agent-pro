@@ -482,6 +482,23 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 			r.Bus.Warnf("copies=%d vượt trần %d của dự án — hạ xuống", n, r.MaxParallel)
 			n = r.MaxParallel
 		}
+		// CỔNG TRẦN ĐỒNG THỜI — bốn chiều, và nó CHỜ chứ không từ chối.
+		//
+		// Đặt ở đây chứ không ở runWave là cố ý: `foreach` cũng chạy song song
+		// (runForEach có semaphore riêng) và cũng đi qua đúng hàm này. Canh ở
+		// runWave thì bịt được một đường mà hở đường kia — đúng lớp lỗi cả ngày
+		// hôm nay đi sửa.
+		the, err := r.xinCho(ctx, s, n)
+		if err != nil {
+			return KetQuaAgent{}, err
+		}
+		// Giữ chỗ tới khi RunAgents TRẢ VỀ, tức tới khi phiên đã rời sổ (cầu
+		// agentBridge đợi waitSessions xong mới về). Trả sớm hơn là mời bước sau
+		// bật phiên trong lúc phiên này còn sống.
+		defer the.Tra()
+		if the != nil && the.Cap > 0 {
+			n = the.Cap
+		}
 		return r.Agent.RunAgents(ctx, s.Profile, s.Model, ExpandChay(s.Prompt, vars), n, s.Worktree, s.TuDuyetQuyen)
 
 	// Node `model`: gọi THẲNG model API. Khai từ đầu dự án với ghi chú "chờ
