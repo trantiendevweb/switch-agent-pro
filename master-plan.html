@@ -560,8 +560,19 @@ Chi tiết: <code>96 [x] · 4 [~] · 0 [ ] · 0 [!]</code>. <strong>5 ô đổi 
     Antigravity là <strong>kết luận KHÔNG đọc được</strong>, không phải khoảng trống.</li>
 <li><strong>Xong — state máy dùng chung ngoài config root</strong>: phân loại <code>~/.codex</code> thành
     danh tính vs <strong>khoá ghi/SQLite</strong> (<code>thread-writer-locks</code>, <code>*.sqlite*</code>) ở Pha 2.5.</li>
-<li><strong>CHƯA — ACP</strong>: <code>grep -rni "acp" internal/ cmd/</code> không ra gì. Không harness nào
-    được đo qua giao thức này.</li>
+<li><strong>BỎ KHỎI PHẠM VI — ACP</strong>, và đây là một <strong>quyết định có phép đo</strong>, không phải
+    một ô bỏ trống. Dòng này từng ghi <em>"CHƯA — ACP"</em>, tức đếm một hướng <strong>đã bị bác
+    bỏ</strong> thành nợ, và ai đọc nó sẽ đi làm đúng cái việc dự án đã cố ý không làm.
+    Đo 18/08 (<code>docs/DO-LUONG.md</code>, mục <em>"Bỏ dò chuỗi, đọc dữ liệu có cấu trúc"</em>):
+    <strong>không CLI nào trên máy nói ACP</strong> — <code>claude --help</code>, <code>codex --help</code>,
+    <code>agy --help</code> đều không có. Nhưng cả ba đều có đường khác <strong>sẵn hôm nay</strong>:
+    <code>claude --output-format stream-json --verbose</code>, <code>agy --output-format json</code>
+    kèm <code>--json-schema</code>, <code>codex mcp-server</code>. Nguyên văn kết luận hôm đó:
+    <em>"đích đến không phải ACP — mà là dữ liệu có cấu trúc, và nó có sẵn"</em>.
+    Thứ ACP hứa (sự kiện có cấu trúc thay cho dò chuỗi) <strong>đã đạt được bằng đường
+    khác</strong>: <code>permission_denials</code>, <code>subtype = error_max_turns</code>, <code>api_error_status</code>,
+    <code>rate_limit_event.resetsAt</code> — bốn kiểu hỏng từng phải đoán bằng chuỗi nay đọc
+    thẳng ra trường. Cùng lệ với <code><del>symlink Linux</del></code> và <code>Gemini CLI đã bỏ</code>.</li>
 <li><strong>CHƯA — resume/cancel Ở TẦNG HARNESS</strong>: <code>flow resume</code>/<code>flow huy</code> là resume và
     cancel của <strong>bộ thực thi flow</strong> (<code>internal/flow/approve.go:65</code>), không phải cờ
     <code>--resume</code>/hủy phiên của từng CLI. Chưa ai đo chúng.</li>

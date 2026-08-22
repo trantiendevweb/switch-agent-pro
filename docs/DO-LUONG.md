@@ -3939,3 +3939,34 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
 - **Rủi ro còn lại, nhắc lại cho rõ**: ai đọc được đĩa thì tầng này không cản.
   Nó chỉ cản nội dung **đi ra** — mà cửa đi ra đáng lo nhất là cổng 8788 đang
   phơi ra internet, và đó đúng là cửa được che.
+
+## 22/08 — Kế hoạch đang đếm một hướng ĐÃ BỊ BÁC BỎ là nợ (ACP)
+
+- **Đo lúc nào**: 22/08/2026 ~15:58, khi chuẩn bị brief cho đợt tiếp theo. Ô
+  **Subscription** là nợ lớn nhất còn tự gỡ được, nên tôi đi tra "ACP" là gì
+  trong bối cảnh repo này **trước khi** giao việc.
+- **Mâu thuẫn tìm được giữa hai tài liệu**:
+  - `docs/MASTER-PLAN.md` liệt kê `**CHƯA — ACP**: grep không ra gì. Không
+    harness nào được đo qua giao thức này.` → đọc ra là **việc phải làm**.
+  - `docs/DO-LUONG.md` mục 18/08 đã kết luận ngược lại, có phép đo: **không CLI
+    nào trên máy nói ACP** (`claude --help`, `codex --help`, `agy --help` đều
+    không có), và cả ba đều có đường khác sẵn hôm nay. Nguyên văn: *"đích đến
+    không phải ACP — mà là dữ liệu có cấu trúc, và nó có sẵn"*.
+- **Vì sao đây là lỗi đáng sửa chứ không phải chuyện chữ nghĩa**: nếu tôi giao
+  đợt tới theo bản kế hoạch, một phiên agent sẽ đi **bọc adapter ACP** — đúng
+  việc dự án đã cố ý không làm, cho một giao thức **không CLI nào trên máy này
+  nói**. Đó là một lượt hạn mức mất trắng, và nó mất vì SỔ nói sai chứ không vì
+  ai làm sai.
+- **Thứ ACP hứa thì đã đạt bằng đường khác**, và đo được: bốn kiểu hỏng từng
+  phải đoán bằng dò chuỗi nay đọc thẳng ra trường —
+  `permission_denials` (bị chặn quyền) · `subtype = error_max_turns` (chạy quẩn)
+  · `api_error_status` (hết hạn đăng nhập) · `rate_limit_event.resetsAt` (nói
+  được *"hạn mức quay lại lúc mấy giờ"* thay vì chỉ báo hỏng).
+- **Đã sửa**: dòng đó thành **"BỎ KHỎI PHẠM VI — ACP"**, kèm phép đo và nguyên
+  văn kết luận 18/08, theo đúng lệ đã có trong chính bản kế hoạch
+  (`~~symlink Linux~~ bỏ theo mục 2b`, `Gemini CLI đã bỏ`). **Không đổi dấu tick**
+  — ô Subscription vẫn `[~]` vì còn hai mục CHƯA thật: resume/cancel ở tầng
+  harness, và nhật ký chạm file theo pha login/refresh/exit.
+- **Bài học về thứ tự việc**: tra sổ **trước khi** viết brief tốn 5 phút và cứu
+  một lượt chạy. Cả ngày hôm nay tôi viết brief từ bản kế hoạch mà không đối
+  chiếu ngược lại sổ đo lường — lần này tình cờ đối chiếu vì không biết ACP là gì.

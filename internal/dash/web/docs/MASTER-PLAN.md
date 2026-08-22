@@ -404,8 +404,19 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     Antigravity là **kết luận KHÔNG đọc được**, không phải khoảng trống.
   - **Xong — state máy dùng chung ngoài config root**: phân loại `~/.codex` thành
     danh tính vs **khoá ghi/SQLite** (`thread-writer-locks`, `*.sqlite*`) ở Pha 2.5.
-  - **CHƯA — ACP**: `grep -rni "acp" internal/ cmd/` không ra gì. Không harness nào
-    được đo qua giao thức này.
+  - **BỎ KHỎI PHẠM VI — ACP**, và đây là một **quyết định có phép đo**, không phải
+    một ô bỏ trống. Dòng này từng ghi *"CHƯA — ACP"*, tức đếm một hướng **đã bị bác
+    bỏ** thành nợ, và ai đọc nó sẽ đi làm đúng cái việc dự án đã cố ý không làm.
+    Đo 18/08 (`docs/DO-LUONG.md`, mục *"Bỏ dò chuỗi, đọc dữ liệu có cấu trúc"*):
+    **không CLI nào trên máy nói ACP** — `claude --help`, `codex --help`,
+    `agy --help` đều không có. Nhưng cả ba đều có đường khác **sẵn hôm nay**:
+    `claude --output-format stream-json --verbose`, `agy --output-format json`
+    kèm `--json-schema`, `codex mcp-server`. Nguyên văn kết luận hôm đó:
+    *"đích đến không phải ACP — mà là dữ liệu có cấu trúc, và nó có sẵn"*.
+    Thứ ACP hứa (sự kiện có cấu trúc thay cho dò chuỗi) **đã đạt được bằng đường
+    khác**: `permission_denials`, `subtype = error_max_turns`, `api_error_status`,
+    `rate_limit_event.resetsAt` — bốn kiểu hỏng từng phải đoán bằng chuỗi nay đọc
+    thẳng ra trường. Cùng lệ với `~~symlink Linux~~` và `Gemini CLI đã bỏ`.
   - **CHƯA — resume/cancel Ở TẦNG HARNESS**: `flow resume`/`flow huy` là resume và
     cancel của **bộ thực thi flow** (`internal/flow/approve.go:65`), không phải cờ
     `--resume`/hủy phiên của từng CLI. Chưa ai đo chúng.
