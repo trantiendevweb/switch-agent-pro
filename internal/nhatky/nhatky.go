@@ -50,6 +50,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/paths"
+	"github.com/trantiendevweb/switch-agent-pro/internal/redaction"
 )
 
 // Khối tiêu đề do sagent ghi vào ĐẦU nhật ký, trước khi agent in chữ nào.
@@ -193,7 +194,17 @@ func GhiLoi(duong, msg string) error {
 // và truyền sang bước sau. Không cắt thì lời chỉ dẫn nội bộ của sagent trở
 // thành một phần câu trả lời của agent — nhìn thì nhỏ, nhưng bước sau là một
 // agent khác đang đọc nó như dữ liệu thật.
+//
+// CŨNG CHE bí mật và danh tính (redaction.Che). Cùng lý do vừa nói, chỉ nặng
+// hơn một bậc: thứ trả về ở đây được nạp thẳng vào prompt của agent bước sau,
+// mà agent đó có thể là một NHÀ CUNG CẤP KHÁC. Che ở đây chứ không ở mặt gọi vì
+// đây là một trong hai cửa duy nhất mà nội dung nhật ký thoát ra ngoài — mặt
+// gọi viết sau này không quên được cái nó không phải nhớ.
 func BoDau(raw string) string {
+	return redaction.Che(boDau(raw))
+}
+
+func boDau(raw string) string {
 	if !strings.HasPrefix(raw, MocDau) {
 		return raw
 	}
@@ -219,7 +230,16 @@ func BoDau(raw string) string {
 // đĩa: một file 200 MB đổ thẳng ra terminal thì không đọc được mà còn treo máy.
 // Dòng cuối cũng đúng chỗ đáng đọc nhất — bản ghi `{"type":"result"}` của
 // Claude nằm ở cuối, và lý do chết luôn nằm ở cuối.
+//
+// CŨNG CHE bí mật và danh tính (redaction.Che) — cửa ra thứ hai, bên cạnh
+// BoDau. Đây là đường của `sagent nhat-ky` và của dash; dash thì tự biết mình
+// có thể không nằm trên loopback. Che kể cả khi n <= 0: "xin nguyên file" là
+// xin đủ dòng, không phải xin cả bí mật.
 func Duoi(raw string, n int) string {
+	return redaction.Che(duoi(raw, n))
+}
+
+func duoi(raw string, n int) string {
 	if n <= 0 {
 		return raw
 	}
