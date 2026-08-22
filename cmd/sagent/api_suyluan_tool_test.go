@@ -198,18 +198,18 @@ func TestDocFileToolTheoDungKhuonGiaoThuc(t *testing.T) {
 //
 // Đoán hộ ở đây là gửi tiền của người dùng tới một nhà cung cấp họ không chọn.
 func TestChonRouteToolKhongDoanHo(t *testing.T) {
-	if r, err := chonRouteTool(dsThu, "grok", ""); err != nil || r.Model != "grok-4.5" {
+	if r, err := chonRouteDichDanh(dsThu, "grok", ""); err != nil || r.Model != "grok-4.5" {
 		t.Fatalf("gọi đích danh hỏng: %+v %v", r, err)
 	}
-	if r, err := chonRouteTool(dsThu, "", "deepseek"); err != nil || r.Ten != "deepseek" {
+	if r, err := chonRouteDichDanh(dsThu, "", "deepseek"); err != nil || r.Ten != "deepseek" {
 		t.Fatalf("không lấy default_route: %+v %v", r, err)
 	}
-	_, err := chonRouteTool(dsThu, "", "")
+	_, err := chonRouteDichDanh(dsThu, "", "")
 	if err == nil {
 		t.Fatal("không có tên lẫn default_route mà vẫn chọn đại một route — " +
 			"gửi tiền tới nhà cung cấp người dùng không chọn")
 	}
-	_, err = chonRouteTool(dsThu, "khong-co", "")
+	_, err = chonRouteDichDanh(dsThu, "khong-co", "")
 	if err == nil || !strings.Contains(err.Error(), "grok") {
 		t.Fatalf("route lạ: lỗi phải liệt kê route đang khai, được: %v", err)
 	}

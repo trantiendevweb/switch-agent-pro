@@ -159,7 +159,7 @@ func GoiTool(ctx context.Context, r Route, prompt string, tools []Tool, chon str
 			chon, ChonToolTuDo, ChonToolBatBuoc, ChonToolTat)
 	}
 
-	kq, err := goiThat(ctx, r, prompt, tools, chon)
+	kq, err := goiThat(ctx, r, prompt, themVao{Tools: tools, ChonTool: chon})
 	if err != nil && chon == ChonToolBatBuoc {
 		var l *LoiAPI
 		if errors.As(err, &l) && l.Status == http.StatusBadRequest &&

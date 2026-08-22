@@ -205,20 +205,27 @@ func apiDs() {
 	fmt.Println()
 }
 
-// apiGoi nhận args THÔ, còn nguyên cờ.
+// coGoi là MỌI cờ của một lượt `sagent api …`, đã rút khỏi dãy tham số.
 //
-// Thứ tự bắt buộc: RÚT CỜ TRƯỚC, tách tên route SAU. Bản đầu làm ngược lại và
-// `sagent api --suy-luan grok "câu hỏi"` hỏng theo kiểu tệ nhất — `--suy-luan`
-// không khớp tên route nào nên cả dãy bị coi là câu hỏi, và chữ "grok" đi thẳng
-// vào prompt. Lượt gọi vẫn chạy, vẫn tính tiền, chỉ là hỏi sai câu qua sai route.
-func apiGoi(args []string) {
-	// `--stream`: in chữ ra NGAY khi nhận được thay vì đợi cả câu.
+// VÌ SAO TÁCH RA THÀNH KIỂU + HAI HÀM THUẦN, thay vì rút cờ ngay trong `apiGoi`
+// như bản trước: `apiGoi` mở CSDL và gọi `fail` (tức `os.Exit`), nên không bài
+// kiểm nào chạm được vào nó. Mọi luật ở đây — cờ nào lặp lại được, cặp nào cấm
+// đi chung — vì thế mà không được canh bởi gì cả.
+//
+// Chỗ trống đó có giá đo được: tối 22/08, một phép thử phá hoại đổi `--anh` từ
+// `strFlagNhieu` sang `strFlag` (tức lặng lẽ chỉ nhận MỘT ảnh, vứt phần còn
+// lại) và TOÀN BỘ bộ test vẫn xanh. Bài kiểm của `strFlagNhieu` có, nhưng không
+// ai hỏi `apiGoi` có gọi nó không — đúng lại hình dạng "có ở mọi tầng trừ tầng
+// cuối" mà cả ngày hôm nay dựng lên để chống, lần này nằm trong chính bản vá.
+type coGoi struct {
+	// Stream: in chữ ra NGAY khi nhận được thay vì đợi cả câu.
 	//
 	// Đo được: một lượt grok-4.5 mất 13,6 giây (docs/DO-LUONG.md). Không có cờ
 	// này thì người dùng nhìn màn hình đứng im 13 giây — không phân biệt được
 	// "đang nghĩ" với "đã treo".
-	stream, args := boolFlag(args, "--stream")
-	// `--suy-luan`: in kèm PHẦN NGHĨ của model.
+	Stream bool
+
+	// XemSuyLuan: in kèm PHẦN NGHĨ của model.
 	//
 	// VÌ SAO LÀ MỘT CỜ, KHÔNG PHẢI IN LUÔN: phần nghĩ dài hơn câu trả lời rất
 	// nhiều — đo 22/08 với deepseek-v4-flash, câu trả lời 91 ký tự còn phần
@@ -227,11 +234,119 @@ func apiGoi(args []string) {
 	//
 	// VÌ SAO KHÔNG IN THÌ VẪN PHẢI NHẮC: người dùng ĐÃ TRẢ TIỀN cho phần nghĩ
 	// đó (nó nằm trong `completion_tokens`). Một thứ đã mua mà không ai nói là
-	// có thì coi như không có. Nên lượt nào có phần nghĩ mà không bật cờ, dòng
-	// tổng kết vẫn nói ra nó dài bao nhiêu và gõ gì để xem — xem `dongSuyLuan`.
-	xemSuyLuan, args := boolFlag(args, "--suy-luan")
-	fileTool, args := strFlag(args, "--tool", "")
-	chonTool, args := strFlag(args, "--tool-chon", aiapi.ChonToolTuDo)
+	// có thì coi như không có. Xem `dongSuyLuan`.
+	XemSuyLuan bool
+
+	FileTool string
+	ChonTool string
+
+	// AnhFile là mọi `--anh` theo ĐÚNG THỨ TỰ gõ. Xem `strFlagNhieu`.
+	AnhFile []string
+
+	FileSoDo string
+
+	// CuGui bỏ qua lời chặn của bảng năng lực. Xem đầu internal/aiapi/goikem.go.
+	CuGui bool
+}
+
+// KemAnhHoacSoDo nói lượt này có đi đường `GoiKem` hay không.
+func (c coGoi) KemAnhHoacSoDo() bool { return len(c.AnhFile) > 0 || c.FileSoDo != "" }
+
+// rutCoGoi rút mọi cờ khỏi dãy tham số, trả về phần còn lại NGUYÊN THỨ TỰ.
+func rutCoGoi(args []string) (coGoi, []string) {
+	var c coGoi
+	c.Stream, args = boolFlag(args, "--stream")
+	c.XemSuyLuan, args = boolFlag(args, "--suy-luan")
+	c.FileTool, args = strFlag(args, "--tool", "")
+	c.ChonTool, args = strFlag(args, "--tool-chon", aiapi.ChonToolTuDo)
+	// `--anh` LẶP LẠI ĐƯỢC: một câu hỏi có thể chỉ vào nhiều ảnh ("so hai cái
+	// biểu đồ này"). Cờ chỉ nhận một giá trị thì người dùng phải gộp ảnh bằng
+	// tay trước khi hỏi — mà lúc đó model không phân biệt được đâu là ảnh nào.
+	c.AnhFile, args = strFlagNhieu(args, "--anh")
+	c.FileSoDo, args = strFlag(args, "--so-do", "")
+	c.CuGui, args = boolFlag(args, "--cu-gui")
+	return c, args
+}
+
+// kiemCoGoi từ chối những tổ hợp cờ KHÔNG chạy đúng được.
+//
+// Luật chung của cả hàm, và nó là luật của cả lệnh: KHÔNG im lặng bỏ một cờ
+// người dùng đã gõ. Bỏ đi thì lượt gọi vẫn chạy, vẫn tính tiền, và trả về một
+// kết quả trông đúng cho một câu hỏi khác câu đã hỏi.
+func kiemCoGoi(c coGoi) error {
+	kem := c.KemAnhHoacSoDo()
+	switch {
+	case c.Stream && c.FileTool != "":
+		// Đường stream chưa mang `tools` đi được, nên chạy tiếp là gửi một yêu
+		// cầu không có tool rồi báo "model không đòi gọi tool nào" — sai, và
+		// sai sau khi đã tính tiền.
+		return fmt.Errorf("--stream và --tool chưa đi chung được: đường stream chưa mang " +
+			"định nghĩa tool. Bỏ --stream đi.")
+	case c.Stream && kem:
+		return fmt.Errorf("--stream chưa đi chung được với --anh/--so-do: đường stream chưa " +
+			"mang ảnh lẫn schema. Bỏ --stream đi.")
+	case c.FileTool != "" && kem:
+		return fmt.Errorf("--tool chưa đi chung được với --anh/--so-do: nhánh tool đi đường " +
+			"riêng (aiapi.GoiTool). Tách thành hai lượt gọi.")
+	case c.CuGui && !kem:
+		return fmt.Errorf("--cu-gui chỉ có nghĩa khi đi kèm --anh hoặc --so-do: nó bỏ qua " +
+			"lời chặn của bảng năng lực cho HAI năng lực đó. Xem: sagent nang-luc-api")
+	}
+	return nil
+}
+
+// nhanhGoi là NHÁNH mà một lượt `sagent api` sẽ đi. Ba nhánh, ba đường mã khác
+// hẳn nhau về việc có dự phòng hay không.
+type nhanhGoi string
+
+const (
+	nhanhThuong nhanhGoi = "thuong" // qua api.AICall — CÓ route dự phòng
+	nhanhTool   nhanhGoi = "tool"   // aiapi.GoiTool  — đích danh, không dự phòng
+	nhanhKem    nhanhGoi = "kem"    // aiapi.GoiKem   — đích danh, không dự phòng
+)
+
+// viecGoi là QUYẾT ĐỊNH đã chốt của `apiGoi`: đi nhánh nào, hỏi câu gì.
+type viecGoi struct {
+	Nhanh  nhanhGoi
+	Prompt string
+}
+
+// quyetDinhGoi soát cờ rồi chốt nhánh. Thuần — không mở CSDL, không chạm mạng.
+//
+// VÌ SAO GỘP SOÁT VÀ CHỐT NHÁNH VÀO MỘT HÀM, và vì sao `apiGoi` phải đi qua nó:
+//
+// Bản trước để `apiGoi` gọi `kiemCoGoi` rồi tự `switch` trên các trường của
+// `coGoi`. Một phép thử phá hoại gỡ hẳn lời gọi `kiemCoGoi` ra khỏi `apiGoi` —
+// và TOÀN BỘ bộ test vẫn xanh, vì bài kiểm gọi thẳng `kiemCoGoi`, không ai hỏi
+// `apiGoi` có gọi nó không. `apiGoi` mở CSDL và gọi `os.Exit` nên không bài
+// kiểm nào chạm được vào nó, và một lời gọi không ai canh được là một lời gọi
+// sẽ có ngày biến mất.
+//
+// Cách đóng khe đó KHÔNG phải viết thêm một bài kiểm — mà là làm cho lời gọi
+// TRỞ NÊN KHÔNG BỎ ĐƯỢC: nhánh dưới `switch` theo `v.Nhanh`, mà `v.Nhanh` chỉ
+// hàm này sinh ra. Gỡ lời gọi đi là hỏng lúc BIÊN DỊCH, không phải lúc chạy.
+func quyetDinhGoi(co coGoi, phanConLai []string) (viecGoi, error) {
+	if err := kiemCoGoi(co); err != nil {
+		return viecGoi{}, err
+	}
+	v := viecGoi{Nhanh: nhanhThuong, Prompt: strings.Join(phanConLai, " ")}
+	switch {
+	case co.FileTool != "":
+		v.Nhanh = nhanhTool
+	case co.KemAnhHoacSoDo():
+		v.Nhanh = nhanhKem
+	}
+	return v, nil
+}
+
+// apiGoi nhận args THÔ, còn nguyên cờ.
+//
+// Thứ tự bắt buộc: RÚT CỜ TRƯỚC, tách tên route SAU. Bản đầu làm ngược lại và
+// `sagent api --suy-luan grok "câu hỏi"` hỏng theo kiểu tệ nhất — `--suy-luan`
+// không khớp tên route nào nên cả dãy bị coi là câu hỏi, và chữ "grok" đi thẳng
+// vào prompt. Lượt gọi vẫn chạy, vẫn tính tiền, chỉ là hỏi sai câu qua sai route.
+func apiGoi(args []string) {
+	co, args := rutCoGoi(args)
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu prompt: sagent api [<route>] \"câu hỏi\""))
 	}
@@ -239,31 +354,32 @@ func apiGoi(args []string) {
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu prompt: sagent api %s \"câu hỏi\"", ten))
 	}
-	if stream && fileTool != "" {
-		// Không im lặng bỏ một trong hai: đường stream chưa mang `tools` đi
-		// được, nên chạy tiếp là gửi một yêu cầu không có tool rồi báo "model
-		// không đòi gọi tool nào" — sai, và sai sau khi đã tính tiền.
-		fail(fmt.Errorf("--stream và --tool chưa đi chung được: đường stream chưa mang " +
-			"định nghĩa tool. Bỏ --stream đi."))
+	v, err := quyetDinhGoi(co, args)
+	if err != nil {
+		fail(err)
 	}
-	if fileTool != "" {
-		apiGoiTool(ten, strings.Join(args, " "), fileTool, chonTool, xemSuyLuan)
+	switch v.Nhanh {
+	case nhanhTool:
+		apiGoiTool(ten, v.Prompt, co.FileTool, co.ChonTool, co.XemSuyLuan)
+		return
+	case nhanhKem:
+		apiGoiKem(ten, v.Prompt, co.AnhFile, co.FileSoDo, co.CuGui, co.XemSuyLuan)
 		return
 	}
+	stream, xemSuyLuan := co.Stream, co.XemSuyLuan
 	a, done := open()
 	defer done()
 
 	// Gọi qua api.AICall chứ không tự tìm route: chỗ đó mới biết default_route và
 	// fallback_routes. Tự dựng Route ở đây là bỏ qua fallback mà không ai thấy.
 	var kq aiapi.KetQua
-	var err error
 	if stream {
 		fmt.Println()
-		kq, err = a.AICallStream(context.Background(), ten, strings.Join(args, " "),
+		kq, err = a.AICallStream(context.Background(), ten, v.Prompt,
 			func(s string) { fmt.Print(s) })
 		fmt.Println()
 	} else {
-		kq, err = a.AICall(context.Background(), ten, strings.Join(args, " "))
+		kq, err = a.AICall(context.Background(), ten, v.Prompt)
 	}
 	// Lấy danh sách route TRƯỚC khi đóng: `DocSuyLuan` cần nó để tra bảng năng
 	// lực của route đã trả lời. Đọc cấu hình, không chạm mạng, không tốn token.

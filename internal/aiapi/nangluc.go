@@ -1,6 +1,7 @@
 package aiapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -237,25 +238,119 @@ var phepDoMaNguon = map[string]func() (TrangThaiNangLuc, string){
 				"chưa bao giờ mang định nghĩa tool đi (aiapi.go, kiểu `yeuCau`)"
 		}
 	},
+	// HAI PHÉP ĐO DƯỚI ĐÂY KHÔNG DÙNG REFLECT, và đó là một nấc thu hẹp điểm mù
+	// chứ không phải lệch chuẩn.
+	//
+	// Reflect trả lời đúng MỘT câu: "kiểu có trường đó không". Với hai năng lực
+	// này câu đó từ 22/08 trở đi TRẢ LỜI SAI, vì `tinNhan` nay có `MarshalJSON`
+	// riêng (anh.go): kiểu Go của `Content` vẫn là `string` thuần trong khi
+	// thân trên dây đã là MẢNG. Hỏi kiểu thì được "không gửi được ảnh" — sai
+	// hẳn, và sai theo hướng khiến người ta đi sửa một thứ đang chạy.
+	//
+	// Nên hai ô này đo bằng cách DỰNG THẬT một thân JSON rồi ĐỌC LẠI nó. Vẫn
+	// miễn phí, vẫn không chạm mạng, vẫn tự lật khi mã đổi — nhưng câu hỏi mạnh
+	// hơn hẳn: không phải "kiểu có chỗ chứa không" mà "thứ ta gửi đi có mang nó
+	// không".
+	//
+	// ĐIỂM MÙ CÒN LẠI, nói ra để đừng ai tưởng đã hết: phép đo tự dựng lấy tin
+	// nhắn của nó. Nó KHÔNG trả lời được "`GoiKem` có nhét ảnh của người dùng
+	// vào đó không". Câu đó chỉ bài kiểm đi hết đường mới trả lời được —
+	// TestAnhDiHetDuongToiThanJSON và TestCoCauTrucDiHetDuongToiKetQua.
 	NLAPIDauVaoAnh: func() (TrangThaiNangLuc, string) {
-		t, co := kieuTruong(reflect.TypeOf(tinNhan{}), "content")
-		if co && t.Kind() == reflect.String {
-			// `content` là chuỗi thuần thì không có chỗ nào nhét `image_url`:
-			// giao thức đòi một MẢNG phần tử {type,text|image_url}.
-			return KhongLamDuoc, "aiapi.tinNhan.Content là `string` thuần — giao thức đòi content " +
-				"dạng mảng {type, image_url} mới gửi được ảnh (aiapi.go, kiểu `tinNhan`)"
+		b, err := json.Marshal(tinNhan{
+			Role:    "user",
+			Content: "ảnh này màu gì",
+			Phan:    []PhanNoiDung{PhanAnh("data:image/png;base64,iVBORw0KGgo=")},
+		})
+		if err != nil {
+			return KhongLamDuoc, "aiapi.tinNhan không dựng nổi thân JSON có ảnh: " + err.Error()
 		}
-		if !co {
-			return ChuaDo, "không tìm thấy trường `content` trong aiapi.tinNhan — kiểu đã đổi, đo lại"
+		var thu struct {
+			Content []struct {
+				Loai string `json:"type"`
+				Chu  string `json:"text"`
+				Anh  *struct {
+					URL string `json:"url"`
+				} `json:"image_url"`
+			} `json:"content"`
 		}
-		return LamDuoc, "aiapi.tinNhan.Content không còn là chuỗi thuần, chứa được phần ảnh"
+		if json.Unmarshal(b, &thu) != nil {
+			// `content` không giải mã được thành mảng nghĩa là nó vẫn là chuỗi
+			// thuần — giao thức đòi mảng {type, text|image_url} mới gửi được ảnh.
+			return KhongLamDuoc, "thân JSON của aiapi.tinNhan vẫn để `content` là chuỗi thuần — " +
+				"giao thức đòi content dạng mảng {type, image_url} mới gửi được ảnh (anh.go)"
+		}
+		var coAnh, coChu bool
+		for _, p := range thu.Content {
+			if p.Loai == "image_url" && p.Anh != nil && strings.HasPrefix(p.Anh.URL, "data:image/") {
+				coAnh = true
+			}
+			if p.Loai == "text" && p.Chu != "" {
+				coChu = true
+			}
+		}
+		switch {
+		case !coAnh:
+			return KhongLamDuoc, "aiapi.tinNhan dựng được content dạng mảng nhưng KHÔNG có mẩu " +
+				"`image_url` mang data URL — ảnh rụng trên đường lên dây (anh.go, MarshalJSON)"
+		case !coChu:
+			// Nuốt mất câu hỏi thì lượt gọi vẫn chạy, vẫn tính tiền, và model
+			// nhận được một tấm ảnh không kèm câu hỏi nào.
+			return KhongLamDuoc, "thân JSON mang được ảnh nhưng NUỐT phần chữ của tin nhắn — " +
+				"model nhận ảnh mà không có câu hỏi (anh.go, luật hợp nhất Content+Phan)"
+		default:
+			return LamDuoc, fmt.Sprintf("aiapi.tinNhan.MarshalJSON dựng `content` thành mảng %d mẩu "+
+				"(1 text + 1 image_url mang data URL), và aiapi.GoiKem nhét ảnh của người dùng "+
+				"vào đó (anh.go, goikem.go)", len(thu.Content))
+		}
 	},
 	NLAPIDauRaCoCauTruc: func() (TrangThaiNangLuc, string) {
-		if coTruong(reflect.TypeOf(yeuCau{}), "response_format") {
-			return LamDuoc, "aiapi.yeuCau có trường `response_format`"
+		if !coTruong(reflect.TypeOf(yeuCau{}), "response_format") {
+			return KhongLamDuoc, "aiapi.yeuCau không có trường `response_format` — không ép được " +
+				"JSON schema, câu trả lời về dạng văn xuôi (aiapi.go, kiểu `yeuCau`)"
 		}
-		return KhongLamDuoc, "aiapi.yeuCau không có trường `response_format` — không ép được " +
-			"JSON schema, câu trả lời về dạng văn xuôi (aiapi.go, kiểu `yeuCau`)"
+		// Có trường là một chuyện; SCHEMA ĐI QUA NGUYÊN VẸN là chuyện khác. Đây
+		// đúng chỗ một lớp kiểu trung gian gọt mất `required` trong im lặng —
+		// bài học đã ghi cho `HamTool.Tham` (tool.go).
+		b, err := json.Marshal(yeuCau{
+			Model:    "m",
+			Messages: []tinNhan{{Role: "user", Content: "hỏi"}},
+			DangTraLoi: SoDoNghiem("mau_sac", map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"mau": map[string]any{"type": "string"}},
+				"required":   []any{"mau"},
+			}),
+		})
+		if err != nil {
+			return KhongLamDuoc, "aiapi.yeuCau không dựng nổi thân JSON có response_format: " + err.Error()
+		}
+		var thu struct {
+			Dang *struct {
+				Loai string `json:"type"`
+				SoDo *struct {
+					Ten    string         `json:"name"`
+					Nghiem bool           `json:"strict"`
+					So     map[string]any `json:"schema"`
+				} `json:"json_schema"`
+			} `json:"response_format"`
+		}
+		if json.Unmarshal(b, &thu) != nil || thu.Dang == nil || thu.Dang.SoDo == nil {
+			return KhongLamDuoc, "aiapi.yeuCau có trường `response_format` nhưng thân JSON gửi đi " +
+				"KHÔNG mang phần `json_schema` — schema rụng trước khi lên dây (cocautruc.go)"
+		}
+		if thu.Dang.SoDo.So["required"] == nil {
+			return KhongLamDuoc, "schema lên dây nhưng RỤNG `required` — model sẽ trả JSON thiếu " +
+				"khoá và bước sau hỏng lúc chạy (cocautruc.go, kiểu `SoDoJSON`)"
+		}
+		if !coTruongGo(reflect.TypeOf(KhoiCoCauTruc{}), "Thieu") {
+			// Cùng câu hỏi thứ ba như `goi-tool`: gửi được mà không đọc lại thì
+			// ca "HTTP 200 kèm văn xuôi" đi qua trong im lặng.
+			return KhongLamDuoc, "gửi được schema nhưng không có chỗ nào ĐỌC LẠI câu trả lời — " +
+				"nhà cung cấp nuốt `response_format` rồi trả văn xuôi thì không ai biết"
+		}
+		return LamDuoc, fmt.Sprintf("aiapi.yeuCau gửi `response_format` kiểu %q strict=%v kèm schema "+
+			"còn nguyên `required`, và aiapi.DocCoCauTruc đọc lại câu trả lời để bắt ca nhà cung "+
+			"cấp nuốt trường đó (cocautruc.go)", thu.Dang.Loai, thu.Dang.SoDo.Nghiem)
 	},
 	NLAPIReasoning: func() (TrangThaiNangLuc, string) {
 		for _, ten := range []string{"reasoning_content", "reasoning"} {

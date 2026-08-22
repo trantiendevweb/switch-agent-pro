@@ -815,6 +815,28 @@ func strFlag(args []string, name, def string) (string, []string) {
 	return val, out
 }
 
+// strFlagNhieu rút một cờ LẶP LẠI ĐƯỢC, trả về mọi giá trị theo đúng thứ tự gõ.
+//
+// Thứ tự phải giữ nguyên, và đó không phải chi tiết vặt: `--anh truoc.png --anh
+// sau.png "cái nào mới hơn"` chỉ trả lời đúng khi hai ảnh tới model theo đúng
+// thứ tự người dùng gõ. Đảo chúng đi thì câu trả lời vẫn trôi chảy, vẫn tính
+// tiền, và sai ngược hoàn toàn — kiểu hỏng không ai phát hiện ra.
+//
+// `strFlag` trả về giá trị CUỐI cùng, nên gõ hai lần là mất lặng lẽ một cái.
+func strFlagNhieu(args []string, name string) ([]string, []string) {
+	out := make([]string, 0, len(args))
+	var vals []string
+	for i := 0; i < len(args); i++ {
+		if args[i] == name && i+1 < len(args) {
+			vals = append(vals, args[i+1])
+			i++
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return vals, out
+}
+
 func intFlag(args []string, name string, def int) (int, []string) {
 	out := make([]string, 0, len(args))
 	val := def
@@ -940,6 +962,13 @@ func cmdHelp() {
                                 --tool <file.json> [--tool-chon auto|required|none]:
                                 gửi định nghĩa tool, in lời gọi tool model đòi
                                 chạy. sagent KHÔNG chạy tool hộ
+                                --anh <file.png|jpg|gif|webp>: gửi ảnh trong tin
+                                nhắn. Lặp lại được để gửi nhiều ảnh
+                                --so-do <file.json>: ép câu trả lời theo JSON
+                                schema, rồi ĐỌC LẠI xem nhà cung cấp có làm thật
+                                không (200 kèm văn xuôi là ca hay gặp nhất)
+                                --cu-gui: vẫn gửi dù bảng năng lực đã đo được là
+                                route này không đọc ảnh / không ép được JSON
     sagent api --lich-su        lịch sử lời gọi API: tiêu bao nhiêu, ở đâu
     sagent route                sổ route: cấu hình khai gì, đã gọi thật qua đâu
     sagent nang-luc-api         route API nào làm được gì: gọi tool, đọc ảnh,

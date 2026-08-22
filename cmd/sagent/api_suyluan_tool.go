@@ -137,7 +137,7 @@ func apiGoiTool(ten, prompt, fileTool, chonTool string, xemSuyLuan bool) {
 	macDinh := a.Config().AI.DefaultRoute
 	done()
 
-	r, err := chonRouteTool(routes, ten, macDinh)
+	r, err := chonRouteDichDanh(routes, ten, macDinh)
 	if err != nil {
 		fail(err)
 	}
@@ -164,12 +164,13 @@ func apiGoiTool(ten, prompt, fileTool, chonTool string, xemSuyLuan bool) {
 		"(đường dự phòng chưa mang tool đi được).")
 }
 
-// chonRouteTool tìm route sẽ gọi, và nói rõ khi không tìm được.
+// chonRouteDichDanh tìm route sẽ gọi cho những nhánh KHÔNG có dự phòng
+// (`--tool`, `--anh`, `--so-do`), và nói rõ khi không tìm được.
 //
 // Tên rỗng thì dùng `default_route`. KHÔNG tự lấy route đầu danh sách khi thiếu
 // khai báo: đoán hộ ở đây là gửi tiền của người dùng tới một nhà cung cấp họ
 // không chọn.
-func chonRouteTool(ds []aiapi.Route, ten, macDinh string) (aiapi.Route, error) {
+func chonRouteDichDanh(ds []aiapi.Route, ten, macDinh string) (aiapi.Route, error) {
 	if ten == "" {
 		ten = macDinh
 	}
