@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/plugin"
 )
@@ -57,6 +58,21 @@ const ThamSoThuDuongDan = "duong-dan-thu"
 // TenFileThuGhi là tên file plugin thử tạo trong thư mục được dò.
 const TenFileThuGhi = "sagent-plugin-thu-ghi.tmp"
 
+// Hai tham số dựng đúng hai ca HỎNG mà host khai là xử lý được nhưng chưa đo:
+// plugin TREO, và plugin CHẾT giữa chừng.
+//
+// Vì sao phải dựng được chúng: cả hai ca đều nằm ở phía plugin, và host không
+// có cách nào tự tạo ra chúng. Không có hai cần gạt này thì `chay.go` chỉ được
+// đọc bằng mắt — mà "đọc bằng mắt thấy đúng" chính là thứ đã để lọt ô quyền
+// `thu-muc-lam-viec` khai `chan-that` suốt từ lúc viết tới 22/08.
+//
+// Chúng KHÔNG phải cửa hậu: plugin này không xin quyền nào, treo hay chết thì
+// cũng chỉ treo/chết chính nó, và host phải bắt được — đó đúng là thứ đang đo.
+const (
+	ThamSoThuTreoGiay = "thu-treo-giay" // ngủ N giây rồi mới trả lời
+	ThamSoThuChet     = "thu-chet"      // thoát ngay, KHÔNG trả lời
+)
+
 type mau struct{}
 
 // ThongTin: tên phải khớp manifest, và danh sách quyền là LỜI TỰ KHAI mà host
@@ -64,6 +80,22 @@ type mau struct{}
 func (mau) ThongTin() (string, string, []string) { return "tom-luoc", PhienBan, nil }
 
 func (mau) Chay(moi plugin.MoiTruongChay, ts plugin.ThamSoChay) (plugin.KetQuaChay, error) {
+	// Hai cần gạt đo hàng rào phía host. Đặt TRƯỚC mọi thứ khác: ca "chết giữa
+	// chừng" phải chết trong khi host đang đợi phản hồi, không phải sau khi đã
+	// trả lời xong.
+	if v := strings.TrimSpace(ts.ThamSo[ThamSoThuChet]); v != "" {
+		fmt.Fprintln(os.Stderr, "sagent-plugin-mau: thoat giua chung theo yeu cau cua phep do")
+		os.Exit(3)
+	}
+	if v := strings.TrimSpace(ts.ThamSo[ThamSoThuTreoGiay]); v != "" {
+		giay, err := strconv.Atoi(v)
+		if err != nil || giay < 0 {
+			return plugin.KetQuaChay{}, fmt.Errorf("tham_so.%s = %q phải là số nguyên ≥ 0",
+				ThamSoThuTreoGiay, v)
+		}
+		time.Sleep(time.Duration(giay) * time.Second)
+	}
+
 	vao := strings.TrimSpace(ts.Vao)
 	if vao == "" {
 		// Hỏng to còn hơn trả về một bản tóm lược rỗng: bước sau sẽ nhận chuỗi

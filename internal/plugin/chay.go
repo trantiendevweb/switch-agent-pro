@@ -59,6 +59,15 @@ type Client struct {
 
 	tmp string // thư mục tạm host tạo khi KHÔNG cấp quyền thư mục
 
+	// timeout là trần cho MỖI lượt gọi, lấy từ TuyChon.Timeout. 0 = TimeoutMacDinh.
+	//
+	// Phải giữ lại ở đây vì `Chay` được gọi SAU khi `Mo` đã trả về, lúc `opt`
+	// không còn trong tầm. Bản trước không giữ, nên `Chay` truyền thẳng 0 và
+	// lượt chạy thật LUÔN dùng TimeoutMacDinh — trong khi bình luận ngay trên
+	// hằng số đó ghi "người gọi đặt Timeout khác được". Lời hứa chỉ được giữ ở
+	// lượt bắt tay, tức ở đúng lượt gọi không ai cần đặt trần riêng.
+	timeout time.Duration
+
 	mu  sync.Mutex
 	loi *dauCuoi // stderr của plugin, giữ phần cuối
 }
@@ -217,7 +226,8 @@ func Mo(ctx context.Context, m Manifest, opt TuyChon) (*Client, error) {
 		return nil, fmt.Errorf("không chạy được plugin %q (%s): %w", m.Plugin.Ten, duong, err)
 	}
 
-	c := &Client{m: m, cmd: cmd, vao: stdin, ra: bufio.NewReaderSize(stdout, 64<<10), tmp: tmp, loi: batLoi}
+	c := &Client{m: m, cmd: cmd, vao: stdin, ra: bufio.NewReaderSize(stdout, 64<<10), tmp: tmp,
+		loi: batLoi, timeout: opt.Timeout}
 
 	quyen := make([]string, 0, len(m.Quyen))
 	for _, q := range m.Quyen {
@@ -269,7 +279,7 @@ func (c *Client) doiChieu(kq KetQuaBatTay) error {
 // Chay gọi một lượt việc.
 func (c *Client) Chay(ctx context.Context, vao string, thamSo map[string]string) (KetQuaChay, error) {
 	var kq KetQuaChay
-	err := c.goi(ctx, 0, MethodChay, ThamSoChay{Vao: vao, ThamSo: thamSo}, &kq)
+	err := c.goi(ctx, c.timeout, MethodChay, ThamSoChay{Vao: vao, ThamSo: thamSo}, &kq)
 	return kq, err
 }
 

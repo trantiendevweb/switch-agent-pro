@@ -3337,9 +3337,26 @@ với cây làm việc.
   | `claude/phu/1` | 22/08 **05:16** | 22/08 00:50 |
   | `claude/tns/1` | 22/08 **05:16** | 22/08 00:51 |
 
-  Lúc đo là **10:06**, tức cả hai đã **quá hạn 4 giờ 50 phút**. `sagent ds` vẫn
-  in *"sẵn sàng"* cho cả hai — nó trả lời câu *"có file token không"*, không
-  phải câu *"token còn dùng được không"*. Đọc dòng đó thành "chạy được" là đoán.
+  Lúc đo là **10:06**, tức access token của cả hai đã **quá hạn 4 giờ 50 phút**.
+  `sagent ds` vẫn in *"sẵn sàng"* cho cả hai.
+
+  > **NỢ NGƯỢC đã sửa cùng ngày**: dòng trên từng ghi tiếp *"nó trả lời câu 'có
+  > file token không', không phải câu 'token còn dùng được không'"*, và xếp
+  > `sagent ds` vào nhóm đèn xanh nói dối. **Sai, và sai theo hướng tệ nhất:
+  > tố oan một chỗ đã được sửa đúng rồi.** `TokenExpiry` của Claude
+  > (`internal/provider/claude.go:157`) **cố ý** trả hạn của **refresh token**
+  > chứ không phải access token, kèm nguyên một khối bình luận giải thích vì
+  > sao: bản trước trả hạn access token nên `ds` in *"HẾT HẠN — đăng nhập lại"*
+  > sau mỗi 8 tiếng và **chặn oan lượt chạy #39**, trong khi CLI vẫn tự đổi
+  > access token mới và tài khoản vẫn chạy được. Câu người vận hành cần trả lời
+  > là *"tài khoản này còn chạy được không"*, và câu đó nằm ở refresh token.
+  > `HasToken` cũng không chỉ kiểm file tồn tại — nó đòi `expiresAt != 0` để
+  > bắt ca đăng nhập dở dang (`claude.go:104`).
+  >
+  > Nói cách khác: phép đo dưới đây **không phát hiện `ds` nói dối — nó xác nhận
+  > `ds` nói đúng.** Access token hết hạn mà tài khoản vẫn chạy được chính là
+  > điều thiết kế đó dự đoán. Bài học cho chính lượt ghi sổ này: thấy một con số
+  > "sai" thì đọc mã trước khi gọi tên nó là lỗi — đúng luật của cuốn sổ này.
 
 - **Con số / Bằng chứng**: bật `sagent fleet claude:phu` (#197) lúc 10:14 và
   `claude:tns` (#198) lúc 10:15. Đọc lại file token ngay sau đó:
@@ -3418,3 +3435,38 @@ với cây làm việc.
   `TestBaTrangThaiDiRaToiHopDong`.
 - **Còn CHƯA ĐO**: hàng rào thật (ACL từng lượt chạy / Job Object /
   AppContainer) có dựng được trên Windows không. Chưa ai thử.
+
+## 22/08 — Hai ca hỏng của plugin có mã xử lý nhưng 0 test, và một lỗi lộ ra khi đi viết test
+
+- **Đo lúc nào**: 22/08/2026, ngay sau khi trộn nhánh plugin vào `main`.
+- **Ô nợ**: bản rà nhánh plugin đếm ra ba ca hỏng của giao thức — plugin **treo**,
+  plugin **chết giữa chừng**, **lệch phiên bản** — mà **chỉ ca thứ ba có test**.
+  Hai ca đầu viết đúng nhưng chưa ai chạy thử, giữa một bộ **34 test** rất
+  nghiêm ở mọi chỗ khác. Lệch chuẩn so với chính nó là dấu hiệu đáng tin nhất
+  của một chỗ chưa được đo.
+- **Cách dựng**: hai ca đều do PHÍA PLUGIN gây ra, host không tự tạo được. Thêm
+  hai cần gạt vào plugin mẫu — `thu-treo-giay` (ngủ N giây) và `thu-chet`
+  (thoát ngay, không trả lời) — đi qua **tham số JSON-RPC**, cùng đường với
+  cần gạt đo hàng rào thư mục.
+- **LỖI LỘ RA KHI VIẾT TEST, không phải khi đọc mã**: `TuyChon.Timeout` **chỉ
+  áp cho lượt BẮT TAY** (`chay.go:241`). Lượt chạy thật (`Chay`) truyền thẳng
+  `0` nên **luôn** dùng `TimeoutMacDinh = 60s`, bất kể người gọi đặt gì — trong
+  khi bình luận ngay trên hằng số đó ghi *"Người gọi đặt Timeout khác được"*.
+  Lời hứa chỉ được giữ ở đúng lượt gọi không ai cần đặt trần riêng.
+- **Con số / Bằng chứng**: trần 1 giây, plugin ngủ 30 giây.
+
+  | | Thời gian host đợi |
+  |---|---|
+  | Trước khi vá | **28,7 giây** (bị `ctx` 30s cắt, không phải trần 1s) |
+  | Sau khi vá | dưới 10 giây, đúng trần |
+
+  Chi tiết đáng giữ: **bản chưa vá VẪN trả về lỗi** — chỉ là 28 giây sau. Một
+  bài kiểm chỉ hỏi *"có lỗi không"* sẽ **xanh** với đúng lỗi này. Phải khẳng
+  định cả **THỜI GIAN** mới bắt được. Đã chứng minh bằng cách dựng lại đúng
+  dòng cũ rồi chạy lại.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** — `Client` giữ `timeout` từ `TuyChon.Timeout`
+  (phải giữ vì `Chay` chạy sau khi `Mo` đã trả về, lúc `opt` hết tầm), `Chay`
+  truyền `c.timeout`. Ba bài kiểm mới: `TestPluginTreoThiHostCatTheoTran`
+  (kèm khẳng định thời gian), `TestPluginChetGiuaChungThiHostNoiRoKemStderr`
+  (khẳng định cả lời trăng trối ở stderr đi kèm — thiếu nó thì mọi lỗi plugin
+  đều hiện ra là *"đóng ống trước khi trả lời"*, đúng mà vô dụng).

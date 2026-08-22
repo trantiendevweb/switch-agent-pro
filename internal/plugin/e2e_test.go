@@ -339,6 +339,84 @@ func TestKhongKhaiThuMucThiKhongThayThuMucDuAn(t *testing.T) {
 	}
 }
 
+// BA CA HỎNG mà `chay.go` khai là xử lý được nhưng KHÔNG bài nào đo.
+//
+// Bản rà nhánh plugin ngày 22/08 đếm ra: trong ba ca hỏng của giao thức —
+// plugin TREO, plugin CHẾT giữa chừng, LỆCH PHIÊN BẢN — chỉ ca thứ ba có test
+// (TestLechGiaoThucThiDungNgayLucBatTay). Hai ca đầu viết đúng nhưng chưa ai
+// chạy thử, giữa một bộ 34 test rất nghiêm ở mọi chỗ khác. Lệch chuẩn so với
+// chính nó là dấu hiệu đáng tin cậy nhất của một chỗ chưa được đo.
+//
+// Cả hai ca đều phải do PHÍA PLUGIN gây ra — host không tự dựng được chúng.
+// Nên plugin mẫu có hai cần gạt (`thu-treo-giay`, `thu-chet`) chỉ để đo.
+
+// Plugin TREO thì host phải cắt theo trần, giết tiến trình, và nói rõ nó chờ
+// bao lâu ở phương thức nào.
+func TestPluginTreoThiHostCatTheoTran(t *testing.T) {
+	m := datPlugin(t, t.TempDir(), tenMau, nil, nil)
+
+	ctx, huy := context.WithTimeout(context.Background(), 30*time.Second)
+	defer huy()
+	// Trần 1 giây, plugin ngủ 30 giây. Khoảng cách 30 lần để bài kiểm không
+	// đỏ oan trên một máy đang tải nặng.
+	c, err := Mo(ctx, m, TuyChon{Timeout: time.Second})
+	if err != nil {
+		t.Fatalf("Mo: %v", err)
+	}
+	defer c.Dong()
+
+	batDau := time.Now()
+	_, err = c.Chay(ctx, "x", map[string]string{"thu-treo-giay": "30"})
+	troi := time.Since(batDau)
+
+	if err == nil {
+		t.Fatal("plugin ngủ 30 giây với trần 1 giây mà host vẫn báo chạy xong")
+	}
+	if !strings.Contains(err.Error(), "không trả lời") {
+		t.Errorf("lỗi không nói ra là hết giờ, người đọc lúc 2 giờ sáng không đoán được: %v", err)
+	}
+	// Đây mới là chỗ lỗi thật từng nằm: `Chay` truyền thẳng 0 nên trần của
+	// người gọi bị bỏ qua và lượt chạy dùng TimeoutMacDinh = 60s. Không có
+	// khẳng định về THỜI GIAN thì bài kiểm vẫn xanh với lỗi đó, vì rốt cuộc
+	// nó cũng hết giờ — chỉ là 60 giây sau.
+	if troi > 10*time.Second {
+		t.Errorf("trần 1 giây mà host đợi %v — TuyChon.Timeout không tới được lượt chạy thật", troi)
+	}
+	// Giết thật, không chỉ trả lỗi rồi bỏ tiến trình nằm đó ăn RAM tới sáng.
+	if c.cmd.Process != nil {
+		_ = c.cmd.Process.Kill()
+	}
+}
+
+// Plugin CHẾT giữa chừng thì host phải nói nó chết, KÈM lời trăng trối ở stderr.
+//
+// Vế thứ hai mới là vế đáng giá: không có nó thì mọi lỗi plugin đều hiện ra là
+// "đóng ống trước khi trả lời" — đúng mà vô dụng, trong khi nguyên nhân thật
+// đang nằm sẵn trong stderr của tiến trình vừa chết.
+func TestPluginChetGiuaChungThiHostNoiRoKemStderr(t *testing.T) {
+	m := datPlugin(t, t.TempDir(), tenMau, nil, nil)
+
+	ctx, huy := context.WithTimeout(context.Background(), 30*time.Second)
+	defer huy()
+	c, err := Mo(ctx, m, TuyChon{})
+	if err != nil {
+		t.Fatalf("Mo: %v", err)
+	}
+	defer c.Dong()
+
+	_, err = c.Chay(ctx, "x", map[string]string{"thu-chet": "1"})
+	if err == nil {
+		t.Fatal("plugin thoát giữa chừng mà host vẫn báo chạy xong")
+	}
+	if !strings.Contains(err.Error(), "đóng ống trước khi trả lời") {
+		t.Errorf("host không nhận ra plugin chết giữa chừng: %v", err)
+	}
+	if !strings.Contains(err.Error(), "thoat giua chung theo yeu cau") {
+		t.Errorf("mất lời trăng trối ở stderr — người đọc chỉ còn \"đóng ống trước khi "+
+			"trả lời\", đúng nhưng không dùng được để chẩn đoán: %v", err)
+	}
+}
+
 // ĐÂY LÀ PHÉP ĐO của dòng thu-muc-lam-viec trong quyen.go — và nó đo thứ mà
 // TestKhongKhaiThuMucThiKhongThayThuMucDuAn ở trên KHÔNG đo.
 //
