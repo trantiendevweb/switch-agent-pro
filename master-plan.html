@@ -455,28 +455,49 @@ một đằng là thứ dự án không tự gỡ được. Lượt soát 21/08 
 bị chặn thật (OpenRouter/Ollama, thiếu key) nằm ở dòng <code>⬜</code> trong Trạng thái
 Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</code>=1, <code>[~]</code>=0,5,
 <code>[ ]</code>=0, <code>[!]</code> <strong>không vào mẫu số</strong>. Bảng đếm ở cuối mục 7.</p>
+<p><strong>ĐIỂM MỘT DÒNG (soát lại 22/08/2026):</strong>
+<code>92,0/99 = 93%</code> <em>(bảng cũ khai)</em> → <code>94,0/99 = 95%</code> <em>(đếm lại đúng bản <code>.md</code>
+trước lượt này — bảng cũ đã trôi 2 điểm)</em> → <strong><code>98,0/100 = 98%</code></strong> <em>(sau lượt này)</em>.
+Chi tiết: <code>96 [x] · 4 [~] · 0 [ ] · 0 [!]</code>. <strong>5 ô đổi dấu · 1 ô mới thêm ·
+0 ô còn <code>[ ]</code>.</strong> Bảng đầy đủ và danh sách thứ đang bị chặn ở cuối mục 7.</p>
 </blockquote>
-<h3>Bước 0 — Đổi tên  <strong>75%</strong> (3 xong · 1 chưa)</h3>
+<h3>Bước 0 — Đổi tên  <strong>100%</strong> (4 xong)</h3>
 <ul>
 <li class="task done"><span class="box"></span><code>go.mod</code> module → <code>github.com/trantiendevweb/switch-agent-pro</code>; <code>cmd/ccswitch</code>
   → <code>cmd/sagent</code> (git mv); cập nhật mọi import; <strong>build + vet + test xanh</strong>; <code>sagent ds</code> chạy đúng.</li>
 <li class="task done"><span class="box"></span>Cập nhật <code>install/cai-dat.{ps1,sh}</code>, CI, <code>.gitignore</code> sang <code>sagent</code>.</li>
-<li class="task"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code>. <strong>Vẫn CHƯA LÀM, và lý do hoãn
-  cũ đã hết hiệu lực</strong>: mục này ghi "làm khi viết installer phát hành", nhưng
-  installer đã có từ Pha 7 (<code>install/cai-dat.ps1</code>, <code>install/get.ps1</code>,
-  <code>.github/workflows/phat-hanh.yml</code>) mà alias thì không. Đo 21/08:
-  <code>grep -ni "alias\|ccswitch" install/</code> <strong>không ra dòng nào</strong>, và
-  <code>cmd/sagent/main.go</code> không đọc <code>os.Args[0]</code> nên gọi binary bằng tên khác cũng
-  không đổi hành vi. Xếp <code>[ ]</code> chứ không <code>[!]</code>: không có thứ gì bên ngoài cản —
-  chỉ là chưa làm. (Riêng phần <code>ccswitch</code> còn một nút thật: Pha 7 ghi "chưa có
-  bản <code>ccswitch</code> thật để mở ra xem", nên tương thích cờ của nó vẫn là suy đoán.)</li>
+<li class="task done"><span class="box"></span>Alias tương thích <code>tk</code>/<code>ccswitch</code> → <code>sagent</code>. ✅ <strong>LÀM 22/08</strong> — xem
+  <a href="BAO-CAO-CLI-NODE.md"><code>docs/BAO-CAO-CLI-NODE.md</code></a> VIỆC 1. Nguồn sự thật duy
+  nhất là <code>install/cai-dat.ps1:75-76</code>: <code>$TenAlias = @('tk','ccswitch')</code> và
+  <code>$ShimNoiDung = '@"%~dp0sagent.exe" %*'</code>. Đo trước khi sửa 21/08:
+  <code>grep -ni "alias\|ccswitch" install/</code> ra <strong>0 dòng</strong>; nay ra 9 dòng.</li>
+<li><strong>Chọn shim <code>.cmd</code> (23 byte/alias), CỐ Ý bỏ hai cách kia</strong> — bản sao <code>.exe</code>
+    (+32 MB, đo thật 2 × 16.016.384 byte) và hard link đều <strong>chạy binary CŨ sau
+    khi nâng cấp, im lặng</strong>, vì installer thay <code>sagent.exe</code> bằng một file mới
+    (<code>Move-Item</code>). Shim trỏ <strong>theo đường dẫn</strong> nên luôn chạy đúng file đang nằm
+    đó. Giá phải trả nói thẳng: thêm một tiến trình <code>cmd.exe</code> mỗi lần gọi, và
+    Ctrl+C vào <code>tk dash</code> thì cmd hỏi "Terminate batch job (Y/N)?". <strong>Cả hai đều
+    nhìn thấy được; chạy nhầm phiên bản thì không.</strong></li>
+<li><strong><code>%*</code> chứ không <code>%1 %2 %3</code></strong> — chỉ <code>%*</code> giữ nguyên đuôi dòng lệnh, tức giữ
+    được cả tham số có dấu cách lẫn tham số thứ mười trở đi.</li>
+<li><strong>KHÔNG đọc <code>os.Args[0]</code>, có chủ ý</strong>: đọc tên binary chỉ cần khi muốn cư xử
+    KHÁC theo tên gọi; ở đây muốn ngược lại — giống hệt. Thêm một nhánh rẽ theo
+    tên là thêm một đường cho hai lối gọi lệch nhau.</li>
+<li><strong>Đã chạy thật một lần</strong>: installer chạy vào một <code>USERPROFILE</code> tạm
+    (<code>hometest-77c6750f</code>) để không đụng <code>sagent.exe</code> đang chạy; <code>User PATH</code> chụp
+    trước và khôi phục nguyên trạng sau khi đo. Ra <code>✓ alias: tk</code> và
+    <code>✓ alias: ccswitch</code>.</li>
+<li><strong>Còn một nút, ghi ra để không ai tưởng đã đóng</strong>: Pha 7 ghi "chưa có bản
+    <code>ccswitch</code> thật để mở ra xem", nên <strong>tương thích CỜ</strong> của tên cũ vẫn là suy
+    đoán. Cái đã đóng là <em>gõ tên nào cũng chạy đúng binary</em>, không phải <em>mọi cờ
+    của v1 đều còn nghĩa cũ</em>.</li>
 <li class="task done"><span class="box"></span>Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
   <code>legacy/v1-powershell/</code>; <code>design-system/switch-agent-pro/</code>; 3 trang HTML sạch tên cũ.</li>
 </ul>
-<h3>Pha 0 — Đo giả định &amp; lập hợp đồng  <strong>71%</strong> (3 xong · 4 một phần)</h3>
+<h3>Pha 0 — Đo giả định &amp; lập hợp đồng  <strong>86%</strong> (5 xong · 2 một phần)</h3>
 <p>🎯 Chứng minh cơ chế của <strong>cả hai đường</strong> trước khi khoá interface.</p>
 <ul>
-<li class="task part"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.</li>
+<li class="task done"><span class="box"></span>Test harness không chứa credential trong repo; mọi output <strong>redaction</strong>.</li>
 <li><strong>Xong — không credential trong repo</strong>: giàn test chạy trên HOME giả
     (<code>homeGia(t)</code> trong <code>internal/aiapi/aiapi_test.go</code>) và khoá bịa
     (<code>sk-bi-mat-khong-duoc-lo</code>). Adapter GIẢ trong <code>internal/fleet/fleet_test.go:296</code>
@@ -488,11 +509,38 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
     cả terminal lẫn dashboard.</li>
 <li><strong>Xong — mặt web dùng allowlist chứ không phơi struct</strong>: <code>internal/dash/server.go:665-667</code>
     dựng <code>profileDTO</code> bằng danh sách trường tường minh, token chỉ còn cờ <code>HasToken</code>.</li>
-<li><strong>CHƯA — không có TẦNG redaction chung</strong>: <code>grep -rni "redact" internal/ cmd/</code>
-    ra <strong>0 dòng</strong>. Nhật ký phiên (<code>~/.ai-accounts/.nhat-ky/</code>) là stdout thô của
-    agent, không đi qua bộ lọc nào.</li>
-<li><strong>CHƯA — không có bài kiểm quét toàn repo tìm credential</strong>. Tính chất "repo
-    sạch" hiện đúng nhờ kỷ luật, không nhờ một phép đo tự chạy.</li>
+<li>✅ <strong>XONG 22/08 — TẦNG redaction chung</strong>: <code>internal/redaction/redaction.go:263</code>
+    (<code>Che</code>), <strong>16 luật</strong> trong MỘT bảng duy nhất (12 luật bí mật + 4 luật danh
+    tính). Trước lượt này <code>grep -rni "redact" internal/ cmd/</code> ra <strong>0 dòng</strong>.
+    Xem <a href="BAO-CAO-REDACTION.md"><code>docs/BAO-CAO-REDACTION.md</code></a>.<ul>
+<li><strong>Đo trước, viết mã sau</strong> — quét 22 file nhật ký thật / 6.797 dòng / 10,6 MB.
+  Kết quả quan trọng nhất: <strong>0 khoá hay token đang rò</strong> (<code>sk-ant-</code>, <code>ghp_</code>,
+  <code>AKIA</code>, <code>AIza</code>, JWT đủ ba đoạn, <code>Bearer &lt;giá trị&gt;</code> — tất cả đều 0 lần).
+  <strong>Cái ĐANG rò là danh tính</strong>: tên tài khoản <code>Administrator</code> <strong>2.060 lần</strong>,
+  email 179 lần (75 là địa chỉ thật). Trên đúng cái máy đang bị dò mật khẩu
+  ~3,9 nghìn lần/giờ và có <code>dash</code> tự biết mình <code>exposed</code>, đó không phải chuyện nhỏ.</li>
+<li><strong>Cắm ở CỬA RA chứ không ở đường ghi, có lý do kiến trúc</strong>: <code>StartDetached</code>
+  gán thẳng file handle cho tiến trình con rồi cha THOÁT — không còn ai đứng
+  giữa dòng ghi. Hai cửa ra thật là <code>nhatky.Duoi</code> (người + dash) và
+  <code>nhatky.BoDau</code> (máy → prompt bước sau); tầng che gắn vào <strong>cả hai</strong>, 20 dòng
+  thêm / 0 dòng xoá. Đo lại sau khi sửa: 2.060 → <strong>0</strong>, email 179 → <strong>0</strong>,
+  chữ ký thinking giữ nguyên <strong>489</strong>, dòng JSON hỏng <strong>0/6.092</strong>.</li>
+<li><strong>Đường máy phân loại CỐ Ý không bị đụng</strong> (<code>api.phanLoaiPhienChet</code> đọc byte
+  gốc) — có test ghim <code>TestPhanLoaiPhienChetVanNhinThayByteGoc</code>. Cắm nhầm tầng
+  che vào đó thì mọi phiên rơi về <code>lost</code>, tức trả lại đúng cái mù loà mà nhật
+  ký sinh ra để chữa.</li>
+</ul>
+</li>
+<li>✅ <strong>XONG 22/08 — bài kiểm quét toàn repo tìm credential</strong>:
+    <code>internal/redaction/quet_repo_test.go:31</code> (<code>TestRepoKhongCoBiMat</code>) duyệt
+    <code>git ls-files</code> — <strong>đúng tập file sẽ đi vào commit</strong> — quét 294 file văn bản,
+    bỏ qua 16 (nhị phân/quá 8 MB) và <strong>báo cả hai con số</strong> để không có chuyện cắt
+    ngầm mà đọc như đã phủ hết. <strong>Không có danh sách miễn trừ</strong>: bí mật giả trong
+    test đều được GHÉP LÚC CHẠY nên bài kiểm không thấy chúng — mở miễn trừ thì
+    lần rò thật đầu tiên cũng sẽ được cho vào đó, đúng lúc đang vội. Là test Go
+    chứ không phải git hook (hook nằm trong <code>.git/</code>, không clone theo, tắt được
+    bằng <code>--no-verify</code>). Kèm <code>quet_xungdot_test.go:34</code> chặn vạch xung đột git.
+    Tính chất "repo sạch" nay là một <strong>phép đo tự chạy</strong>, không còn là kỷ luật.</li>
 <li class="task part"><span class="box"></span><strong>Subscription</strong> (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
   root override có bao trùm config/session/auth? token ở file/env/keyring? file nào
   đọc/ghi lúc login/prompt/refresh/exit? <strong>concurrent refresh</strong> khi 2 process chung
@@ -534,14 +582,53 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
     request id (<code>stream_test.go:153</code>); <code>internal/aiapi/suckhoe.go:55</code> hỏi
     <code>GET /models</code> nên trả lời được cả "route sống không" lẫn "model khai có thật
     không" lẫn "nhà cung cấp liệt kê bao nhiêu model".</li>
-<li><strong>CHƯA — ba giao thức còn lại</strong>: Anthropic Messages, Gemini native, OpenAI
-    Responses. Phần này <strong>bị chặn thật</strong>: máy chỉ có khoá của nhà bán lại, và
-    <code>docs/DO-LUONG.md</code> đã đo rằng khoá đó trả <strong>401 ở <code>api.deepseek.com</code></strong>.</li>
-<li><strong>CHƯA — rate-limit schema và retry header</strong>: <code>grep -rn "429\|Retry-After"
-    internal/aiapi internal/api</code> ra <strong>0 dòng</strong>. Bị 429 thì hiện xử lý y như mọi
-    lỗi HTTP khác, và <code>Retry-After</code> bị bỏ qua.</li>
-<li><strong>CHƯA — tool / reasoning / vision / structured-output</strong>: chỉ mới đi đường
-    prompt → text.</li>
+<li>🚫 <strong>BỊ CHẶN — ba giao thức còn lại</strong>: Anthropic Messages, Gemini native,
+    OpenAI Responses. <strong>Thiếu THỨ GÌ bên ngoài, nói rõ</strong>: cả ba đòi <strong>khoá thật
+    của chính nhà cung cấp</strong> (<code>api.anthropic.com</code>, <code>generativelanguage.googleapis.com</code>,
+    <code>api.openai.com</code>). Máy này chỉ có khoá của <strong>nhà bán lại</strong> <code>modelapi.vn</code>, và
+    <code>docs/DO-LUONG.md</code> đã đo rằng khoá đó trả <strong>401 ở <code>api.deepseek.com</code></strong> — tức
+    nó không đi được cả tới cổng gốc của nhà mà nó bán lại. Đây là lý do ô cha
+    vẫn là <code>[~]</code> chứ không phải <code>[!]</code>: phần <strong>còn lại</strong> của ô (tool/vision/…) là
+    nợ của chính dự án, không bị ai chặn.</li>
+<li>✅ <strong>XONG 22/08 — rate-limit schema và retry header</strong>: trước lượt này
+    <code>grep -rn "429\|Retry-After" internal/aiapi internal/api</code> ra <strong>0 dòng</strong>; nay
+    có <code>internal/aiapi/cholai.go</code> (đọc <code>Retry-After</code> <strong>cả hai dạng</strong>: số giây và
+    mốc HTTP-date) + <code>aiapi.go:109</code> (<code>BiChanTocDo</code>). Luật chọn: <strong>chờ theo
+    <code>Retry-After</code> rồi thử lại CHÍNH route đó, có trần; hết lượt mới để tầng trên
+    đổi route.</strong> Xem <a href="BAO-CAO-429.md"><code>docs/BAO-CAO-429.md</code></a>.<ul>
+<li><strong>Vì sao không nhảy ngay</strong> — ba dữ kiện của chính dự án này: (1) hai route
+  <code>deepseek</code> và <code>grok</code> khai <strong>cùng</strong> <code>base_url = https://modelapi.vn/v1</code>, nên
+  "route dự phòng" là cùng một cổng, cùng máy chủ; chặn theo tài khoản/IP thì
+  lượt hai <strong>chắc chắn cũng 429</strong>. (2) 429 khác 5xx ở <strong>bản chất</strong>: 5xx nói
+  "chỗ tôi đang hỏng", 429 nói "chỗ tôi vẫn tốt, anh đi nhanh quá" — kèm một
+  <strong>lời hứa có thời hạn</strong>; nhảy ngay là vứt bỏ thứ duy nhất 429 cho không.
+  (3) Với 5xx thì nhảy ĐÚNG, và đã đo: thân 503 là "No available channel for
+  model grok-code-fast-1" — hỏng theo TỪNG MODEL. Nên bản sửa <strong>cố ý không mở
+  rộng sang 5xx</strong>.</li>
+<li><strong>Không đóng cửa đường kia</strong>: hết lượt thử lại, lỗi vẫn là <code>*LoiAPI</code> với
+  <code>Nguoi = false</code>, nên <code>internal/api</code> vẫn đổi route dự phòng theo luật cũ —
+  không phải sửa một dòng nào ở tầng đó.</li>
+<li>⬜ <strong>Nói thẳng lỗ lớn nhất: CHƯA ĐO ĐƯỢC MỘT CÚ 429 THẬT.</strong> Đo miễn phí qua
+  <code>GET /v1/models</code> cho thấy modelapi.vn <strong>không gửi header hạn mức nào</strong> ở
+  phản hồi thành công (không <code>X-RateLimit-*</code>), tức <strong>không có cách nào biết
+  trước còn bao nhiêu lượt</strong> — chỉ biết khi đã đâm vào tường. Nhà này chạy
+  gateway <code>new-api</code> (<code>X-New-Api-Version</code>), và <strong>chưa kiểm</strong> new-api có gửi
+  <code>Retry-After</code> kèm 429 hay không. Mã đường 429 hiện được canh bằng test, chưa
+  bằng một phản hồi thật.</li>
+</ul>
+</li>
+<li>🟡 <strong>ĐÃ ĐO, CHƯA LÀM — tool / reasoning / vision / structured-output</strong>: trước
+    đây dòng này là một khoảng trống; nay nó là một <strong>kết luận có số</strong>. Đo thật
+    22/08 bằng key thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
+    <a href="BAO-CAO-NANGLUC-API.md"><code>docs/BAO-CAO-NANGLUC-API.md</code></a>:
+    <strong>4 trên 7 năng lực bị chặn ở PHÍA DỰ ÁN, không phải ở nhà cung cấp.</strong>
+    <code>goi-tool</code> (<code>aiapi.yeuCau</code> không có trường <code>tools</code>, <code>phanHoi</code> không đọc
+    <code>tool_calls</code> — <strong>cả hai nhà đều làm được</strong>), <code>dau-vao-anh</code> (<code>tinNhan.Content</code>
+    là <code>string</code> thuần, giao thức đòi mảng <code>{type, image_url}</code> — <strong>grok làm được</strong>),
+    <code>dau-ra-co-cau-truc</code> (không có <code>response_format</code> — <strong>grok làm được</strong>),
+    <code>reasoning</code> (<code>phanHoi</code> chỉ đọc <code>content</code>, phần suy luận bị vứt trước khi ai
+    nhìn thấy — <strong>deepseek làm được</strong>). Chỗ phải sửa nằm trong repo này, nên ô
+    này là <strong>nợ</strong>, không phải bị chặn.</li>
 <li class="task done"><span class="box"></span>Junction Windows ✓ / <del>symlink Linux</del> từ Go, không admin. Đo ở
   <code>docs/DO-LUONG.md:112-122</code>: <code>sagent them claude:smoketest</code> (không quyền quản
   trị) nối <strong>17 mục dùng chung</strong>, PowerShell xác nhận <code>ReparsePoint = True</code> cho
@@ -564,7 +651,7 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
 <li><strong>config ghi dở</strong>: <code>internal/jsonutil/jsonutil.go:28</code> <code>AtomicWrite</code> ghi file
     tạm rồi <code>Rename</code>; <code>Backup</code> (<code>:38</code>) sao lưu trước khi đè. Phía DB thì chặn hạ
     cấp schema + tự sao lưu bằng <code>VACUUM INTO</code> (Pha 7).</li>
-<li class="task part"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).</li>
+<li class="task done"><span class="box"></span><strong>Capability matrix</strong> stable/experimental/unsupported/unknown (harness + API).</li>
 <li><strong>Xong cho HARNESS, và sạch</strong>: <code>internal/provider/nangluc.go:21-28</code> khai ba
     trạng thái <code>LamDuoc</code> / <code>KhongLamDuoc</code> / <code>ChuaDo</code>, có conformance test đối
     chiếu lời khai với hành vi thật (<code>internal/provider/nangluc_test.go:78,230</code>).
@@ -573,9 +660,33 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
 <li><strong>Bốn trạng thái rút thành ba, CÓ CHỦ Ý</strong>: <code>experimental</code> bị bỏ vì nó trộn hai
     câu khác nhau ("đã đo, hơi rung" và "chưa ai đo"). <code>KhongLamDuoc</code> là một <strong>kết
     luận</strong> chứ không phải khoảng trống — đó là chỗ ba trạng thái đáng giá hơn hai.</li>
-<li><strong>CHƯA — nửa API</strong>: <code>sagent nang-luc</code> chỉ in 5 nhóm harness. Không có bảng năng
-    lực nào cho nhà cung cấp API; <code>grep -rni "experimental" internal/</code> ra 0 dòng.
-    Câu "route này hỗ trợ tool/vision/reasoning không" hiện không ai trả lời được.</li>
+<li>✅ <strong>XONG 22/08 — nửa API</strong>: <code>internal/aiapi/nangluc.go</code> (617 dòng) +
+    <code>donangluc.go</code> (493 dòng), lệnh <code>sagent nang-luc-api [--chua-do|--do]</code>,
+    <code>GET /api/nang-luc-api</code>, và khối "Năng lực route API" trên mặt web. <strong>7 năng
+    lực × 2 route</strong>, đo THẬT 22/08 bằng key thật (~4.500 token) — chứ không phải
+    một bảng khai tay. Xem <a href="BAO-CAO-NANGLUC-API.md"><code>docs/BAO-CAO-NANGLUC-API.md</code></a>.
+    Câu "route này hỗ trợ tool/vision/reasoning không" nay có người trả lời.</li>
+<li><strong>Ba trạng thái KHÔNG bị chép làm hai bản</strong>: <code>aiapi.TrangThaiNangLuc</code> là
+    <strong>type alias</strong> sang <code>provider.TrangThaiNangLuc</code> — <code>aiapi.LamDuoc</code> và
+    <code>provider.LamDuoc</code> là <strong>cùng một kiểu</strong>. Hai bản sao của một quy ước là hai
+    bản sẽ lệch nhau, và bản lệch bao giờ cũng lệch theo đúng một chiều: gộp "đã
+    đo, KHÔNG" với "chưa ai đo" thành một chữ <code>false</code>.</li>
+<li><strong>Chỗ nửa API khác nửa CLI, và đây là quyết định đáng giá nhất của nó</strong>: mỗi ô
+    trả lời <strong>HAI câu</strong> — <em>KHÁCH</em> (mã của DỰ ÁN NÀY có gửi/đọc được thứ đó không —
+    đo bằng <code>reflect</code> trên chính các kiểu của gói, <strong>miễn phí</strong>) và <em>NCC</em> (nhà cung
+    cấp có làm được không — đo bằng mạng, <strong>tốn token</strong>), cộng một cột <code>Cho</code> nói
+    <strong>vướng ở đâu</strong> (<code>khach</code> / <code>nha-cung-cap</code> / <code>ca-hai</code> / <code>chua-ro</code> / <code>khong-vuong</code>).
+    Trộn hai câu vào một ô là làm mất đúng thứ đáng giá nhất: modelapi.vn <strong>gọi
+    tool ngon lành</strong>, nhưng <code>aiapi.yeuCau</code> không có trường <code>tools</code> — một ô "không
+    làm được" trơ trọi sẽ đẩy người đọc đi đổi nhà cung cấp, sai hẳn hướng.
+    Phần KHÁCH đo bằng reflect chứ không phải bảng bool viết tay: bảng viết tay
+    là một <strong>lời khai</strong> nữa, và lời khai thì mục ruỗng.</li>
+<li><strong>Hai action chứ không một</strong> (<code>api.nang-luc</code> đọc bảng · <code>api.nang-luc-do</code> tiêu
+    tiền), và đường <code>/do</code> <strong>đòi POST</strong> — một GET tiêu tiền là một GET mà trình
+    duyệt, bộ nạp trước hay một lần bấm F5 nhầm đều gọi lại được.</li>
+<li><strong>Bốn trạng thái rút thành ba vẫn giữ nguyên ở cả hai nửa</strong>: <code>experimental</code> bị
+    bỏ vì nó trộn "đã đo, hơi rung" với "chưa ai đo" — <code>grep -rni "experimental"
+    internal/</code> vẫn ra <strong>0 dòng</strong>, và đó là chủ ý chứ không phải thiếu sót.</li>
 <li class="task done"><span class="box"></span><strong>Threat model</strong> cho subscription credential, API key, dashboard, command exec.
   ✅ <strong>VIẾT XONG 21/08 — <a href="MO-HINH-DE-DOA.md"><code>docs/MO-HINH-DE-DOA.md</code></a></strong> (tên tiếng
   Việt, thay cho <code>docs/security/THREAT-MODEL.md</code> mà artifact cũ hứa).</li>
@@ -624,6 +735,19 @@ Pha 4 chứ không phải một ô tick. Cách tính phần trăm: <code>[x]</co
   6 ký tự trên một cổng đang phơi ra internet là <strong>thực thi mã tuỳ ý dưới
   <code>Administrator</code></strong>. Không mặt nào trong bốn mặt tự nói ra được điều đó; <strong>chỉ có cái
   sườn mới nói ra</strong>. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.</li>
+<li><strong>Cập nhật 22/08:</strong> đóng nốt <strong>hai</strong> ô mà lượt soát 21/08 chỉ đích danh là còn
+  thiếu — <strong>tầng redaction chung</strong> (<code>internal/redaction</code>, 16 luật, 2.060 lần lộ
+  danh tính → 0) và <strong>bảng năng lực cho nửa API</strong> (<code>internal/aiapi/nangluc.go</code>,
+  7 năng lực × 2 route, đo thật bằng key thật). Đếm lại: <strong>5 xong · 2 xong một
+  phần · 0 chưa làm → 6,0/7 = 86%</strong>.
+  <strong>Hai ô còn lại <code>[~]</code> không phải vì lười, và cần nói rõ chúng khác nhau ở đâu:</strong>
+  ô <strong>Subscription</strong> thiếu ACP + resume/cancel ở tầng harness + trình tự chạm file
+  theo pha — đều là <strong>nợ của dự án</strong>, không ai cản. Ô <strong>API</strong> thì lai: phần "ba
+  giao thức còn lại" <strong>bị chặn thật</strong> vì thiếu khoá gốc của Anthropic / Google /
+  OpenAI, còn phần "tool · vision · structured-output · reasoning" thì lượt đo
+  22/08 vừa chứng minh là <strong>lỗi nằm trong repo này</strong> — bốn năng lực đó nhà cung
+  cấp làm được mà <code>aiapi.yeuCau</code>/<code>phanHoi</code> không có trường để gửi và đọc. Gộp hai
+  nửa ấy vào một chữ "chưa" là đúng cái bệnh mà bốn dấu sinh ra để chữa.</li>
 </ul>
 <h3>Pha 1 — Storage + Claude slice + 1 API slice  <strong>95%</strong> (9 xong · 1 một phần)</h3>
 <p>🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và <strong>hai lát cắt dọc</strong>.</p>
@@ -772,15 +896,16 @@ dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.</
   khác biệt tương tác nằm trong driver/model client; <strong>conformance suite</strong> chạy cho 2 harness</li>
 <li>2 API protocol; capability không hỗ trợ báo trung thực.</li>
 </ul>
-<h3>Pha 3 — Flow DAG ghép được  <strong>90%</strong> (18 xong · 2 một phần · 1 chưa)</h3>
+<h3>Pha 3 — Flow DAG ghép được  <strong>98%</strong> (20 xong · 1 một phần)</h3>
 <p>🎯 Người dùng định nghĩa workflow mới <strong>không sửa mã Go</strong>.</p>
 <ul>
 <li class="task part"><span class="box"></span>Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
   retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
   theo capability/model/giá/health/fallback; <strong>approval gate</strong>; <strong>resume sau restart</strong>;
   idempotency key; failure policy (stop/continue/fallback/compensate).
-  <strong>Đếm từng mảnh — 10 xong / 3 chưa</strong> (dòng này từng ghi <code>[ ]</code> trong khi engine
-  đã chạy thật cả ngày):</li>
+  <strong>Đếm từng mảnh — 14 xong / 1 chưa</strong> (22/08: đóng artifact · idempotency ·
+  compensate, và concurrency limit lên đủ 5 nấc ở đường hạm đội). Dòng này từng
+  ghi <code>[ ]</code> trong khi engine đã chạy thật cả ngày:</li>
 <li>✅ <strong>DAG + cycle validation</strong> — <code>internal/flow/flow.go:417</code> (<code>Order</code>, topo ổn
     định) và <code>:476-516</code> (dò chu trình, trả về <strong>đúng vòng lặp</strong> chứ không chỉ nói
     "có chu trình").</li>
@@ -803,28 +928,89 @@ dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.</
 <li>✅ <strong>failure policy stop / continue / fallback</strong> — <code>flow.go:58-60</code>.</li>
 <li>✅ <strong>fallback + health ở tầng route</strong> — <code>internal/api/api.go:794</code> (một lần
     chuyển, không lặp hết danh sách), <code>internal/aiapi/suckhoe.go:55</code>.</li>
-<li>⬜ <strong>concurrency limit mới có 2/5 nấc</strong>: <code>Runner.MaxParallel</code> (<code>runner.go:56</code>)
-    lấy từ <code>policy.max_parallel_sessions</code> — tức <strong>global + project</strong>. Không có trần
-    riêng theo harness, theo provider, hay theo profile. Hệ quả: bốn bước cùng
-    dùng một tài khoản Claude vẫn chạy song song được cho tới trần chung.</li>
-<li>⬜ <strong>artifact giữa step</strong> — <code>grep -n artifact internal/flow/*.go</code> ra <strong>0 dòng</strong>.
-    Chỉ truyền được <strong>chuỗi output</strong>, không có khái niệm file sản phẩm.</li>
-<li>⬜ <strong>idempotency key</strong> — không có. Gọi <code>flow run</code> hai lần là hai lượt chạy thật.</li>
-<li>⬜ <strong>route theo capability / giá</strong> — chọn được theo <strong>tên</strong> (<code>Step.Route</code>,
-    <code>flow.go:184</code>) chứ không theo năng lực hay giá; chi phí chỉ được ghi <strong>sau khi
-    gọi</strong> (<code>api_calls.cost_usd</code>), không dùng để chọn trước.</li>
-<li>⬜ <strong>failure policy <code>compensate</code></strong> — không có. Bước hỏng thì dừng, đi tiếp, hoặc
-    chạy bước dự phòng; không có đường hoàn tác việc đã làm.</li>
-<li class="task part"><span class="box"></span>Node built-in: <code>agent · model · route · shell · test · lint · review · approve · merge · notify</code>.
-  <strong>8/10 chạy được</strong>, khai ở <code>internal/flow/flow.go:30-38</code> và bảng <code>implemented</code>
-  (<code>:42-55</code>) — nguyên tắc trung thực năng lực: loại chưa chạy được thì <strong>cảnh báo
-  lúc <code>flow validate</code></strong>, không im lặng chấp nhận.</li>
+<li>✅ <strong>concurrency limit — 5/5 nấc ở đường hạm đội, 22/08.</strong> Khối
+    <code>[policy.tran]</code> thêm <strong>bốn trần CỘNG DỒN</strong> (chung · harness · provider · hồ
+    sơ), áp ở <code>api.xetTran</code> (<code>internal/api/api.go:1059</code>) → <code>FleetStart</code> (<code>:1118</code>),
+    kiểu dữ liệu thuần ở <code>internal/fleet/tran.go:43</code>. Mặc định
+    <strong>chung 4 · harness 3 · provider 3 · hồ sơ 2</strong> — muốn chạy đủ 4 phiên thì
+    <strong>buộc phải trải ra ít nhất hai tài khoản</strong>, tức chính sự cố đẻ ra mảnh này
+    đã bị chặn mà không ai phải sửa file nào (<code>TestMacDinhDaChanDonBonPhienVaoMotTaiKhoan</code>).
+    Quy ước <strong>số 0 = TẮT chiều đó</strong>, giống hệt <code>max_parallel_sessions</code>; số âm bị
+    từ chối ngay lúc đọc file kèm câu chỉ cách tắt — người gõ <code>-1</code> với ý "bỏ giới
+    hạn" mà để lọt sẽ nhận đúng điều ngược lại. Xem
+    <a href="BAO-CAO-TRAN-DONG-THOI.md"><code>docs/BAO-CAO-TRAN-DONG-THOI.md</code></a>.
+    <strong>Nói thẳng phần CHƯA phủ</strong>: bộ chạy flow vẫn chỉ nhận một con số —
+    <code>internal/api/api.go:1677</code> truyền <code>MaxParallel: a.cfg.Policy.MaxParallelSessions</code>
+    vào <code>flow.Runner</code>. Bốn trần mới canh cửa <code>FleetStart</code>, <strong>không</strong> canh số bước
+    song song trong một lượt flow. Ô này xanh cho đường hạm đội, còn nợ ở đường flow.</li>
+<li>✅ <strong>artifact giữa step, 22/08</strong> — <code>internal/flow/artifact.go</code>. Bước trước khai
+    <code>artifact = { ban-va = "ban-va.diff" }</code> và ghi vào <code>{{artifact_dir}}</code>; bước sau
+    nhận <strong>đường dẫn TUYỆT ĐỐI</strong> qua <code>{{artifacts.ban-va}}</code>, mỗi lượt một thư mục
+    <code>~/.ai-accounts/artifacts/run-&lt;id&gt;/&lt;bước&gt;/</code>. Hợp đồng: chạy xong mà <strong>không có
+    file</strong> thì bước HỎNG (<code>ThieuArtifact</code>), và <code>doc_duoc</code> chặn được cả đường này —
+    không thì hàng rào chặn bản tóm tắt mà để lọt bản đầy đủ.
+    <strong>Số đo dứt khoát</strong> (lượt #53–#58, 22/08 11:53, <strong>0 token</strong>): bước sinh một
+    file <strong>60.094 byte / 1200 dòng</strong>; qua artifact bước sau nhận <strong>1200/1200 dòng</strong>,
+    qua <code>{{steps.x.output}}</code> chỉ nhận <strong>651/1200</strong> — <strong>mất 45,75% ngay ở tầng LƯU</strong>
+    (<code>MaxStepOutput = 32.768</code>), trước cả tầng nhét (<code>MaxInject = 6.000</code>). Và phần
+    mất là phần <strong>cuối</strong>, đúng chỗ mọi báo cáo để kết luận.</li>
+<li>✅ <strong>idempotency key, 22/08</strong> — <code>internal/flow/idempotent.go</code>, khai
+    <code>idempotent = true</code>. Đo thật: lượt <strong>#55</strong> in <em>"bỏ qua — việc này lượt chạy
+    #54 đã làm xong (idempotent)"</em>, <strong>dẫn đích danh lượt cũ</strong>, và artifact được
+    <strong>chép sang</strong> <code>run-55/</code> nên bước sau vẫn đọc đủ 5.092 byte (kiểm bằng <code>ls</code>).
+    Lượt <strong>#56</strong> đổi đúng một chỗ trong dòng lệnh (<code>1..400</code> → <code>1..401</code>) thì bước
+    <strong>chạy lại</strong> — khoá bám <strong>nội dung thật</strong>, không bám id bước.</li>
+<li>✅ <strong>failure policy <code>compensate</code>, 22/08</strong> — <code>internal/flow/compensate.go</code>.
+    Bước hỏng thì chạy một bước <strong>GỠ LẠI rồi VẪN DỪNG</strong>. Đo thật lượt <strong>#58</strong>:
+    bước <code>dat-cho</code> tạo file "chỗ đã đặt", bước <code>hong</code> thoát 1, engine chạy <code>go-lai</code>,
+    xác nhận <code>cho da dat ton tai=True</code> rồi xoá — kiểm trên đĩa sau đó: file
+    <strong>không còn</strong>; lượt chạy kết thúc <code>failed</code>. Đúng: <code>compensate</code> <strong>gỡ lại</strong>,
+    không phải <strong>cứu</strong>. Bước gỡ lại bị cấm khai <code>idempotent = true</code> (<code>:175</code>) —
+    khoá sẽ trùng với lần gỡ trước và lần gỡ thứ hai sẽ bị bỏ qua im lặng.</li>
+<li>⬜ <strong>route theo capability / giá</strong> — <strong>mảnh duy nhất còn lại</strong>. Từ 22/08 đã có
+    bảng năng lực API (<code>aiapi.BangNangLuc</code>) và node <code>route</code> chọn theo <strong>sức khoẻ</strong>,
+    nhưng bộ chọn vẫn đi theo <strong>tên</strong> (<code>Step.Route</code>, <code>flow.go:184</code>) chứ không đọc
+    bảng năng lực hay bảng giá; <code>grep</code> cho thấy <code>BangNangLucNhieu</code> chỉ được gọi ở
+    <code>internal/api/api.go:1943,1950</code> (đường ĐỌC bảng) và ở CLI, <strong>không</strong> ở chỗ chọn
+    đường. Chi phí vẫn chỉ được ghi <strong>sau khi gọi</strong> (<code>api_calls.cost_usd</code>).</li>
+<li class="task done"><span class="box"></span>Node built-in: <code>agent · model · route · shell · test · lint · review · approve · merge · notify</code>.
+  ✅ <strong>10/10 chạy được từ 22/08</strong>, khai ở <code>internal/flow/flow.go:30-40</code> và bảng
+  <code>implemented</code> (<code>:42-55</code>) — nguyên tắc trung thực năng lực: loại chưa chạy được
+  thì <strong>cảnh báo lúc <code>flow validate</code></strong>, không im lặng chấp nhận. Xem
+  <a href="BAO-CAO-CLI-NODE.md"><code>docs/BAO-CAO-CLI-NODE.md</code></a> VIỆC 2.</li>
 <li>✅ <code>agent</code> · <code>shell</code> · <code>approve</code> · <code>notify</code> · <code>test</code> · <code>lint</code> · <code>review</code> · <code>model</code>
-    (<code>model</code> bật 20/08 khi đường API đã đo thật).</li>
-<li>⬜ <code>merge</code> — <strong>khai rồi nhưng <code>implemented[TypeMerge] = false</code></strong> (<code>flow.go:53</code>),
-    ghi chú "còn chờ cơ chế merge an toàn". Viết vào <code>flows.toml</code> thì <code>validate</code> kêu.</li>
-<li>⬜ <code>route</code> — <strong>chưa có node riêng</strong>. Route hiện là một <strong>thuộc tính</strong> của bước
-    <code>model</code> (<code>Step.Route</code>), không phải một node chọn đường rồi chuyền cho bước sau.</li>
+    (<code>model</code> bật 20/08 khi đường API đã đo thật). Node <code>plugin</code> là đường thứ ba,
+    bật cùng ngày (xem ô plugin model bên dưới).</li>
+<li>✅ <code>route</code> — <strong>tách thành node riêng</strong> (<code>internal/flow/route.go</code>,
+    <code>TypeRoute = "route"</code> ở <code>flow.go:40</code>). Trước: route là một <strong>thuộc tính</strong> của
+    bước <code>model</code>. Nay: một node chọn đường sống rồi <strong>chuyền TÊN cho bước sau</strong>
+    (<code>route = "{{steps.chon.output}}"</code>). <strong>Vì sao đáng tách</strong>: flow có năm bước
+    <code>model</code> cùng đi một đường; đường đó chết thì mỗi bước tự hỏi lại và có thể rơi
+    sang một đường dự phòng <strong>khác nhau</strong> — năm bước của cùng một lượt trả lời
+    bằng năm mô hình khác nhau, mà bảng chỉ ghi "model".
+    <strong>Dùng lại, không làm lại</strong>: <code>internal/flow</code> khai interface hẹp <code>RouteChon</code>,
+    phần cắm ở <code>internal/api/routenode.go</code> gọi đúng <code>API.ThuTuRoute</code> và
+    <code>aiapi.Kiem</code> (<code>GET /models</code>, <strong>không tốn token</strong>) — <strong>không một dòng logic
+    chọn đường nào được viết lại</strong>. "Dùng được" = <code>SucKhoe.Dung()</code> (route sống
+    <strong>VÀ</strong> model khai có thật), không hạ xuống thành <code>Song</code>.
+    Hai quyết định phụ: <strong>output là ĐÚNG cái tên, không gì khác</strong> (một ký tự thừa
+    là một đường không tồn tại; phần người đọc cần đi ra event bus, kể cả khi
+    hỏng), và <strong>hết đường thì DỪNG HẲN, không đoán bừa</strong> (đoán bừa là bước sau
+    đem tên ấy đi gọi thật — tốn thời gian, tốn tiền nếu trúng, và hỏng bằng một
+    thông báo không liên quan tới nguyên nhân).
+    <strong>Mắt xích suýt đứt, ghi lại</strong>: <code>Step.Route</code> trước đây đi <strong>thẳng</strong> vào lời gọi
+    mà <strong>không qua <code>Expand</code></strong>, nên node <code>route</code> sẽ chạy đúng mà <strong>vô dụng</strong>. Đã sửa,
+    và <code>TestRouteChonDuongRoiChuyenChoBuocSau</code> khẳng định cả chuỗi.</li>
+<li>✅ <code>merge</code> — bật lên, <strong>và đổi nghĩa công khai chứ không lặng lẽ bật cờ</strong>
+    (<code>internal/flow/merge.go</code>). Ghi chú cũ ở <code>flow.go:53</code> là "gộp nhánh git — hành
+    động nguy hiểm", <code>implemented = false</code>, hẹn "còn chờ cơ chế merge an toàn".
+    <strong>Cơ chế ấy sẽ không bao giờ tới</strong>: một node tự chạy <code>git merge</code> là một node
+    có quyền viết đè lên cây mã của người khác, và không có cách nào làm việc đó
+    an toàn bằng một dòng TOML. Muốn gộp nhánh thì đường cũ đúng hơn — <code>shell</code>
+    chạy <code>git merge</code> đứng <strong>sau</strong> <code>approve</code>, nơi người duyệt nhìn thấy chính xác
+    lệnh sắp chạy. Node này gộp <strong>ĐẦU RA (chữ)</strong> của N bước, theo <strong>đúng thứ tự
+    khai trong <code>needs</code></strong>, và "an toàn" ở đây nghĩa là <strong>đo được</strong>: hai lượt chạy
+    giống hệt nhau cho ra đúng một khối chữ.</li>
 <li class="task done"><span class="box"></span>3 flow mẫu: <code>fanout</code> (nhiều agent → review → chọn), <code>squad</code> (API planner → agent
   implementer → reviewer → test → approval), <code>agents</code> (danh sách task theo concurrency).
   Dựng sẵn trong binary: <code>internal/flow/builtin.go:10</code> (<code>fanout</code>), <code>:31</code> (<code>squad</code>),
@@ -861,14 +1047,33 @@ dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.</
     chỉ là lớp thứ hai.
   Bảng quyền (<code>sagent plugin quyen</code>) có <strong>HAI cột chứ không phải một</strong>: plugin KHAI
   gì, và host <strong>CHẶN được tới đâu</strong> — ba trạng thái y như bảng năng lực provider.
-  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên hai chỗ này phải nói thẳng:</li>
+  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên <strong>ba</strong> chỗ này phải nói
+  thẳng — 5 quyền: <strong>2 <code>chan-that</code> · 2 <code>khong-chan-duoc</code> · 1 <code>chua-do</code></strong>
+  (<code>internal/plugin/quyen.go:56-122</code>):</li>
+<li><code>thu-muc-lam-viec</code>: <strong>KHÔNG CHẶN ĐƯỢC</strong> — ⚠ <strong>hạ cấp 22/08, dòng này trước đây
+    khai <code>chan-that</code> và đó là một lời khai SAI</strong>. Phép đo bác bỏ nó:
+    <code>TestBangQuyenThuMucPhaiKhopVoiThucTeChamDuoc</code> chạy một plugin <strong>không khai
+    quyền nào</strong>, host báo <code>thu-muc=(khong-cap)</code>, vậy mà plugin vẫn <strong>đọc đúng 33
+    byte</strong> một file trong thư mục dự án, <strong>ghi được</strong> file mới và <strong>liệt kê được</strong>
+    thư mục. Thứ host làm thật là <strong>không CẤP đường dẫn</strong> (<code>cmd.Dir</code> là thư mục tạm
+    rỗng), không phải dựng hàng rào — plugin biết đường dẫn bằng cách khác (nhúng
+    lúc build, đọc cấu hình riêng, hoặc đoán <code>C:\Users\...</code>) thì vào như thường.
+    Muốn khai <code>chan-that</code> phải có ACL riêng từng lượt chạy, Job Object, hoặc
+    AppContainer — chưa cái nào được làm. Số đo ở <code>docs/DO-LUONG.md</code> mục 22/08.</li>
 <li><code>ghi-thu-muc-lam-viec</code>: <strong>KHÔNG CHẶN ĐƯỢC</strong> (đã đo, là kết luận chứ không phải
     khoảng trống). Thấy được đường dẫn thì ghi được; chặn ghi đòi ACL riêng cho từng
-    lần chạy, chưa làm. Cách chặn thật đang có là không cấp <code>thu-muc-lam-viec</code>.</li>
+    lần chạy, chưa làm. ⚠ Câu chốt cũ <em>"cách chặn thật đang có là không cấp
+    <code>thu-muc-lam-viec</code>"</em> <strong>đã bị chính phép đo trên bác bỏ</strong> và đã gỡ khỏi mã.</li>
 <li><code>mang</code>: <strong>CHƯA ĐO</strong>. Host hiện KHÔNG chặn tiến trình con mở socket. Còn đường
     WFP/AppContainer trên Windows nhưng chưa ai thử, chưa có phép đo nào trên máy
     thật. <strong>Không khai quyền <code>mang</code> KHÔNG có nghĩa là plugin bị chặn</strong> — CLI in
-    cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.
+    cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.</li>
+<li>Hai ô <code>chan-that</code> còn lại (<code>moi-truong</code>, <code>secret</code>) đứng vững, nhưng ô <code>secret</code>
+    kèm một câu phải đọc kỹ: <code>chan-that</code> ở đây nói <strong>host không ĐƯA secret cho
+    plugin không xin</strong> — nó <strong>không</strong> nói plugin không lấy được secret. Plugin chạy
+    cùng quyền hệ điều hành với host, nên plugin nào biết đường tới kho key vẫn đọc
+    thẳng file được. Hai câu đó khác nhau, và người đọc lướt sẽ gộp chúng làm một.
+  <strong>Bảng quyền này đã ra tới mặt web 22/08</strong> — xem ô tương ứng ở Pha 5b.
   Node <code>plugin</code> bật <code>implemented = true</code> vì đã chạy THẬT đầu-cuối
   (<code>TestFlowChayPluginThat</code>: build binary → <code>flow.Runner</code> thật → tiến trình con →
   kết quả chuyền sang bước sau), không phải vì đã viết xong mã. Nó là ĐƯỜNG THỨ BA
@@ -967,7 +1172,27 @@ dưới đây đã đối chiếu với mã nguồn trước khi đánh dấu.</
     dự đoán "chỉ là thêm route" — không phải sửa mã nào. Lưu ý đã đo: key này KHÔNG
     dùng được ở <code>api.deepseek.com</code> (401), chỉ dùng được ở nhà bán lại; và route này
     trả HTTP 503 ba lần lúc 16:54–16:56 cùng ngày rồi tự hồi phục.</li>
-<li>⬜ OpenRouter/Ollama: chưa đo — chưa có key, và Ollama chưa cài trên máy này.</li>
+<li>✅ <strong>HTTP 429 + <code>Retry-After</code>: XONG 22/08</strong> — <code>internal/aiapi/cholai.go</code>.
+    Bị chặn tốc độ thì <strong>chờ theo <code>Retry-After</code> rồi thử lại CHÍNH route đó, có
+    trần</strong>; hết lượt mới để <code>internal/api</code> đổi route dự phòng theo luật sẵn có
+    (không sửa một dòng nào ở tầng đó). Đọc được <strong>cả hai dạng</strong> header: số giây
+    và mốc HTTP-date. Mọi con số đều có trần — <code>Retry-After: 3600</code> mà chờ thật là
+    cả lượt flow đứng im một tiếng, không log, không lối ra. Nhật ký <code>ChoLai</code>
+    (<code>aiapi.go:79</code>) giữ lại mọi lần chờ, và khi hết lượt thì lỗi trả về <strong>nguyên
+    văn</strong> thân 429 kèm request id. <strong>Cố ý KHÔNG mở rộng sang 5xx</strong>: luật cũ đã
+    đúng cho 5xx (đo 20/08: thân 503 hỏng theo TỪNG MODEL nên đổi route cứu được
+    thật), chỉ 429 mới cần chờ. Chi tiết và phần chưa chắc ở
+    <a href="BAO-CAO-429.md"><code>docs/BAO-CAO-429.md</code></a>.</li>
+<li>⬜ <strong>429 THẬT thì chưa đo được</strong> — modelapi.vn không gửi header hạn mức nào
+    (<code>X-RateLimit-*</code> đều vắng ở phản hồi 200), nên <strong>không biết trước còn bao
+    nhiêu lượt</strong>; và chưa kiểm gateway <code>new-api</code> mà nhà này dùng có gửi
+    <code>Retry-After</code> kèm 429 hay không. Đường mã hiện được canh bằng test, chưa bằng
+    một phản hồi thật.</li>
+<li>🚫 <strong>OpenRouter/Ollama: BỊ CHẶN, thiếu thứ bên ngoài</strong> — OpenRouter thiếu
+    <strong>khoá API thật</strong> của openrouter.ai; Ollama thiếu <strong>cả khoá lẫn phần mềm</strong>
+    (<code>ollama</code> chưa được cài trên máy này, nên không có endpoint cục bộ nào để
+    trỏ tới). Cả hai đều "làm được, chỉ là thêm route" như DeepSeek đã chứng
+    minh — không có nợ mã nào ở đây, chỉ có nợ thứ bên ngoài.</li>
 </ul>
 <h3>Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)</h3>
 <p>🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
@@ -982,13 +1207,19 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 <li class="task done"><span class="box"></span><strong>Test ngang quyền</strong> (<code>cmd/sagent/main_test.go</code>): mọi action đều phải có
   lệnh CLI, và CLI không được có action ngoài hợp đồng. Luật 2 giờ có răng.</li>
 <li class="task done"><span class="box"></span>Trần <code>max_parallel_sessions</code> giờ chặn cả <strong>tổng số phiên đang chạy</strong>, không
-  chỉ <code>--copies</code>.</li>
+  chỉ <code>--copies</code>. <strong>Mở rộng 22/08 — bốn trần CỘNG DỒN</strong> (<code>[policy.tran]</code>): chung ·
+  harness · provider · hồ sơ, áp cùng chỗ ở <code>api.xetTran</code> → <code>FleetStart</code>. Một con
+  số không đo được hai thứ khác nhau: <strong>RAM và tiến trình con</strong> tính theo harness,
+  còn <strong>hạn mức thuê bao</strong> tính theo tài khoản — bốn phiên rơi hết vào <code>claude:tns</code>
+  vẫn hợp lệ dưới trần chung trong khi <code>claude:phu</code> ngồi không. Việc này <strong>không
+  đẻ ra action mới</strong> nên luật ngang quyền bốn mặt không thủng: nó siết đúng
+  <code>fleet.start</code> đã có. Xem <a href="BAO-CAO-TRAN-DONG-THOI.md"><code>docs/BAO-CAO-TRAN-DONG-THOI.md</code></a>.</li>
 <li class="task done"><span class="box"></span><strong>TUI</strong> (<code>cmd/sagent/tui.go</code>): gõ <code>sagent</code> không tham số ra bảng chọn
   đánh số như <code>tk</code> v1 — số=mở · t=thêm · d=đồng bộ · x=xoá · s=phiên · ?=trợ giúp.
   Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
 <em>DoD:</em> mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào <code>store</code>.</li>
 </ul>
-<p><strong>5b · Dashboard 2D.</strong>  <strong>94%</strong> (7 xong · 1 một phần)</p>
+<p><strong>5b · Dashboard 2D.</strong>  <strong>100%</strong> (9 xong)</p>
 <ul>
 <li class="task done"><span class="box"></span><code>internal/dash</code>: server localhost bọc <code>internal/api</code> (không mở đường riêng
   vào store). Assets nhúng bằng Go <code>embed</code> — vẫn một binary.</li>
@@ -1000,8 +1231,13 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 <li class="task done"><span class="box"></span><strong>Bảo mật</strong>: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
   · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.</li>
 <li class="task done"><span class="box"></span><strong>Trạng thái phiên chi tiết (3 trạng thái đo được)</strong>: phân loại chính xác các phiên gặp sự cố sang <code>rate_limited</code> (chạm trần hạn mức, có mốc thời gian mở lại), <code>blocked</code> (bị chặn quyền thao tác), và <code>failed</code> (lỗi từ phía API nhà cung cấp) dựa trên dữ liệu có cấu trúc từ kết quả phiên (<code>provider.KetQua</code>, hiện đo được đầy đủ trên Claude; các adapter chưa đo vẫn giữ <code>lost</code>). Riêng trạng thái <code>queued</code> (xếp hàng chờ) <strong>CHƯA đo được</strong> và chưa thêm vì hệ thống chưa có cơ chế hàng đợi trong mã nguồn (<code>FleetStart</code> từ chối thẳng khi chạm trần <code>max_parallel_sessions</code>).</li>
-<li class="task part"><span class="box"></span>Approval gate — <del>chờ Pha 3 flow</del> Pha 3 xong rồi, <strong>nhưng lượt soát 21/08
-  lôi ra một lỗ hồi quy thật</strong>:</li>
+<li class="task done"><span class="box"></span>Approval gate — <del>chờ Pha 3 flow</del> Pha 3 xong rồi, và lỗ hồi quy mà lượt
+  soát 21/08 lôi ra <strong>đã vá xong cùng ngày</strong>. Ô này giữ dấu <code>[~]</code> thêm một ngày
+  sau khi cả hai nửa đã xanh — đúng kiểu bi quan mà mục 7 sinh ra để bắt. Đo lại
+  22/08: <code>grep -rn "flow/decide" internal/dash/web/</code> ra <strong><code>index.html:1910</code></strong>, và
+  <code>internal/dash/ngangquyen_ui_test.go:21</code>
+  (<code>TestMoiHanhDongCuaNguoiDungDeuCoDuongVaoTuWeb</code>) đang canh chiều UI ↔ API.
+  Hai nửa của ô:</li>
 <li><strong>Xong — đường server</strong>: <code>/api/flow/decide</code> có ở <code>internal/dash/server.go:86</code>,
     xử lý ở <code>internal/dash/flow_api.go:159-182</code>, và nó gọi ĐÚNG <code>FlowApproveOnly</code>
     / <code>FlowApprove</code> mà CLI dùng — nên approval gate vẫn không thể bị bỏ qua từ
@@ -1019,7 +1255,32 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
     một lần vẽ lại giao diện sau đó. Vì vậy dòng "Duyệt / từ chối ngay trên web"
     đang tick ở Pha 5c <strong>hiện không còn đúng</strong> — xem ghi chú ở đó.</li>
 <li>Bài học đúng thứ dự án này lấy làm gốc: luật ngang quyền canh <strong>API ↔ CLI</strong>,
-    không canh <strong>UI ↔ API</strong>. Nút biến mất mà không test nào đỏ.
+    không canh <strong>UI ↔ API</strong>. Nút biến mất mà không test nào đỏ.</li>
+<li class="task done"><span class="box"></span><strong>Bảng quyền plugin ra mặt web</strong> (22/08) — khối "Plugin đã cài" trong ô Tổng
+  quan của <code>internal/dash/web/index.html</code>, đặt ngay dưới "Năng lực provider" vì
+  cùng loại câu hỏi: <em>thứ này làm được gì trên máy tôi, và tôi chặn được tới đâu</em>.
+  Xem <a href="BAO-CAO-WEB-PLUGIN.md"><code>docs/BAO-CAO-WEB-PLUGIN.md</code></a>.</li>
+<li><strong>Mắt còn thiếu, nay đã cắm</strong>: hợp đồng có <code>plugin.list</code>, CLI có
+    <code>sagent plugin list|quyen</code>, endpoint <code>/api/plugins</code> có — chỉ mặt web là không.</li>
+<li><strong>Yêu cầu thật KHÔNG phải "hiện danh sách plugin"</strong> mà là <strong>hiện cột <code>[chặn]</code>
+    với đủ BA trạng thái rời nhau</strong>. Một mặt web bẹp <code>khong-chan-duoc</code> với <code>chua-do</code>
+    làm một thì <strong>tệ hơn không có mặt web nào</strong> — nó cho người ta cảm giác đã kiểm tra.
+    <code>internal/dash/plugin_api.go:86-88</code> thay con số gộp <code>so_chua_chan</code> bằng ba ngăn
+    riêng (<code>so_chan_that</code> · <code>so_khong_chan_duoc</code> · <code>so_chua_do</code>); <code>so_chua_chan</code> giữ
+    lại nhưng nay là <strong>tổng</strong> của hai ngăn sau, và không mặt nào được hiện mình nó.
+    Vòng đếm chuyển từ so chuỗi trần sang <code>switch plugin.TrangThaiChan(...)</code> đối
+    chiếu <strong>thẳng với hằng Go</strong>, nhánh <code>default</code> gom mọi khoá lạ về <code>so_chua_do</code> —
+    chiều an toàn: thứ không đọc được phải đếm là "chưa biết", không phải "đã chặn".</li>
+<li><strong>Đo bằng đột biến chứ không bằng lời</strong>: 11 phép phá hoại thử, <strong>11/11 bị bắt</strong>
+    (bẹp <code>chua-do</code> thành <code>khong-chan-duoc</code>; hai trạng thái chung một lớp CSS; hai
+    lớp khác nhau nhưng chung một màu; hai trạng thái cùng một nhãn chữ; nhãn đếm
+    đọc nhầm con số đã gộp…). DTO allowlist giữ nguyên: <code>Secret</code> vẫn chỉ là
+    <code>"&lt;tên&gt; → key_id &lt;id&gt;"</code>, không bao giờ là giá trị.</li>
+<li><strong>Một cái bẫy gặp thật, ghi lại</strong>: bài kiểm "mặt web có nói rõ <em>khai quyền
+    không phải hàng rào</em> không" ban đầu <strong>không cắn</strong> — câu cần tìm nằm sẵn trong
+    một dòng <strong>bình luận HTML</strong> giải thích, nên test xanh dù trang không hiện chữ
+    nào. Đã thêm <code>boCommentHTML</code>. Đúng lớp bẫy mà <code>boComment</code> (JS) sinh ra để
+    tránh, gặp lại ở dạng HTML.
 <em>DoD:</em> mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.</li>
 </ul>
 <p><strong>5c · Workflow board.</strong>  <strong>93%</strong> (6 xong · 1 một phần)</p>
@@ -1157,7 +1418,7 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <li>⚠ <strong>Chứng chỉ TỰ KÝ, không phải CA công cộng.</strong> Trình duyệt vẫn cảnh báo; người dùng
     phải đối chiếu vân tay. Không đối chiếu = chống được nghe lén, không chống kẻ đứng giữa.</li>
 </ul>
-<h3>Bảng đếm lại (soát 21/08/2026)</h3>
+<h3>Bảng đếm lại (soát 22/08/2026)</h3>
 <p><code>[x]</code>=1 · <code>[~]</code>=0,5 · <code>[ ]</code>=0 · <code>[!]</code> không vào mẫu số.</p>
 <div class="tw"><table>
 <thead>
@@ -1169,26 +1430,29 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <th><code>[!]</code></th>
 <th>Điểm</th>
 <th>%</th>
+<th>so với 21/08</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Bước 0 — Đổi tên</td>
-<td>3</td>
-<td>0</td>
-<td>1</td>
-<td>0</td>
-<td>3,0/4</td>
-<td><strong>75%</strong></td>
-</tr>
-<tr>
-<td>Pha 0 — Đo giả định</td>
-<td>3</td>
 <td>4</td>
 <td>0</td>
 <td>0</td>
-<td>5/7</td>
-<td><strong>71%</strong></td>
+<td>0</td>
+<td>4,0/4</td>
+<td><strong>100%</strong></td>
+<td>↑ 75%</td>
+</tr>
+<tr>
+<td>Pha 0 — Đo giả định</td>
+<td>5</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>6,0/7</td>
+<td><strong>86%</strong></td>
+<td>↑ 71%</td>
 </tr>
 <tr>
 <td>Pha 1 — Storage + slice</td>
@@ -1198,6 +1462,7 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <td>0</td>
 <td>9,5/10</td>
 <td><strong>95%</strong></td>
+<td>=</td>
 </tr>
 <tr>
 <td>Pha 2 — Song song + Workspace</td>
@@ -1207,6 +1472,7 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <td>0</td>
 <td>22,0/22</td>
 <td><strong>100%</strong></td>
+<td>=</td>
 </tr>
 <tr>
 <td>Pha 2.5 — Codex + OpenAI-compat</td>
@@ -1216,15 +1482,17 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <td>0</td>
 <td>8,0/8</td>
 <td><strong>100%</strong></td>
+<td>=</td>
 </tr>
 <tr>
 <td>Pha 3 — Flow DAG</td>
-<td>18</td>
-<td>2</td>
+<td>20</td>
 <td>1</td>
 <td>0</td>
-<td>19,0/21</td>
-<td><strong>90%</strong></td>
+<td>0</td>
+<td>20,5/21</td>
+<td><strong>98%</strong></td>
+<td>↑ 90%</td>
 </tr>
 <tr>
 <td>Pha 5a — API lõi + Terminal</td>
@@ -1234,24 +1502,27 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <td>0</td>
 <td>6,0/6</td>
 <td><strong>100%</strong></td>
+<td>=</td>
 </tr>
 <tr>
 <td>Pha 5b — Dashboard 2D</td>
-<td>7</td>
-<td>1</td>
+<td>9</td>
 <td>0</td>
 <td>0</td>
-<td>7,5/8</td>
-<td><strong>94%</strong></td>
+<td>0</td>
+<td>9,0/9</td>
+<td><strong>100%</strong></td>
+<td>↑ 94%</td>
 </tr>
 <tr>
 <td>Pha 5c — Workflow board</td>
-<td>6</td>
-<td>1</td>
+<td>7</td>
 <td>0</td>
 <td>0</td>
-<td>6,5/7</td>
-<td><strong>93%</strong></td>
+<td>0</td>
+<td>7,0/7</td>
+<td><strong>100%</strong></td>
+<td>↑ 93%</td>
 </tr>
 <tr>
 <td>Pha 5d — Cấu hình theo project</td>
@@ -1261,29 +1532,105 @@ và cũng <strong>điều khiển được</strong>, không chỉ để ngắm (
 <td>0</td>
 <td>6,0/6</td>
 <td><strong>100%</strong></td>
+<td>=</td>
 </tr>
 <tr>
 <td><strong>TỔNG</strong></td>
-<td><strong>87</strong></td>
-<td><strong>10</strong></td>
-<td><strong>2</strong></td>
+<td><strong>96</strong></td>
+<td><strong>4</strong></td>
 <td><strong>0</strong></td>
-<td><strong>92,0/99</strong></td>
-<td><strong>93%</strong></td>
+<td><strong>0</strong></td>
+<td><strong>98,0/100</strong></td>
+<td><strong>98%</strong></td>
+<td>↑ 93%</td>
 </tr>
 </tbody>
 </table></div>
 <p>Pha 4, 6, 7 không dùng ô tick (viết bằng danh sách trạng thái ✅/⬜/🚫), nên không
 nằm trong bảng này — trạng thái của chúng đọc thẳng ở mục tương ứng.</p>
-<p><strong>82% → 93%.</strong> Con số cũ không phải do làm thêm việc hôm nay, mà do <strong>kế hoạch
-báo thấp chính nó</strong>: 7 trong 18 ô trống đã xong từ trước và chỉ thiếu người mở mã
-ra đối chiếu, 9 ô nữa xong quá nửa. Đây là lệch theo chiều bi quan — ít nguy hiểm
-hơn chiều tô hồng, nhưng vẫn là kế hoạch nói sai về chính nó, và nó khiến việc
-"còn lại phải làm gì" bị chôn dưới 18 dòng nhìn giống nhau.</p>
-<p><strong>Hai mục thật sự CHƯA LÀM</strong> (không có gì bên ngoài cản): alias <code>tk</code>/<code>ccswitch</code>
-ở Bước 0, và plugin model ở Pha 3.</p>
-<p><strong>Một lỗ hồi quy lượt soát này lôi ra</strong>: nút Duyệt / Từ chối trên mặt web đã biến
-mất im lặng — endpoint còn, UI mất. Xem Pha 5b.</p>
+<p>⚠ <strong>98% nghĩa là 98% SỐ Ô TICK của mục 7, KHÔNG phải 98% dự án.</strong> Mẫu số là 100 ô;
+Pha 4, 6, 7 không có mặt trong đó, và một ô <code>[~]</code> đáng nửa điểm có thể chứa khối
+lượng như "ba giao thức API còn lại". Một con số tròn trịa không kèm mẫu số là
+cách một tài liệu trung thực bắt đầu nói dối.</p>
+<p><strong>93% → 98%, và phải tách con số đó ra làm hai phần vì chúng khác hẳn nhau:</strong></p>
+<ol>
+<li><strong>Bảng cũ đã sai sẵn 2 điểm trước khi ai làm gì hôm nay.</strong> Bảng khai
+   <code>87 · 10 · 2 = 92,0/99 = 93%</code>; đếm lại đúng bản <code>.md</code> <strong>trước</strong> lượt sửa này ra
+   <code>90 · 8 · 1 = 94,0/99 = 95%</code>. Ba ô đã được tick trong phần chữ mà <strong>không ai đi
+   sửa bảng</strong>: plugin model (Pha 3), threat model (Pha 0), Duyệt/Từ chối trên web
+   (Pha 5c). Đây là chính cái bệnh mà lượt soát 21/08 đi chữa, tái phát sau đúng
+   một ngày ở dạng nhẹ hơn — lần này là <strong>bảng tổng</strong> trôi khỏi phần chữ, chứ
+   không phải phần chữ trôi khỏi mã.</li>
+<li><strong>Phần còn lại — 95% → 98% — là việc làm thật hôm 22/08</strong>: <strong>5 ô đổi dấu</strong>
+   (alias <code>tk</code>/<code>ccswitch</code> <code>[ ]</code>→<code>[x]</code>; redaction <code>[~]</code>→<code>[x]</code>; bảng năng lực
+   <code>[~]</code>→<code>[x]</code>; node built-in <code>[~]</code>→<code>[x]</code>; approval gate 5b <code>[~]</code>→<code>[x]</code>) và <strong>1 ô
+   mới thêm vào mẫu số</strong> (bảng quyền plugin ra mặt web, Pha 5b) — nên mẫu số đi từ
+   99 lên 100.</li>
+</ol>
+<p><strong>KHÔNG CÒN ô <code>[ ]</code> nào.</strong> Hai mục "thật sự chưa làm" mà lượt soát 21/08 chỉ đích
+danh — alias ở Bước 0 và plugin model ở Pha 3 — <strong>đã đóng cả hai</strong> trong ngày.</p>
+<p><strong>Ô <code>[!]</code> vẫn rỗng, và đây KHÔNG phải vì không có gì bị chặn.</strong> Thứ bị chặn thật
+hôm nay nằm <strong>bên trong</strong> hai ô <code>[~]</code> và ở các dòng <code>⬜</code>/<code>🚫</code> của Pha 4, chứ không
+đứng riêng thành một ô tick:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Bị chặn ở đâu</th>
+<th>Thiếu THỨ GÌ bên ngoài</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pha 0 · ô API — ba giao thức còn lại</td>
+<td><strong>Khoá thật của chính nhà cung cấp</strong>: Anthropic Messages (<code>api.anthropic.com</code>), Gemini native (<code>generativelanguage.googleapis.com</code>), OpenAI Responses (<code>api.openai.com</code>). Máy chỉ có khoá <strong>nhà bán lại</strong> <code>modelapi.vn</code>, và khoá đó đã đo là <strong>401 ở <code>api.deepseek.com</code></strong></td>
+</tr>
+<tr>
+<td>Pha 4 · OpenRouter</td>
+<td><strong>Khoá API thật</strong> của openrouter.ai</td>
+</tr>
+<tr>
+<td>Pha 4 · Ollama</td>
+<td><strong>Khoá VÀ phần mềm</strong> — <code>ollama</code> chưa được cài trên máy này, không có endpoint cục bộ nào để trỏ tới</td>
+</tr>
+</tbody>
+</table></div>
+<p>Không nâng chúng thành <code>[!]</code> vì luật ở đầu mục 7 nói <code>[!]</code> là <strong>cả ô</strong> bị chặn.
+Ô API còn một nửa là <strong>nợ của chính dự án</strong> (tool · vision · structured-output ·
+reasoning — đo 22/08, nhà cung cấp làm được mà <code>aiapi.yeuCau</code>/<code>phanHoi</code> không có
+trường để gửi và đọc), nên nó là <code>[~]</code>. Nâng cả ô lên <code>[!]</code> là đổ cho bên ngoài
+một khoản nợ của mình — tô hồng, đúng chiều đắt hơn.</p>
+<p><strong>Bốn ô <code>[~]</code> còn lại, và mỗi ô còn thiếu đúng cái gì:</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Ô</th>
+<th>Ở đâu</th>
+<th>Phần chưa xong</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subscription</td>
+<td>Pha 0</td>
+<td>ACP (chưa harness nào đo qua giao thức này) · resume/cancel <strong>ở tầng harness</strong> (<code>flow resume</code>/<code>flow huy</code> là của bộ chạy flow, không phải cờ <code>--resume</code> của từng CLI) · trình tự chạm file theo pha login/prompt/refresh/exit</td>
+</tr>
+<tr>
+<td>API</td>
+<td>Pha 0</td>
+<td>3/4 giao thức (<strong>bị chặn</strong>, xem bảng trên) · tool · vision · structured-output · reasoning (<strong>nợ của dự án</strong>)</td>
+</tr>
+<tr>
+<td>1 direct-API vertical slice</td>
+<td>Pha 1</td>
+<td>xem chi tiết tại ô đó</td>
+</tr>
+<tr>
+<td>Engine flow</td>
+<td>Pha 3</td>
+<td><strong>route theo capability/giá</strong> — mảnh cuối cùng; bảng năng lực API đã có từ 22/08 nhưng bộ chọn đường vẫn đi theo TÊN, chưa đọc bảng đó và chưa đọc bảng giá</td>
+</tr>
+</tbody>
+</table></div>
 <hr>
 <h2>8. Project config <code>.sagent/project.toml</code> (không chứa secret)</h2>
 <pre><code class="language-toml">version = 1
@@ -1354,11 +1701,19 @@ dashboard ra mạng ngoài. Sau mỗi pha: <code>docs/knowledge/PHASE-&lt;n&gt;-
 <h2>12. Việc còn treo cần bạn quyết/cung cấp</h2>
 <ol>
 <li>✅ Tên đã chốt: <strong>Switch-Agent-Pro</strong>, lệnh <code>sagent</code> (code đã đổi tên, build xanh).</li>
-<li><strong>Máy/VM Linux</strong> — chặn Pha 0 Linux + đa nền tảng.</li>
-<li><strong>API key thật</strong> (local-only, redaction) để đo + làm API path — hoặc hoãn API path,
-   giữ nhãn <code>experimental</code>, làm subscription path trước.</li>
-<li>Mức độ dùng <strong>daemon + SQLite</strong> ngay từ Pha 2 (đúng plan) hay giữ prototype nhẹ thêm
-   một nhịp — khuyến nghị: theo plan (SQLite SSOT) để không phải viết lại.</li>
+<li><del><strong>Máy/VM Linux</strong> — chặn Pha 0 Linux + đa nền tảng.</del> ✅ <strong>HẾT HIỆU LỰC</strong> —
+   nhánh Linux đã <strong>bỏ khỏi phạm vi</strong> theo quyết định "CHỈ WINDOWS" ở đầu tài
+   liệu, nên đây không còn là thứ cần cung cấp.</li>
+<li>🚫 <strong>API key thật của CHÍNH nhà cung cấp</strong> — vẫn treo, và nay là thứ duy nhất
+   ở mục này còn chặn việc. Đã có key của <strong>nhà bán lại</strong> <code>modelapi.vn</code> (đủ để
+   đóng đường OpenAI-compatible, streaming, usage, fallback, 429, và bảng năng
+   lực 7 × 2 route). <strong>Còn thiếu</strong>: khoá <code>api.anthropic.com</code> (Anthropic Messages),
+   <code>generativelanguage.googleapis.com</code> (Gemini native), <code>api.openai.com</code> (OpenAI
+   Responses), openrouter.ai (OpenRouter) — và <strong>Ollama thì thiếu cả phần mềm</strong>,
+   chưa cài trên máy này. Nhãn <code>experimental</code> đã bị bỏ hẳn khỏi dự án: ba trạng
+   thái <code>LamDuoc</code> / <code>KhongLamDuoc</code> / <code>ChuaDo</code> thay chỗ nó ở cả hai nửa.</li>
+<li>✅ <strong>Đã chốt và đã làm</strong>: SQLite là SSOT từ Pha 2 (<code>~/.ai-accounts/state.db</code>,
+   migration có version); <del>daemon</del> bỏ theo mục 2b — <code>dash</code> là server thay thế.</li>
 </ol></main>
 <a class="top" href="#top" aria-label="Len dau trang">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>

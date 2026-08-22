@@ -301,25 +301,49 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 > Pha 4 chứ không phải một ô tick. Cách tính phần trăm: `[x]`=1, `[~]`=0,5,
 > `[ ]`=0, `[!]` **không vào mẫu số**. Bảng đếm ở cuối mục 7.
 
-### Bước 0 — Đổi tên  **75%** (3 xong · 1 chưa)
+> **ĐIỂM MỘT DÒNG (soát lại 22/08/2026):**
+> `92,0/99 = 93%` *(bảng cũ khai)* → `94,0/99 = 95%` *(đếm lại đúng bản `.md`
+> trước lượt này — bảng cũ đã trôi 2 điểm)* → **`98,0/100 = 98%`** *(sau lượt này)*.
+> Chi tiết: `96 [x] · 4 [~] · 0 [ ] · 0 [!]`. **5 ô đổi dấu · 1 ô mới thêm ·
+> 0 ô còn `[ ]`.** Bảng đầy đủ và danh sách thứ đang bị chặn ở cuối mục 7.
+
+
+
+### Bước 0 — Đổi tên  **100%** (4 xong)
 - [x] `go.mod` module → `github.com/trantiendevweb/switch-agent-pro`; `cmd/ccswitch`
   → `cmd/sagent` (git mv); cập nhật mọi import; **build + vet + test xanh**; `sagent ds` chạy đúng.
 - [x] Cập nhật `install/cai-dat.{ps1,sh}`, CI, `.gitignore` sang `sagent`.
-- [ ] Alias tương thích `tk`/`ccswitch` → `sagent`. **Vẫn CHƯA LÀM, và lý do hoãn
-  cũ đã hết hiệu lực**: mục này ghi "làm khi viết installer phát hành", nhưng
-  installer đã có từ Pha 7 (`install/cai-dat.ps1`, `install/get.ps1`,
-  `.github/workflows/phat-hanh.yml`) mà alias thì không. Đo 21/08:
-  `grep -ni "alias\|ccswitch" install/` **không ra dòng nào**, và
-  `cmd/sagent/main.go` không đọc `os.Args[0]` nên gọi binary bằng tên khác cũng
-  không đổi hành vi. Xếp `[ ]` chứ không `[!]`: không có thứ gì bên ngoài cản —
-  chỉ là chưa làm. (Riêng phần `ccswitch` còn một nút thật: Pha 7 ghi "chưa có
-  bản `ccswitch` thật để mở ra xem", nên tương thích cờ của nó vẫn là suy đoán.)
+- [x] Alias tương thích `tk`/`ccswitch` → `sagent`. ✅ **LÀM 22/08** — xem
+  [`docs/BAO-CAO-CLI-NODE.md`](BAO-CAO-CLI-NODE.md) VIỆC 1. Nguồn sự thật duy
+  nhất là `install/cai-dat.ps1:75-76`: `$TenAlias = @('tk','ccswitch')` và
+  `$ShimNoiDung = '@"%~dp0sagent.exe" %*'`. Đo trước khi sửa 21/08:
+  `grep -ni "alias\|ccswitch" install/` ra **0 dòng**; nay ra 9 dòng.
+  - **Chọn shim `.cmd` (23 byte/alias), CỐ Ý bỏ hai cách kia** — bản sao `.exe`
+    (+32 MB, đo thật 2 × 16.016.384 byte) và hard link đều **chạy binary CŨ sau
+    khi nâng cấp, im lặng**, vì installer thay `sagent.exe` bằng một file mới
+    (`Move-Item`). Shim trỏ **theo đường dẫn** nên luôn chạy đúng file đang nằm
+    đó. Giá phải trả nói thẳng: thêm một tiến trình `cmd.exe` mỗi lần gọi, và
+    Ctrl+C vào `tk dash` thì cmd hỏi "Terminate batch job (Y/N)?". **Cả hai đều
+    nhìn thấy được; chạy nhầm phiên bản thì không.**
+  - **`%*` chứ không `%1 %2 %3`** — chỉ `%*` giữ nguyên đuôi dòng lệnh, tức giữ
+    được cả tham số có dấu cách lẫn tham số thứ mười trở đi.
+  - **KHÔNG đọc `os.Args[0]`, có chủ ý**: đọc tên binary chỉ cần khi muốn cư xử
+    KHÁC theo tên gọi; ở đây muốn ngược lại — giống hệt. Thêm một nhánh rẽ theo
+    tên là thêm một đường cho hai lối gọi lệch nhau.
+  - **Đã chạy thật một lần**: installer chạy vào một `USERPROFILE` tạm
+    (`hometest-77c6750f`) để không đụng `sagent.exe` đang chạy; `User PATH` chụp
+    trước và khôi phục nguyên trạng sau khi đo. Ra `✓ alias: tk` và
+    `✓ alias: ccswitch`.
+  - **Còn một nút, ghi ra để không ai tưởng đã đóng**: Pha 7 ghi "chưa có bản
+    `ccswitch` thật để mở ra xem", nên **tương thích CỜ** của tên cũ vẫn là suy
+    đoán. Cái đã đóng là *gõ tên nào cũng chạy đúng binary*, không phải *mọi cờ
+    của v1 đều còn nghĩa cũ*.
 - [x] Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
   `legacy/v1-powershell/`; `design-system/switch-agent-pro/`; 3 trang HTML sạch tên cũ.
 
-### Pha 0 — Đo giả định & lập hợp đồng  **71%** (3 xong · 4 một phần)
+### Pha 0 — Đo giả định & lập hợp đồng  **86%** (5 xong · 2 một phần)
 🎯 Chứng minh cơ chế của **cả hai đường** trước khi khoá interface.
-- [~] Test harness không chứa credential trong repo; mọi output **redaction**.
+- [x] Test harness không chứa credential trong repo; mọi output **redaction**.
   - **Xong — không credential trong repo**: giàn test chạy trên HOME giả
     (`homeGia(t)` trong `internal/aiapi/aiapi_test.go`) và khoá bịa
     (`sk-bi-mat-khong-duoc-lo`). Adapter GIẢ trong `internal/fleet/fleet_test.go:296`
@@ -331,11 +355,36 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     cả terminal lẫn dashboard.
   - **Xong — mặt web dùng allowlist chứ không phơi struct**: `internal/dash/server.go:665-667`
     dựng `profileDTO` bằng danh sách trường tường minh, token chỉ còn cờ `HasToken`.
-  - **CHƯA — không có TẦNG redaction chung**: `grep -rni "redact" internal/ cmd/`
-    ra **0 dòng**. Nhật ký phiên (`~/.ai-accounts/.nhat-ky/`) là stdout thô của
-    agent, không đi qua bộ lọc nào.
-  - **CHƯA — không có bài kiểm quét toàn repo tìm credential**. Tính chất "repo
-    sạch" hiện đúng nhờ kỷ luật, không nhờ một phép đo tự chạy.
+  - ✅ **XONG 22/08 — TẦNG redaction chung**: `internal/redaction/redaction.go:263`
+    (`Che`), **16 luật** trong MỘT bảng duy nhất (12 luật bí mật + 4 luật danh
+    tính). Trước lượt này `grep -rni "redact" internal/ cmd/` ra **0 dòng**.
+    Xem [`docs/BAO-CAO-REDACTION.md`](BAO-CAO-REDACTION.md).
+    - **Đo trước, viết mã sau** — quét 22 file nhật ký thật / 6.797 dòng / 10,6 MB.
+      Kết quả quan trọng nhất: **0 khoá hay token đang rò** (`sk-ant-`, `ghp_`,
+      `AKIA`, `AIza`, JWT đủ ba đoạn, `Bearer <giá trị>` — tất cả đều 0 lần).
+      **Cái ĐANG rò là danh tính**: tên tài khoản `Administrator` **2.060 lần**,
+      email 179 lần (75 là địa chỉ thật). Trên đúng cái máy đang bị dò mật khẩu
+      ~3,9 nghìn lần/giờ và có `dash` tự biết mình `exposed`, đó không phải chuyện nhỏ.
+    - **Cắm ở CỬA RA chứ không ở đường ghi, có lý do kiến trúc**: `StartDetached`
+      gán thẳng file handle cho tiến trình con rồi cha THOÁT — không còn ai đứng
+      giữa dòng ghi. Hai cửa ra thật là `nhatky.Duoi` (người + dash) và
+      `nhatky.BoDau` (máy → prompt bước sau); tầng che gắn vào **cả hai**, 20 dòng
+      thêm / 0 dòng xoá. Đo lại sau khi sửa: 2.060 → **0**, email 179 → **0**,
+      chữ ký thinking giữ nguyên **489**, dòng JSON hỏng **0/6.092**.
+    - **Đường máy phân loại CỐ Ý không bị đụng** (`api.phanLoaiPhienChet` đọc byte
+      gốc) — có test ghim `TestPhanLoaiPhienChetVanNhinThayByteGoc`. Cắm nhầm tầng
+      che vào đó thì mọi phiên rơi về `lost`, tức trả lại đúng cái mù loà mà nhật
+      ký sinh ra để chữa.
+  - ✅ **XONG 22/08 — bài kiểm quét toàn repo tìm credential**:
+    `internal/redaction/quet_repo_test.go:31` (`TestRepoKhongCoBiMat`) duyệt
+    `git ls-files` — **đúng tập file sẽ đi vào commit** — quét 294 file văn bản,
+    bỏ qua 16 (nhị phân/quá 8 MB) và **báo cả hai con số** để không có chuyện cắt
+    ngầm mà đọc như đã phủ hết. **Không có danh sách miễn trừ**: bí mật giả trong
+    test đều được GHÉP LÚC CHẠY nên bài kiểm không thấy chúng — mở miễn trừ thì
+    lần rò thật đầu tiên cũng sẽ được cho vào đó, đúng lúc đang vội. Là test Go
+    chứ không phải git hook (hook nằm trong `.git/`, không clone theo, tắt được
+    bằng `--no-verify`). Kèm `quet_xungdot_test.go:34` chặn vạch xung đột git.
+    Tính chất "repo sạch" nay là một **phép đo tự chạy**, không còn là kỷ luật.
 - [~] **Subscription** (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
   root override có bao trùm config/session/auth? token ở file/env/keyring? file nào
   đọc/ghi lúc login/prompt/refresh/exit? **concurrent refresh** khi 2 process chung
@@ -377,14 +426,51 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     request id (`stream_test.go:153`); `internal/aiapi/suckhoe.go:55` hỏi
     `GET /models` nên trả lời được cả "route sống không" lẫn "model khai có thật
     không" lẫn "nhà cung cấp liệt kê bao nhiêu model".
-  - **CHƯA — ba giao thức còn lại**: Anthropic Messages, Gemini native, OpenAI
-    Responses. Phần này **bị chặn thật**: máy chỉ có khoá của nhà bán lại, và
-    `docs/DO-LUONG.md` đã đo rằng khoá đó trả **401 ở `api.deepseek.com`**.
-  - **CHƯA — rate-limit schema và retry header**: `grep -rn "429\|Retry-After"
-    internal/aiapi internal/api` ra **0 dòng**. Bị 429 thì hiện xử lý y như mọi
-    lỗi HTTP khác, và `Retry-After` bị bỏ qua.
-  - **CHƯA — tool / reasoning / vision / structured-output**: chỉ mới đi đường
-    prompt → text.
+  - 🚫 **BỊ CHẶN — ba giao thức còn lại**: Anthropic Messages, Gemini native,
+    OpenAI Responses. **Thiếu THỨ GÌ bên ngoài, nói rõ**: cả ba đòi **khoá thật
+    của chính nhà cung cấp** (`api.anthropic.com`, `generativelanguage.googleapis.com`,
+    `api.openai.com`). Máy này chỉ có khoá của **nhà bán lại** `modelapi.vn`, và
+    `docs/DO-LUONG.md` đã đo rằng khoá đó trả **401 ở `api.deepseek.com`** — tức
+    nó không đi được cả tới cổng gốc của nhà mà nó bán lại. Đây là lý do ô cha
+    vẫn là `[~]` chứ không phải `[!]`: phần **còn lại** của ô (tool/vision/…) là
+    nợ của chính dự án, không bị ai chặn.
+  - ✅ **XONG 22/08 — rate-limit schema và retry header**: trước lượt này
+    `grep -rn "429\|Retry-After" internal/aiapi internal/api` ra **0 dòng**; nay
+    có `internal/aiapi/cholai.go` (đọc `Retry-After` **cả hai dạng**: số giây và
+    mốc HTTP-date) + `aiapi.go:109` (`BiChanTocDo`). Luật chọn: **chờ theo
+    `Retry-After` rồi thử lại CHÍNH route đó, có trần; hết lượt mới để tầng trên
+    đổi route.** Xem [`docs/BAO-CAO-429.md`](BAO-CAO-429.md).
+    - **Vì sao không nhảy ngay** — ba dữ kiện của chính dự án này: (1) hai route
+      `deepseek` và `grok` khai **cùng** `base_url = https://modelapi.vn/v1`, nên
+      "route dự phòng" là cùng một cổng, cùng máy chủ; chặn theo tài khoản/IP thì
+      lượt hai **chắc chắn cũng 429**. (2) 429 khác 5xx ở **bản chất**: 5xx nói
+      "chỗ tôi đang hỏng", 429 nói "chỗ tôi vẫn tốt, anh đi nhanh quá" — kèm một
+      **lời hứa có thời hạn**; nhảy ngay là vứt bỏ thứ duy nhất 429 cho không.
+      (3) Với 5xx thì nhảy ĐÚNG, và đã đo: thân 503 là "No available channel for
+      model grok-code-fast-1" — hỏng theo TỪNG MODEL. Nên bản sửa **cố ý không mở
+      rộng sang 5xx**.
+    - **Không đóng cửa đường kia**: hết lượt thử lại, lỗi vẫn là `*LoiAPI` với
+      `Nguoi = false`, nên `internal/api` vẫn đổi route dự phòng theo luật cũ —
+      không phải sửa một dòng nào ở tầng đó.
+    - ⬜ **Nói thẳng lỗ lớn nhất: CHƯA ĐO ĐƯỢC MỘT CÚ 429 THẬT.** Đo miễn phí qua
+      `GET /v1/models` cho thấy modelapi.vn **không gửi header hạn mức nào** ở
+      phản hồi thành công (không `X-RateLimit-*`), tức **không có cách nào biết
+      trước còn bao nhiêu lượt** — chỉ biết khi đã đâm vào tường. Nhà này chạy
+      gateway `new-api` (`X-New-Api-Version`), và **chưa kiểm** new-api có gửi
+      `Retry-After` kèm 429 hay không. Mã đường 429 hiện được canh bằng test, chưa
+      bằng một phản hồi thật.
+  - 🟡 **ĐÃ ĐO, CHƯA LÀM — tool / reasoning / vision / structured-output**: trước
+    đây dòng này là một khoảng trống; nay nó là một **kết luận có số**. Đo thật
+    22/08 bằng key thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
+    [`docs/BAO-CAO-NANGLUC-API.md`](BAO-CAO-NANGLUC-API.md):
+    **4 trên 7 năng lực bị chặn ở PHÍA DỰ ÁN, không phải ở nhà cung cấp.**
+    `goi-tool` (`aiapi.yeuCau` không có trường `tools`, `phanHoi` không đọc
+    `tool_calls` — **cả hai nhà đều làm được**), `dau-vao-anh` (`tinNhan.Content`
+    là `string` thuần, giao thức đòi mảng `{type, image_url}` — **grok làm được**),
+    `dau-ra-co-cau-truc` (không có `response_format` — **grok làm được**),
+    `reasoning` (`phanHoi` chỉ đọc `content`, phần suy luận bị vứt trước khi ai
+    nhìn thấy — **deepseek làm được**). Chỗ phải sửa nằm trong repo này, nên ô
+    này là **nợ**, không phải bị chặn.
 - [x] Junction Windows ✓ / ~~symlink Linux~~ từ Go, không admin. Đo ở
   `docs/DO-LUONG.md:112-122`: `sagent them claude:smoketest` (không quyền quản
   trị) nối **17 mục dùng chung**, PowerShell xác nhận `ReparsePoint = True` cho
@@ -407,7 +493,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - **config ghi dở**: `internal/jsonutil/jsonutil.go:28` `AtomicWrite` ghi file
     tạm rồi `Rename`; `Backup` (`:38`) sao lưu trước khi đè. Phía DB thì chặn hạ
     cấp schema + tự sao lưu bằng `VACUUM INTO` (Pha 7).
-- [~] **Capability matrix** stable/experimental/unsupported/unknown (harness + API).
+- [x] **Capability matrix** stable/experimental/unsupported/unknown (harness + API).
   - **Xong cho HARNESS, và sạch**: `internal/provider/nangluc.go:21-28` khai ba
     trạng thái `LamDuoc` / `KhongLamDuoc` / `ChuaDo`, có conformance test đối
     chiếu lời khai với hành vi thật (`internal/provider/nangluc_test.go:78,230`).
@@ -416,9 +502,33 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - **Bốn trạng thái rút thành ba, CÓ CHỦ Ý**: `experimental` bị bỏ vì nó trộn hai
     câu khác nhau ("đã đo, hơi rung" và "chưa ai đo"). `KhongLamDuoc` là một **kết
     luận** chứ không phải khoảng trống — đó là chỗ ba trạng thái đáng giá hơn hai.
-  - **CHƯA — nửa API**: `sagent nang-luc` chỉ in 5 nhóm harness. Không có bảng năng
-    lực nào cho nhà cung cấp API; `grep -rni "experimental" internal/` ra 0 dòng.
-    Câu "route này hỗ trợ tool/vision/reasoning không" hiện không ai trả lời được.
+  - ✅ **XONG 22/08 — nửa API**: `internal/aiapi/nangluc.go` (617 dòng) +
+    `donangluc.go` (493 dòng), lệnh `sagent nang-luc-api [--chua-do|--do]`,
+    `GET /api/nang-luc-api`, và khối "Năng lực route API" trên mặt web. **7 năng
+    lực × 2 route**, đo THẬT 22/08 bằng key thật (~4.500 token) — chứ không phải
+    một bảng khai tay. Xem [`docs/BAO-CAO-NANGLUC-API.md`](BAO-CAO-NANGLUC-API.md).
+    Câu "route này hỗ trợ tool/vision/reasoning không" nay có người trả lời.
+  - **Ba trạng thái KHÔNG bị chép làm hai bản**: `aiapi.TrangThaiNangLuc` là
+    **type alias** sang `provider.TrangThaiNangLuc` — `aiapi.LamDuoc` và
+    `provider.LamDuoc` là **cùng một kiểu**. Hai bản sao của một quy ước là hai
+    bản sẽ lệch nhau, và bản lệch bao giờ cũng lệch theo đúng một chiều: gộp "đã
+    đo, KHÔNG" với "chưa ai đo" thành một chữ `false`.
+  - **Chỗ nửa API khác nửa CLI, và đây là quyết định đáng giá nhất của nó**: mỗi ô
+    trả lời **HAI câu** — *KHÁCH* (mã của DỰ ÁN NÀY có gửi/đọc được thứ đó không —
+    đo bằng `reflect` trên chính các kiểu của gói, **miễn phí**) và *NCC* (nhà cung
+    cấp có làm được không — đo bằng mạng, **tốn token**), cộng một cột `Cho` nói
+    **vướng ở đâu** (`khach` / `nha-cung-cap` / `ca-hai` / `chua-ro` / `khong-vuong`).
+    Trộn hai câu vào một ô là làm mất đúng thứ đáng giá nhất: modelapi.vn **gọi
+    tool ngon lành**, nhưng `aiapi.yeuCau` không có trường `tools` — một ô "không
+    làm được" trơ trọi sẽ đẩy người đọc đi đổi nhà cung cấp, sai hẳn hướng.
+    Phần KHÁCH đo bằng reflect chứ không phải bảng bool viết tay: bảng viết tay
+    là một **lời khai** nữa, và lời khai thì mục ruỗng.
+  - **Hai action chứ không một** (`api.nang-luc` đọc bảng · `api.nang-luc-do` tiêu
+    tiền), và đường `/do` **đòi POST** — một GET tiêu tiền là một GET mà trình
+    duyệt, bộ nạp trước hay một lần bấm F5 nhầm đều gọi lại được.
+  - **Bốn trạng thái rút thành ba vẫn giữ nguyên ở cả hai nửa**: `experimental` bị
+    bỏ vì nó trộn "đã đo, hơi rung" với "chưa ai đo" — `grep -rni "experimental"
+    internal/` vẫn ra **0 dòng**, và đó là chủ ý chứ không phải thiếu sót.
 - [x] **Threat model** cho subscription credential, API key, dashboard, command exec.
   ✅ **VIẾT XONG 21/08 — [`docs/MO-HINH-DE-DOA.md`](MO-HINH-DE-DOA.md)** (tên tiếng
   Việt, thay cho `docs/security/THREAT-MODEL.md` mà artifact cũ hứa).
@@ -467,6 +577,19 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   6 ký tự trên một cổng đang phơi ra internet là **thực thi mã tuỳ ý dưới
   `Administrator`**. Không mặt nào trong bốn mặt tự nói ra được điều đó; **chỉ có cái
   sườn mới nói ra**. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.
+- **Cập nhật 22/08:** đóng nốt **hai** ô mà lượt soát 21/08 chỉ đích danh là còn
+  thiếu — **tầng redaction chung** (`internal/redaction`, 16 luật, 2.060 lần lộ
+  danh tính → 0) và **bảng năng lực cho nửa API** (`internal/aiapi/nangluc.go`,
+  7 năng lực × 2 route, đo thật bằng key thật). Đếm lại: **5 xong · 2 xong một
+  phần · 0 chưa làm → 6,0/7 = 86%**.
+  **Hai ô còn lại `[~]` không phải vì lười, và cần nói rõ chúng khác nhau ở đâu:**
+  ô **Subscription** thiếu ACP + resume/cancel ở tầng harness + trình tự chạm file
+  theo pha — đều là **nợ của dự án**, không ai cản. Ô **API** thì lai: phần "ba
+  giao thức còn lại" **bị chặn thật** vì thiếu khoá gốc của Anthropic / Google /
+  OpenAI, còn phần "tool · vision · structured-output · reasoning" thì lượt đo
+  22/08 vừa chứng minh là **lỗi nằm trong repo này** — bốn năng lực đó nhà cung
+  cấp làm được mà `aiapi.yeuCau`/`phanHoi` không có trường để gửi và đọc. Gộp hai
+  nửa ấy vào một chữ "chưa" là đúng cái bệnh mà bốn dấu sinh ra để chữa.
 
 ### Pha 1 — Storage + Claude slice + 1 API slice  **95%** (9 xong · 1 một phần)
 🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và **hai lát cắt dọc**.
@@ -609,14 +732,15 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   khác biệt tương tác nằm trong driver/model client; **conformance suite** chạy cho 2 harness
   + 2 API protocol; capability không hỗ trợ báo trung thực.
 
-### Pha 3 — Flow DAG ghép được  **90%** (18 xong · 2 một phần · 1 chưa)
+### Pha 3 — Flow DAG ghép được  **98%** (20 xong · 1 một phần)
 🎯 Người dùng định nghĩa workflow mới **không sửa mã Go**.
 - [~] Engine: DAG + cycle validation; input/output/artifact giữa step; condition/timeout/
   retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
   theo capability/model/giá/health/fallback; **approval gate**; **resume sau restart**;
   idempotency key; failure policy (stop/continue/fallback/compensate).
-  **Đếm từng mảnh — 10 xong / 3 chưa** (dòng này từng ghi `[ ]` trong khi engine
-  đã chạy thật cả ngày):
+  **Đếm từng mảnh — 14 xong / 1 chưa** (22/08: đóng artifact · idempotency ·
+  compensate, và concurrency limit lên đủ 5 nấc ở đường hạm đội). Dòng này từng
+  ghi `[ ]` trong khi engine đã chạy thật cả ngày:
   - ✅ **DAG + cycle validation** — `internal/flow/flow.go:417` (`Order`, topo ổn
     định) và `:476-516` (dò chu trình, trả về **đúng vòng lặp** chứ không chỉ nói
     "có chu trình").
@@ -639,28 +763,89 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - ✅ **failure policy stop / continue / fallback** — `flow.go:58-60`.
   - ✅ **fallback + health ở tầng route** — `internal/api/api.go:794` (một lần
     chuyển, không lặp hết danh sách), `internal/aiapi/suckhoe.go:55`.
-  - ⬜ **concurrency limit mới có 2/5 nấc**: `Runner.MaxParallel` (`runner.go:56`)
-    lấy từ `policy.max_parallel_sessions` — tức **global + project**. Không có trần
-    riêng theo harness, theo provider, hay theo profile. Hệ quả: bốn bước cùng
-    dùng một tài khoản Claude vẫn chạy song song được cho tới trần chung.
-  - ⬜ **artifact giữa step** — `grep -n artifact internal/flow/*.go` ra **0 dòng**.
-    Chỉ truyền được **chuỗi output**, không có khái niệm file sản phẩm.
-  - ⬜ **idempotency key** — không có. Gọi `flow run` hai lần là hai lượt chạy thật.
-  - ⬜ **route theo capability / giá** — chọn được theo **tên** (`Step.Route`,
-    `flow.go:184`) chứ không theo năng lực hay giá; chi phí chỉ được ghi **sau khi
-    gọi** (`api_calls.cost_usd`), không dùng để chọn trước.
-  - ⬜ **failure policy `compensate`** — không có. Bước hỏng thì dừng, đi tiếp, hoặc
-    chạy bước dự phòng; không có đường hoàn tác việc đã làm.
-- [~] Node built-in: `agent · model · route · shell · test · lint · review · approve · merge · notify`.
-  **8/10 chạy được**, khai ở `internal/flow/flow.go:30-38` và bảng `implemented`
-  (`:42-55`) — nguyên tắc trung thực năng lực: loại chưa chạy được thì **cảnh báo
-  lúc `flow validate`**, không im lặng chấp nhận.
+  - ✅ **concurrency limit — 5/5 nấc ở đường hạm đội, 22/08.** Khối
+    `[policy.tran]` thêm **bốn trần CỘNG DỒN** (chung · harness · provider · hồ
+    sơ), áp ở `api.xetTran` (`internal/api/api.go:1059`) → `FleetStart` (`:1118`),
+    kiểu dữ liệu thuần ở `internal/fleet/tran.go:43`. Mặc định
+    **chung 4 · harness 3 · provider 3 · hồ sơ 2** — muốn chạy đủ 4 phiên thì
+    **buộc phải trải ra ít nhất hai tài khoản**, tức chính sự cố đẻ ra mảnh này
+    đã bị chặn mà không ai phải sửa file nào (`TestMacDinhDaChanDonBonPhienVaoMotTaiKhoan`).
+    Quy ước **số 0 = TẮT chiều đó**, giống hệt `max_parallel_sessions`; số âm bị
+    từ chối ngay lúc đọc file kèm câu chỉ cách tắt — người gõ `-1` với ý "bỏ giới
+    hạn" mà để lọt sẽ nhận đúng điều ngược lại. Xem
+    [`docs/BAO-CAO-TRAN-DONG-THOI.md`](BAO-CAO-TRAN-DONG-THOI.md).
+    **Nói thẳng phần CHƯA phủ**: bộ chạy flow vẫn chỉ nhận một con số —
+    `internal/api/api.go:1677` truyền `MaxParallel: a.cfg.Policy.MaxParallelSessions`
+    vào `flow.Runner`. Bốn trần mới canh cửa `FleetStart`, **không** canh số bước
+    song song trong một lượt flow. Ô này xanh cho đường hạm đội, còn nợ ở đường flow.
+  - ✅ **artifact giữa step, 22/08** — `internal/flow/artifact.go`. Bước trước khai
+    `artifact = { ban-va = "ban-va.diff" }` và ghi vào `{{artifact_dir}}`; bước sau
+    nhận **đường dẫn TUYỆT ĐỐI** qua `{{artifacts.ban-va}}`, mỗi lượt một thư mục
+    `~/.ai-accounts/artifacts/run-<id>/<bước>/`. Hợp đồng: chạy xong mà **không có
+    file** thì bước HỎNG (`ThieuArtifact`), và `doc_duoc` chặn được cả đường này —
+    không thì hàng rào chặn bản tóm tắt mà để lọt bản đầy đủ.
+    **Số đo dứt khoát** (lượt #53–#58, 22/08 11:53, **0 token**): bước sinh một
+    file **60.094 byte / 1200 dòng**; qua artifact bước sau nhận **1200/1200 dòng**,
+    qua `{{steps.x.output}}` chỉ nhận **651/1200** — **mất 45,75% ngay ở tầng LƯU**
+    (`MaxStepOutput = 32.768`), trước cả tầng nhét (`MaxInject = 6.000`). Và phần
+    mất là phần **cuối**, đúng chỗ mọi báo cáo để kết luận.
+  - ✅ **idempotency key, 22/08** — `internal/flow/idempotent.go`, khai
+    `idempotent = true`. Đo thật: lượt **#55** in *"bỏ qua — việc này lượt chạy
+    #54 đã làm xong (idempotent)"*, **dẫn đích danh lượt cũ**, và artifact được
+    **chép sang** `run-55/` nên bước sau vẫn đọc đủ 5.092 byte (kiểm bằng `ls`).
+    Lượt **#56** đổi đúng một chỗ trong dòng lệnh (`1..400` → `1..401`) thì bước
+    **chạy lại** — khoá bám **nội dung thật**, không bám id bước.
+  - ✅ **failure policy `compensate`, 22/08** — `internal/flow/compensate.go`.
+    Bước hỏng thì chạy một bước **GỠ LẠI rồi VẪN DỪNG**. Đo thật lượt **#58**:
+    bước `dat-cho` tạo file "chỗ đã đặt", bước `hong` thoát 1, engine chạy `go-lai`,
+    xác nhận `cho da dat ton tai=True` rồi xoá — kiểm trên đĩa sau đó: file
+    **không còn**; lượt chạy kết thúc `failed`. Đúng: `compensate` **gỡ lại**,
+    không phải **cứu**. Bước gỡ lại bị cấm khai `idempotent = true` (`:175`) —
+    khoá sẽ trùng với lần gỡ trước và lần gỡ thứ hai sẽ bị bỏ qua im lặng.
+  - ⬜ **route theo capability / giá** — **mảnh duy nhất còn lại**. Từ 22/08 đã có
+    bảng năng lực API (`aiapi.BangNangLuc`) và node `route` chọn theo **sức khoẻ**,
+    nhưng bộ chọn vẫn đi theo **tên** (`Step.Route`, `flow.go:184`) chứ không đọc
+    bảng năng lực hay bảng giá; `grep` cho thấy `BangNangLucNhieu` chỉ được gọi ở
+    `internal/api/api.go:1943,1950` (đường ĐỌC bảng) và ở CLI, **không** ở chỗ chọn
+    đường. Chi phí vẫn chỉ được ghi **sau khi gọi** (`api_calls.cost_usd`).
+- [x] Node built-in: `agent · model · route · shell · test · lint · review · approve · merge · notify`.
+  ✅ **10/10 chạy được từ 22/08**, khai ở `internal/flow/flow.go:30-40` và bảng
+  `implemented` (`:42-55`) — nguyên tắc trung thực năng lực: loại chưa chạy được
+  thì **cảnh báo lúc `flow validate`**, không im lặng chấp nhận. Xem
+  [`docs/BAO-CAO-CLI-NODE.md`](BAO-CAO-CLI-NODE.md) VIỆC 2.
   - ✅ `agent` · `shell` · `approve` · `notify` · `test` · `lint` · `review` · `model`
-    (`model` bật 20/08 khi đường API đã đo thật).
-  - ⬜ `merge` — **khai rồi nhưng `implemented[TypeMerge] = false`** (`flow.go:53`),
-    ghi chú "còn chờ cơ chế merge an toàn". Viết vào `flows.toml` thì `validate` kêu.
-  - ⬜ `route` — **chưa có node riêng**. Route hiện là một **thuộc tính** của bước
-    `model` (`Step.Route`), không phải một node chọn đường rồi chuyền cho bước sau.
+    (`model` bật 20/08 khi đường API đã đo thật). Node `plugin` là đường thứ ba,
+    bật cùng ngày (xem ô plugin model bên dưới).
+  - ✅ `route` — **tách thành node riêng** (`internal/flow/route.go`,
+    `TypeRoute = "route"` ở `flow.go:40`). Trước: route là một **thuộc tính** của
+    bước `model`. Nay: một node chọn đường sống rồi **chuyền TÊN cho bước sau**
+    (`route = "{{steps.chon.output}}"`). **Vì sao đáng tách**: flow có năm bước
+    `model` cùng đi một đường; đường đó chết thì mỗi bước tự hỏi lại và có thể rơi
+    sang một đường dự phòng **khác nhau** — năm bước của cùng một lượt trả lời
+    bằng năm mô hình khác nhau, mà bảng chỉ ghi "model".
+    **Dùng lại, không làm lại**: `internal/flow` khai interface hẹp `RouteChon`,
+    phần cắm ở `internal/api/routenode.go` gọi đúng `API.ThuTuRoute` và
+    `aiapi.Kiem` (`GET /models`, **không tốn token**) — **không một dòng logic
+    chọn đường nào được viết lại**. "Dùng được" = `SucKhoe.Dung()` (route sống
+    **VÀ** model khai có thật), không hạ xuống thành `Song`.
+    Hai quyết định phụ: **output là ĐÚNG cái tên, không gì khác** (một ký tự thừa
+    là một đường không tồn tại; phần người đọc cần đi ra event bus, kể cả khi
+    hỏng), và **hết đường thì DỪNG HẲN, không đoán bừa** (đoán bừa là bước sau
+    đem tên ấy đi gọi thật — tốn thời gian, tốn tiền nếu trúng, và hỏng bằng một
+    thông báo không liên quan tới nguyên nhân).
+    **Mắt xích suýt đứt, ghi lại**: `Step.Route` trước đây đi **thẳng** vào lời gọi
+    mà **không qua `Expand`**, nên node `route` sẽ chạy đúng mà **vô dụng**. Đã sửa,
+    và `TestRouteChonDuongRoiChuyenChoBuocSau` khẳng định cả chuỗi.
+  - ✅ `merge` — bật lên, **và đổi nghĩa công khai chứ không lặng lẽ bật cờ**
+    (`internal/flow/merge.go`). Ghi chú cũ ở `flow.go:53` là "gộp nhánh git — hành
+    động nguy hiểm", `implemented = false`, hẹn "còn chờ cơ chế merge an toàn".
+    **Cơ chế ấy sẽ không bao giờ tới**: một node tự chạy `git merge` là một node
+    có quyền viết đè lên cây mã của người khác, và không có cách nào làm việc đó
+    an toàn bằng một dòng TOML. Muốn gộp nhánh thì đường cũ đúng hơn — `shell`
+    chạy `git merge` đứng **sau** `approve`, nơi người duyệt nhìn thấy chính xác
+    lệnh sắp chạy. Node này gộp **ĐẦU RA (chữ)** của N bước, theo **đúng thứ tự
+    khai trong `needs`**, và "an toàn" ở đây nghĩa là **đo được**: hai lượt chạy
+    giống hệt nhau cho ra đúng một khối chữ.
 - [x] 3 flow mẫu: `fanout` (nhiều agent → review → chọn), `squad` (API planner → agent
   implementer → reviewer → test → approval), `agents` (danh sách task theo concurrency).
   Dựng sẵn trong binary: `internal/flow/builtin.go:10` (`fanout`), `:31` (`squad`),
@@ -697,14 +882,33 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     chỉ là lớp thứ hai.
   Bảng quyền (`sagent plugin quyen`) có **HAI cột chứ không phải một**: plugin KHAI
   gì, và host **CHẶN được tới đâu** — ba trạng thái y như bảng năng lực provider.
-  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên hai chỗ này phải nói thẳng:
+  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên **ba** chỗ này phải nói
+  thẳng — 5 quyền: **2 `chan-that` · 2 `khong-chan-duoc` · 1 `chua-do`**
+  (`internal/plugin/quyen.go:56-122`):
+  - `thu-muc-lam-viec`: **KHÔNG CHẶN ĐƯỢC** — ⚠ **hạ cấp 22/08, dòng này trước đây
+    khai `chan-that` và đó là một lời khai SAI**. Phép đo bác bỏ nó:
+    `TestBangQuyenThuMucPhaiKhopVoiThucTeChamDuoc` chạy một plugin **không khai
+    quyền nào**, host báo `thu-muc=(khong-cap)`, vậy mà plugin vẫn **đọc đúng 33
+    byte** một file trong thư mục dự án, **ghi được** file mới và **liệt kê được**
+    thư mục. Thứ host làm thật là **không CẤP đường dẫn** (`cmd.Dir` là thư mục tạm
+    rỗng), không phải dựng hàng rào — plugin biết đường dẫn bằng cách khác (nhúng
+    lúc build, đọc cấu hình riêng, hoặc đoán `C:\Users\...`) thì vào như thường.
+    Muốn khai `chan-that` phải có ACL riêng từng lượt chạy, Job Object, hoặc
+    AppContainer — chưa cái nào được làm. Số đo ở `docs/DO-LUONG.md` mục 22/08.
   - `ghi-thu-muc-lam-viec`: **KHÔNG CHẶN ĐƯỢC** (đã đo, là kết luận chứ không phải
     khoảng trống). Thấy được đường dẫn thì ghi được; chặn ghi đòi ACL riêng cho từng
-    lần chạy, chưa làm. Cách chặn thật đang có là không cấp `thu-muc-lam-viec`.
+    lần chạy, chưa làm. ⚠ Câu chốt cũ *"cách chặn thật đang có là không cấp
+    `thu-muc-lam-viec`"* **đã bị chính phép đo trên bác bỏ** và đã gỡ khỏi mã.
   - `mang`: **CHƯA ĐO**. Host hiện KHÔNG chặn tiến trình con mở socket. Còn đường
     WFP/AppContainer trên Windows nhưng chưa ai thử, chưa có phép đo nào trên máy
     thật. **Không khai quyền `mang` KHÔNG có nghĩa là plugin bị chặn** — CLI in
     cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.
+  - Hai ô `chan-that` còn lại (`moi-truong`, `secret`) đứng vững, nhưng ô `secret`
+    kèm một câu phải đọc kỹ: `chan-that` ở đây nói **host không ĐƯA secret cho
+    plugin không xin** — nó **không** nói plugin không lấy được secret. Plugin chạy
+    cùng quyền hệ điều hành với host, nên plugin nào biết đường tới kho key vẫn đọc
+    thẳng file được. Hai câu đó khác nhau, và người đọc lướt sẽ gộp chúng làm một.
+  **Bảng quyền này đã ra tới mặt web 22/08** — xem ô tương ứng ở Pha 5b.
   Node `plugin` bật `implemented = true` vì đã chạy THẬT đầu-cuối
   (`TestFlowChayPluginThat`: build binary → `flow.Runner` thật → tiến trình con →
   kết quả chuyền sang bước sau), không phải vì đã viết xong mã. Nó là ĐƯỜNG THỨ BA
@@ -802,7 +1006,27 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     dự đoán "chỉ là thêm route" — không phải sửa mã nào. Lưu ý đã đo: key này KHÔNG
     dùng được ở `api.deepseek.com` (401), chỉ dùng được ở nhà bán lại; và route này
     trả HTTP 503 ba lần lúc 16:54–16:56 cùng ngày rồi tự hồi phục.
-  - ⬜ OpenRouter/Ollama: chưa đo — chưa có key, và Ollama chưa cài trên máy này.
+  - ✅ **HTTP 429 + `Retry-After`: XONG 22/08** — `internal/aiapi/cholai.go`.
+    Bị chặn tốc độ thì **chờ theo `Retry-After` rồi thử lại CHÍNH route đó, có
+    trần**; hết lượt mới để `internal/api` đổi route dự phòng theo luật sẵn có
+    (không sửa một dòng nào ở tầng đó). Đọc được **cả hai dạng** header: số giây
+    và mốc HTTP-date. Mọi con số đều có trần — `Retry-After: 3600` mà chờ thật là
+    cả lượt flow đứng im một tiếng, không log, không lối ra. Nhật ký `ChoLai`
+    (`aiapi.go:79`) giữ lại mọi lần chờ, và khi hết lượt thì lỗi trả về **nguyên
+    văn** thân 429 kèm request id. **Cố ý KHÔNG mở rộng sang 5xx**: luật cũ đã
+    đúng cho 5xx (đo 20/08: thân 503 hỏng theo TỪNG MODEL nên đổi route cứu được
+    thật), chỉ 429 mới cần chờ. Chi tiết và phần chưa chắc ở
+    [`docs/BAO-CAO-429.md`](BAO-CAO-429.md).
+  - ⬜ **429 THẬT thì chưa đo được** — modelapi.vn không gửi header hạn mức nào
+    (`X-RateLimit-*` đều vắng ở phản hồi 200), nên **không biết trước còn bao
+    nhiêu lượt**; và chưa kiểm gateway `new-api` mà nhà này dùng có gửi
+    `Retry-After` kèm 429 hay không. Đường mã hiện được canh bằng test, chưa bằng
+    một phản hồi thật.
+  - 🚫 **OpenRouter/Ollama: BỊ CHẶN, thiếu thứ bên ngoài** — OpenRouter thiếu
+    **khoá API thật** của openrouter.ai; Ollama thiếu **cả khoá lẫn phần mềm**
+    (`ollama` chưa được cài trên máy này, nên không có endpoint cục bộ nào để
+    trỏ tới). Cả hai đều "làm được, chỉ là thêm route" như DeepSeek đã chứng
+    minh — không có nợ mã nào ở đây, chỉ có nợ thứ bên ngoài.
 
 ### Pha 5 — Bốn mặt điều khiển (làm theo thứ tự 5a → 5d)
 🎯 Điều khiển được từ mọi mặt, mặt nào cũng cấu hình được. Thứ tự cố ý: mặt càng
@@ -817,13 +1041,19 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 - [x] **Test ngang quyền** (`cmd/sagent/main_test.go`): mọi action đều phải có
   lệnh CLI, và CLI không được có action ngoài hợp đồng. Luật 2 giờ có răng.
 - [x] Trần `max_parallel_sessions` giờ chặn cả **tổng số phiên đang chạy**, không
-  chỉ `--copies`.
+  chỉ `--copies`. **Mở rộng 22/08 — bốn trần CỘNG DỒN** (`[policy.tran]`): chung ·
+  harness · provider · hồ sơ, áp cùng chỗ ở `api.xetTran` → `FleetStart`. Một con
+  số không đo được hai thứ khác nhau: **RAM và tiến trình con** tính theo harness,
+  còn **hạn mức thuê bao** tính theo tài khoản — bốn phiên rơi hết vào `claude:tns`
+  vẫn hợp lệ dưới trần chung trong khi `claude:phu` ngồi không. Việc này **không
+  đẻ ra action mới** nên luật ngang quyền bốn mặt không thủng: nó siết đúng
+  `fleet.start` đã có. Xem [`docs/BAO-CAO-TRAN-DONG-THOI.md`](BAO-CAO-TRAN-DONG-THOI.md).
 - [x] **TUI** (`cmd/sagent/tui.go`): gõ `sagent` không tham số ra bảng chọn
   đánh số như `tk` v1 — số=mở · t=thêm · d=đồng bộ · x=xoá · s=phiên · ?=trợ giúp.
   Không có bàn phím (CI/pipe) thì in bảng rồi thoát, KHÔNG treo.
 *DoD:* mọi verb hiện có đi qua API; chạy được qua SSH; không mặt nào gọi tắt vào `store`.
 
-**5b · Dashboard 2D.**  **94%** (7 xong · 1 một phần)
+**5b · Dashboard 2D.**  **100%** (9 xong)
 - [x] `internal/dash`: server localhost bọc `internal/api` (không mở đường riêng
   vào store). Assets nhúng bằng Go `embed` — vẫn một binary.
 - [x] `sagent dash [--port N]`: in URL kèm token, mở trình duyệt là thấy.
@@ -834,8 +1064,13 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
 - [x] **Bảo mật**: chỉ bind loopback · token ngẫu nhiên · chặn Host lạ (DNS-rebind)
   · chặn Origin lạ trên POST (CSRF) · DTO allowlist nên KHÔNG rò secret. Có test.
 - [x] **Trạng thái phiên chi tiết (3 trạng thái đo được)**: phân loại chính xác các phiên gặp sự cố sang `rate_limited` (chạm trần hạn mức, có mốc thời gian mở lại), `blocked` (bị chặn quyền thao tác), và `failed` (lỗi từ phía API nhà cung cấp) dựa trên dữ liệu có cấu trúc từ kết quả phiên (`provider.KetQua`, hiện đo được đầy đủ trên Claude; các adapter chưa đo vẫn giữ `lost`). Riêng trạng thái `queued` (xếp hàng chờ) **CHƯA đo được** và chưa thêm vì hệ thống chưa có cơ chế hàng đợi trong mã nguồn (`FleetStart` từ chối thẳng khi chạm trần `max_parallel_sessions`).
-- [~] Approval gate — ~~chờ Pha 3 flow~~ Pha 3 xong rồi, **nhưng lượt soát 21/08
-  lôi ra một lỗ hồi quy thật**:
+- [x] Approval gate — ~~chờ Pha 3 flow~~ Pha 3 xong rồi, và lỗ hồi quy mà lượt
+  soát 21/08 lôi ra **đã vá xong cùng ngày**. Ô này giữ dấu `[~]` thêm một ngày
+  sau khi cả hai nửa đã xanh — đúng kiểu bi quan mà mục 7 sinh ra để bắt. Đo lại
+  22/08: `grep -rn "flow/decide" internal/dash/web/` ra **`index.html:1910`**, và
+  `internal/dash/ngangquyen_ui_test.go:21`
+  (`TestMoiHanhDongCuaNguoiDungDeuCoDuongVaoTuWeb`) đang canh chiều UI ↔ API.
+  Hai nửa của ô:
   - **Xong — đường server**: `/api/flow/decide` có ở `internal/dash/server.go:86`,
     xử lý ở `internal/dash/flow_api.go:159-182`, và nó gọi ĐÚNG `FlowApproveOnly`
     / `FlowApprove` mà CLI dùng — nên approval gate vẫn không thể bị bỏ qua từ
@@ -854,6 +1089,31 @@ gần lõi làm càng trước, để hợp đồng API được thử lửa tr�
     đang tick ở Pha 5c **hiện không còn đúng** — xem ghi chú ở đó.
   - Bài học đúng thứ dự án này lấy làm gốc: luật ngang quyền canh **API ↔ CLI**,
     không canh **UI ↔ API**. Nút biến mất mà không test nào đỏ.
+- [x] **Bảng quyền plugin ra mặt web** (22/08) — khối "Plugin đã cài" trong ô Tổng
+  quan của `internal/dash/web/index.html`, đặt ngay dưới "Năng lực provider" vì
+  cùng loại câu hỏi: *thứ này làm được gì trên máy tôi, và tôi chặn được tới đâu*.
+  Xem [`docs/BAO-CAO-WEB-PLUGIN.md`](BAO-CAO-WEB-PLUGIN.md).
+  - **Mắt còn thiếu, nay đã cắm**: hợp đồng có `plugin.list`, CLI có
+    `sagent plugin list|quyen`, endpoint `/api/plugins` có — chỉ mặt web là không.
+  - **Yêu cầu thật KHÔNG phải "hiện danh sách plugin"** mà là **hiện cột `[chặn]`
+    với đủ BA trạng thái rời nhau**. Một mặt web bẹp `khong-chan-duoc` với `chua-do`
+    làm một thì **tệ hơn không có mặt web nào** — nó cho người ta cảm giác đã kiểm tra.
+    `internal/dash/plugin_api.go:86-88` thay con số gộp `so_chua_chan` bằng ba ngăn
+    riêng (`so_chan_that` · `so_khong_chan_duoc` · `so_chua_do`); `so_chua_chan` giữ
+    lại nhưng nay là **tổng** của hai ngăn sau, và không mặt nào được hiện mình nó.
+    Vòng đếm chuyển từ so chuỗi trần sang `switch plugin.TrangThaiChan(...)` đối
+    chiếu **thẳng với hằng Go**, nhánh `default` gom mọi khoá lạ về `so_chua_do` —
+    chiều an toàn: thứ không đọc được phải đếm là "chưa biết", không phải "đã chặn".
+  - **Đo bằng đột biến chứ không bằng lời**: 11 phép phá hoại thử, **11/11 bị bắt**
+    (bẹp `chua-do` thành `khong-chan-duoc`; hai trạng thái chung một lớp CSS; hai
+    lớp khác nhau nhưng chung một màu; hai trạng thái cùng một nhãn chữ; nhãn đếm
+    đọc nhầm con số đã gộp…). DTO allowlist giữ nguyên: `Secret` vẫn chỉ là
+    `"<tên> → key_id <id>"`, không bao giờ là giá trị.
+  - **Một cái bẫy gặp thật, ghi lại**: bài kiểm "mặt web có nói rõ *khai quyền
+    không phải hàng rào* không" ban đầu **không cắn** — câu cần tìm nằm sẵn trong
+    một dòng **bình luận HTML** giải thích, nên test xanh dù trang không hiện chữ
+    nào. Đã thêm `boCommentHTML`. Đúng lớp bẫy mà `boComment` (JS) sinh ra để
+    tránh, gặp lại ở dạng HTML.
 *DoD:* mọi hành động của UI đều có lệnh CLI tương đương (test ngang quyền) ✅.
 
 **5c · Workflow board.**  **93%** (6 xong · 1 một phần)
@@ -989,38 +1249,74 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
   - ⚠ **Chứng chỉ TỰ KÝ, không phải CA công cộng.** Trình duyệt vẫn cảnh báo; người dùng
     phải đối chiếu vân tay. Không đối chiếu = chống được nghe lén, không chống kẻ đứng giữa.
 
-### Bảng đếm lại (soát 21/08/2026)
+### Bảng đếm lại (soát 22/08/2026)
 
 `[x]`=1 · `[~]`=0,5 · `[ ]`=0 · `[!]` không vào mẫu số.
 
-| Pha | `[x]` | `[~]` | `[ ]` | `[!]` | Điểm | % |
-|---|---|---|---|---|---|---|
-| Bước 0 — Đổi tên | 3 | 0 | 1 | 0 | 3,0/4 | **75%** |
-| Pha 0 — Đo giả định | 3 | 4 | 0 | 0 | 5/7 | **71%** |
-| Pha 1 — Storage + slice | 9 | 1 | 0 | 0 | 9,5/10 | **95%** |
-| Pha 2 — Song song + Workspace | 22 | 0 | 0 | 0 | 22,0/22 | **100%** |
-| Pha 2.5 — Codex + OpenAI-compat | 8 | 0 | 0 | 0 | 8,0/8 | **100%** |
-| Pha 3 — Flow DAG | 18 | 2 | 1 | 0 | 19,0/21 | **90%** |
-| Pha 5a — API lõi + Terminal | 6 | 0 | 0 | 0 | 6,0/6 | **100%** |
-| Pha 5b — Dashboard 2D | 7 | 1 | 0 | 0 | 7,5/8 | **94%** |
-| Pha 5c — Workflow board | 6 | 1 | 0 | 0 | 6,5/7 | **93%** |
-| Pha 5d — Cấu hình theo project | 6 | 0 | 0 | 0 | 6,0/6 | **100%** |
-| **TỔNG** | **87** | **10** | **2** | **0** | **92,0/99** | **93%** |
+| Pha | `[x]` | `[~]` | `[ ]` | `[!]` | Điểm | % | so với 21/08 |
+|---|---|---|---|---|---|---|---|
+| Bước 0 — Đổi tên | 4 | 0 | 0 | 0 | 4,0/4 | **100%** | ↑ 75% |
+| Pha 0 — Đo giả định | 5 | 2 | 0 | 0 | 6,0/7 | **86%** | ↑ 71% |
+| Pha 1 — Storage + slice | 9 | 1 | 0 | 0 | 9,5/10 | **95%** | = |
+| Pha 2 — Song song + Workspace | 22 | 0 | 0 | 0 | 22,0/22 | **100%** | = |
+| Pha 2.5 — Codex + OpenAI-compat | 8 | 0 | 0 | 0 | 8,0/8 | **100%** | = |
+| Pha 3 — Flow DAG | 20 | 1 | 0 | 0 | 20,5/21 | **98%** | ↑ 90% |
+| Pha 5a — API lõi + Terminal | 6 | 0 | 0 | 0 | 6,0/6 | **100%** | = |
+| Pha 5b — Dashboard 2D | 9 | 0 | 0 | 0 | 9,0/9 | **100%** | ↑ 94% |
+| Pha 5c — Workflow board | 7 | 0 | 0 | 0 | 7,0/7 | **100%** | ↑ 93% |
+| Pha 5d — Cấu hình theo project | 6 | 0 | 0 | 0 | 6,0/6 | **100%** | = |
+| **TỔNG** | **96** | **4** | **0** | **0** | **98,0/100** | **98%** | ↑ 93% |
 
 Pha 4, 6, 7 không dùng ô tick (viết bằng danh sách trạng thái ✅/⬜/🚫), nên không
 nằm trong bảng này — trạng thái của chúng đọc thẳng ở mục tương ứng.
 
-**82% → 93%.** Con số cũ không phải do làm thêm việc hôm nay, mà do **kế hoạch
-báo thấp chính nó**: 7 trong 18 ô trống đã xong từ trước và chỉ thiếu người mở mã
-ra đối chiếu, 9 ô nữa xong quá nửa. Đây là lệch theo chiều bi quan — ít nguy hiểm
-hơn chiều tô hồng, nhưng vẫn là kế hoạch nói sai về chính nó, và nó khiến việc
-"còn lại phải làm gì" bị chôn dưới 18 dòng nhìn giống nhau.
+⚠ **98% nghĩa là 98% SỐ Ô TICK của mục 7, KHÔNG phải 98% dự án.** Mẫu số là 100 ô;
+Pha 4, 6, 7 không có mặt trong đó, và một ô `[~]` đáng nửa điểm có thể chứa khối
+lượng như "ba giao thức API còn lại". Một con số tròn trịa không kèm mẫu số là
+cách một tài liệu trung thực bắt đầu nói dối.
 
-**Hai mục thật sự CHƯA LÀM** (không có gì bên ngoài cản): alias `tk`/`ccswitch`
-ở Bước 0, và plugin model ở Pha 3.
+**93% → 98%, và phải tách con số đó ra làm hai phần vì chúng khác hẳn nhau:**
 
-**Một lỗ hồi quy lượt soát này lôi ra**: nút Duyệt / Từ chối trên mặt web đã biến
-mất im lặng — endpoint còn, UI mất. Xem Pha 5b.
+1. **Bảng cũ đã sai sẵn 2 điểm trước khi ai làm gì hôm nay.** Bảng khai
+   `87 · 10 · 2 = 92,0/99 = 93%`; đếm lại đúng bản `.md` **trước** lượt sửa này ra
+   `90 · 8 · 1 = 94,0/99 = 95%`. Ba ô đã được tick trong phần chữ mà **không ai đi
+   sửa bảng**: plugin model (Pha 3), threat model (Pha 0), Duyệt/Từ chối trên web
+   (Pha 5c). Đây là chính cái bệnh mà lượt soát 21/08 đi chữa, tái phát sau đúng
+   một ngày ở dạng nhẹ hơn — lần này là **bảng tổng** trôi khỏi phần chữ, chứ
+   không phải phần chữ trôi khỏi mã.
+2. **Phần còn lại — 95% → 98% — là việc làm thật hôm 22/08**: **5 ô đổi dấu**
+   (alias `tk`/`ccswitch` `[ ]`→`[x]`; redaction `[~]`→`[x]`; bảng năng lực
+   `[~]`→`[x]`; node built-in `[~]`→`[x]`; approval gate 5b `[~]`→`[x]`) và **1 ô
+   mới thêm vào mẫu số** (bảng quyền plugin ra mặt web, Pha 5b) — nên mẫu số đi từ
+   99 lên 100.
+
+**KHÔNG CÒN ô `[ ]` nào.** Hai mục "thật sự chưa làm" mà lượt soát 21/08 chỉ đích
+danh — alias ở Bước 0 và plugin model ở Pha 3 — **đã đóng cả hai** trong ngày.
+
+**Ô `[!]` vẫn rỗng, và đây KHÔNG phải vì không có gì bị chặn.** Thứ bị chặn thật
+hôm nay nằm **bên trong** hai ô `[~]` và ở các dòng `⬜`/`🚫` của Pha 4, chứ không
+đứng riêng thành một ô tick:
+
+| Bị chặn ở đâu | Thiếu THỨ GÌ bên ngoài |
+|---|---|
+| Pha 0 · ô API — ba giao thức còn lại | **Khoá thật của chính nhà cung cấp**: Anthropic Messages (`api.anthropic.com`), Gemini native (`generativelanguage.googleapis.com`), OpenAI Responses (`api.openai.com`). Máy chỉ có khoá **nhà bán lại** `modelapi.vn`, và khoá đó đã đo là **401 ở `api.deepseek.com`** |
+| Pha 4 · OpenRouter | **Khoá API thật** của openrouter.ai |
+| Pha 4 · Ollama | **Khoá VÀ phần mềm** — `ollama` chưa được cài trên máy này, không có endpoint cục bộ nào để trỏ tới |
+
+Không nâng chúng thành `[!]` vì luật ở đầu mục 7 nói `[!]` là **cả ô** bị chặn.
+Ô API còn một nửa là **nợ của chính dự án** (tool · vision · structured-output ·
+reasoning — đo 22/08, nhà cung cấp làm được mà `aiapi.yeuCau`/`phanHoi` không có
+trường để gửi và đọc), nên nó là `[~]`. Nâng cả ô lên `[!]` là đổ cho bên ngoài
+một khoản nợ của mình — tô hồng, đúng chiều đắt hơn.
+
+**Bốn ô `[~]` còn lại, và mỗi ô còn thiếu đúng cái gì:**
+
+| Ô | Ở đâu | Phần chưa xong |
+|---|---|---|
+| Subscription | Pha 0 | ACP (chưa harness nào đo qua giao thức này) · resume/cancel **ở tầng harness** (`flow resume`/`flow huy` là của bộ chạy flow, không phải cờ `--resume` của từng CLI) · trình tự chạm file theo pha login/prompt/refresh/exit |
+| API | Pha 0 | 3/4 giao thức (**bị chặn**, xem bảng trên) · tool · vision · structured-output · reasoning (**nợ của dự án**) |
+| 1 direct-API vertical slice | Pha 1 | xem chi tiết tại ô đó |
+| Engine flow | Pha 3 | **route theo capability/giá** — mảnh cuối cùng; bảng năng lực API đã có từ 22/08 nhưng bộ chọn đường vẫn đi theo TÊN, chưa đọc bảng đó và chưa đọc bảng giá |
 
 ---
 
@@ -1105,8 +1401,16 @@ dashboard ra mạng ngoài. Sau mỗi pha: `docs/knowledge/PHASE-<n>-RETROSPECTI
 ## 12. Việc còn treo cần bạn quyết/cung cấp
 
 1. ✅ Tên đã chốt: **Switch-Agent-Pro**, lệnh `sagent` (code đã đổi tên, build xanh).
-2. **Máy/VM Linux** — chặn Pha 0 Linux + đa nền tảng.
-3. **API key thật** (local-only, redaction) để đo + làm API path — hoặc hoãn API path,
-   giữ nhãn `experimental`, làm subscription path trước.
-4. Mức độ dùng **daemon + SQLite** ngay từ Pha 2 (đúng plan) hay giữ prototype nhẹ thêm
-   một nhịp — khuyến nghị: theo plan (SQLite SSOT) để không phải viết lại.
+2. ~~**Máy/VM Linux** — chặn Pha 0 Linux + đa nền tảng.~~ ✅ **HẾT HIỆU LỰC** —
+   nhánh Linux đã **bỏ khỏi phạm vi** theo quyết định "CHỈ WINDOWS" ở đầu tài
+   liệu, nên đây không còn là thứ cần cung cấp.
+3. 🚫 **API key thật của CHÍNH nhà cung cấp** — vẫn treo, và nay là thứ duy nhất
+   ở mục này còn chặn việc. Đã có key của **nhà bán lại** `modelapi.vn` (đủ để
+   đóng đường OpenAI-compatible, streaming, usage, fallback, 429, và bảng năng
+   lực 7 × 2 route). **Còn thiếu**: khoá `api.anthropic.com` (Anthropic Messages),
+   `generativelanguage.googleapis.com` (Gemini native), `api.openai.com` (OpenAI
+   Responses), openrouter.ai (OpenRouter) — và **Ollama thì thiếu cả phần mềm**,
+   chưa cài trên máy này. Nhãn `experimental` đã bị bỏ hẳn khỏi dự án: ba trạng
+   thái `LamDuoc` / `KhongLamDuoc` / `ChuaDo` thay chỗ nó ở cả hai nửa.
+4. ✅ **Đã chốt và đã làm**: SQLite là SSOT từ Pha 2 (`~/.ai-accounts/state.db`,
+   migration có version); ~~daemon~~ bỏ theo mục 2b — `dash` là server thay thế.
