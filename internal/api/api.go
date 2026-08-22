@@ -148,6 +148,19 @@ var Actions = []string{
 	"flow.cancel",
 	"flow.save",
 	"flow.delete",
+	// Xem ARTIFACT một lượt chạy để lại: liệt kê, và đọc nội dung một file.
+	//
+	// Nằm trong hợp đồng vì đây là một ĐỘNG TỪ MỚI, không phải một trường thêm
+	// vào. Ba mảnh của #199 (artifact/idempotent/compensate) cố ý không là
+	// action — chúng đổi *cái flow làm gì*. Cái này đổi *người ta bảo công cụ
+	// làm gì*: trước nó, muốn đọc file một bước để lại thì phải mở
+	// `~/.ai-accounts/artifacts/run-<id>/` bằng tay, tức là tính năng chỉ dùng
+	// được bởi người đang ngồi trước máy chủ.
+	//
+	// Một action cho cả liệt kê lẫn đọc: cùng một câu hỏi, cùng một cái giá
+	// (đọc file cục bộ, không tốn token). Khác cặp `api.nang-luc` /
+	// `api.nang-luc-do` — cặp đó tách vì một cái đọc bảng, một cái tiêu tiền.
+	"flow.artifacts",
 	// Tóm tắt một lượt chạy VÀ đối chiếu lời agent với git. Nằm trong hợp đồng
 	// chứ không phải một mẹo đọc log: câu "lượt vừa rồi ai làm được gì" hiện chỉ
 	// trả lời được bằng cách người đọc tự tin những gì agent in ra — mà lượt #21,

@@ -54,6 +54,25 @@ func (s *runState) state(id string) string {
 	return s.states[id]
 }
 
+// output đọc kết quả một bước đã để lại.
+func (s *runState) output(id string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.outputs[id]
+}
+
+// datOutput ghi kết quả cho một bước mà KHÔNG đụng tới trạng thái của nó.
+//
+// Có riêng một hàm chứ không dùng set(id, state, out) vì chỗ gọi duy nhất là
+// ganKetQuaThayThe: nó gán kết quả của bước CHẠY THAY vào chỗ bước HỎNG, và
+// bước hỏng phải giữ nguyên `failed`. Đi qua set() thì phải truyền lại trạng
+// thái cũ — một chỗ để sau này ai đó truyền nhầm `done` vào và làm sổ nói dối.
+func (s *runState) datOutput(id, out string) {
+	s.mu.Lock()
+	s.outputs[id] = out
+	s.mu.Unlock()
+}
+
 // readySteps tìm các bước có thể chạy ngay. waiting là id bước approve đang chặn
 // (nếu có) để lời gọi biết vì sao hết việc.
 func (s *runState) readySteps(steps []Step) (ready []Step, waiting string) {
@@ -67,7 +86,7 @@ func (s *runState) readySteps(steps []Step) (ready []Step, waiting string) {
 		}
 		ok := true
 		for _, n := range step.Needs {
-			if s.finished(n) || choDiTiep(steps, n, s.state(n)) {
+			if s.finished(n) || s.choDiTiep(steps, n) {
 				continue
 			}
 			ok = false
@@ -97,14 +116,29 @@ func (s *runState) readySteps(steps []Step) (ready []Step, waiting string) {
 //
 // Người viết flow gõ "continue" là đã nói rõ ý: hỏng thì cứ đi tiếp. Chặn bước
 // sau lại là làm ngược ý họ, và tệ hơn là làm ngược trong im lặng.
-func choDiTiep(steps []Step, id, state string) bool {
-	if state != store.StepFailed {
+//
+// CỬA THỨ HAI: `on_failure = "fallback"`. Bước hỏng nhưng bước CHẠY THAY của nó
+// đã xong thật thì việc coi như có người làm, và bước sau đi tiếp — đó chính là
+// nghĩa của "chạy thay". Điều kiện `state(Fallback) == done` không phải thủ tục:
+// bước chạy thay mà hỏng thì lượt chạy dừng ở xuLyHong, và nếu vì lý do nào đó
+// nó chưa chạy thì bước sau PHẢI bị chặn — mở cửa ở đây khi chưa ai làm thay là
+// tái lập đúng cái lỗi #23 mà hàm này sinh ra để chống, chỉ đổi tên trường.
+//
+// Là METHOD chứ không phải hàm rời vì cửa thứ hai cần TRẠNG THÁI của một bước
+// thứ ba (bước chạy thay), thứ mà chữ ký cũ `(steps, id, state)` không có.
+func (s *runState) choDiTiep(steps []Step, id string) bool {
+	if s.state(id) != store.StepFailed {
 		return false
 	}
 	for _, st := range steps {
-		if st.ID == id {
-			return st.OnFailure == OnFailContinue
+		if st.ID != id {
+			continue
 		}
+		if st.OnFailure == OnFailContinue {
+			return true
+		}
+		return st.OnFailure == OnFailFallback && st.Fallback != "" && st.Fallback != st.ID &&
+			s.state(st.Fallback) == store.StepDone
 	}
 	return false
 }

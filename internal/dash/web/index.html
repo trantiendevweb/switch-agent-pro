@@ -234,6 +234,58 @@
     font-variant-numeric:tabular-nums;font-size:12px;color:var(--hi)}
   .td .so .v.trong{color:var(--lo);font-size:10.5px;letter-spacing:.02em}
 
+  /* ---- ARTIFACT: FILE lượt chạy để lại ----------------------------------
+     Đường truyền THỨ HAI giữa các bước, không đi qua {{steps.x.output}} — nên
+     nhìn danh sách bước ở trên KHÔNG thấy nó. Trước khối này, muốn đọc một
+     file bước để lại thì phải mở ~/.ai-accounts/artifacts/run-N/ bằng tay,
+     tức là tính năng chỉ dùng được bởi người đang ngồi trước máy chủ.
+
+     Chrome đơn sắc như mọi khối khác: không có màu trạng thái nào ở đây, vì
+     một cái file không có trạng thái. Dữ liệu máy (đường dẫn, số byte) dùng
+     font mono. */
+  .td .af{margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+  .td .af[hidden]{display:none}
+  .td .af h4{margin:0 0 7px;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--lo);font-weight:600;display:flex;align-items:baseline;gap:7px}
+  .td .af h4 .n{margin-left:auto;font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums;letter-spacing:0;text-transform:none}
+  .td .af ul{list-style:none;margin:0;padding:0;display:grid;gap:4px;
+    max-height:150px;overflow:auto}
+  .td .af li button{width:100%;text-align:left;font:inherit;cursor:pointer;
+    display:flex;align-items:baseline;gap:8px;padding:4px 7px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--hi);
+    transition:.15s var(--ease)}
+  .td .af li button:hover:not(:disabled){border-color:var(--line-2)}
+  .td .af li button:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+  .td .af li button:disabled{cursor:default;opacity:.55}
+  .td .af .d{font-family:var(--font-mono);font-size:11px;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .td .af .t{flex:none;font-size:10px;color:var(--mid)}
+  .td .af .b{margin-left:auto;flex:none;font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums;font-size:10px;color:var(--lo)}
+  .td .af .trong{font-size:11.5px;color:var(--lo);line-height:1.45}
+  /* Khung nội dung: cuộn được, chữ giữ nguyên xuống dòng. max-height chứ không
+     để tràn — 64 KiB chữ đổ thẳng vào trang sẽ đẩy mọi thứ khác xuống dưới
+     màn hình. */
+  .td .af pre{margin:8px 0 0;padding:8px 10px;border:1px solid var(--line);
+    border-radius:7px;background:var(--void);color:var(--hi);
+    font-family:var(--font-mono);font-size:11px;line-height:1.5;
+    max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  /* Câu "bị cắt" dùng token trạng thái CHỜ, không phải lỗi: file vẫn nguyên
+     vẹn trên đĩa, chỉ là mới đọc một khúc. (Không viết tên token kèm dấu hai
+     chấm trong comment — designsystem_test đọc đó thành một khai báo.) */
+  .td .af .cat{margin-top:7px;border:1px solid rgba(246,178,61,.42);
+    background:rgba(246,178,61,.09);border-radius:7px;padding:7px 9px;
+    font-size:11.5px;color:var(--pending);line-height:1.45;
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .td .af .cat b{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .td .af .cat button{font:inherit;font-size:11.5px;padding:4px 11px;border-radius:6px;
+    cursor:pointer;margin-left:auto;border:1px solid var(--line-2);
+    background:var(--panel-2);color:var(--hi);transition:.15s var(--ease)}
+  .td .af .cat button:hover:not(:disabled){border-color:var(--pending);color:var(--pending)}
+  .td .af .cat button:disabled{opacity:.5;cursor:default}
+  .td .af .cat button:focus-visible{outline:2px solid var(--core);outline-offset:2px}
+
   /* ------------------------------------------------- ngăn kéo trượt từ phải
      Sáu ô thao tác (bật hạm đội, chạy workflow, hỏi AI API, báo tin, máy & dọn
      dẹp, tổng quan) nằm hết trong đây. Chúng vẫn ở trong DOM ngay từ lúc tải
@@ -630,6 +682,13 @@
             <div><span class="k">token vào</span><span class="v" id="td-vao">0</span></div>
             <div><span class="k">token ra</span><span class="v" id="td-ra">0</span></div>
             <div><span class="k">chi phí</span><span class="v" id="td-usd">0</span></div>
+          </div>
+          <!-- FILE lượt chạy để lại (artifact). Dữ liệu từ /api/flow/artifacts
+               và /api/flow/artifact — cùng nguồn với `sagent flow artifacts`. -->
+          <div class="af" id="td-af" hidden>
+            <h4>File để lại <span class="n" id="td-af-n"></span></h4>
+            <ul id="td-af-ds"></ul>
+            <div id="td-af-xem"></div>
           </div>
         </div>
         <div id="td-trong" class="empty">Chưa có lượt chạy nào. Bấm "Chạy workflow" trên thanh công cụ.</div>
@@ -1927,6 +1986,99 @@ function veTienDo(run, buoc, now){
   datSo($('td-usd'), usd > 0 ? usd.toFixed(4) + ' USD' : null);
 }
 
+// ------------------------------------------------- FILE lượt chạy để lại
+//
+// HỢP ĐỒNG DỮ LIỆU — hai đường, cùng nguồn với `sagent flow artifacts`:
+//   /api/flow/artifacts?id=N        → {dir, tongByte, thieuDinhNghia,
+//                                      file[]{duong,buoc,ten,byte,nhiPhan}}
+//   /api/flow/artifact?id=N&duong=D&tu=B
+//                                   → {byte,tu,docByte,biCat,conLai,nhiPhan,chu}
+//
+// VÌ SAO CÓ: artifact là đường truyền THỨ HAI giữa các bước — nó KHÔNG đi qua
+// {{steps.x.output}}, nên danh sách bước ở trên không hé lộ một chữ nào về nó.
+// Trước khối này, đọc một file bước để lại nghĩa là mở thư mục trên máy chủ
+// bằng tay.
+//
+// `duong` gửi lên là chuỗi LẤY NGUYÊN từ bảng liệt kê, không ghép tay ở đây.
+// Server từ chối mọi thứ khác (`..`, đường dẫn tuyệt đối, liên kết mềm trỏ ra
+// ngoài) — nhưng phía này cũng không có lý do gì để dựng đường dẫn cả.
+let afRun = 0;      // lượt chạy đang hiện bảng file
+let afDangXem = ''; // file đang mở, để giữ nguyên khi bảng vẽ lại
+
+function afByte(n){
+  if(n < 1024) return n + ' B';
+  if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+
+async function veArtifact(run){
+  const box = $('td-af');
+  if(!run){ box.hidden = true; afRun = 0; afDangXem = ''; return; }
+  if(run.id !== afRun){ afRun = run.id; afDangXem = ''; $('td-af-xem').innerHTML = ''; }
+  let kho;
+  try{ kho = await api('/api/flow/artifacts?id=' + run.id); }
+  catch(e){ box.hidden = true; return; }
+
+  const ds = kho.file || [];
+  box.hidden = false;
+  $('td-af-n').textContent = ds.length ? (ds.length + ' file · ' + afByte(kho.tongByte||0)) : '';
+  if(!ds.length){
+    // Nói ra chứ không giấu khối đi: "lượt này không để lại file nào" là một
+    // câu trả lời, còn một khối biến mất thì người đọc không biết mình đang
+    // nhìn thiếu hay nhìn đủ.
+    $('td-af-ds').innerHTML = '<li class="trong">Lượt chạy này không để lại file nào. ' +
+      'Bước muốn để lại file thì phải khai <code>artifact</code> trong flows.toml.</li>';
+    $('td-af-xem').innerHTML = '';
+    return;
+  }
+  $('td-af-ds').innerHTML = ds.map(f =>
+    '<li><button type="button" data-duong="' + esc(f.duong) + '"' +
+    (f.nhiPhan ? ' disabled title="file nhị phân — không đọc ra chữ được"' : '') + '>' +
+    '<span class="d">' + esc(f.duong) + '</span>' +
+    '<span class="t">' + esc(f.ten || '(không khai)') + '</span>' +
+    '<span class="b">' + afByte(f.byte||0) + (f.nhiPhan ? ' · nhị phân' : '') + '</span>' +
+    '</button></li>').join('');
+  $('td-af-ds').querySelectorAll('button[data-duong]').forEach(n =>
+    n.addEventListener('click', () => moArtifact(run.id, n.dataset.duong, 0)));
+
+  if(kho.thieuDinhNghia){
+    $('td-af-ds').insertAdjacentHTML('beforeend',
+      '<li class="trong">Không đọc được định nghĩa flow của lượt chạy này nữa — cột tên trống ' +
+      'vì KHÔNG TRA ĐƯỢC, không phải vì không bước nào khai.</li>');
+  }
+}
+
+async function moArtifact(runID, duong, tu){
+  const xem = $('td-af-xem');
+  afDangXem = duong;
+  xem.innerHTML = '<pre>đang đọc…</pre>';
+  let nd;
+  try{
+    nd = await api('/api/flow/artifact?id=' + runID +
+      '&duong=' + encodeURIComponent(duong) + '&tu=' + tu);
+  }catch(e){ xem.innerHTML = '<pre>' + esc(e.message) + '</pre>'; return; }
+
+  if(nd.nhiPhan){
+    xem.innerHTML = '<pre>' + esc(duong) + ' — ' + afByte(nd.byte||0) +
+      '\n\n(file nhị phân, không in ra chữ được)</pre>';
+    return;
+  }
+  let h = '<pre>' + esc(nd.chu || '') + '</pre>';
+  // BỊ CẮT thì nói THẲNG, kèm SỐ, và kèm chỗ bấm đọc tiếp. Trần là một cửa sổ
+  // trượt chứ không phải bức tường — nhưng nếu không nói ra thì người đọc tưởng
+  // mình đã đọc hết file, và đó là kiểu sai tệ nhất mà một ô văn bản gây ra.
+  if(nd.biCat){
+    h += '<div class="cat">Mới đọc <b>' + ((nd.tu||0) + (nd.docByte||0)).toLocaleString('vi-VN') +
+      '</b>/<b>' + (nd.byte||0).toLocaleString('vi-VN') + '</b> byte — còn <b>' +
+      (nd.conLai||0).toLocaleString('vi-VN') + '</b> byte nữa.' +
+      '<button type="button" id="af-tiep">Đọc tiếp</button></div>';
+  }
+  xem.innerHTML = h;
+  const nut = document.getElementById('af-tiep');
+  if(nut) nut.addEventListener('click', () =>
+    moArtifact(runID, duong, (nd.tu||0) + (nd.docByte||0)));
+}
+
 // ---------------------------------------------------------------- Tổng quan
 //
 // Meter CHỈ ăn số thật. Hai nguồn duy nhất hiện có:
@@ -1942,13 +2094,18 @@ let buocFlow = [];
 
 async function napDoTuFlow(state){
   const r = (state.runs||[])[0];
-  if(!r){ buocFlow = []; veTienDo(null, [], state.now); veTongQuan(); return; }
+  if(!r){ buocFlow = []; veTienDo(null, [], state.now); veArtifact(null); veTongQuan(); return; }
   const khoa = r.id + ':' + r.state;
   // Lượt ĐANG CHẠY thì phải đọc lại mỗi vòng: run.state đứng nguyên là
   // "running" suốt cả lượt, nên khoá cache theo nó là đóng băng tiến độ ở bước
   // đầu tiên — đúng kiểu hỏng im lặng, khối vẫn vẽ ra đầy đủ mà số không đổi.
   if(khoa === doFlow.khoa && r.state !== 'running'){
-    veTienDo(r, buocFlow, state.now); veTongQuan(); return;
+    veTienDo(r, buocFlow, state.now); veTongQuan();
+    // Bảng file vẽ lại kể cả khi tiến độ đã đóng băng: lượt đã xong rồi vẫn có
+    // thể được xoá artifact (DonArtifact chạy ở đầu mỗi lượt mới), và một bảng
+    // liệt kê file không còn tồn tại là bảng nói dối.
+    if(r.id !== afRun) veArtifact(r);
+    return;
   }
   try{
     const d = await api('/api/flow/detail?id=' + r.id);
@@ -1958,6 +2115,7 @@ async function napDoTuFlow(state){
     buocFlow = d.steps||[];
   }catch(e){ doFlow = {vao:0, ra:0, usd:0, id:r.id, khoa}; buocFlow = []; }
   veTienDo(r, buocFlow, state.now);
+  veArtifact(r);
   veTongQuan();
 }
 
@@ -2039,6 +2197,19 @@ function veKeHoachKhan(d){
       h += '<div class="mono" style="font-size:12px;padding:2px 0 2px 10px">· '+
         esc(b.id)+' <span class="mid">['+esc(b.type)+']</span>'+
         (phu ? ' <span class="mid">'+phu+'</span>' : '')+'</div>';
+      // BƯỚC KHÔNG CHẠY TRONG LƯỢT SUÔN SẺ. Bảng này liệt kê bước theo đợt của
+      // DAG, nên bước gỡ lại và bước chạy thay hiện ra y hệt một bước sắp chạy
+      // — trong khi bộ thực thi ghi thẳng chúng là `skipped` ngay đầu lượt.
+      // Dòng lệnh đã nói ra chuyện đó từ trước; ở đây thì chưa, và đây mới là
+      // chỗ người ta bấm chạy.
+      if((b.goLaiCho||[]).length){
+        h += '<div class="mid" style="font-size:12px;padding:0 0 2px 22px">KHÔNG chạy nếu suôn sẻ '+
+             '— bước gỡ lại cho '+esc(b.goLaiCho.join(' hoặc '))+', chạy xong thì cả lượt dừng</div>';
+      }
+      if((b.thayTheCho||[]).length){
+        h += '<div class="mid" style="font-size:12px;padding:0 0 2px 22px">KHÔNG chạy nếu suôn sẻ '+
+             '— bước chạy thay cho '+esc(b.thayTheCho.join(' hoặc '))+', chạy xong thì lượt đi tiếp</div>';
+      }
     });
   });
   h += '<div class="mid" style="margin-top:10px;font-size:12px">Chưa tiêu gì cả — '+

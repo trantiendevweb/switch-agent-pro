@@ -88,7 +88,18 @@ func ArtifactStepDir(runID int64, stepID string) string {
 // hoặc có `..` cho phép một flow gửi qua mạng ghi đè file bất kỳ trên máy người
 // nhận — cùng lớp nguy hiểm với lý do `plugin` chỉ nhận TÊN chứ không nhận
 // đường dẫn tới executable.
-func duongDanArtifact(rel string) error {
+func duongDanArtifact(rel string) error { return duongDanTuongDoi(rel, "thư mục của bước") }
+
+// duongDanTuongDoi là phép kiểm cú pháp dùng chung cho HAI chỗ gọi có cùng luật
+// nhưng khác RANH GIỚI: đường dẫn khai trong flows.toml bị chốt trong thư mục
+// của một BƯỚC, còn đường dẫn người gọi đưa vào lúc chạy bị chốt trong thư mục
+// của cả LƯỢT CHẠY.
+//
+// `choNao` là tên ranh giới đó, và nó có mặt vì một lý do cụ thể chứ không phải
+// cho đẹp: đo thật ngày 22/08, câu từ chối của endpoint đọc artifact nói "đi ra
+// ngoài thư mục của bước" trong khi thứ nó vừa chặn là một đường dẫn tương đối
+// so với LƯỢT CHẠY. Người đọc sửa theo câu đó sẽ sửa sai chỗ.
+func duongDanTuongDoi(rel, choNao string) error {
 	if strings.TrimSpace(rel) == "" {
 		return fmt.Errorf("đường dẫn rỗng")
 	}
@@ -97,11 +108,11 @@ func duongDanArtifact(rel string) error {
 	if filepath.IsAbs(rel) || filepath.VolumeName(rel) != "" ||
 		strings.HasPrefix(rel, "/") || strings.HasPrefix(rel, "\\") ||
 		strings.Contains(rel, ":") {
-		return fmt.Errorf("phải là đường dẫn TƯƠNG ĐỐI trong thư mục của bước, không phải %q", rel)
+		return fmt.Errorf("phải là đường dẫn TƯƠNG ĐỐI trong %s, không phải %q", choNao, rel)
 	}
 	c := filepath.ToSlash(filepath.Clean(rel))
 	if c == ".." || strings.HasPrefix(c, "../") {
-		return fmt.Errorf("%q đi ra ngoài thư mục của bước", rel)
+		return fmt.Errorf("%q đi ra ngoài %s", rel, choNao)
 	}
 	return nil
 }
@@ -109,6 +120,90 @@ func duongDanArtifact(rel string) error {
 // DuongDanArtifact là đường dẫn TUYỆT ĐỐI của một artifact.
 func DuongDanArtifact(runID int64, stepID, rel string) string {
 	return filepath.Join(ArtifactStepDir(runID, stepID), filepath.FromSlash(rel))
+}
+
+// ============================================================================
+// ĐỌC ARTIFACT TỪ NGOÀI VÀO — CỬA NGUY HIỂM NHẤT CỦA CẢ MẢNH NÀY
+// ============================================================================
+//
+// duongDanArtifact ở trên canh đường dẫn KHAI TRONG flows.toml. Hàm dưới đây
+// canh một thứ khác hẳn và nặng hơn: đường dẫn do NGƯỜI GỌI đưa vào lúc chạy —
+// tham số dòng lệnh, và query string của một endpoint HTTP trên cái cổng mà
+// dashboard tự biết có thể không nằm trên loopback (`s.exposed`).
+//
+// Ai chưa qua được cửa này thì không đọc được byte nào. BA lớp, và lớp thứ ba
+// mới là lớp thật:
+//
+//  1. Cùng bộ luật cú pháp với đường dẫn khai trong flows.toml (dùng lại đúng
+//     hàm đó, không chép luật ra chỗ thứ hai): không tuyệt đối, không ổ đĩa,
+//     không `..`.
+//  2. Ghép vào thư mục của lượt chạy rồi Clean.
+//  3. GIẢI LIÊN KẾT MỀM rồi so lại với gốc ĐÃ GIẢI LIÊN KẾT.
+//
+// Lớp 3 không thừa, và nó là lớp duy nhất chặn được ca thật ở đây: thư mục
+// artifact là chỗ AGENT GHI VÀO. Một agent (hoặc một bước shell trong flow ai
+// đó gửi tới) tạo được `run-51/soi/tat.lnk → ~/.ai-accounts/keys/` mà không cần
+// một dấu `..` nào. Lúc đó lớp 1 và 2 đều cho qua sạch sẽ, vì chuỗi đường dẫn
+// hoàn toàn vô tội — chỉ có ĐĨA mới biết nó trỏ đi đâu.
+//
+// Hỏng thì HỎNG KÍN: mọi lỗi đều trả về, không có nhánh nào "gần đúng thì cho
+// qua". filepath.Rel không tính được thì cũng là từ chối.
+func DuongDanArtifactAnToan(runID int64, duong string) (string, error) {
+	if err := duongDanTuongDoi(duong, fmt.Sprintf("thư mục artifact của lượt chạy #%d", runID)); err != nil {
+		return "", fmt.Errorf("đường dẫn artifact không hợp lệ: %w", err)
+	}
+	goc := ArtifactRunDir(runID)
+	gocThat, err := filepath.EvalSymlinks(goc)
+	if err != nil {
+		return "", fmt.Errorf("lượt chạy #%d không để lại artifact nào", runID)
+	}
+	that, err := filepath.EvalSymlinks(filepath.Join(goc, filepath.FromSlash(duong)))
+	if err != nil {
+		// Cố ý KHÔNG nói ra lỗi hệ thống gốc: "permission denied" với
+		// "no such file" là hai câu trả lời khác nhau cho người dò tìm, và
+		// chúng vẽ được bản đồ đĩa của máy chủ. Người dùng thật thì đã có
+		// danh sách file từ FlowArtifacts.
+		return "", fmt.Errorf("không có artifact %q trong lượt chạy #%d", duong, runID)
+	}
+	if !trongThuMuc(gocThat, that) {
+		return "", fmt.Errorf("đường dẫn %q đi ra NGOÀI thư mục artifact của lượt chạy #%d", duong, runID)
+	}
+	return that, nil
+}
+
+// trongThuMuc cho biết p có nằm trong goc không. Cả hai phải đã tuyệt đối và đã
+// giải liên kết mềm — hàm này chỉ so chuỗi, nó không biết gì về đĩa.
+//
+// Dùng filepath.Rel chứ không dùng strings.HasPrefix: `…/run-5` là tiền tố
+// chuỗi của `…/run-51`, nên HasPrefix cho một lượt chạy khác lọt qua.
+func trongThuMuc(goc, p string) bool {
+	rel, err := filepath.Rel(goc, p)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// TenTheoDuong lập bản đồ "<bước>/<đường dẫn tương đối>" → TÊN artifact khai
+// trong flows.toml.
+//
+// Chiều ngược của nguoiSanXuat, và có riêng vì bảng liệt kê đi từ ĐĨA vào: nó
+// duyệt file có thật rồi hỏi "cái này có tên không". File không có tên là
+// chuyện BÌNH THƯỜNG — bước ghi ba file mà chỉ khai một cái là hợp lệ — nên chỗ
+// gọi phải hiện nó ra chứ không được giấu. Giấu thì bảng nói thiếu đúng những
+// file mà không ai ngờ tới.
+func TenTheoDuong(f Flow) map[string]string {
+	out := map[string]string{}
+	for _, s := range f.Steps {
+		for ten, rel := range s.Artifact {
+			k := filepath.ToSlash(filepath.Join(s.ID, filepath.FromSlash(rel)))
+			out[k] = ten
+		}
+	}
+	return out
 }
 
 // nguoiSanXuat lập bản đồ TÊN artifact → bước khai ra nó.

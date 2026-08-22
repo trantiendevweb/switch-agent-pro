@@ -150,6 +150,13 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 				fmt.Printf("       ↩ BƯỚC GỠ LẠI — KHÔNG chạy trong lượt suôn sẻ; chỉ chạy khi %s hỏng\n",
 					strings.Join(b.GoLaiCho, " hoặc "))
 			}
+			// Bước CHẠY THAY: cùng một lời cảnh báo, cùng một lý do. Khác chữ
+			// vì khác vai — sau bước gỡ lại thì lượt chạy DỪNG, sau bước chạy
+			// thay thì lượt chạy ĐI TIẾP — và người đọc kế hoạch cần phân biệt.
+			if len(b.ThayTheCho) > 0 {
+				fmt.Printf("       ↪ BƯỚC CHẠY THAY — KHÔNG chạy trong lượt suôn sẻ; chỉ chạy khi %s hỏng\n",
+					strings.Join(b.ThayTheCho, " hoặc "))
+			}
 			// Quyền đọc in cho MỌI bước, kể cả bước chưa khai `doc_duoc`. In
 			// riêng bước có khai thì im lặng lại thành "mặc định là gì" — mà
 			// mặc định ở đây là MỞ HẾT, đúng thứ người đọc kế hoạch cần biết
@@ -166,7 +173,7 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 			}
 			// Ba trường mà bảng chạy khan trước đây KHÔNG hề nhắc tới. Cùng câu
 			// chữ với `flow show` (moTaBaTruong) — một nguồn, hai mặt.
-			for _, d := range moTaBaTruong(b.Artifact, b.Idempotent, b.Compensate) {
+			for _, d := range moTaBaTruong(b.Artifact, b.Idempotent, b.Compensate, b.Fallback) {
 				fmt.Printf("       %s\n", d)
 			}
 			if b.ConSot != "" {
@@ -187,6 +194,10 @@ func flowChayKho(name string, vars map[string]string, prof string) {
 	if kh.SoBuocGoLai > 0 {
 		fmt.Printf("  Trong đó %d bước là BƯỚC GỠ LẠI — không chạy nếu mọi thứ suôn sẻ, "+
 			"và KHÔNG tính vào tổng trên\n", kh.SoBuocGoLai)
+	}
+	if kh.SoBuocThayThe > 0 {
+		fmt.Printf("  Trong đó %d bước là BƯỚC CHẠY THAY — không chạy nếu mọi thứ suôn sẻ, "+
+			"và KHÔNG tính vào tổng trên\n", kh.SoBuocThayThe)
 	}
 	for _, v := range kh.Van {
 		mark := "✗"

@@ -743,8 +743,15 @@ func (r *Runner) xuLyHong(ctx context.Context, runID int64, f Flow, s Step, msg 
 		return false, ""
 
 	case OnFailFallback:
-		r.Bus.Warnf("%s.%s hỏng — bước %s sẽ chạy thay", f.Name, s.ID, s.Fallback)
-		return false, ""
+		xong, lyThay := r.chayThayThe(ctx, runID, f, s, vars, st)
+		if xong {
+			// Khác `compensate` ở ĐÚNG chỗ này: bước thay thế làm xong việc thì
+			// lượt chạy ĐI TIẾP. `compensate` gỡ lại rồi dừng vì việc chính coi
+			// như không làm; `fallback` thì việc chính có người làm thay.
+			return false, ""
+		}
+		return true, fmt.Sprintf("%s — VÀ BƯỚC CHẠY THAY %q CŨNG HỎNG (%s). "+
+			"Không còn đường nào khác cho bước này: dừng.", msg, s.Fallback, lyThay)
 
 	case OnFailCompensate:
 		xong, lyGo := r.chayGoLai(ctx, runID, f, s, vars, st)
@@ -812,6 +819,67 @@ func (r *Runner) chayGoLai(ctx context.Context, runID int64, f Flow, hong Step,
 			// Khoá này để mặt web nối được mũi tên "gỡ cho bước nào" mà không
 			// phải tách chuỗi trong câu Msg.
 			"go_lai_cho": hong.ID,
+		}})
+	return true, ""
+}
+
+// chayThayThe chạy bước CHẠY THAY của một bước vừa hỏng.
+//
+// Song song với chayGoLai và cố ý giống nó: cùng đường vào (`runStep`), cùng bộ
+// lọc quyền đọc, cùng biến `{{buoc_hong}}`, cùng lý do dùng ctx CỦA CẢ LƯỢT chứ
+// không phải waveCtx (một bước cùng đợt hỏng và huỷ đợt thì không được giết bước
+// đang chạy thay — nó sẽ bị ghi là "chạy thay cũng hỏng", một câu sai sự thật).
+//
+// Khác ở phần đuôi: gỡ lại xong thì dừng, chạy thay xong thì ĐI TIẾP — và để đi
+// tiếp được thì kết quả phải nằm đúng chỗ bước sau đang tìm. Xem fallback.go.
+//
+// Không có đường nào để thay-thế-của-thay-thế: runStep không xét `on_failure`
+// (việc đó của runWave). Tính chất của chỗ cắm, không phải một cái cờ.
+func (r *Runner) chayThayThe(ctx context.Context, runID int64, f Flow, hong Step,
+	vars map[string]string, st *runState) (xong bool, ly string) {
+
+	g, co := TimBuoc(f, hong.Fallback)
+	if !co {
+		ly = fmt.Sprintf("fallback trỏ tới bước %q không tồn tại", hong.Fallback)
+		r.Bus.Failuref("%s.%s: %s", f.Name, hong.ID, ly)
+		return false, ly
+	}
+	if g.ID == hong.ID {
+		ly := "bước không thể tự chạy thay chính nó"
+		r.Bus.Failuref("%s.%s: %s", f.Name, hong.ID, ly)
+		return false, ly
+	}
+
+	r.Bus.Warnf("%s.%s hỏng — chạy bước %s thay", f.Name, hong.ID, g.ID)
+
+	states, outs := st.snapshot()
+	outs = LocDocDuoc(g, outs)
+	arts := moiTruongThem(runID, f, g, states, outs)
+	// Một bước chạy thay dùng chung cho ba bước phải biết mình đang thay cho ai.
+	// CÙNG một biến với bước gỡ lại, không đặt tên thứ hai: câu hỏi giống hệt
+	// nhau ("bước nào vừa hỏng"), và hai cái tên cho một thứ là hai cái phải nhớ.
+	bien := make(map[string]string, len(vars)+1)
+	for k, v := range vars {
+		bien[k] = v
+	}
+	bien[KhoaBuocHong] = hong.ID
+
+	state, msg, out := r.runStep(ctx, runID, f, g, bien, outs, arts)
+	st.set(g.ID, state, out)
+	if state != store.StepDone {
+		return false, msg
+	}
+	// Kết quả của bước chạy thay đọc được BẰNG TÊN BƯỚC HỎNG — không có dòng này
+	// thì bước sau nhận một ô rỗng và `fallback` không dùng được vào việc gì.
+	ganKetQuaThayThe(f, st)
+	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + g.ID,
+		SessionID: runID, Msg: fmt.Sprintf("đã chạy thay cho bước %s", hong.ID),
+		Detail: map[string]string{
+			"run": fmt.Sprint(runID), "step": g.ID,
+			"state": store.StepDone, "type": g.Type,
+			// Cùng lý do với `go_lai_cho`: mặt web nối mũi tên bằng khoá có cấu
+			// trúc, không bằng cách tách chuỗi trong câu Msg.
+			"chay_thay_cho": hong.ID,
 		}})
 	return true, ""
 }

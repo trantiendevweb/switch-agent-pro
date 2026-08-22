@@ -106,6 +106,9 @@ func init() {
 		"__fapp":  {"flow.approve", "duyệt/từ chối bước đang chờ", nil},
 		"__fhuy":  {"flow.cancel", "huỷ một lượt chạy dở dang", nil},
 		"__ftt":   {"flow.tom-tat", "tóm tắt lượt chạy, đối chiếu lời agent với git", nil},
+		// `sagent flow artifacts <#> [đường-dẫn]` — lệnh con của `flow`, khai ở
+		// đây để test ngang quyền thấy nó.
+		"__fart": {"flow.artifacts", "xem file một lượt chạy để lại (liệt kê / đọc nội dung)", nil},
 		// `run` không có tên lệnh riêng: gõ thẳng địa chỉ là chạy.
 		"__run": {"profile.run", "chạy CLI bằng tài khoản đó", nil},
 	}
@@ -908,6 +911,12 @@ func cmdHelp() {
                                 nào hỏng vì sao, việc gì treo — rồi TỰ ĐẾM commit
                                 trên các nhánh sagent/* và đối chiếu với lời agent
                                 khai. Lệch thì nói thẳng và TIN GIT.
+    sagent flow artifacts <#>   FILE lượt chạy đó để lại: bước nào sản xuất,
+                                tên khai trong flows.toml, kích thước, đường dẫn
+    sagent flow artifacts <#> <đường-dẫn> [--tu <byte>]
+                                đọc nội dung MỘT file. Trần 65.536 byte mỗi lần
+                                đọc; bị cắt thì nói rõ còn bao nhiêu và in sẵn
+                                lệnh đọc khúc tiếp theo
     sagent flow approve <#> <bước>   duyệt để chạy tiếp
     sagent flow reject  <#> <bước>   từ chối, huỷ lần chạy
     sagent flow resume  <#>     chạy tiếp sau khi máy khởi động lại

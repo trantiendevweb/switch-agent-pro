@@ -56,8 +56,14 @@ func cmdFlow(args []string) {
 			fail(fmt.Errorf("thiếu số lần chạy. Ví dụ: sagent flow resume 3"))
 		}
 		flowResume(args[1])
+	case "artifacts", "file":
+		if len(args) < 2 {
+			fail(fmt.Errorf("thiếu số lần chạy. Ví dụ: sagent flow artifacts 51"))
+		}
+		flowArtifacts(args[1], args[2:])
 	default:
-		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | tom-tat | approve | reject | resume | huy", sub))
+		fail(fmt.Errorf("không hiểu 'flow %s' — dùng: list | show | validate | run | runs | tom-tat | "+
+			"artifacts | approve | reject | resume | huy", sub))
 	}
 }
 
@@ -109,9 +115,10 @@ func flowShow(name string) {
 		}
 		fmt.Println()
 	}
-	// Bước nào đang làm nhiệm vụ GỠ LẠI cho bước khác — tính một lần cho cả
-	// flow, đúng cách bộ thực thi tính (flow.BuocGoLai).
-	goLai := flow.BuocGoLai(f)
+	// Bước nào bị LOẠI khỏi lịch chạy thường — bước gỡ lại (`compensate`) và
+	// bước chạy thay (`fallback`). Tính một lần cho cả flow, đúng cách bộ thực
+	// thi tính (flow.BuocNgoaiLichThuong — cùng một hàm, không đếm lại).
+	ngoaiLich := flow.BuocNgoaiLichThuong(f)
 
 	fmt.Println("  Thứ tự chạy:")
 	for i, s := range order {
@@ -120,13 +127,14 @@ func flowShow(name string) {
 			dep = "  ← " + strings.Join(s.Needs, ", ")
 		}
 		fmt.Printf("   %d. %-10s [%s]%s\n", i+1, s.ID, s.Type, dep)
-		// BƯỚC GỠ LẠI: nói ra NGAY dưới tên bước, trước cả prompt.
+		// BƯỚC NGOÀI LỊCH THƯỜNG (gỡ lại / chạy thay): nói ra NGAY dưới tên
+		// bước, trước cả prompt.
 		//
-		// Đây là dòng quan trọng nhất trong cả bảng này. Bước gỡ lại đứng trong
-		// danh sách "Thứ tự chạy" y như mọi bước khác, nên người đọc đếm nó vào
-		// kế hoạch — trong khi bộ thực thi LOẠI nó khỏi lịch chạy thường và chỉ
-		// gọi khi có sự cố. Không có dòng này thì bảng đang nói sai.
-		if cho := flow.MoTaChoGoLai(f, s.ID); goLai[s.ID] && cho != "" {
+		// Đây là dòng quan trọng nhất trong cả bảng này. Chúng đứng trong danh
+		// sách "Thứ tự chạy" y như mọi bước khác, nên người đọc đếm chúng vào
+		// kế hoạch — trong khi bộ thực thi LOẠI chúng khỏi lịch chạy thường và
+		// chỉ gọi khi có sự cố. Không có dòng này thì bảng đang nói sai.
+		if cho := ngoaiLich[s.ID]; cho != "" {
 			fmt.Printf("      %s\n", cho)
 		}
 		switch s.Type {
@@ -162,7 +170,7 @@ func flowShow(name string) {
 		if s.Type == flow.TypeModel && s.Route != "" {
 			fmt.Printf("      đường: %s\n", s.Route)
 		}
-		for _, d := range moTaBaTruong(s.Artifact, s.Idempotent, buocGoLaiCua(s)) {
+		for _, d := range moTaBaTruong(s.Artifact, s.Idempotent, buocGoLaiCua(s), buocChayThayCua(s)) {
 			fmt.Printf("      %s\n", d)
 		}
 	}
@@ -205,25 +213,27 @@ func flowValidate() {
 	}
 }
 
-// moTaBaTruong dựng dòng mô tả cho ba trường mà `flow show` từng KHÔNG hiện:
-// `artifact`, `idempotent` và `compensate`.
+// moTaBaTruong dựng dòng mô tả cho những trường mà `flow show` từng KHÔNG hiện:
+// `artifact`, `idempotent`, `compensate` — và nay cả `fallback`.
 //
-// VÌ SAO ĐÚNG BA TRƯỜNG NÀY: cả ba đổi HÀNH VI của lượt chạy theo cách không
-// suy ra được từ tên bước hay từ sơ đồ phụ thuộc.
+// VÌ SAO ĐÚNG NHỮNG TRƯỜNG NÀY: tất cả đổi HÀNH VI của lượt chạy theo cách
+// không suy ra được từ tên bước hay từ sơ đồ phụ thuộc.
 //
 //	artifact    bước để lại FILE cho bước sau — đường truyền thứ hai, không đi
 //	            qua {{steps.x.output}} nên nhìn sơ đồ không thấy;
 //	idempotent  bước có thể KHÔNG CHẠY lần này vì một lượt trước đã làm xong;
-//	compensate  bước hỏng thì một bước khác chạy để GỠ LẠI, rồi cả lượt dừng.
+//	compensate  bước hỏng thì một bước khác chạy để GỠ LẠI, rồi cả lượt dừng;
+//	fallback    bước hỏng thì một bước khác chạy THAY, và lượt chạy ĐI TIẾP —
+//	            với kết quả của bước chạy thay nằm ở chỗ của bước hỏng.
 //
-// Người đọc `flow show` đang quyết định có bấm chạy hay không. Giấu ba thứ này
-// đi thì họ quyết định trên một bản kế hoạch thiếu ba hành vi.
+// Người đọc `flow show` đang quyết định có bấm chạy hay không. Giấu những thứ
+// này đi thì họ quyết định trên một bản kế hoạch thiếu mấy hành vi.
 //
-// Nhận ba GIÁ TRỊ chứ không nhận flow.Step: `sagent flow show` đọc từ Step, còn
+// Nhận GIÁ TRỊ chứ không nhận flow.Step: `sagent flow show` đọc từ Step, còn
 // bảng chạy khan đọc từ api.BuocKho đi qua JSON. Hai mặt phải in ra ĐÚNG một
 // câu chữ, và cách chắc chắn nhất là chúng gọi chung một hàm — chứ không phải
 // hai hàm "giống nhau" viết ở hai file.
-func moTaBaTruong(artifact map[string]string, idempotent bool, buocGoLai string) []string {
+func moTaBaTruong(artifact map[string]string, idempotent bool, buocGoLai, buocChayThay string) []string {
 	var out []string
 	if len(artifact) > 0 {
 		ten := make([]string, 0, len(artifact))
@@ -243,6 +253,13 @@ func moTaBaTruong(artifact map[string]string, idempotent bool, buocGoLai string)
 	if buocGoLai != "" {
 		out = append(out, "hỏng thì: chạy bước gỡ lại \""+buocGoLai+"\" rồi DỪNG cả lượt")
 	}
+	if buocChayThay != "" {
+		// Nói cả chỗ ĐỌC KẾT QUẢ, không chỉ tên bước: đó là nửa hay quên nhất
+		// của `fallback`, và quên nó thì người viết flow đi trỏ
+		// `{{steps.<bước chạy thay>.output}}` — một ô rỗng ở mọi lượt suôn sẻ.
+		out = append(out, "hỏng thì: chạy bước \""+buocChayThay+"\" THAY rồi ĐI TIẾP "+
+			"— kết quả của nó đọc bằng tên bước này")
+	}
 	return out
 }
 
@@ -251,6 +268,17 @@ func moTaBaTruong(artifact map[string]string, idempotent bool, buocGoLai string)
 func buocGoLaiCua(s flow.Step) string {
 	if s.OnFailure == flow.OnFailCompensate {
 		return s.Compensate
+	}
+	return ""
+}
+
+// buocChayThayCua trả về id bước chạy thay của s, hoặc "" nếu s không dùng chính
+// sách `fallback`. Cùng lý do tách như buocGoLaiCua: `Fallback` là một trường có
+// thể nằm đó mà không có tác dụng gì, và in nó ra khi không có tác dụng là nói
+// sai với đúng người đang quyết định có chạy hay không.
+func buocChayThayCua(s flow.Step) string {
+	if s.OnFailure == flow.OnFailFallback {
+		return s.Fallback
 	}
 	return ""
 }

@@ -94,6 +94,8 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/flow/save", s.guard(s.handleFlowSave))
 	m.HandleFunc("/api/flow/delete", s.guard(s.handleFlowDelete))
 	m.HandleFunc("/api/flow/def", s.guard(s.handleFlowDef))
+	m.HandleFunc("/api/flow/artifacts", s.guard(s.handleFlowArtifacts))
+	m.HandleFunc("/api/flow/artifact", s.guard(s.handleFlowArtifact))
 
 	m.HandleFunc("/login", s.handleLogin)
 	m.HandleFunc("/logout", s.handleLogout)
