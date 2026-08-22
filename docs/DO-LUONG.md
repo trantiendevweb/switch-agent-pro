@@ -4082,3 +4082,33 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
   một lời hứa sai trong chuỗi mô tả, và `flow validate` **có** kêu nhưng chưa ai
   chạy nó trên máy sạch. Cùng họ với dashboard cũ 16,5 tiếng: thứ hỏng nằm ở
   chỗ **không ai đo vì nó không phải mã**.
+
+## 22/08 — `TestNoiRaKhiDangChoTran` CHẬP CHỜN: đỏ 16/30 lượt, đã vào `main`
+
+- **Phát hiện lúc nào**: 22/08 16:40, khi chạy `go test ./...` sau một thay đổi
+  **không liên quan** (flow mẫu). Bài kiểm này đến từ lượt trộn trần đồng thời
+  cho đường flow (#206) chiều nay.
+- **Số đo**:
+
+  | Cách chạy | Kết quả |
+  |---|---|
+  | cả gói `internal/flow`, 4 lượt | **đỏ 2/4** |
+  | riêng bài đó, `-count=30` | **đỏ 16/30** |
+
+  Thông điệp luôn giống nhau: `TREO IM LẶNG: bước phải chờ mà không nói một
+  dòng nào` (`tran_flow_test.go:255`).
+- **KHÔNG phải do thay đổi của tôi**, và đây là điều phải chứng minh chứ không
+  phải khẳng định: bài kiểm **tự dựng flow riêng** (`buocAgent(4, "claude:tns")`)
+  và không đọc `Builtin()`; nó đỏ **cả khi chạy một mình** với `-count=30`, tức
+  không phải do tranh CPU với gói khác.
+- **Bản chất**: bài kiểm chờ **60ms** rồi khẳng định bộ chạy ĐÃ phát ra tin
+  *"đang chờ trần"*. Đó là một cuộc đua giữa goroutine phát tin và dòng đọc
+  `*noi` — 60ms không phải hàng rào, chỉ là một hy vọng.
+- **Vì sao nguy hiểm hơn một bài kiểm đỏ bình thường**: nó đỏ **hơn một nửa số
+  lượt**, nên nó dạy người đọc bỏ qua `go test ./...`. Một bộ test mà đỏ ngẫu
+  nhiên thì mọi lần đỏ THẬT sau đó đều bị đọc thành "lại chập chờn thôi".
+- **CHƯA SỬA, có lý do**: `internal/flow/tran_flow_test.go` đang nằm trong cây
+  làm việc của phiên **#208** (đã thấy nó sửa đúng file này, và chạy
+  `for i in 2 3; do go test` — nhiều khả năng đang đuổi đúng con chập chờn
+  này). Sửa chồng lên là hai bên giẫm chân. Nếu #208 không đóng, đây là việc
+  đầu tiên của lượt kế.
