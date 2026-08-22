@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
@@ -109,6 +110,13 @@ func (r *Runner) Start(ctx context.Context, f Flow, dir string, vars map[string]
 		merged[k] = v
 	}
 	raw, _ := json.Marshal(merged)
+
+	// Dọn artifact cũ ở đầu MỖI lượt chạy mới, không phải bằng một lệnh riêng.
+	// Một nút dọn rác phải nhớ bấm là một nút không ai bấm. Chỉ đụng tới lượt
+	// chạy ĐÃ KẾT THÚC và cũ hơn ArtifactGiuLai — xem DonArtifact.
+	if n := DonArtifact(r.DB, ArtifactGiuLai, time.Now()); n > 0 {
+		r.Bus.Infof("dọn artifact của %d lượt chạy cũ (quá %s)", n, ArtifactGiuLai)
+	}
 
 	runID, err := r.DB.CreateRun(f.Name, dir, string(raw))
 	if err != nil {

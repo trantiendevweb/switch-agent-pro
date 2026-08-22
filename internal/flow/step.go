@@ -52,6 +52,11 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 			// ba đường mà chỉ vá một. Bước không khai `doc_duoc` thì LocDocDuoc
 			// trả về nguyên map cũ — không đổi một byte nào.
 			outs = LocDocDuoc(s, outs)
+			// Biến artifact dựng ở ĐÂY, cùng chỗ và cùng lúc với `outs`: cả hai
+			// đều là "bước này được thấy gì của bước khác", và tách ra hai chỗ
+			// thì `doc_duoc` chặn được một đường mà hở đường kia. MoiTruongArtifact
+			// tự lọc theo doc_duoc, xem artifact.go.
+			arts := MoiTruongArtifact(runID, f, s, states)
 			if s.When != "" {
 				ok, err := Eval(s.When, Ctx{Vars: vars, States: states, Outputs: outs})
 				if err != nil {
@@ -95,7 +100,7 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 						SessionID: runID, Msg: "bỏ qua — danh sách rỗng"})
 					return
 				}
-				state, msg, out := r.runForEach(waveCtx, runID, f, s, vars, outs, items)
+				state, msg, out := r.runForEach(waveCtx, runID, f, s, vars, outs, arts, items)
 				st.set(s.ID, state, out)
 				if state == store.StepFailed && s.OnFailure != OnFailContinue && s.OnFailure != OnFailFallback {
 					mu.Lock()
@@ -108,7 +113,7 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 				return
 			}
 
-			state, msg, out := r.runStep(waveCtx, runID, f, s, vars, outs)
+			state, msg, out := r.runStep(waveCtx, runID, f, s, vars, outs, arts)
 			st.set(s.ID, state, out)
 
 			if state == store.StepFailed {
@@ -186,7 +191,20 @@ func (r *Runner) taiKhoan(s Step) string {
 // Kết quả gộp lại có đánh dấu từng mục, để bước sau đọc `{{steps.x.output}}`
 // vẫn biết mục nào ra kết quả gì.
 func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
-	vars map[string]string, outs map[string]string, items []string) (state, msg, output string) {
+	vars map[string]string, outs, arts map[string]string, items []string) (state, msg, output string) {
+
+	// `artifact` + `foreach` là một cái bẫy: mọi lượt lặp chạy song song trong
+	// CÙNG một thư mục artifact và ghi đè lên nhau, rồi `{{artifacts.<tên>}}` chỉ
+	// trỏ được tới một file — tức là bước sau đọc kết quả của một mục ngẫu nhiên
+	// và tưởng đó là kết quả của cả bước. Validate đã chặn ở lúc lưu; chặn thêm ở
+	// đây vì Flow còn dựng được thẳng bằng mã Go và bằng file chưa qua `validate`.
+	if len(s.Artifact) > 0 {
+		ly := "không dùng `artifact` chung với `foreach` — các lượt lặp chạy song song " +
+			"trong cùng một thư mục và sẽ ghi đè lên nhau"
+		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, ly, 1)
+		r.baoBuocHong(runID, f, s, ly)
+		return store.StepFailed, ly, ""
+	}
 
 	r.Bus.Infof("%s.%s lặp trên %d mục", f.Name, s.ID, len(items))
 	_ = r.DB.SetStep(runID, s.ID, store.StepRunning, fmt.Sprintf("lặp %d mục", len(items)), 1)
@@ -215,6 +233,9 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 				return
 			}
 			env := WithOutputs(itemVars(vars, item, i), outs)
+			for k, v := range arts {
+				env[k] = v
+			}
 
 			stepCtx := ctx
 			var cancel context.CancelFunc
@@ -280,9 +301,14 @@ func stepIDs(ss []Step) string {
 
 // runStep chạy một bước, có timeout và retry.
 func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
-	vars map[string]string, outputs map[string]string) (state, msg, output string) {
+	vars map[string]string, outputs, arts map[string]string) (state, msg, output string) {
 	// Bước sau dùng được kết quả bước trước.
 	env := WithOutputs(vars, outputs)
+	// …và FILE bước trước để lại. WithOutputs trả về map mới nên ghi thẳng vào
+	// đây không đụng gì tới `vars` của lượt chạy.
+	for k, v := range arts {
+		env[k] = v
+	}
 	tries := s.Retry + 1
 	if tries < 1 {
 		tries = 1
@@ -290,6 +316,15 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	var lastErr error
 	var kqCuoi KetQuaAgent // giữ kết quả lần thử cuối, kể cả khi nó hỏng
 	for attempt := 1; attempt <= tries; attempt++ {
+		// Dọn thư mục artifact TRƯỚC MỖI LẦN THỬ, không phải một lần trước vòng
+		// lặp. Lần thử 1 ghi được file rồi mới hỏng ở đoạn sau; nếu để file đó
+		// nằm lại thì lần thử 2 hỏng vẫn "đủ artifact" và bước được ghi là xong.
+		// Retry không được phép biến một bước hỏng thành một bước xong.
+		if _, err := ChuanBiArtifact(runID, s); err != nil {
+			_ = r.DB.SetStep(runID, s.ID, store.StepFailed, err.Error(), attempt)
+			r.baoBuocHong(runID, f, s, err.Error())
+			return store.StepFailed, err.Error(), ""
+		}
 		_ = r.DB.SetStep(runID, s.ID, store.StepRunning, "", attempt)
 		// Lưu CÂU HỎI trước khi chạy, không phải sau: bước có thể treo hoặc bị
 		// cắt ngang, mà lúc đó câu hỏi lại là thứ cần nhất để hiểu vì sao.
@@ -322,6 +357,18 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 		// tin nhầm — kể cả bước sau đang chờ nó.
 		if err == nil {
 			if thieu := ThieuPhaiCo(s, kq.Output); thieu != "" {
+				err = fmt.Errorf("%s", thieu)
+			}
+		}
+
+		// HỢP ĐỒNG ARTIFACT — cùng chỗ, cùng lý do với `phai_co` ngay trên.
+		//
+		// Khai `artifact` là hứa để lại một file. Không kiểm ở đây thì bước được
+		// ghi `done`, bước sau nhận một đường dẫn hợp lệ trỏ vào hư không, và nó
+		// hỏng bằng "no such file" — một thông báo chỉ vào SAI BƯỚC. Người đọc
+		// sổ sẽ đi tìm lỗi ở bước tiêu thụ trong khi thủ phạm là bước sản xuất.
+		if err == nil {
+			if thieu := ThieuArtifact(runID, s); thieu != "" {
 				err = fmt.Errorf("%s", thieu)
 			}
 		}
@@ -425,6 +472,13 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 			if id := BuocConSot(a, vars); id != "" {
 				return KetQuaAgent{}, fmt.Errorf(
 					"tham số %d cần kết quả của bước %q nhưng bước đó không để lại gì", i+1, id)
+			}
+			// Cùng luật cho artifact, và ở đây còn cần hơn: một placeholder
+			// artifact chưa thay sẽ được truyền vào lệnh như một TÊN FILE, và
+			// `no such file` là thông báo dẫn người đọc đi sai hướng.
+			if ten := ArtifactConSot(a, vars); ten != "" {
+				return KetQuaAgent{}, fmt.Errorf(
+					"tham số %d cần artifact %q nhưng bước sản xuất nó chưa để lại file nào", i+1, ten)
 			}
 			args[i] = Expand(a, vars)
 		}
