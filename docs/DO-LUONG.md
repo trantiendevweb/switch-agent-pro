@@ -3640,3 +3640,38 @@ với cây làm việc.
   con số đáng giá nhất còn thiếu — bước gộp báo cáo tốn bao nhiêu token vào
   trước/sau khi chuyển sang artifact (lượt #34 từng là 10.998 token cho một
   bước gộp).
+
+## 22/08 — `sagent help` bỏ sót 5 lệnh chạy được, không ai canh chiều CLI ↔ help
+
+- **Đo lúc nào**: 22/08/2026, khi cắm nốt phần `#202` cố ý để lại.
+- **Bắt đầu từ đâu**: `#202` thêm lệnh `nang-luc-api` và **tự nói ra** khoảng
+  trống nó không được phép vá: `cmdHelp()` trong `main.go` là một **chuỗi viết
+  tay**, không sinh từ bảng `commands`, nên lệnh mới chạy được ngay mà **không
+  bao giờ hiện ra trong help**.
+- **Đây là hình dạng lỗi thứ TƯ trong ngày**, cùng một họ với `route.kiem`, nút
+  Duyệt/Từ chối và `plugin.list`: thứ gì đó "có" ở mọi tầng **trừ** tầng người
+  dùng thật sự chạm vào. Luật ngang quyền của dự án canh
+  `api.Actions ↔ CLI ↔ HTTP ↔ web-UI`; nó **không** canh `CLI ↔ help`.
+- **Con số**: dựng `TestMoiLenhCapMotDeuXuatHienTrongHelp` (bắt stdout của
+  `cmdHelp()`, đối chiếu với bảng `commands`, bỏ qua tên tiền tố `__` vì đó là
+  quy ước cho lệnh con/cờ). Chạy lần đầu → **5 lệnh** chạy được mà help chưa
+  bao giờ nhắc:
+
+  | Lệnh | Người dùng mất gì khi không biết nó tồn tại |
+  |---|---|
+  | `plugin` | không có đường nào xem plugin đã cài xin quyền gì |
+  | `db` | không biết có `db backup` / `db restore` — đúng thứ cần lúc sự cố |
+  | `quet` | không biết cách tìm tiến trình mồ côi của phiên đã chết |
+  | `api` | không biết có đường API thứ hai, không tiêu hạn mức thuê bao |
+  | `version` | không biết cách phân biệt bản tải về với bản tự build |
+
+  Ba trong năm (`plugin`, `db`, `quet`) là **lệnh dùng lúc đang có sự cố** —
+  đúng lúc người ta đi gõ `sagent help`.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** — thêm cả 5 vào help kèm câu cảnh báo đi
+  kèm (`quet` chỉ LIỆT KÊ, Windows dùng lại PID; `db restore` phải dừng dash
+  trước; bảng quyền plugin: khai một quyền trong manifest **không tự nó là một
+  hàng rào**), cộng `nang-luc-api`. Bài kiểm nay xanh và **giữ cho lệnh thứ sáu
+  không lọt được nữa**.
+- **Bắt stdout chứ không tách chuỗi help thành hằng số**: tách ra là sửa mã sản
+  phẩm cho vừa bài kiểm, và bài kiểm sẽ đo cái hằng số đó thay vì đo thứ người
+  dùng thật sự thấy.

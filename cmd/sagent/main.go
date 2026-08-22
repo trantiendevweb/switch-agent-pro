@@ -864,11 +864,29 @@ func cmdHelp() {
     sagent clean <provider:tên> [--force]
                                 gỡ worktree + xoá clone (giữ lại worktree
                                 còn thay đổi chưa commit)
+    sagent quet                 tìm tiến trình MỒ CÔI của phiên đã chết (chỉ
+                                LIỆT KÊ). Windows dùng lại PID nên đọc kỹ tên và
+                                giờ bật trước khi thêm --giet
 
   Cấu hình theo dự án:
 
     sagent init                 tạo .sagent/project.toml
     sagent config               xem cấu hình đã gộp + đọc từ file nào
+    sagent version              phiên bản của binary NÀY (không phải của CLI
+                                nhà cung cấp)
+
+  Plugin — mã của người khác chạy trên máy mình:
+
+    sagent plugin               plugin đã cài + quyền chúng xin
+    sagent plugin quyen         bảng quyền: cột [chặn] nói host có hàng rào
+                                THẬT hay không. Khai một quyền trong manifest
+                                KHÔNG tự nó là một hàng rào
+
+  Sổ trạng thái:
+
+    sagent db                   xem sổ (đường dẫn, kích thước, schema)
+    sagent db backup            sao lưu ngay
+    sagent db restore <file>    khôi phục (DỪNG dash trước)
 
   Workflow:
 
@@ -904,7 +922,14 @@ func cmdHelp() {
 
   Route API:
 
+    sagent api "<câu hỏi>"      gọi thẳng AI API — đường THỨ HAI, đi theo khoá
+                                API chứ không tiêu hạn mức thuê bao
+    sagent api --lich-su        lịch sử lời gọi API: tiêu bao nhiêu, ở đâu
     sagent route                sổ route: cấu hình khai gì, đã gọi thật qua đâu
+    sagent nang-luc-api         route API nào làm được gì: gọi tool, đọc ảnh,
+                                đầu ra có cấu trúc… (làm được / không / chưa đo)
+                                --chua-do: chỉ những ô chưa ai đo
+                                --do [<route>]: ĐO THẬT — chạm mạng, TỐN TOKEN
 
   Dashboard:
 
