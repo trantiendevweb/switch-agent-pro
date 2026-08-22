@@ -1292,9 +1292,46 @@ function capNhat(){
     dan.push({khoa:'ai:'+st.profile, prof:st.profile, may:false, st:buocCua(st.profile)});
   });
 
+  // PHIÊN HẠM ĐỘI cũng là nhân vật — sửa 22/08 theo báo cáo của chủ dự án
+  // ("tôi không thấy AI luôn nhỉ").
+  //
+  // LỖI CŨ: vòng lặp trên chỉ đọc `flowSteps`, nên sàn CHỈ có người khi đang có
+  // một lượt FLOW. Chạy bằng `sagent fleet` — cách công cụ này thật sự được
+  // dùng cả ngày — thì sàn TRỐNG TRƠN dù có bao nhiêu agent. `hamDoi.sessions`
+  // vốn đã được nạp về (xem refresh()) nhưng chỉ dùng cho SỐ ở góc màn hình và
+  // cho nút Dừng của một nhân vật ĐÃ CÓ; không dòng nào tạo nhân vật từ nó.
+  //
+  // Hệ quả đo được: HUD ghi "2 phiên đang chạy" trong khi chân màn hình ghi
+  // "0 nhân vật" — hai con số của cùng một sự thật, trên cùng một màn hình, nói
+  // ngược nhau. Đúng hình dạng lỗi đã cắn dự án này năm lần trong ngày.
+  //
+  // Vì sao đứng ở Sảnh chung: phiên hạm đội KHÔNG có `vai_tro` (vai là thuộc
+  // tính của bước flow). `phongCuaVai('')` trả về đúng Sảnh chung — "chưa phân
+  // vai" là sự thật, không phải chỗ chứa tạm.
+  ((hamDoi && hamDoi.sessions) || []).forEach(s=>{
+    if(!s || !s.addr) return;
+    // Một phiên đã CHẾT thì không còn ai ngồi đó. Chỉ vẽ phiên còn sống, giống
+    // hệt luật của HUD — hai chỗ đếm khác nhau là lại đẻ ra đúng lỗi vừa sửa.
+    if(s.state !== 'running') return;
+    // Bước flow ĐÃ đại diện tài khoản này rồi thì đừng nhân đôi: cùng một agent
+    // không thể đứng ở hai phòng.
+    const hoSo = String(s.addr).split('#')[0];
+    if(daCo[hoSo]) return;
+    daCo[hoSo] = true;
+    dan.push({khoa:'phien:'+s.addr, prof:s.addr, may:false, st:null, phien:s});
+  });
+
   // Bỏ nhân vật không còn trong lượt chạy này.
   Object.keys(nhanVat).forEach(k=>{ if(!dan.some(d => d.khoa === k)) xoaNhanVat(k); });
-  $('scount').textContent = dan.length + ' nhân vật';
+
+  // NÓI RA KHI TRỐNG, đừng để "0 nhân vật" đọc thành "không ai đang chạy".
+  // Con số 0 ở đây có hai nghĩa khác hẳn nhau và người xem không phân biệt được:
+  // thật sự rảnh, hay mặt này không vẽ được thứ đang chạy.
+  const soChay = ((hamDoi && hamDoi.sessions) || []).filter(x => x.state === 'running').length;
+  $('scount').textContent = dan.length
+    ? dan.length + ' nhân vật'
+    : (soChay ? soChay + ' phiên đang chạy — chưa dựng được nhân vật, xem mặt 2D'
+              : 'chưa có ai chạy');
 
   // Xếp chỗ: gom theo phòng trước để biết mỗi phòng có bao nhiêu người.
   const theoPhong = {};
@@ -1315,7 +1352,10 @@ function capNhat(){
     if(!A.may && !A.obj) dungNguoi(A);
 
     const st = d.st;
-    const tt = st ? (st.state || '') : '';
+    // Nhân vật sinh từ PHIÊN hạm đội không có bước nào, nên trạng thái lấy từ
+    // chính phiên. Không có dòng này thì họ đứng im không màu, và người xem đọc
+    // ra là "có mặt nhưng không làm gì" — sai theo đúng chiều nguy hiểm.
+    const tt = st ? (st.state || '') : (d.phien ? (d.phien.state || '') : '');
     const phongCu = A.phongKhoa;
 
     // ĐỔI PHÒNG = bước chuyển sang loại việc khác. Đây là lúc DUY NHẤT nhân vật
@@ -1722,7 +1762,7 @@ function dungQuyDao(dan){
     }
     A.goc = goc;
     const st = d.st;
-    const tt = st && st.state ? st.state : '';
+    const tt = st && st.state ? st.state : (d.phien && d.phien.state ? d.phien.state : '');
     // Hạt chạy dọc beam CHỈ khi bước đang làm việc thật, và CHỈ khi người dùng
     // không bảo giảm chuyển động. Tạo rồi để đứng im là một chấm sáng vô nghĩa.
     if(CHAY(tt) && !RM){

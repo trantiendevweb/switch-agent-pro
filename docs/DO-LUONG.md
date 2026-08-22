@@ -3970,3 +3970,54 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
 - **Bài học về thứ tự việc**: tra sổ **trước khi** viết brief tốn 5 phút và cứu
   một lượt chạy. Cả ngày hôm nay tôi viết brief từ bản kế hoạch mà không đối
   chiếu ngược lại sổ đo lường — lần này tình cờ đối chiếu vì không biết ACP là gì.
+
+## 22/08 — Mặt 3D không vẽ phiên hạm đội: sàn trống trong khi HUD nói 2 phiên đang chạy
+
+- **Ai tìm ra**: chủ dự án, 22/08 chiều — *"tôi ko thấy AI luôn nhỉ"*, kèm ảnh
+  chụp mặt 3D trống trơn.
+- **Hai con số trên CÙNG một màn hình nói ngược nhau**: góc trái ghi
+  **"2 phiên đang chạy · 2.1M token · $201.08"**, chân màn hình ghi
+  **"0 nhân vật"**.
+- **Nguyên nhân, đọc mã chứ không đoán**:
+  1. `capNhat()` (`internal/dash/web/trung-tam.html`) dựng dàn nhân vật **chỉ**
+     bằng `flowSteps.forEach(...)`. `hamDoi.sessions` **có** được nạp về trong
+     `refresh()` nhưng chỉ dùng cho **số ở góc** (`capNhatHudSo`) và cho **nút
+     Dừng của một nhân vật ĐÃ CÓ** (`phienCuaNhanVat`). **Không dòng nào tạo
+     nhân vật từ một phiên.** Nên chạy bằng `sagent fleet` — đúng cách công cụ
+     này được dùng cả ngày — thì sàn **luôn trống**.
+  2. `refresh()` chọn `runs.find(r => r.state === 'running') || runs[0]`. Không
+     có flow nào chạy thì nó rơi về lượt gần nhất — hôm đó là **#70,
+     `completed`, 0 bước**, của một flow tạm **đã bị xoá**
+     (`sagent flow runs 70` → *"không có flow shell-song-song"*). Không có bước
+     nào để vẽ.
+  3. Nó **không nói ra**: *"0 nhân vật"* đọc thành *"không ai đang chạy"*.
+- **Đây là hình dạng lỗi thứ SÁU trong ngày** — sau `route.kiem`, nút Duyệt/Từ
+  chối, `plugin.list`, `sagent help`, và điểm mù của bảng năng lực: hai mặt của
+  cùng một sự thật lệch nhau, và mặt im lặng hiện ra như bình thường.
+- **Đã sửa, hai lớp**:
+  1. `capNhat()` thêm nhân vật từ `hamDoi.sessions` (chỉ phiên `running`), khoá
+     `phien:<addr>`, dedup theo hồ sơ để một agent không đứng hai phòng. Không
+     có `vai_tro` → `phongCuaVai('')` → đứng ở **Sảnh chung · chưa phân vai**,
+     đúng sự thật. Trạng thái lấy từ phiên khi không có bước.
+  2. Chỗ trống **tự nói ra**: `dan.length === 0` mà vẫn có phiên chạy thì in
+     *"N phiên đang chạy — chưa dựng được nhân vật, xem mặt 2D"*.
+- **FIXTURE CŨ KHÔNG KHỚP HỢP ĐỒNG, và đó là lý do lỗi lọt**:
+  `testdata/trungtam_harness.js` cấp phiên giả **không có trường `addr`**, trong
+  khi `sessionDTO` thật có. Ngay phía trên đó có sẵn một bình luận cảnh báo đúng
+  chuyện này cho `tokensIn`/`costUsd` — *"fixture được viết để khớp TRANG ĐANG
+  LỖI, không khớp hợp đồng"* — và lần này nó tái diễn ở một trường khác.
+- **Bài canh**: thêm **kịch bản 2** vào chính harness đang chạy thật
+  (`TestVanPhongChayThatVoiDomGia`, DOM giả + THREE giả + 60 khung hình): lượt
+  chạy gần nhất `completed` với **0 bước**, một phiên hạm đội đang chạy. Đã
+  chứng minh **ĐỎ** bằng cách gỡ đúng khối vừa thêm:
+
+  ```
+  [khong flow] scount: "1 phiên đang chạy — chưa dựng được nhân vật, xem mặt 2D"
+  HONG: cho doi DUNG MOT nhan vat (phien claude:phu#1 dang chay)
+  ```
+
+  Dòng đó cũng cho thấy **lớp vá thứ hai đứng độc lập**: kể cả khi không dựng
+  được nhân vật, màn hình đã thôi nói dối.
+- **Kịch bản 2 không đụng con số nào của kịch bản 1** (6 nhân vật · 6 đường nối
+  · 6 nhãn): `addr` của phiên đang chạy cố ý trùng profile `claude:phu` của một
+  bước flow nên đi qua đường **dedup**.

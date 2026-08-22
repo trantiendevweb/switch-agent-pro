@@ -215,6 +215,10 @@ const buocGia = [
 ];
 
 let khung = null;
+// kichBan 1 = co mot luot flow DANG CHAY (mac dinh, moi phep kiem cu dung no).
+// kichBan 2 = khong flow nao chay, luot gan nhat da xong va 0 buoc.
+let kichBan = 1;
+
 const ctx = {
   THREE, console, Math, JSON, Promise, Error, Float32Array, Array, Object,
   String, Number, Boolean, Date, Set, Map,
@@ -238,8 +242,12 @@ const ctx = {
   fetch: async (u) => {
     const s = String(u);
     if (s.endsWith('.glb')) return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
-    if (s.indexOf('/api/flows') >= 0) return { ok: true, json: async () => ({ runs: [{ id: 46, flow: 'doi-4', state: 'running' }] }) };
-    if (s.indexOf('/api/flow/detail') >= 0) return { ok: true, json: async () => ({ steps: buocGia }) };
+    // kichBan 2 = KHONG co flow nao dang chay, luot gan nhat da xong va KHONG
+    // co buoc nao. Day dung la canh chu du an gap that ngay 22/08.
+    if (s.indexOf('/api/flows') >= 0) return { ok: true, json: async () => ({ runs: kichBan === 2
+      ? [{ id: 70, flow: 'shell-song-song', state: 'completed' }]
+      : [{ id: 46, flow: 'doi-4', state: 'running' }] }) };
+    if (s.indexOf('/api/flow/detail') >= 0) return { ok: true, json: async () => ({ steps: kichBan === 2 ? [] : buocGia }) };
     if (s.indexOf('/api/state') >= 0) return {
       ok: true, json: async () => ({ sessions: [
         // TEN TRUONG PHAI KHOP sessionDTO trong internal/dash/server.go:
@@ -250,8 +258,18 @@ const ctx = {
         // khop voi hop dong. Bai kiem va ma cung chia mot gia dinh sai thi bai
         // kiem thanh ra chung thuc cho chinh cai loi. Do la ly do o token/chi
         // phi tren man 3D dung o dau gach rat lau ma khong bai kiem nao keu.
-        { id: 1, state: 'running', tokensIn: 10000, tokensOut: 2500, costUsd: 0.42 },
-        { id: 2, state: 'stopped', tokensIn: 2600, tokensOut: 500, costUsd: 0.11 }
+        //
+        // `addr` THEM 22/08: sessionDTO that CO truong nay, fixture cu thi khong.
+        // Thieu no, doan ma ve nhan vat tu phien ham doi khong bao gio chay
+        // trong bai kiem, va lo hong "chay bang sagent fleet thi san 3D trong
+        // tron" van di qua duoc. Cung mot bai hoc voi tokensIn/costUsd o tren:
+        // fixture phai khop HOP DONG, khong khop trang dang loi.
+        //
+        // addr cua phien dang chay CO Y trung profile `claude:phu` cua buoc
+        // flow, de bai kiem di qua duong DEDUP: mot agent khong duoc dung o hai
+        // phong. Nho vay moi con so cu trong file nay giu nguyen.
+        { id: 1, addr: 'claude:phu#1', state: 'running', tokensIn: 10000, tokensOut: 2500, costUsd: 0.42 },
+        { id: 2, addr: 'codex:tns#2', state: 'stopped', tokensIn: 2600, tokensOut: 500, costUsd: 0.11 }
       ] })
     };
     // Duong ghi (POST) cua thanh lenh — tra ve nhu that de kiem duoc lenh.
@@ -653,6 +671,28 @@ setTimeout(async () => {
     }
   } else {
     console.error('  HONG: khong thay ham loiThoai'); hong++;
+  }
+
+  // ---- KICH BAN 2: KHONG FLOW NAO CHAY, ma HAM DOI VAN dang chay ----
+  //
+  // Lo hong that, chu du an bao 22/08: "toi ko thay AI luon nhi". San 3D trong
+  // tron trong khi HUD ngay goc man hinh ghi "2 phien dang chay". Nguyen nhan:
+  // capNhat() dung dan nhan vat CHI tu flowSteps; hamDoi.sessions thi chi dung
+  // cho SO o goc va cho nut Dung cua mot nhan vat DA CO.
+  //
+  // Bai kiem nay dung lai dung canh do: luot chay gan nhat da xong, 0 buoc, va
+  // mot phien ham doi dang chay. Truoc ban va: scount = "0 nhan vat".
+  kichBan = 2;
+  await ctx.refresh();
+  for (let i = 0; i < 5; i++) khung();
+  const sc = kho.scount.textContent;
+  console.log('  [khong flow] scount: ' + JSON.stringify(sc));
+  if (/^0 /.test(sc)) {
+    console.error('  HONG: ham doi dang chay ma san 3D khong co ai — dung loi 22/08'); hong++;
+  }
+  if (!/1 nhân vật/.test(sc)) {
+    console.error('  HONG: cho doi DUNG MOT nhan vat (phien claude:phu#1 dang chay), duoc: ' + sc);
+    hong++;
   }
 
   console.log(hong ? '\nCO ' + hong + ' CHO HONG' : '\nTAT CA KIEM TRA XANH');
