@@ -35,8 +35,9 @@ const (
 	TypeTest    = "test"    // chạy commands.test của project
 	TypeLint    = "lint"    // chạy commands.lint
 	TypeReview  = "review"  // agent đọc kết quả bước trước
-	TypeMerge   = "merge"   // gộp nhánh — hành động nguy hiểm, mặc định cần duyệt
+	TypeMerge   = "merge"   // gộp ĐẦU RA của N bước (KHÔNG phải gộp nhánh git — xem merge.go)
 	TypePlugin  = "plugin"  // gọi một plugin ngoài (executable riêng, JSON-RPC/stdio)
+	TypeRoute   = "route"   // chọn đường API còn sống rồi chuyền tên cho bước sau
 )
 
 // implemented đánh dấu loại nào chạy được ở phiên bản hiện tại.
@@ -50,14 +51,27 @@ var implemented = map[string]bool{
 	// usage, có chuyển route dự phòng, có sổ lời gọi). Xem TypeModel trong
 	// internal/flow/step.go.
 	TypeModel: true,
-	// còn chờ cơ chế merge an toàn
-	TypeMerge: false,
+	// merge = gộp ĐẦU RA của N bước. Bật 22/08.
+	//
+	// Ghi chú cũ ở đây là "còn chờ cơ chế merge an toàn", và nó treo suốt vì
+	// hiểu `merge` là gộp NHÁNH GIT — việc đó không có cách nào làm an toàn
+	// bằng một dòng TOML, nên cái cơ chế ấy sẽ không bao giờ tới.
+	//
+	// Node này gộp CHỮ, và "an toàn" ở đây có nghĩa đo được: hai lượt chạy
+	// giống hệt nhau cho ra đúng một khối chữ. Hai câu quyết định chuyện đó —
+	// gộp theo thứ tự nào, và nguồn hỏng thì ra gì — được trả lời ở đầu
+	// merge.go, và TestMergeHaiLuotGiongHetNhauRaGiongNhau giữ câu trả lời.
+	TypeMerge: true,
 	// plugin = gọi một executable ngoài qua JSON-RPC/stdio (internal/plugin).
 	// Bật vì đã chạy THẬT đầu-cuối, không phải vì đã viết xong mã: xem
 	// TestFlowChayPluginThat trong internal/plugin/e2e_test.go — nó build plugin
 	// mẫu, dựng flow.Runner thật, và khẳng định output của bước đến từ tiến trình
 	// con. Bộ chạy chưa cắm thì bước báo lỗi rõ ràng chứ không im lặng bỏ qua.
 	TypePlugin: true,
+	// route = chọn đường API còn sống rồi chuyền TÊN cho bước sau. Bật 22/08.
+	// Không có mã gọi mạng nào ở gói này: nó dùng lại đúng aiapi.Kiem và
+	// API.ThuTuRoute qua interface RouteChon — xem route.go.
+	TypeRoute: true,
 }
 
 // Chính sách khi một bước hỏng.
@@ -257,7 +271,21 @@ type Step struct {
 
 	// Route là route API cho node `model`. Rỗng = `default_route` rồi tới route
 	// dự phòng, y như `sagent api "câu hỏi"`. Không dùng cho node khác.
+	//
+	// NHẬN {{bien}} và {{steps.<id>.output}}: đó là cách một bước `model` đi
+	// theo đường mà một bước `route` vừa chọn. Trước đây trường này đi thẳng
+	// vào lời gọi mà không qua Expand, nên viết placeholder vào đây chỉ ra một
+	// tên route không tồn tại.
 	Route string `toml:"route,omitempty" json:"route,omitempty"`
+
+	// Routes là danh sách ứng viên của node `route`, theo THỨ TỰ ƯU TIÊN:
+	//
+	//	routes = ["grok", "deepseek"]
+	//
+	// Rỗng = để cấu hình quyết định (`default_route` rồi tới route dự phòng).
+	// Chỉ dùng cho node `route`; khai ở node khác là một dòng chết và Validate
+	// báo lỗi. Xem route.go.
+	Routes []string `toml:"routes,omitempty" json:"routes,omitempty"`
 
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
@@ -518,6 +546,13 @@ func Validate(f Flow) []Problem {
 
 	// `compensate` — xem compensate.go. Cần cả flow vì nó soi cả quan hệ needs.
 	ps = append(ps, VanDeCompensate(f)...)
+
+	// `merge` — xem merge.go. Cần cả flow vì nó soi `on_failure` của các nguồn.
+	ps = append(ps, VanDeMerge(f)...)
+
+	// `route` — xem route.go. Cần cả flow vì nó soi hai chiều: bước chọn đường
+	// có ai dùng không, và bước dùng có trỏ đúng vào một bước chọn đường không.
+	ps = append(ps, VanDeRoute(f)...)
 
 	return ps
 }

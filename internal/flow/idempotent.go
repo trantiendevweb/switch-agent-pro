@@ -88,15 +88,25 @@ func KhoaIdem(s Step, env map[string]string) string {
 		fmt.Fprintf(h, "%s\x00%d\x00%s\x00", nhan, len(v), v)
 	}
 
+	e := envChoKhoa(env)
+
 	ghi("id", s.ID)
 	ghi("type", s.Type)
 	// cauHoi() là ĐÚNG thứ bước gửi đi sau khi thay hết biến — prompt cho agent,
-	// dòng lệnh cho shell, đầu vào cho plugin. Dùng lại nó thay vì băm từng
-	// trường thô để khoá không thể lệch khỏi thứ thật sự được thực thi.
-	ghi("viec", cauHoi(s, envChoKhoa(env)))
+	// dòng lệnh cho shell, đầu vào cho plugin, khối chữ đã gộp cho merge. Dùng
+	// lại nó thay vì băm từng trường thô để khoá không thể lệch khỏi thứ thật
+	// sự được thực thi.
+	ghi("viec", cauHoi(s, e))
 	ghi("profile", s.Profile)
 	ghi("model", s.Model)
-	ghi("route", s.Route)
+	// ĐÃ THAY BIẾN, không phải chuỗi thô trong flows.toml. Từ khi có node
+	// `route`, trường này thường là "{{steps.chon-duong.output}}" — băm chuỗi
+	// thô thì hai lượt chạy đi HAI ĐƯỜNG KHÁC NHAU vẫn ra cùng một khoá, và
+	// lượt sau dùng lại câu trả lời của một mô hình khác hẳn.
+	ghi("route", Expand(s.Route, e))
+	for _, r := range s.Routes {
+		ghi("routes", Expand(r, e))
+	}
 	ghi("copies", fmt.Sprint(s.Copies))
 	ghi("worktree", fmt.Sprint(s.Worktree))
 	ghi("tu_duyet", fmt.Sprint(s.TuDuyetQuyen))

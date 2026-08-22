@@ -56,7 +56,7 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 			// đều là "bước này được thấy gì của bước khác", và tách ra hai chỗ
 			// thì `doc_duoc` chặn được một đường mà hở đường kia. MoiTruongArtifact
 			// tự lọc theo doc_duoc, xem artifact.go.
-			arts := MoiTruongArtifact(runID, f, s, states)
+			arts := moiTruongThem(runID, f, s, states, outs)
 			if s.When != "" {
 				ok, err := Eval(s.When, Ctx{Vars: vars, States: states, Outputs: outs})
 				if err != nil {
@@ -207,6 +207,10 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 	case s.Idempotent:
 		lyDoChan = "chưa dùng `idempotent` chung với `foreach` được — một khoá chung cho cả bước " +
 			"sẽ bỏ qua cả những mục MỚI trong danh sách"
+	case s.Type == TypeMerge:
+		lyDoChan = "không dùng `foreach` với `merge` — mỗi lượt lặp sẽ gộp lại đúng cùng một tập nguồn"
+	case s.Type == TypeRoute:
+		lyDoChan = "không dùng `foreach` với `route` — mỗi lượt lặp sẽ chọn lại đúng cùng một tập đường"
 	}
 	if lyDoChan != "" {
 		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, lyDoChan, 1)
@@ -297,6 +301,28 @@ func short(s string, n int) string {
 		return string(r)
 	}
 	return string(r[:n-1]) + "…"
+}
+
+// moiTruongThem gom MỌI biến thuộc loại "bước này được thấy gì của bước khác"
+// vào đúng một chỗ: đường dẫn artifact, và khối chữ đã gộp của bước `merge`.
+//
+// Một chỗ chứ không hai, vì cả hai đều đi qua cùng một bộ lọc quyền đọc
+// (`doc_duoc`) và đều cần TRẠNG THÁI các bước nguồn — thứ mà do() không có.
+// Tách ra hai chỗ thì `doc_duoc` chặn được một đường mà hở đường kia; đó đúng
+// là lý do biến artifact đã được dựng cạnh `outs` ngay từ đầu.
+func moiTruongThem(runID int64, f Flow, s Step, states, outs map[string]string) map[string]string {
+	m := MoiTruongArtifact(runID, f, s, states)
+	gop := MoiTruongGop(s, states, outs)
+	if len(gop) == 0 {
+		return m
+	}
+	if m == nil {
+		m = make(map[string]string, len(gop))
+	}
+	for k, v := range gop {
+		m[k] = v
+	}
+	return m
 }
 
 func stepIDs(ss []Step) string {
@@ -471,7 +497,58 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 			return KetQuaAgent{}, fmt.Errorf("node `model` cần đường AI API nhưng chưa được cắm " +
 				"(xem internal/api: Runner.Model)")
 		}
-		return r.Model.GoiModel(ctx, s.Route, ExpandChay(s.Prompt, vars))
+		// `route` đi qua Expand chứ KHÔNG phải ExpandChay, và thiếu thì dừng
+		// ngay — cùng luật với tham số của bước shell, vì cùng lớp nguy hiểm.
+		// Chốt placeholder ở đây sẽ cho ra tên route là cả một câu tiếng Việt,
+		// rồi lỗi hiện ra là "không có route này" kèm nguyên câu đó: một thông
+		// báo chỉ vào sai chỗ hoàn toàn.
+		if id := BuocConSot(s.Route, vars); id != "" {
+			return KetQuaAgent{}, fmt.Errorf(
+				"route cần kết quả của bước %q nhưng bước đó không để lại gì — bước này không biết đi đường nào", id)
+		}
+		return r.Model.GoiModel(ctx, strings.TrimSpace(Expand(s.Route, vars)), ExpandChay(s.Prompt, vars))
+
+	// Node `route`: CHỌN đường rồi chuyền tên cho bước sau. Xem route.go.
+	case TypeRoute:
+		if r.Route == nil {
+			return KetQuaAgent{}, fmt.Errorf("node `route` cần đường AI API nhưng chưa được cắm " +
+				"(xem internal/api: Runner.Route)")
+		}
+		ung := make([]string, 0, len(s.Routes))
+		for _, x := range s.Routes {
+			if t := strings.TrimSpace(Expand(x, vars)); t != "" {
+				ung = append(ung, t)
+			}
+		}
+		kq, err := r.Route.ChonRoute(ctx, ung)
+		// Nhật ký in ra CẢ KHI hỏng: lúc không đường nào sống thì lý do từng
+		// đường chết mới là thứ người đọc cần, chứ không phải một câu tổng kết.
+		for _, d := range kq.NhatKy {
+			r.Bus.Infof("%s.%s: %s", s.ID, "route", d)
+		}
+		if err != nil {
+			return KetQuaAgent{}, err
+		}
+		ten := strings.TrimSpace(kq.Ten)
+		if ten == "" {
+			return KetQuaAgent{}, fmt.Errorf("phần cắm route trả về một cái tên RỖNG mà không báo lỗi — " +
+				"bước sau sẽ đi đường mặc định thay vì đường được chọn, nên dừng ở đây")
+		}
+		// Output là ĐÚNG cái tên, không gì khác — nó sẽ đi thẳng vào
+		// `route = "{{steps.x.output}}"` của bước sau.
+		return KetQuaAgent{Output: ten}, nil
+
+	// Node `merge`: gộp đầu ra của các bước trong `needs`. Xem merge.go.
+	//
+	// Phần chữ đã được dựng sẵn ở moiTruongThem, cùng chỗ và cùng lúc với biến
+	// artifact — vì nó cần TRẠNG THÁI các bước nguồn, mà do() không có.
+	case TypeMerge:
+		gop, co := vars[KhoaGopDauRa]
+		if !co {
+			return KetQuaAgent{}, fmt.Errorf("bước merge %q chạy mà bộ chạy chưa dựng phần chữ đã gộp "+
+				"— đây là lỗi của chỗ dựng Runner, không phải của flow", s.ID)
+		}
+		return KetQuaAgent{Output: gop}, nil
 
 	case TypeShell, TypeTest, TypeLint:
 		argv := s.Run
@@ -576,6 +653,17 @@ func cauHoi(s Step, vars map[string]string) string {
 		// Bước plugin cũng là tiếng nói của MÁY: ghi lại ĐÚNG thứ đã gửi đi, vì
 		// đó là thứ duy nhất giải thích được vì sao plugin trả về cái nó trả về.
 		return ExpandChay(s.Vao, vars)
+	// Với `merge`, "câu hỏi" là ĐÚNG khối chữ nó gộp được. Không phải một câu
+	// tóm tắt kiểu "gộp a, b, c": khối chữ ấy chính là toàn bộ đầu vào quyết
+	// định kết quả bước, nên nó phải nằm trong khoá idempotency (KhoaIdem đọc
+	// cauHoi). Tóm tắt thì nguồn đổi kết quả mà khoá không đổi, và lượt sau sẽ
+	// dùng lại một khối gộp đã cũ.
+	case TypeMerge:
+		return vars[KhoaGopDauRa]
+	// Với `route`, "câu hỏi" là tập đường được xét — thứ duy nhất quyết định
+	// đường nào được chọn.
+	case TypeRoute:
+		return "chọn đường: " + MoTaRoute(s)
 	case TypeShell, TypeTest, TypeLint:
 		if len(s.Run) == 0 {
 			return ""
@@ -701,7 +789,7 @@ func (r *Runner) chayGoLai(ctx context.Context, runID int64, f Flow, hong Step,
 
 	states, outs := st.snapshot()
 	outs = LocDocDuoc(g, outs)
-	arts := MoiTruongArtifact(runID, f, g, states)
+	arts := moiTruongThem(runID, f, g, states, outs)
 	// Bước gỡ lại phải biết mình đang gỡ CÁI GÌ. Không có biến này thì một bước
 	// gỡ dùng chung cho ba bước không có cách nào phân biệt, và người viết flow
 	// phải chép ra ba bước gỡ gần như giống hệt nhau.

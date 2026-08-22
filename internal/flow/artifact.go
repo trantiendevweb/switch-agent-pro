@@ -203,17 +203,10 @@ func CauChanArtifact(ten, buoc string) string {
 }
 
 // artifactChoDoc: bước s có được đọc artifact của bước buoc không.
-func artifactChoDoc(s Step, buoc string) bool {
-	if s.DocDuoc == nil {
-		return true // chưa khai = mở hết, y như output
-	}
-	for _, id := range s.DocDuoc {
-		if id == buoc {
-			return true
-		}
-	}
-	return false
-}
+//
+// Cùng một phép kiểm tư cách với output và với `merge` — xem ChoDoc trong
+// doc_duoc.go. Giữ cái tên này vì nó nói đúng chỗ dùng.
+func artifactChoDoc(s Step, buoc string) bool { return ChoDoc(s, buoc) }
 
 // MoiTruongArtifact dựng phần biến artifact cho MỘT bước sắp chạy.
 //
@@ -354,11 +347,16 @@ func sapXepKhoa(m map[string]string) []string {
 // loaiKhongGhiDuocFile là những loại node KHÔNG có đường nào ghi ra file.
 //
 // `approve` không bao giờ được thực thi (nó là cái rào, người duyệt mới gỡ);
-// `notify` và `model` chỉ trả về chữ. Khai artifact ở ba loại này là khai một
+// `notify` và `model` chỉ trả về chữ. Khai artifact ở những loại này là khai một
 // hợp đồng chắc chắn không giữ được — bước sẽ hỏng ở MỌI lượt chạy, và hỏng vì
 // một lý do mà lúc viết flow đã nhìn ra được.
+//
+// `merge` và `route` vào cùng danh sách vì cùng lý do: merge chỉ nối chữ đã có
+// sẵn trong bộ nhớ, route chỉ trả về một cái tên. Không loại nào có đường nào
+// chạm tới đĩa.
 var loaiKhongGhiDuocFile = map[string]bool{
 	TypeApprove: true, TypeNotify: true, TypeModel: true,
+	TypeMerge: true, TypeRoute: true,
 }
 
 // VanDeArtifact soi phần `artifact` của cả flow.

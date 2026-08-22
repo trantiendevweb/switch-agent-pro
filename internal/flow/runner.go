@@ -77,6 +77,14 @@ type Runner struct {
 	// lỗi nói rõ là chưa cắm, chứ không bỏ qua rồi trả về chuỗi rỗng.
 	Plugin PluginRunner
 
+	// Route chạy node `route` — chọn đường API còn sống rồi chuyền tên cho bước
+	// sau. nil = chưa cắm, cùng luật với Model và Plugin.
+	//
+	// Tách khỏi Model dù cùng đi tới một gói: gọi model TIÊU TIỀN theo token và
+	// trả về chữ, còn chọn đường chỉ hỏi thăm sức khoẻ (không tốn token) và trả
+	// về một cái tên. Xem RouteChon trong route.go.
+	Route RouteChon
+
 	// MaxParallel là trần số bước/agent chạy cùng lúc, lấy từ policy của dự án.
 	MaxParallel int
 

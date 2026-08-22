@@ -62,7 +62,10 @@
 // có chuyện".
 package flow
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // KhoaBuocHong là tên biến bước gỡ lại dùng để biết mình đang gỡ cái gì.
 //
@@ -187,4 +190,21 @@ func VanDeCompensate(f Flow) []Problem {
 		}
 	}
 	return ps
+}
+
+// BuocDuocGoLaiBoi trả về các bước mà `id` làm nhiệm vụ GỠ LẠI cho, đã sắp xếp.
+//
+// Cùng dữ liệu với MoTaChoGoLai nhưng ở dạng DANH SÁCH thay vì một câu: mặt web
+// và bảng chạy khan cần nối được "gỡ cho bước nào" thành liên kết, mà tách chuỗi
+// từ một câu tiếng Việt thì sớm muộn cũng sai. Một nguồn, hai dạng — chứ không
+// phải hai chỗ tự đi đếm.
+func BuocDuocGoLaiBoi(f Flow, id string) []string {
+	var out []string
+	for _, s := range f.Steps {
+		if s.OnFailure == OnFailCompensate && s.Compensate == id {
+			out = append(out, s.ID)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
