@@ -295,6 +295,52 @@ func TestRutCoGoiVaKiemCoGoiCanhDungLuatCua_apiGoi(t *testing.T) {
 	}
 }
 
+// QUYẾT ĐỊNH NHÁNH phải SOÁT CỜ TRƯỚC, và phải chốt đúng nhánh.
+//
+// Bài này ra đời từ phép thử phá hoại thứ hai còn sống sót tối 22/08: gỡ hẳn
+// lời gọi `kiemCoGoi` ra khỏi `apiGoi` mà toàn bộ test vẫn xanh — `apiGoi` mở
+// CSDL và gọi `os.Exit` nên không bài kiểm nào chạm được vào nó.
+//
+// Khe đó KHÔNG đóng bằng cách viết thêm một bài kiểm, mà bằng cách làm cho lời
+// gọi không bỏ được: nhánh dưới `switch` theo `v.Nhanh`, thứ chỉ `quyetDinhGoi`
+// sinh ra. Bài này canh nốt phần còn lại — rằng `quyetDinhGoi` thật sự soát.
+func TestQuyetDinhGoiSoatCoTruocRoiMoiChotNhanh(t *testing.T) {
+	// Soát TRƯỚC: tổ hợp cấm không được chốt nhánh nào cả.
+	if _, err := quyetDinhGoi(coGoi{Stream: true, AnhFile: []string{"a.png"}}, []string{"hỏi"}); err == nil {
+		t.Fatal("--stream + --anh mà vẫn chốt được nhánh — lời soát cờ bị bỏ qua, và " +
+			"lượt gọi sẽ chạy với một cờ người dùng đã gõ bị vứt trong im lặng")
+	}
+
+	for _, x := range []struct {
+		ten  string
+		co   coGoi
+		muon nhanhGoi
+	}{
+		{"không cờ gì", coGoi{}, nhanhThuong},
+		{"--stream", coGoi{Stream: true}, nhanhThuong},
+		{"--tool", coGoi{FileTool: "t.json"}, nhanhTool},
+		{"--anh", coGoi{AnhFile: []string{"a.png"}}, nhanhKem},
+		{"--so-do", coGoi{FileSoDo: "s.json"}, nhanhKem},
+		{"--anh + --so-do", coGoi{AnhFile: []string{"a.png"}, FileSoDo: "s.json"}, nhanhKem},
+	} {
+		v, err := quyetDinhGoi(x.co, []string{"câu", "hỏi"})
+		if err != nil {
+			t.Errorf("%s: bị chặn nhầm: %v", x.ten, err)
+			continue
+		}
+		if v.Nhanh != x.muon {
+			// Chốt nhầm nhánh KHÔNG hiện ra như một lỗi: `nhanhThuong` có route
+			// dự phòng, hai nhánh kia thì không. Đi nhầm sang `nhanhThuong` là
+			// gửi một yêu cầu TRƠ (không ảnh, không schema) rồi báo kết quả như
+			// thật.
+			t.Errorf("%s: chốt nhánh %q, chờ %q", x.ten, v.Nhanh, x.muon)
+		}
+		if v.Prompt != "câu hỏi" {
+			t.Errorf("%s: prompt ghép sai: %q", x.ten, v.Prompt)
+		}
+	}
+}
+
 // anhThu dựng một `aiapi.Anh` thật từ ảnh PNG sinh tại chỗ.
 //
 // Sinh tại chỗ chứ không để file .png trong repo: git trên Windows với

@@ -295,6 +295,50 @@ func kiemCoGoi(c coGoi) error {
 	return nil
 }
 
+// nhanhGoi là NHÁNH mà một lượt `sagent api` sẽ đi. Ba nhánh, ba đường mã khác
+// hẳn nhau về việc có dự phòng hay không.
+type nhanhGoi string
+
+const (
+	nhanhThuong nhanhGoi = "thuong" // qua api.AICall — CÓ route dự phòng
+	nhanhTool   nhanhGoi = "tool"   // aiapi.GoiTool  — đích danh, không dự phòng
+	nhanhKem    nhanhGoi = "kem"    // aiapi.GoiKem   — đích danh, không dự phòng
+)
+
+// viecGoi là QUYẾT ĐỊNH đã chốt của `apiGoi`: đi nhánh nào, hỏi câu gì.
+type viecGoi struct {
+	Nhanh  nhanhGoi
+	Prompt string
+}
+
+// quyetDinhGoi soát cờ rồi chốt nhánh. Thuần — không mở CSDL, không chạm mạng.
+//
+// VÌ SAO GỘP SOÁT VÀ CHỐT NHÁNH VÀO MỘT HÀM, và vì sao `apiGoi` phải đi qua nó:
+//
+// Bản trước để `apiGoi` gọi `kiemCoGoi` rồi tự `switch` trên các trường của
+// `coGoi`. Một phép thử phá hoại gỡ hẳn lời gọi `kiemCoGoi` ra khỏi `apiGoi` —
+// và TOÀN BỘ bộ test vẫn xanh, vì bài kiểm gọi thẳng `kiemCoGoi`, không ai hỏi
+// `apiGoi` có gọi nó không. `apiGoi` mở CSDL và gọi `os.Exit` nên không bài
+// kiểm nào chạm được vào nó, và một lời gọi không ai canh được là một lời gọi
+// sẽ có ngày biến mất.
+//
+// Cách đóng khe đó KHÔNG phải viết thêm một bài kiểm — mà là làm cho lời gọi
+// TRỞ NÊN KHÔNG BỎ ĐƯỢC: nhánh dưới `switch` theo `v.Nhanh`, mà `v.Nhanh` chỉ
+// hàm này sinh ra. Gỡ lời gọi đi là hỏng lúc BIÊN DỊCH, không phải lúc chạy.
+func quyetDinhGoi(co coGoi, phanConLai []string) (viecGoi, error) {
+	if err := kiemCoGoi(co); err != nil {
+		return viecGoi{}, err
+	}
+	v := viecGoi{Nhanh: nhanhThuong, Prompt: strings.Join(phanConLai, " ")}
+	switch {
+	case co.FileTool != "":
+		v.Nhanh = nhanhTool
+	case co.KemAnhHoacSoDo():
+		v.Nhanh = nhanhKem
+	}
+	return v, nil
+}
+
 // apiGoi nhận args THÔ, còn nguyên cờ.
 //
 // Thứ tự bắt buộc: RÚT CỜ TRƯỚC, tách tên route SAU. Bản đầu làm ngược lại và
@@ -310,15 +354,16 @@ func apiGoi(args []string) {
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu prompt: sagent api %s \"câu hỏi\"", ten))
 	}
-	if err := kiemCoGoi(co); err != nil {
+	v, err := quyetDinhGoi(co, args)
+	if err != nil {
 		fail(err)
 	}
-	if co.FileTool != "" {
-		apiGoiTool(ten, strings.Join(args, " "), co.FileTool, co.ChonTool, co.XemSuyLuan)
+	switch v.Nhanh {
+	case nhanhTool:
+		apiGoiTool(ten, v.Prompt, co.FileTool, co.ChonTool, co.XemSuyLuan)
 		return
-	}
-	if co.KemAnhHoacSoDo() {
-		apiGoiKem(ten, strings.Join(args, " "), co.AnhFile, co.FileSoDo, co.CuGui, co.XemSuyLuan)
+	case nhanhKem:
+		apiGoiKem(ten, v.Prompt, co.AnhFile, co.FileSoDo, co.CuGui, co.XemSuyLuan)
 		return
 	}
 	stream, xemSuyLuan := co.Stream, co.XemSuyLuan
@@ -328,14 +373,13 @@ func apiGoi(args []string) {
 	// Gọi qua api.AICall chứ không tự tìm route: chỗ đó mới biết default_route và
 	// fallback_routes. Tự dựng Route ở đây là bỏ qua fallback mà không ai thấy.
 	var kq aiapi.KetQua
-	var err error
 	if stream {
 		fmt.Println()
-		kq, err = a.AICallStream(context.Background(), ten, strings.Join(args, " "),
+		kq, err = a.AICallStream(context.Background(), ten, v.Prompt,
 			func(s string) { fmt.Print(s) })
 		fmt.Println()
 	} else {
-		kq, err = a.AICall(context.Background(), ten, strings.Join(args, " "))
+		kq, err = a.AICall(context.Background(), ten, v.Prompt)
 	}
 	// Lấy danh sách route TRƯỚC khi đóng: `DocSuyLuan` cần nó để tra bảng năng
 	// lực của route đã trả lời. Đọc cấu hình, không chạm mạng, không tốn token.
