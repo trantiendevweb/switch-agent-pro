@@ -13,6 +13,42 @@ workspace      = "worktree"   # "dir" = dùng chung thư mục | "worktree" = m�
 max_parallel_sessions = 4
 require_approval_for  = ["merge", "deploy"]
 
+# ---- Trần đồng thời theo từng chiều ----
+# BỐN trần CỘNG DỒN, không thay thế nhau: `max_parallel_sessions` ở trên vẫn là
+# trần ngoài cùng, ba trần dưới siết thêm bên trong nó. Một lượt `sagent fleet`
+# phải qua được cả bốn.
+#
+# Vì sao cần: trần chung chỉ đếm TỔNG. Bốn phiên rơi hết vào MỘT tài khoản
+# claude vẫn qua nó, và chúng đốt sạch hạn mức của đúng tài khoản đó trong khi
+# các tài khoản khác ngồi không. Hạn mức thuê bao tính theo TÀI KHOẢN; còn RAM
+# và tiến trình con tính theo HARNESS. Một con số không đo được cả hai.
+#
+# Cả khối này CÓ THỂ BỎ TRỐNG — mặc định đã là 3/3/2 và chạy được ngay.
+# Số 0 ở bất kỳ khoá nào nghĩa là TẮT chiều đó (giống `max_parallel_sessions`).
+[policy.tran]
+harness_mac_dinh  = 3   # tài nguyên máy: bao nhiêu tiến trình CLI cùng lúc
+provider_mac_dinh = 3   # trần của nhà cung cấp, tính trên TỔNG các tài khoản
+ho_so_mac_dinh    = 2   # hạn mức thuê bao: bao nhiêu phiên trên MỘT tài khoản
+
+  # Đè theo tên. Không khai tên nào thì tên đó dùng số mặc định ở trên.
+  # [policy.tran.harness]
+  # claude = 3
+  #
+  # [policy.tran.provider]
+  # claude = 3
+  #
+  # Khoá phải là địa chỉ ĐẦY ĐỦ "provider:tài_khoản" — gõ thiếu thành "tns" thì
+  # trần im lặng không khớp phiên nào, nên cấu hình bắt lỗi đó lúc đọc file.
+  # [policy.tran.ho_so]
+  # "claude:tns" = 1
+  #
+  # Gộp nhiều provider vào MỘT harness, khi chúng dùng chung runtime trên máy.
+  # Không khai thì harness của một provider chính là tên provider đó (đo 22/08:
+  # năm provider trên máy này ra năm binary khác nhau).
+  # [policy.tran.thuoc_harness]
+  # codex = "node"
+  # grok  = "node"
+
 [ui]
 default_surface = "tui"       # tui | dashboard | workflow | 3d
 theme           = "dark"
