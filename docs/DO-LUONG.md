@@ -3734,3 +3734,24 @@ gặp cùng một hình dạng — sau `route.kiem`, nút Duyệt/Từ chối, `
   vá trong lượt này vì `cmd/sagent/*` và `internal/dash/*` đang thuộc một phiên
   khác chạy song song. Đây đúng là lỗi "thiếu mặt cuối" mà mục này vừa tố cáo,
   nên nó phải được đóng ở lượt kế, không được để trôi.
+
+### Phụ lục cùng ngày: bản vá `reasoning` làm ĐỎ một bài kiểm, và bài kiểm đó SAI
+
+- `TestVuongCaHaiBenKhongDocThanhVuongMotBen` ghim thẳng một ô sống:
+  *"grok/reasoning phải là `ca-hai`"*. Đúng lúc viết. Nhưng vá xong phía dự án
+  thì ô ấy chỉ còn vướng nhà cung cấp, và bài kiểm **đỏ** — tức nó **chỉ xanh
+  chừng nào dự án còn nợ**, phạt đúng người đi trả nợ.
+- Repo này đã chữa y hệt một lần: `TestBaTrangThaiDiRaToiHopDong` từng đếm
+  trạng thái trên dữ liệu sản phẩm rồi bắt cả ba phải xuất hiện.
+- **Viết lại thành bất biến, không ghim dữ liệu**:
+  `TestKetLuanVuongODauLuonKhopVoiCapTrangThai` duyệt **mọi ô của mọi route** và
+  khẳng định phép ánh xạ `(phía dự án, nhà cung cấp) → kết luận vướng ở đâu`.
+  Ô nào đổi trạng thái cũng không sao — chỉ cần kết luận đi theo. Chạy lần đầu:
+  **14 ô, trong đó 2 ô vướng cả hai bên** (`dau-vao-anh` và `dau-ra-co-cau-truc`
+  của deepseek).
+- **Sự cố kèm theo, ghi để không lặp lại**: tôi commit `2fa3db1` trên một cây
+  **đang đỏ**, vì câu lệnh nghiệm thu in `XANH` **vô điều kiện** sau khi lọc log
+  — dòng `FAIL` có in ra nhưng bị chính chữ "XANH" ngay dưới nó nuốt mất. Nay
+  kiểm bằng **mã thoát** (`go test ./...; echo $?`), không bằng phép lọc chữ.
+  Cùng một bài học với `sagent ds`: một chỉ báo trả lời câu dễ hơn câu người đọc
+  tưởng nó đang trả lời.

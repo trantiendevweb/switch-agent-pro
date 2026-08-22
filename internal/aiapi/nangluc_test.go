@@ -311,32 +311,78 @@ func TestLamDuocTraVeLyDoDocDuoc(t *testing.T) {
 	}
 }
 
-// Vướng CẢ HAI BÊN không được đọc thành vướng mỗi phía dự án.
+// KẾT LUẬN "vướng ở đâu" phải luôn khớp với CẶP (phía dự án, nhà cung cấp).
 //
-// Ca thật: grok-4.5 — `aiapi.phanHoi` không đọc `reasoning_content` (phía dự
-// án), MÀ nhà cung cấp cũng không trả trường đó (đo 22/08). Nếu bảng chỉ nói vế
-// đầu thì có người đi thêm trường vào `phanHoi` rồi mới phát hiện là vô ích.
-func TestVuongCaHaiBenKhongDocThanhVuongMotBen(t *testing.T) {
-	b := BangNangLuc(Route{
-		Ten: "grok", BaseURL: "https://modelapi.vn/v1", Model: "grok-4.5", KeyID: "grok",
-	})
-	var thay bool
-	for _, m := range b.Muc {
-		if m.Khoa != NLAPIReasoning {
-			continue
-		}
-		thay = true
-		if m.Cho != ChoCaHai {
-			t.Errorf("grok/reasoning: khách=%q ncc=%q mà cho=%q — phải là %q",
-				m.Khach, m.NCC, m.Cho, ChoCaHai)
-		}
-		if !strings.Contains(m.BangChung, "CŨNG KHÔNG") {
-			t.Errorf("kết luận không nói ra là nhà cung cấp cũng chịu: %q", m.BangChung)
+// Ca thật đã dựng ra bài kiểm này: grok-4.5 — `aiapi.phanHoi` không đọc
+// `reasoning_content` (phía dự án), MÀ nhà cung cấp cũng không trả trường đó
+// (đo 22/08). Nếu bảng chỉ nói vế đầu thì có người đi thêm trường vào `phanHoi`
+// rồi mới phát hiện là vô ích.
+//
+// VÌ SAO KHÔNG GHIM THẲNG Ô ĐÓ NỮA (viết lại 22/08). Bản đầu của bài kiểm này
+// khẳng định *"grok/reasoning phải là ca-hai"*. Ngay hôm đó phía dự án được vá
+// (`tinNhan` đọc `reasoning_content`), ô chuyển sang chỉ còn vướng nhà cung
+// cấp, và bài kiểm ĐỎ — nó **chỉ xanh chừng nào dự án còn nợ**, phạt đúng người
+// đi trả nợ. Repo này đã chữa y hệt một lần với
+// `TestBaTrangThaiDiRaToiHopDong`.
+//
+// Nên bài này ghim CƠ CHẾ, không ghim dữ liệu: duyệt MỌI ô của MỌI route và
+// khẳng định phép ánh xạ. Ô nào đổi trạng thái cũng không sao — chỉ cần kết
+// luận đi theo.
+func TestKetLuanVuongODauLuonKhopVoiCapTrangThai(t *testing.T) {
+	routes := []Route{
+		{Ten: "deepseek", BaseURL: "https://modelapi.vn/v1", Model: "deepseek-v4-flash", KeyID: "deepseek"},
+		{Ten: "grok", BaseURL: "https://modelapi.vn/v1", Model: "grok-4.5", KeyID: "grok"},
+	}
+	soO, soCaHai := 0, 0
+	for _, r := range routes {
+		for _, m := range BangNangLuc(r).Muc {
+			soO++
+			ten := r.Ten + "/" + m.Khoa
+			switch {
+			case m.Khach == KhongLamDuoc && m.NCC == KhongLamDuoc:
+				soCaHai++
+				if m.Cho != ChoCaHai {
+					t.Errorf("%s: cả hai bên đều không mà cho=%q — phải là %q",
+						ten, m.Cho, ChoCaHai)
+				}
+				if !strings.Contains(m.BangChung, "CŨNG KHÔNG") {
+					t.Errorf("%s: kết luận không nói ra là nhà cung cấp cũng chịu: %q",
+						ten, m.BangChung)
+				}
+			case m.Khach == KhongLamDuoc && m.NCC == LamDuoc:
+				if m.Cho != ChoKhach {
+					t.Errorf("%s: chỉ phía dự án vướng mà cho=%q — phải là %q",
+						ten, m.Cho, ChoKhach)
+				}
+				// Câu đáng giá nhất của cả bảng: chỗ hỏng ở TRONG repo này.
+				if !strings.Contains(m.BangChung, "LÀM ĐƯỢC") {
+					t.Errorf("%s: không nói ra rằng sửa được ở phía dự án: %q",
+						ten, m.BangChung)
+				}
+			case m.Khach == LamDuoc && m.NCC == KhongLamDuoc:
+				if m.Cho != ChoNCC {
+					t.Errorf("%s: chỉ nhà cung cấp vướng mà cho=%q — phải là %q",
+						ten, m.Cho, ChoNCC)
+				}
+			case m.Khach == ChuaDo || m.NCC == ChuaDo:
+				if m.Cho != ChoChuaRo {
+					t.Errorf("%s: còn bên CHƯA ĐO mà cho=%q — phải là %q",
+						ten, m.Cho, ChoChuaRo)
+				}
+			case m.Khach == LamDuoc && m.NCC == LamDuoc:
+				if m.Cho != ChoKhongVuong {
+					t.Errorf("%s: cả hai bên đều được mà cho=%q — phải là %q",
+						ten, m.Cho, ChoKhongVuong)
+				}
+			}
 		}
 	}
-	if !thay {
-		t.Fatal("không thấy dòng reasoning của grok")
+	if soO < 10 {
+		t.Fatalf("chỉ duyệt được %d ô — bài kiểm này đang xanh vì rỗng, không phải vì sạch", soO)
 	}
+	// Không phải khẳng định, chỉ là số để lượt sau so được: khi con số này về 0
+	// nghĩa là không còn ô nào vướng cả hai bên nữa.
+	t.Logf("duyệt %d ô, trong đó %d ô vướng CẢ HAI BÊN", soO, soCaHai)
 }
 
 // Số đo khoá theo (base_url, model): đổi model của route thì số đo cũ phải TỰ
