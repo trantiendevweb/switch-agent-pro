@@ -23,6 +23,14 @@ import (
 // miễn phí tuyệt đối, còn bên này phải chạm mạng mới biết, nên phần chạm mạng
 // tách hẳn ra sau cờ `--do`.
 func cmdNangLucAPI(args []string) {
+	// `sagent help` là một chuỗi viết TAY trong main.go — file của agent khác,
+	// nên lệnh này không tự thêm mình vào đó được (hai dòng cần cắm nằm trong
+	// docs/BAO-CAO-NANGLUC-API.md). Chừng nào chưa cắm, `--giup` là cách duy
+	// nhất người dùng terminal đọc được cách gõ, nên nó phải có ở đây.
+	if giup, _ := boolFlag(args, "--giup"); giup {
+		giupNangLucAPI()
+		return
+	}
 	do, args := boolFlag(args, "--do")
 	chuaDo, args := boolFlag(args, "--chua-do")
 	dan, args := boolFlag(args, "--dan")
@@ -30,7 +38,7 @@ func cmdNangLucAPI(args []string) {
 	var route string
 	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
-			fail(fmt.Errorf("chưa có cờ %q. Có: --do, --chua-do, --dan", a))
+			fail(fmt.Errorf("chưa có cờ %q. Xem: sagent nang-luc-api --giup", a))
 		}
 		route = a
 	}
@@ -43,6 +51,36 @@ func cmdNangLucAPI(args []string) {
 		return
 	}
 	inBangNangLucAPI(route, chuaDo)
+}
+
+// giupNangLucAPI in cách gõ. Cùng một khối chữ với phần chú thích của
+// cmdNangLucAPI ở trên — chép làm hai bản là hai bản sẽ lệch, nên chỗ này in ra
+// đúng thứ người đọc mã cũng thấy.
+func giupNangLucAPI() {
+	fmt.Print(`
+  sagent nang-luc-api — route API nào LÀM ĐƯỢC GÌ
+
+    sagent nang-luc-api                 bảng mọi route đã cấu hình
+    sagent nang-luc-api <route>         chỉ một route
+    sagent nang-luc-api --chua-do       chỉ những ô chưa ai đo
+    sagent nang-luc-api --do [<route>]  ĐO THẬT: chạm mạng bằng key thật, TỐN TOKEN
+    sagent nang-luc-api --do --dan      in sẵn khối Go để dán vào sổ số đo
+
+  Bảng KHÔNG tốn token: nó ghép phép đo mã nguồn (chạy tại chỗ) với sổ số đo đã
+  chạy trước đó. Chỉ cờ --do mới chạm mạng.
+
+  Ba trạng thái, và chúng KHÁC NHAU:
+
+    ✓ làm được      đã đo, chạy được
+    ✗ đã đo, KHÔNG  một KẾT LUẬN, không phải một khoảng trống
+    ? chưa ai đo    chưa biết — không được lặng lẽ coi như chạy được
+
+  Mỗi ô nói luôn VƯỚNG Ở ĐÂU: phía dự án (sửa được trong repo này), phía nhà
+  cung cấp (sửa trong repo không cứu được), hay cả hai.
+
+  Bảng bên nửa CLI: sagent nang-luc
+
+`)
 }
 
 // inBangNangLucAPI in bảng. KHÔNG chạm mạng, KHÔNG tốn token.

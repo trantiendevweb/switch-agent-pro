@@ -203,6 +203,28 @@ cần cắm vào bảng `commands` (ghi đè bằng chính nó, hoàn toàn vô 
 "__nlado":      {"api.nang-luc-do", "đo THẬT năng lực route API (chạm mạng, tốn token)", nil},
 ```
 
+### 1.11 CÒN MỘT KHOẢNG TRỐNG: `sagent help` không thấy lệnh mới
+
+`cmdHelp()` trong `main.go` là một **chuỗi viết tay**, không sinh từ bảng
+`commands`, nên lệnh mới không tự hiện ra được — và tôi không được sửa file đó.
+(`sagent route kiem` cũng đang thiếu trong help vì cùng lý do, nên đây không
+phải chuyện riêng của lượt này.)
+
+Thu hẹp trong vùng của mình: đã thêm **`sagent nang-luc-api --giup`**, in đủ
+cách gõ + ý nghĩa ba trạng thái + ý nghĩa cột "vướng ở đâu". Chừng nào help
+chính chưa được cắm, đó là cách người dùng terminal đọc được cách dùng.
+
+Khối cần thêm vào `cmdHelp()`, ngay dưới mục **Route API** đã có:
+
+```
+    sagent nang-luc-api         route API nào làm được gì: gọi tool, đọc ảnh,
+                                JSON có cấu trúc, reasoning, streaming, đếm token
+                                (làm được / đã đo KHÔNG / chưa đo — ba thứ khác nhau)
+      --chua-do                 chỉ những ô chưa ai đo
+      --do [<route>]            ĐO THẬT: chạm mạng bằng key thật, TỐN TOKEN
+      --do --dan                in sẵn khối Go để dán vào sổ số đo
+```
+
 ---
 
 ## 2. Sự cố
@@ -257,7 +279,14 @@ quá không đo nổi" chứ không trông như hỏng — nó suýt đi thẳng
 kiểm ID + tay cầm `onclick` + parse JS bằng `node --check`. Nhưng **chưa có ai
 nhìn bằng mắt** trên trình duyệt thật. Ghi ra đây thay vì im lặng.
 
-### 2.5 Không có sự cố nào về `&&`, em-dash `.ps1`, hay nhánh `main`
+### 2.5 Backtick trong raw string Go cắt đứt chuỗi
+
+Khối `--giup` viết `` `--do` `` bên trong một raw string ``` `...` ``` — backtick
+đóng chuỗi ngay tại đó. Lỗi biên dịch rõ ràng (`missing ',' in argument list`)
+nên không nguy hiểm, nhưng đáng ghi cạnh bẫy em-dash trong `.ps1`: cùng một họ
+"ký tự trong chuỗi phá cú pháp file".
+
+### 2.6 Không có sự cố nào về `&&`, em-dash `.ps1`, hay nhánh `main`
 
 Không viết file `.ps1` nào, không chạm `main`, mọi lệnh chạy riêng lẻ.
 
@@ -289,7 +318,10 @@ bảng vừa chỉ ra chỗ hỏng nằm bên mình:
 5. **Đo thêm nhà cung cấp khác** khi có key (Anthropic Messages là ô còn treo của
    Pha 0). Bảng đã có sẵn đường `ChuaDo` kèm lý do "chưa có key".
 
-6. **Mở dashboard bằng mắt** để đóng mục 2.4.
+6. **Cắm khối help** ở mục 1.11 vào `cmdHelp()` — và nhân tiện cả
+   `sagent route kiem`, đang thiếu cùng lý do.
+
+7. **Mở dashboard bằng mắt** để đóng mục 2.4.
 
 ---
 
@@ -306,6 +338,7 @@ bảng vừa chỉ ra chỗ hỏng nằm bên mình:
 | Hai endpoint HTTP + DTO ba cặp trạng thái | claude-opus-5[1m] | trung bình |
 | Khối web + CSS dùng lại `.nl`, nút đo có `confirm()` | claude-opus-5[1m] | trung bình |
 | 27 bài kiểm + kiểm chứng test đỏ khi gỡ phần sửa | claude-opus-5[1m] | cao |
+| Thêm `--giup` (vì `sagent help` nằm ngoài vùng) | claude-opus-5[1m] | thấp |
 | Nghiệm thu ba lệnh riêng + `node --check` + báo cáo | claude-opus-5[1m] | thấp |
 
 ---
