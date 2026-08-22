@@ -65,6 +65,14 @@ const (
 	OnFailStop     = "stop"     // mặc định: dừng cả flow
 	OnFailContinue = "continue" // ghi nhận rồi đi tiếp
 	OnFailFallback = "fallback" // chạy bước fallback đã khai báo
+
+	// OnFailCompensate: chạy một bước GỠ LẠI (undo) rồi DỪNG.
+	//
+	// Khác `stop` ở chỗ nó dọn hiện trường trước khi dừng; khác `continue` ở chỗ
+	// nó không đi tiếp trên nền một việc dở dang. Xem compensate.go — ở đó có cả
+	// câu trả lời cho "bước gỡ lại mà cũng hỏng thì sao" và "có gỡ lại các bước
+	// đã xong trước đó không".
+	OnFailCompensate = "compensate"
 )
 
 // Vai trò của một bước — LOẠI VIỆC bước đó đại diện, không phải tài khoản chạy
@@ -207,6 +215,46 @@ type Step struct {
 	// Không khai (nil) = không kiểm gì, y như trước.
 	PhaiCo []string `toml:"phai_co,omitempty" json:"phaiCo,omitempty"`
 
+	// Artifact khai những FILE bước này để lại cho bước sau: TÊN → đường dẫn
+	// TƯƠNG ĐỐI trong thư mục artifact của bước.
+	//
+	//	[[flow.x.step]]
+	//	  id       = "viet"
+	//	  prompt   = "Ghi bản vá đầy đủ ra {{artifact_dir}}/ban-va.diff"
+	//	  artifact = { ban-va = "ban-va.diff" }
+	//
+	//	[[flow.x.step]]
+	//	  id     = "ap"
+	//	  needs  = ["viet"]
+	//	  run    = ["git", "apply", "{{artifacts.ban-va}}"]
+	//
+	// VÌ SAO KHÔNG DÙNG `{{steps.viet.output}}`: đường đó đi qua hai cái trần
+	// (store.MaxStepOutput 32 KiB, rồi flow.MaxInject 6.000 ký tự) và cả hai đều
+	// CẮT PHẦN ĐẦU. Một bản vá mất phần đầu vẫn trông như một bản vá.
+	//
+	// Đường dẫn phải TƯƠNG ĐỐI: flows.toml là file người ta gửi cho nhau, và
+	// đường dẫn tuyệt đối trong đó hoặc là rác trên máy người nhận, hoặc là một
+	// lời mời ghi đè file bất kỳ của họ. Xem artifact.go.
+	Artifact map[string]string `toml:"artifact,omitempty" json:"artifact,omitempty"`
+
+	// Idempotent: chạy lại thì KHÔNG làm lại việc lượt trước đã làm xong.
+	//
+	//	idempotent = true
+	//
+	// "Đã làm rồi" = có một lượt chạy TRƯỚC đây làm XONG một bước có cùng KHOÁ,
+	// mà khoá là băm của toàn bộ thứ quyết định kết quả bước — id, loại, câu hỏi
+	// ĐÃ THAY BIẾN, tài khoản, model, tham số, hợp đồng đầu ra. Sửa prompt là đổi
+	// khoá, và bước chạy lại.
+	//
+	// TẮT MẶC ĐỊNH, và cố ý không có cách bật cho cả flow một lượt: bộ chạy
+	// KHÔNG nhìn thấy cây mã trên đĩa, HEAD của git hay đồng hồ, nên với bước
+	// `shell`/`test`/`lint` thì "khoá không đổi" KHÔNG có nghĩa là "kết quả không
+	// đổi". Bật nhầm ở đó là tin rằng test hôm nay vẫn xanh vì hôm qua nó xanh.
+	//
+	// Xem idempotent.go — ở đó có cả ba cách định nghĩa khoá đã cân nhắc và hậu
+	// quả của từng cách.
+	Idempotent bool `toml:"idempotent,omitempty" json:"idempotent,omitempty"`
+
 	// Route là route API cho node `model`. Rỗng = `default_route` rồi tới route
 	// dự phòng, y như `sagent api "câu hỏi"`. Không dùng cho node khác.
 	Route string `toml:"route,omitempty" json:"route,omitempty"`
@@ -214,8 +262,14 @@ type Step struct {
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
 	Retry      int    `toml:"retry,omitempty" json:"retry,omitempty"`
-	OnFailure  string `toml:"on_failure,omitempty" json:"on_failure,omitempty"` // stop | continue | fallback
+	OnFailure  string `toml:"on_failure,omitempty" json:"on_failure,omitempty"` // stop | continue | fallback | compensate
 	Fallback   string `toml:"fallback,omitempty" json:"fallback,omitempty"`
+
+	// Compensate là id bước GỠ LẠI, dùng với on_failure = "compensate".
+	//
+	// Bước được trỏ tới ở đây bị LOẠI khỏi lịch chạy thường và chỉ chạy đúng lúc
+	// bước này hỏng. Xem compensate.go.
+	Compensate string `toml:"compensate,omitempty" json:"compensate,omitempty"`
 
 	// Vị trí trên bảng vẽ. Chỉ để trình soạn thảo bày lại đúng chỗ; bộ thực thi
 	// hoàn toàn bỏ qua. Sửa file bằng tay mà không có x/y thì bảng tự xếp.
@@ -411,8 +465,11 @@ func Validate(f Flow) []Problem {
 			} else if !seen[s.Fallback] {
 				add(s.ID, fmt.Sprintf("fallback trỏ tới bước %q không tồn tại", s.Fallback))
 			}
+		case OnFailCompensate:
+			// Phần soi riêng của compensate nằm ở VanDeCompensate, gọi cuối hàm:
+			// nó cần biết cả flow (ai phụ thuộc ai), không chỉ một bước.
 		default:
-			add(s.ID, fmt.Sprintf("on_failure = %q không hợp lệ (stop | continue | fallback)", s.OnFailure))
+			add(s.ID, fmt.Sprintf("on_failure = %q không hợp lệ (stop | continue | fallback | compensate)", s.OnFailure))
 		}
 
 		for _, n := range s.Needs {
@@ -452,6 +509,15 @@ func Validate(f Flow) []Problem {
 	// `doc_duoc` khai hỏng chỉ CẢNH BÁO — xem doc_duoc.go. Đặt cuối cùng vì nó
 	// cần thứ tự đợt, mà thứ tự đợt chỉ có nghĩa khi phần `needs` đã được soi.
 	ps = append(ps, VanDeDocDuoc(f)...)
+
+	// `artifact` — xem artifact.go. Cũng cần thứ tự đợt, cùng lý do.
+	ps = append(ps, VanDeArtifact(f)...)
+
+	// `idempotent` — xem idempotent.go.
+	ps = append(ps, VanDeIdempotent(f)...)
+
+	// `compensate` — xem compensate.go. Cần cả flow vì nó soi cả quan hệ needs.
+	ps = append(ps, VanDeCompensate(f)...)
 
 	return ps
 }
@@ -588,6 +654,13 @@ func Expand(s string, vars map[string]string) string {
 // conSotOutput bắt các {{steps.<id>.output}} mà Expand KHÔNG thay được.
 var conSotOutput = regexp.MustCompile(`\{\{steps\.([^.{}]+)\.output\}\}`)
 
+// conSotArtifact bắt các {{artifacts.<tên>}} mà Expand KHÔNG thay được.
+//
+// Cùng lớp nguy hiểm với conSotOutput nhưng tệ hơn một bậc: một placeholder
+// output còn sót lọt vào prompt thì agent đọc ra chữ vô nghĩa; một placeholder
+// ARTIFACT còn sót lọt vào `run` thì lệnh nhận một chuỗi trông y như đường dẫn.
+var conSotArtifact = regexp.MustCompile(`\{\{artifacts\.([^.{}]+)\}\}`)
+
 // ExpandChay thay biến như Expand, rồi CHỐT các {{steps.<id>.output}} còn sót
 // lại bằng một câu nói thật thay vì để nguyên chữ sống.
 //
@@ -608,13 +681,31 @@ var conSotOutput = regexp.MustCompile(`\{\{steps\.([^.{}]+)\.output\}\}`)
 // thử prompt lúc CHƯA chạy, khi đó chưa bước nào có kết quả là chuyện bình
 // thường. Chốt ở đó là nói dối theo chiều ngược lại.
 func ExpandChay(s string, vars map[string]string) string {
-	return conSotOutput.ReplaceAllString(Expand(s, vars), `(bước "$1" không để lại kết quả)`)
+	out := conSotOutput.ReplaceAllString(Expand(s, vars), `(bước "$1" không để lại kết quả)`)
+	// Artifact chưa có thì cũng phải NÓI RA, không để nguyên chữ sống. Bước sản
+	// xuất chưa chạy xong (hoặc hỏng) là lúc duy nhất chuyện này xảy ra — xem
+	// MoiTruongArtifact.
+	return conSotArtifact.ReplaceAllString(out, `(artifact "$1" chưa có — bước sản xuất nó chưa chạy xong)`)
 }
 
 // BuocConSot trả về id bước đầu tiên còn placeholder chưa thay, hoặc "" nếu
 // không còn. Dùng cho chỗ KHÔNG được phép đoán bừa — xem bước shell trong do().
 func BuocConSot(s string, vars map[string]string) string {
 	if m := conSotOutput.FindStringSubmatch(Expand(s, vars)); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// ArtifactConSot trả về TÊN artifact đầu tiên còn placeholder chưa thay, hoặc ""
+// nếu không còn.
+//
+// Cùng vai trò với BuocConSot và dùng ở cùng chỗ: bước shell KHÔNG được chốt
+// placeholder thành một câu tiếng Việt. `cat (artifact "x" chưa có...)` là một
+// tên file bịa; lệnh sẽ hỏng bằng "no such file" và người đọc đi tìm sai chỗ
+// suốt buổi. Thiếu thì dừng ngay và nói rõ thiếu artifact nào.
+func ArtifactConSot(s string, vars map[string]string) string {
+	if m := conSotArtifact.FindStringSubmatch(Expand(s, vars)); m != nil {
 		return m[1]
 	}
 	return ""

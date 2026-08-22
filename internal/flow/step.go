@@ -52,6 +52,11 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 			// ba đường mà chỉ vá một. Bước không khai `doc_duoc` thì LocDocDuoc
 			// trả về nguyên map cũ — không đổi một byte nào.
 			outs = LocDocDuoc(s, outs)
+			// Biến artifact dựng ở ĐÂY, cùng chỗ và cùng lúc với `outs`: cả hai
+			// đều là "bước này được thấy gì của bước khác", và tách ra hai chỗ
+			// thì `doc_duoc` chặn được một đường mà hở đường kia. MoiTruongArtifact
+			// tự lọc theo doc_duoc, xem artifact.go.
+			arts := MoiTruongArtifact(runID, f, s, states)
 			if s.When != "" {
 				ok, err := Eval(s.When, Ctx{Vars: vars, States: states, Outputs: outs})
 				if err != nil {
@@ -95,32 +100,29 @@ func (r *Runner) runWave(ctx context.Context, runID int64, f Flow, work []Step,
 						SessionID: runID, Msg: "bỏ qua — danh sách rỗng"})
 					return
 				}
-				state, msg, out := r.runForEach(waveCtx, runID, f, s, vars, outs, items)
+				state, msg, out := r.runForEach(waveCtx, runID, f, s, vars, outs, arts, items)
 				st.set(s.ID, state, out)
-				if state == store.StepFailed && s.OnFailure != OnFailContinue && s.OnFailure != OnFailFallback {
-					mu.Lock()
-					if stopAt == "" {
-						stopAt, stopLy = s.ID, msg
+				if state == store.StepFailed {
+					if dung, ly := r.xuLyHong(ctx, runID, f, s, msg, vars, st); dung {
+						mu.Lock()
+						if stopAt == "" {
+							stopAt, stopLy = s.ID, ly
+						}
+						mu.Unlock()
+						cancelWave()
 					}
-					mu.Unlock()
-					cancelWave()
 				}
 				return
 			}
 
-			state, msg, out := r.runStep(waveCtx, runID, f, s, vars, outs)
+			state, msg, out := r.runStep(waveCtx, runID, f, s, vars, outs, arts)
 			st.set(s.ID, state, out)
 
 			if state == store.StepFailed {
-				switch s.OnFailure {
-				case OnFailContinue:
-					r.Bus.Warnf("%s.%s hỏng nhưng on_failure=continue — đi tiếp", f.Name, s.ID)
-				case OnFailFallback:
-					r.Bus.Warnf("%s.%s hỏng — bước %s sẽ chạy thay", f.Name, s.ID, s.Fallback)
-				default:
+				if dung, ly := r.xuLyHong(ctx, runID, f, s, msg, vars, st); dung {
 					mu.Lock()
 					if stopAt == "" {
-						stopAt, stopLy = s.ID, msg
+						stopAt, stopLy = s.ID, ly
 					}
 					mu.Unlock()
 					cancelWave() // dừng các bước cùng đợt, khỏi tốn thêm
@@ -186,7 +188,31 @@ func (r *Runner) taiKhoan(s Step) string {
 // Kết quả gộp lại có đánh dấu từng mục, để bước sau đọc `{{steps.x.output}}`
 // vẫn biết mục nào ra kết quả gì.
 func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
-	vars map[string]string, outs map[string]string, items []string) (state, msg, output string) {
+	vars map[string]string, outs, arts map[string]string, items []string) (state, msg, output string) {
+
+	// `artifact` + `foreach` là một cái bẫy: mọi lượt lặp chạy song song trong
+	// CÙNG một thư mục artifact và ghi đè lên nhau, rồi `{{artifacts.<tên>}}` chỉ
+	// trỏ được tới một file — tức là bước sau đọc kết quả của một mục ngẫu nhiên
+	// và tưởng đó là kết quả của cả bước. Validate đã chặn ở lúc lưu; chặn thêm ở
+	// đây vì Flow còn dựng được thẳng bằng mã Go và bằng file chưa qua `validate`.
+	// Cả `idempotent` cũng chưa dùng chung với `foreach` được: khoá phải tính
+	// trên TỪNG lượt lặp, còn một khoá chung cho cả bước sẽ bỏ qua luôn những mục
+	// MỚI xuất hiện trong danh sách. Nói ra chứ không im lặng bỏ qua cái cờ —
+	// một cờ bị lờ đi trong im lặng là một tính năng người dùng tưởng đang bật.
+	var lyDoChan string
+	switch {
+	case len(s.Artifact) > 0:
+		lyDoChan = "không dùng `artifact` chung với `foreach` — các lượt lặp chạy song song " +
+			"trong cùng một thư mục và sẽ ghi đè lên nhau"
+	case s.Idempotent:
+		lyDoChan = "chưa dùng `idempotent` chung với `foreach` được — một khoá chung cho cả bước " +
+			"sẽ bỏ qua cả những mục MỚI trong danh sách"
+	}
+	if lyDoChan != "" {
+		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, lyDoChan, 1)
+		r.baoBuocHong(runID, f, s, lyDoChan)
+		return store.StepFailed, lyDoChan, ""
+	}
 
 	r.Bus.Infof("%s.%s lặp trên %d mục", f.Name, s.ID, len(items))
 	_ = r.DB.SetStep(runID, s.ID, store.StepRunning, fmt.Sprintf("lặp %d mục", len(items)), 1)
@@ -215,6 +241,9 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 				return
 			}
 			env := WithOutputs(itemVars(vars, item, i), outs)
+			for k, v := range arts {
+				env[k] = v
+			}
 
 			stepCtx := ctx
 			var cancel context.CancelFunc
@@ -280,9 +309,27 @@ func stepIDs(ss []Step) string {
 
 // runStep chạy một bước, có timeout và retry.
 func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
-	vars map[string]string, outputs map[string]string) (state, msg, output string) {
+	vars map[string]string, outputs, arts map[string]string) (state, msg, output string) {
 	// Bước sau dùng được kết quả bước trước.
 	env := WithOutputs(vars, outputs)
+	// …và FILE bước trước để lại. WithOutputs trả về map mới nên ghi thẳng vào
+	// đây không đụng gì tới `vars` của lượt chạy.
+	for k, v := range arts {
+		env[k] = v
+	}
+	// IDEMPOTENCY: trước khi tốn một đồng nào, hỏi sổ xem việc CHÍNH XÁC NÀY đã
+	// có lượt chạy nào làm xong chưa. Khoá tính từ env ĐÃ THAY BIẾN ở trên, nên
+	// nó cuốn theo cả kết quả các bước trước — xem idempotent.go.
+	//
+	// Bước không bật `idempotent` thì KhoaIdem trả rỗng, và cả khối này không
+	// chạm vào sổ một lần nào.
+	khoa := KhoaIdem(s, env)
+	if khoa != "" {
+		if state, out, xong := r.thuDungLaiViecCu(runID, f, s, env, khoa); xong {
+			return state, "", out
+		}
+	}
+
 	tries := s.Retry + 1
 	if tries < 1 {
 		tries = 1
@@ -290,6 +337,15 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	var lastErr error
 	var kqCuoi KetQuaAgent // giữ kết quả lần thử cuối, kể cả khi nó hỏng
 	for attempt := 1; attempt <= tries; attempt++ {
+		// Dọn thư mục artifact TRƯỚC MỖI LẦN THỬ, không phải một lần trước vòng
+		// lặp. Lần thử 1 ghi được file rồi mới hỏng ở đoạn sau; nếu để file đó
+		// nằm lại thì lần thử 2 hỏng vẫn "đủ artifact" và bước được ghi là xong.
+		// Retry không được phép biến một bước hỏng thành một bước xong.
+		if _, err := ChuanBiArtifact(runID, s); err != nil {
+			_ = r.DB.SetStep(runID, s.ID, store.StepFailed, err.Error(), attempt)
+			r.baoBuocHong(runID, f, s, err.Error())
+			return store.StepFailed, err.Error(), ""
+		}
 		_ = r.DB.SetStep(runID, s.ID, store.StepRunning, "", attempt)
 		// Lưu CÂU HỎI trước khi chạy, không phải sau: bước có thể treo hoặc bị
 		// cắt ngang, mà lúc đó câu hỏi lại là thứ cần nhất để hiểu vì sao.
@@ -326,8 +382,26 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 			}
 		}
 
+		// HỢP ĐỒNG ARTIFACT — cùng chỗ, cùng lý do với `phai_co` ngay trên.
+		//
+		// Khai `artifact` là hứa để lại một file. Không kiểm ở đây thì bước được
+		// ghi `done`, bước sau nhận một đường dẫn hợp lệ trỏ vào hư không, và nó
+		// hỏng bằng "no such file" — một thông báo chỉ vào SAI BƯỚC. Người đọc
+		// sổ sẽ đi tìm lỗi ở bước tiêu thụ trong khi thủ phạm là bước sản xuất.
+		if err == nil {
+			if thieu := ThieuArtifact(runID, s); thieu != "" {
+				err = fmt.Errorf("%s", thieu)
+			}
+		}
+
 		if err == nil {
 			_ = r.DB.SetStep(runID, s.ID, store.StepDone, "", attempt)
+			// Ghi khoá SAU KHI xong, không phải trước: khoá trong sổ nghĩa là
+			// "việc này đã làm XONG". Ghi trước là hứa trước khi làm, và bước
+			// hỏng giữa chừng sẽ khiến lượt sau bỏ qua một việc chưa ai làm.
+			if khoa != "" {
+				_ = r.DB.SetStepIdemKey(runID, s.ID, khoa)
+			}
 			if kq.Output != "" {
 				_ = r.DB.SetStepOutput(runID, s.ID, kq.Output)
 			}
@@ -426,6 +500,13 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 				return KetQuaAgent{}, fmt.Errorf(
 					"tham số %d cần kết quả của bước %q nhưng bước đó không để lại gì", i+1, id)
 			}
+			// Cùng luật cho artifact, và ở đây còn cần hơn: một placeholder
+			// artifact chưa thay sẽ được truyền vào lệnh như một TÊN FILE, và
+			// `no such file` là thông báo dẫn người đọc đi sai hướng.
+			if ten := ArtifactConSot(a, vars); ten != "" {
+				return KetQuaAgent{}, fmt.Errorf(
+					"tham số %d cần artifact %q nhưng bước sản xuất nó chưa để lại file nào", i+1, ten)
+			}
 			args[i] = Expand(a, vars)
 		}
 		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
@@ -506,4 +587,143 @@ func cauHoi(s Step, vars map[string]string) string {
 		return strings.Join(args, " ")
 	}
 	return ""
+}
+
+// thuDungLaiViecCu tra sổ xem việc này đã có lượt chạy trước làm xong chưa, và
+// nếu có thì dựng lại kết quả cho lượt chạy NÀY.
+//
+// Trả về xong=false nghĩa là "cứ chạy thật" — cả khi không trúng, cả khi trúng
+// nhưng không dựng lại được. KHÔNG có nhánh nào trả về done mà thiếu thứ gì:
+// một bước `done` nửa vời là bước sau đọc phải một artifact rỗng và tưởng đó là
+// kết quả thật.
+func (r *Runner) thuDungLaiViecCu(runID int64, f Flow, s Step, env map[string]string,
+	khoa string) (state, output string, xong bool) {
+
+	cu, co, err := r.DB.TimBuocDaLam(khoa, runID)
+	if err != nil || !co {
+		return "", "", false
+	}
+	da := KetQuaCu{RunID: cu.RunID, StepID: cu.StepID, Output: cu.Output}
+
+	// Artifact phải được CHÉP sang lượt này. Trúng cache mà file cũ đã bị dọn thì
+	// coi như KHÔNG trúng — thà chạy lại tốn tiền còn hơn báo xong rồi để bước
+	// sau mở một file không tồn tại.
+	if err := chepArtifactCu(da, runID, s); err != nil {
+		r.Bus.Warnf("%s.%s: lượt #%d đã làm việc này nhưng %v — chạy lại", f.Name, s.ID, cu.RunID, err)
+		return "", "", false
+	}
+
+	_ = r.DB.SetStep(runID, s.ID, store.StepDone, MoTaIdem(da), 0)
+	_ = r.DB.SetStepPrompt(runID, s.ID, cauHoi(s, env))
+	_ = r.DB.SetStepIdemKey(runID, s.ID, khoa)
+	if da.Output != "" {
+		_ = r.DB.SetStepOutput(runID, s.ID, da.Output)
+	}
+	// CỐ Ý KHÔNG chép chi phí của lượt cũ sang. Lượt này không tiêu một token
+	// nào, và ghi lại con số cũ sẽ làm bảng cộng dồn theo ngày đếm cùng một
+	// khoản hai lần — đúng cái sổ chi phí sinh ra để chống.
+	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
+		SessionID: runID, Msg: MoTaIdem(da),
+		Detail: map[string]string{
+			"run": fmt.Sprint(runID), "step": s.ID,
+			"state": store.StepDone, "type": s.Type,
+			// Nói rõ ĐÃ MƯỢN CỦA AI. Không có khoá này thì bảng hiện một bước
+			// `done` không tốn gì và không ai lần ngược được về việc thật.
+			"idem_tu_run": fmt.Sprint(cu.RunID),
+		}})
+	return store.StepDone, da.Output, true
+}
+
+// xuLyHong quyết định một bước hỏng có làm CẢ LƯỢT dừng lại không, và chạy bước
+// GỠ LẠI khi được yêu cầu.
+//
+// MỘT CHỖ DUY NHẤT cho cả nhánh thường lẫn nhánh `foreach`. Trước đây hai nhánh
+// tự xét `OnFailure` riêng, và chúng đã lệch nhau thật: nhánh foreach so bằng
+// với hai giá trị cụ thể, nên thêm giá trị thứ tư vào là nó lặng lẽ rơi vào
+// nhánh "dừng" mà không ai gỡ gì cả.
+//
+// ctx ở đây là ctx của CẢ LƯỢT CHẠY, không phải waveCtx: một bước cùng đợt hỏng
+// và huỷ đợt thì KHÔNG được giết bước gỡ lại đang chạy dở. Một cái undo bị cắt
+// ngang để lại hiện trường tệ hơn cả không undo — nửa gỡ thì không ai biết đang
+// ở đâu nữa. (Người dùng huỷ cả lượt thì vẫn dừng: ctx đó là ctx này.)
+func (r *Runner) xuLyHong(ctx context.Context, runID int64, f Flow, s Step, msg string,
+	vars map[string]string, st *runState) (dungLuot bool, ly string) {
+
+	switch s.OnFailure {
+	case OnFailContinue:
+		r.Bus.Warnf("%s.%s hỏng nhưng on_failure=continue — đi tiếp", f.Name, s.ID)
+		return false, ""
+
+	case OnFailFallback:
+		r.Bus.Warnf("%s.%s hỏng — bước %s sẽ chạy thay", f.Name, s.ID, s.Fallback)
+		return false, ""
+
+	case OnFailCompensate:
+		xong, lyGo := r.chayGoLai(ctx, runID, f, s, vars, st)
+		if xong {
+			// Gỡ được rồi thì VẪN DỪNG. `compensate` là "gỡ rồi dừng", không
+			// phải "gỡ rồi đi tiếp": chạy tiếp trên nền một việc vừa bị gỡ là
+			// chạy tiếp trên nền không có gì.
+			return true, fmt.Sprintf("%s — đã chạy bước gỡ lại %q", msg, s.Compensate)
+		}
+		return true, fmt.Sprintf("%s — VÀ BƯỚC GỠ LẠI %q CŨNG HỎNG (%s). "+
+			"Việc chính không xong mà cũng chưa gỡ được: cần người vào xem tay.",
+			msg, s.Compensate, lyGo)
+
+	default:
+		return true, msg
+	}
+}
+
+// chayGoLai chạy bước gỡ lại của một bước vừa hỏng.
+//
+// Bước gỡ lại chạy qua ĐÚNG runStep như mọi bước khác — nó có timeout, có retry,
+// có hợp đồng `phai_co`, có artifact, và ghi vào sổ y hệt. Cái nó KHÔNG có là
+// `on_failure`: runStep không xét trường đó (việc đó là của runWave), nên không
+// có đường nào để gỡ-lại-của-gỡ-lại xảy ra. Đó là một tính chất của chỗ cắm, chứ
+// không phải một cái cờ ai cũng tắt được.
+func (r *Runner) chayGoLai(ctx context.Context, runID int64, f Flow, hong Step,
+	vars map[string]string, st *runState) (xong bool, ly string) {
+
+	g, co := TimBuoc(f, hong.Compensate)
+	if !co {
+		ly = fmt.Sprintf("compensate trỏ tới bước %q không tồn tại", hong.Compensate)
+		r.Bus.Failuref("%s.%s: %s", f.Name, hong.ID, ly)
+		return false, ly
+	}
+	if g.ID == hong.ID {
+		ly := "bước không thể tự gỡ lại chính nó"
+		r.Bus.Failuref("%s.%s: %s", f.Name, hong.ID, ly)
+		return false, ly
+	}
+
+	r.Bus.Warnf("%s.%s hỏng — chạy bước gỡ lại %s", f.Name, hong.ID, g.ID)
+
+	states, outs := st.snapshot()
+	outs = LocDocDuoc(g, outs)
+	arts := MoiTruongArtifact(runID, f, g, states)
+	// Bước gỡ lại phải biết mình đang gỡ CÁI GÌ. Không có biến này thì một bước
+	// gỡ dùng chung cho ba bước không có cách nào phân biệt, và người viết flow
+	// phải chép ra ba bước gỡ gần như giống hệt nhau.
+	bien := make(map[string]string, len(vars)+1)
+	for k, v := range vars {
+		bien[k] = v
+	}
+	bien[KhoaBuocHong] = hong.ID
+
+	state, msg, out := r.runStep(ctx, runID, f, g, bien, outs, arts)
+	st.set(g.ID, state, out)
+	if state != store.StepDone {
+		return false, msg
+	}
+	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + g.ID,
+		SessionID: runID, Msg: fmt.Sprintf("đã gỡ lại việc của bước %s", hong.ID),
+		Detail: map[string]string{
+			"run": fmt.Sprint(runID), "step": g.ID,
+			"state": store.StepDone, "type": g.Type,
+			// Khoá này để mặt web nối được mũi tên "gỡ cho bước nào" mà không
+			// phải tách chuỗi trong câu Msg.
+			"go_lai_cho": hong.ID,
+		}})
+	return true, ""
 }
