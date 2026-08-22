@@ -41,10 +41,16 @@ func mayStream(t *testing.T, manh []string) (Route, *string) {
 }
 
 func manhChu(s string) string {
-	return `{"model":"m-1","choices":[{"delta":{"content":` + strconv(s) + `}}]}`
+	return `{"model":"m-1","choices":[{"delta":{"content":` + chuoiJSON(s) + `}}]}`
 }
 
-func strconv(s string) string {
+// chuoiJSON đóng gói một chuỗi thành literal JSON.
+//
+// Trước đây hàm này tên là `strconv`, đúng tên một package chuẩn. Tên đó không
+// gây lỗi chừng nào chưa file nào trong package import `strconv` thật — hôm nay
+// cholai.go import, và cả package không biên dịch được. Đổi tên là gỡ bẫy, không
+// phải làm đẹp.
+func chuoiJSON(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }

@@ -75,6 +75,16 @@ type KetQua struct {
 	// LoiChinh là lỗi NGUYÊN VĂN của route chính, kèm request id của nhà cung
 	// cấp. Rỗng nếu không chuyển route.
 	LoiChinh string
+
+	// ChoLai là nhật ký mọi lần bị HTTP 429 rồi chờ và thử lại CHÍNH route này.
+	// Rỗng ở lượt bình thường.
+	//
+	// Phải nằm trong KetQua chứ không chỉ trong lỗi, vì lần chờ hay gặp nhất là
+	// lần chờ THÀNH CÔNG: gọi lần một bị chặn, chờ 2 giây, lần hai chạy. Lượt đó
+	// trả về err=nil, và nếu tin này chỉ đi kèm lỗi thì nó biến mất — người dùng
+	// thấy một lượt đột nhiên mất 15 giây thay vì 2,3 giây mà không có gì giải
+	// thích. `Mat` đo được độ trễ nhưng không nói được vì sao.
+	ChoLai []LanChoLai
 }
 
 // DaChuyenRoute cho biết câu trả lời này đến từ route dự phòng.
@@ -89,9 +99,23 @@ type LoiAPI struct {
 	Status int    // mã HTTP; 0 khi hỏng trước lúc có phản hồi
 	Chi    string // nguyên văn
 	Nguoi  bool   // lỗi từ phía người dùng
+
+	// ChoLai là nhật ký các lần chờ vì 429 trước khi bỏ cuộc. Rỗng nếu không có.
+	ChoLai []LanChoLai
 }
 
 func (e *LoiAPI) Error() string { return e.Chi }
+
+// BiChanTocDo cho biết lỗi này là HTTP 429 — nhà cung cấp chặn tốc độ, chứ không
+// phải hỏng.
+//
+// Tách ra thành hàm chứ không để tầng trên tự so `Status == 429`: đó là kiểu
+// kiến thức bị chép ra nhiều chỗ rồi lệch nhau, và bản lệch bao giờ cũng là bản
+// coi 429 như một lỗi 4xx bình thường.
+func BiChanTocDo(err error) bool {
+	var l *LoiAPI
+	return errors.As(err, &l) && l.Status == http.StatusTooManyRequests
+}
 
 // LoiNguoiDung cho biết lỗi này do phía NGƯỜI DÙNG: key sai hoặc hết quyền
 // (401/403), không đọc được key, prompt rỗng.
@@ -196,17 +220,24 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())
 	}
 	url := strings.TrimRight(r.BaseURL, "/") + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())
+	// Dựng request MỚI mỗi lần thử: `bytes.NewReader(body)` đã đọc cạn sau lần
+	// gửi đầu, dùng lại là gửi thân rỗng.
+	taoReq := func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+key)
+		return req, nil
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+key)
 
 	bat := time.Now()
-	resp, err := (&http.Client{Timeout: 120 * time.Second}).Do(req)
+	resp, choLai, err := goiCoChoLai(ctx, &http.Client{Timeout: 120 * time.Second}, taoReq)
+	kq.ChoLai = choLai
 	if err != nil {
-		return kq, loiMay(r.Ten, 0, "gọi %s hỏng: %s", url, err.Error())
+		return kq, &LoiAPI{Route: r.Ten, Chi: fmt.Sprintf("gọi %s hỏng: %s%s",
+			url, err.Error(), themChoLai(choLai)), ChoLai: choLai}
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
@@ -215,12 +246,21 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 		// GIỮ NGUYÊN VĂN thân lỗi. Nhà cung cấp trả kèm request id trong đó, và
 		// đó là thứ duy nhất dùng được khi phải hỏi lại họ. Rút gọn thành "lỗi
 		// 400" là vứt mất nó.
-		e := loiMay(r.Ten, resp.StatusCode, "%s trả HTTP %d: %s",
-			r.Ten, resp.StatusCode, strings.TrimSpace(string(raw)))
+		//
+		// Với 429 đã hết lượt thử lại, nguyên văn CÀNG quan trọng: thân 429 là
+		// chỗ nhà cung cấp nói hạn mức nào bị chạm (phút hay ngày, token hay lời
+		// gọi). Nuốt nó đi rồi in "bị chặn tốc độ" là biến một thông điệp hành
+		// động được thành một lời than.
+		e := loiMay(r.Ten, resp.StatusCode, "%s trả HTTP %d: %s%s",
+			r.Ten, resp.StatusCode, strings.TrimSpace(string(raw)), themChoLai(choLai))
+		e.ChoLai = choLai
 		// 401/403 = key sai hoặc hết quyền. Route dự phòng dùng key KHÁC nhưng
 		// cái sai ở đây là key của route NÀY: nếu người dùng gõ nhầm key thì họ
 		// cần thấy đúng câu đó, không phải một câu ghép hai lỗi của hai nhà cung
 		// cấp mà nguyên nhân thật bị chôn ở dòng đầu.
+		//
+		// 429 CỐ Ý không nằm ở đây: nó KHÔNG phải lỗi người dùng, nên tầng trên
+		// vẫn được phép chuyển route sau khi ta đã chờ và thử lại mà vẫn hỏng.
 		e.Nguoi = resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden
 		return kq, e
 	}
@@ -238,6 +278,16 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 		Mat:     time.Since(bat),
 		Route:   r.Ten,
 		DaThu:   []string{r.Ten},
+		ChoLai:  choLai,
 	}
 	return kq, nil
+}
+
+// themChoLai ghép nhật ký chờ vào cuối một thông điệp lỗi, có xuống dòng.
+// Rỗng nếu không có lần chờ nào, để lỗi thường không dài ra vô cớ.
+func themChoLai(nk []LanChoLai) string {
+	if s := MoTaChoLai(nk); s != "" {
+		return "\n     " + s
+	}
+	return ""
 }
