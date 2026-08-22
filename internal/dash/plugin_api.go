@@ -1,6 +1,10 @@
 package dash
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/trantiendevweb/switch-agent-pro/internal/plugin"
+)
 
 // handlePlugins — action "plugin.list". Plugin nào đã cài, xin quyền gì, và host
 // CHẶN được quyền đó tới đâu.
@@ -34,7 +38,7 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	muc := make([]mucDTO, 0, len(b.Muc))
-	var soChuaChan int
+	var soChanThat, soKhongChanDuoc, soChuaDo int
 	for _, m := range b.Muc {
 		d := mucDTO{Ten: m.Ten, MoTa: m.MoTa, PhienBan: m.PhienBan, GiaoThuc: m.GiaoThuc,
 			Duong: m.Duong, CoExec: m.CoExec, Quyen: []quyenDTO{}, Secret: m.Secret}
@@ -42,8 +46,15 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
 			d.Secret = []string{}
 		}
 		for _, q := range m.Quyen {
-			if q.Chan != "chan-that" {
-				soChuaChan++
+			switch plugin.TrangThaiChan(q.Chan) {
+			case plugin.ChanThat:
+				soChanThat++
+			case plugin.KhongChanDuoc:
+				soKhongChanDuoc++
+			default:
+				// Khoá lạ rơi vào đây cùng với ChuaDo, và đó là chiều AN TOÀN:
+				// thứ không đọc được phải đếm là "chưa biết", không phải "đã chặn".
+				soChuaDo++
 			}
 			d.Quyen = append(d.Quyen, quyenDTO{q.Khoa, q.Mo, q.LyDo, q.Chan, q.BangChung})
 		}
@@ -57,8 +68,24 @@ func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
 	if nguon == nil {
 		nguon = []string{}
 	}
-	// so_chua_chan đếm những quyền ĐANG ĐƯỢC XIN mà host KHÔNG chặn được (hoặc
-	// chưa đo). Đây là con số người vận hành cần liếc — để mặt web tự cộng thì
-	// mỗi mặt cộng một kiểu, và cách cộng là chỗ dễ nói khác nhau nhất.
-	writeJSON(w, map[string]any{"muc": muc, "nguon": nguon, "loi": loi, "so_chua_chan": soChuaChan})
+	// BA con số, KHÔNG phải một. Đây là chỗ dễ bẹp nhất của cả route này: cộng
+	// "đã đo, host không chặn được" với "chưa ai đo" thành một số cho gọn thì
+	// người vận hành đọc được đúng một câu "còn n chỗ chưa ổn" — trong khi hai
+	// nửa của n đòi hai việc ngược nhau (một cái phải dựng hàng rào, một cái
+	// phải đi đo). Server cộng sẵn để mọi mặt cộng giống nhau; nhưng cộng sẵn
+	// thành BA ngăn riêng chứ không gộp.
+	//
+	// so_chua_chan giữ lại vì nó là tổng của hai ngăn sau và có tên nói đúng
+	// điều đó ("chưa chặn"), nhưng KHÔNG mặt nào được hiện mình nó: hiện một
+	// mình nó là bẹp ba trạng thái thành hai ngay trên màn hình.
+	writeJSON(w, map[string]any{
+		"muc":   muc,
+		"nguon": nguon,
+		"loi":   loi,
+
+		"so_chan_that":       soChanThat,
+		"so_khong_chan_duoc": soKhongChanDuoc,
+		"so_chua_do":         soChuaDo,
+		"so_chua_chan":       soKhongChanDuoc + soChuaDo,
+	})
 }
