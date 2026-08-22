@@ -4050,3 +4050,35 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
   / giá`. Nguyên liệu đã có từ hôm nay (`aiapi.BangNangLuc`) nhưng bộ chọn
   đường vẫn đi theo **tên** (`Step.Route`, `flow.go:184`), và chi phí vẫn chỉ
   được ghi **sau khi gọi**. Đây là ứng viên rõ ràng nhất cho lượt kế.
+
+## 22/08 — Hai trên ba flow mẫu dựng sẵn hứa một việc chúng không làm
+
+- **Tìm ra ở đâu**: phép soát nghiệm thu từ phía người dùng (mục 22/08 ở trên).
+  `sagent flow validate` trên máy sạch in **2 cảnh báo**, cả hai ở **flow mẫu
+  dựng sẵn** — tức thứ người mới gặp **đầu tiên**.
+- **Cảnh báo nói gì**: *"bước approve này không chặn bước nào — không có bước
+  nào khai `needs`. Nó sẽ dừng luồng nhưng các bước khác VẪN CHẠY song song."*
+- **Nhưng lỗi thật nặng hơn cảnh báo, và cảnh báo không nói ra**: cả hai flow
+  **hứa một việc chúng không làm**.
+  - `fanout.chon` in *"Bỏ qua thì không nhánh nào bị merge"* → đọc ra là **duyệt
+    thì CÓ merge**. Không hề: sau `chon` **không có bước nào cả**. Người duyệt
+    bấm xong, tưởng đã giữ bản mình chọn, và nhánh vẫn nằm nguyên đó.
+  - `squad` tự mô tả *"Agent làm → chạy test → người duyệt **trước khi merge**"*
+    — trong khi flow đó **không có bước merge nào**.
+- **Đã sửa**: thêm bước `chi-lenh` (`notify`) sau mỗi bước duyệt, in ra **đúng
+  lệnh** người dùng cần chạy, và hạ lời hứa trong `Desc` cùng trong thông điệp
+  duyệt xuống cho khớp việc thật. `sagent flow validate` nay in
+  **"✓ mọi flow đều hợp lệ"** — 2 cảnh báo về **0**.
+- **CỐ Ý KHÔNG cho flow mẫu tự chạy `git merge`**, và đây là lựa chọn chứ không
+  phải bỏ sót. `internal/flow/merge.go` đã ghi đường đúng: một bước `shell` chạy
+  `git merge` đứng **sau** một bước `approve`, để người duyệt **nhìn thấy đúng
+  lệnh sắp chạy**. Nhưng flow mẫu **không biết** nhánh nào đáng giữ (`fanout`
+  đẻ ra N nhánh), nên nó **in lệnh ra thay vì đoán hộ**. Cho một flow dựng sẵn
+  quyền ghi đè cây mã của người dùng là quyết định của chủ dự án, không phải của
+  một mẫu.
+- **Nghiệm thu chạy thật, không tốn gì**: `sagent flow run squad --kho` cho thấy
+  bước mới nằm ở **Đợt 4**, sau `duyet`.
+- **Vì sao lỗi này sống lâu**: nó không phải lỗi mã. `go test` không bắt được
+  một lời hứa sai trong chuỗi mô tả, và `flow validate` **có** kêu nhưng chưa ai
+  chạy nó trên máy sạch. Cùng họ với dashboard cũ 16,5 tiếng: thứ hỏng nằm ở
+  chỗ **không ai đo vì nó không phải mã**.

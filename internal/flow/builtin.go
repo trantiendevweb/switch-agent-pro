@@ -22,7 +22,30 @@ func Builtin() map[string]Flow {
 				},
 				{
 					ID: "chon", Type: TypeApprove, Needs: []string{"giai"},
-					Message: "Xem các nhánh sagent/* rồi chọn bản để giữ. Bỏ qua thì không nhánh nào bị merge.",
+					Message: "Xem các nhánh sagent/* rồi quyết định giữ bản nào. " +
+						"Duyệt hay từ chối đều KHÔNG merge gì — xem bước `chi-lenh` ngay sau.",
+				},
+				// VÌ SAO CÓ BƯỚC NÀY, và vì sao nó chỉ IN CHỮ (sửa 22/08).
+				//
+				// Hai lỗi cùng lúc ở bản cũ, và lỗi thứ hai nặng hơn:
+				//
+				//  1. `sagent flow validate` cảnh báo "bước approve này không chặn
+				//     bước nào" cho CẢ `fanout` LẪN `squad` — tức hai trên ba flow
+				//     mẫu dựng sẵn kêu ngay lần chạy đầu của người mới.
+				//  2. Lời hứa SAI: câu cũ "bỏ qua thì không nhánh nào bị merge" đọc
+				//     ra là DUYỆT THÌ CÓ MERGE. Không hề — sau `chon` không có bước
+				//     nào cả. Người duyệt bấm xong, tưởng đã giữ bản mình chọn, và
+				//     nhánh vẫn nằm nguyên đó.
+				//
+				// CỐ Ý KHÔNG tự chạy `git merge` ở đây. Đó là quyết định của chủ dự
+				// án chứ không phải của một flow mẫu, và `internal/flow/merge.go` đã
+				// ghi rõ đường đúng: một bước `shell` chạy `git merge` đứng SAU một
+				// bước `approve`, để người duyệt NHÌN THẤY đúng lệnh sắp chạy. Flow
+				// mẫu không biết nhánh nào đáng giữ, nên nó in lệnh ra thay vì đoán.
+				{
+					ID: "chi-lenh", Type: TypeNotify, Needs: []string{"chon"},
+					Message: "Đã duyệt. Giữ bản bạn chọn bằng: git merge --no-ff <nhánh>. " +
+						"Xem có những nhánh nào: git branch --list sagent/*",
 				},
 			},
 		},
@@ -30,7 +53,7 @@ func Builtin() map[string]Flow {
 		// Một đội có phân vai: làm → kiểm thử → duyệt.
 		"squad": {
 			Name: "squad",
-			Desc: "Agent làm → chạy test → người duyệt trước khi merge",
+			Desc: "Agent làm → chạy test → người duyệt, rồi công cụ in ra đúng lệnh merge để bạn tự chạy",
 			Vars: map[string]string{
 				"task": "Sửa lỗi được mô tả trong issue mới nhất.",
 			},
@@ -47,7 +70,18 @@ func Builtin() map[string]Flow {
 				},
 				{
 					ID: "duyet", Type: TypeApprove, Needs: []string{"kiem-thu"},
-					Message: "Xem diff và kết quả test rồi quyết định có merge không.",
+					Message: "Xem diff và kết quả test rồi quyết định. " +
+						"Duyệt hay từ chối đều KHÔNG merge gì — xem bước `chi-lenh` ngay sau.",
+				},
+				// Cùng lý do với `fanout.chi-lenh` ở trên: mô tả cũ của flow này hứa
+				// "người duyệt trước khi merge", mà sau bước duyệt KHÔNG CÓ bước
+				// merge nào. Bước này làm lời hứa đó thành đúng — bằng cách hạ lời
+				// hứa xuống cho khớp việc thật, chứ không bằng cách cho một flow mẫu
+				// quyền ghi đè cây mã của người dùng.
+				{
+					ID: "chi-lenh", Type: TypeNotify, Needs: []string{"duyet"},
+					Message: "Đã duyệt. Merge bằng: git merge --no-ff <nhánh của bước `lam`>. " +
+						"Xem có những nhánh nào: git branch --list sagent/*",
 				},
 			},
 		},
