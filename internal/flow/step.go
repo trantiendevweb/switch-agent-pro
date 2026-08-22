@@ -675,7 +675,12 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 				ung = append(ung, t)
 			}
 		}
-		kq, err := r.Route.ChonRoute(ctx, ung)
+		// `can` KHÔNG qua Expand: nó là khoá trong một danh sách cố định
+		// (aiapi.MoiNangLucAPI), không phải giá trị người dùng ghép từ kết quả
+		// bước trước. Cho placeholder vào đây là mở đường cho một khoá dựng lúc
+		// chạy — mà khoá lạ thì bộ lọc không biết loại ai, nên nó lặng lẽ không
+		// lọc gì. `flow validate` soi được vì nó đọc đúng chuỗi trong file.
+		kq, err := r.Route.ChonRoute(ctx, ung, s.Can)
 		// Nhật ký in ra CẢ KHI hỏng: lúc không đường nào sống thì lý do từng
 		// đường chết mới là thứ người đọc cần, chứ không phải một câu tổng kết.
 		for _, d := range kq.NhatKy {

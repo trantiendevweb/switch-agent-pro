@@ -287,6 +287,24 @@ type Step struct {
 	// báo lỗi. Xem route.go.
 	Routes []string `toml:"routes,omitempty" json:"routes,omitempty"`
 
+	// Can là NĂNG LỰC bước này đòi ở đường API nó đi qua:
+	//
+	//	can = ["goi-tool", "dau-vao-anh"]
+	//
+	// Dùng cho node `route` (LỌC ứng viên trước khi chọn) và cho node `model`
+	// (KIỂM đường đã khai, lúc `flow validate`, trước khi tiêu một đồng nào).
+	// Khoá lấy trong `aiapi.MoiNangLucAPI` — cùng từ vựng với
+	// `sagent nang-luc-api`, không có bảng thứ hai.
+	//
+	// VÌ SAO KHAI TAY CHỨ KHÔNG SUY TỪ NỘI DUNG BƯỚC: suy từ prompt là đoán, và
+	// một cái đoán ở đây LOẠI một route đang sống. Khai tay đoán sai theo chiều
+	// ngược lại — quên khai thì bước chạy y như trước khi có trường này, tức
+	// không có gì tệ hơn hiện trạng. Xem nangluc.go để biết cả hai hậu quả và
+	// những cảnh báo dựng lên để bớt chỗ quên.
+	//
+	// Rỗng = không đòi gì, chọn đường theo SỨC KHOẺ như cũ.
+	Can []string `toml:"can,omitempty" json:"can,omitempty"`
+
 	// điều khiển chung
 	TimeoutSec int    `toml:"timeout_sec,omitempty" json:"timeout_sec,omitempty"`
 	Retry      int    `toml:"retry,omitempty" json:"retry,omitempty"`
@@ -557,6 +575,16 @@ func Validate(f Flow) []Problem {
 	// `route` — xem route.go. Cần cả flow vì nó soi hai chiều: bước chọn đường
 	// có ai dùng không, và bước dùng có trỏ đúng vào một bước chọn đường không.
 	ps = append(ps, VanDeRoute(f)...)
+
+	// `can` — xem nangluc.go. Đặt SAU VanDeRoute vì nó dựa vào quan hệ "bước
+	// model trỏ route vào bước route nào", mà quan hệ đó được soi ở trên: hai
+	// ca hỏng (trỏ vào bước không tồn tại, trỏ vào bước không phải type route)
+	// đã có lỗi riêng ở đó, nên ở đây bỏ qua thay vì báo lần thứ hai.
+	//
+	// Phần soi CẦN BẢNG NĂNG LỰC — khoá lạ, và "route đã khai có làm được
+	// không" — nằm ở internal/api/flow_nangluc.go, vì gói này không import
+	// aiapi. `sagent flow validate` chạy cả hai.
+	ps = append(ps, VanDeCan(f)...)
 
 	return ps
 }
