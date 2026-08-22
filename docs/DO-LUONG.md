@@ -3808,3 +3808,35 @@ MASTER-PLAN rỗng.
 **Bài học về cách chia việc song song**: người cập nhật sổ và người sửa mã
 **không chạy cùng lúc mà sổ vẫn đúng được**. Lượt sau nên để việc cập nhật kế
 hoạch chạy MỘT MÌNH, hoặc chạy sau cùng.
+
+## 22/08 — Soát nghiệm thu từ phía NGƯỜI DÙNG sau 20 lần trộn trong một ngày
+
+- **Đo lúc nào**: 22/08/2026 ~15:20, sau khi trộn đợt 6. Không ai làm việc này
+  trong ngày: mọi lượt đều nghiệm thu bằng `go test`, không lượt nào gõ đúng
+  những lệnh người dùng gõ.
+- **Kết quả — công cụ còn dùng được, không có hồi quy**:
+
+  | Lệnh | Kết quả |
+  |---|---|
+  | `sagent verify` | **mã thoát 0**, mọi ô ✓ trên cả 5 provider + kho hồ sơ |
+  | `sagent route kiem` | deepseek **177ms** · grok **177ms**, cả hai dùng được |
+  | `sagent nang-luc --chua-do` | *"Không còn năng lực nào chưa đo"* |
+  | `sagent nang-luc-api --chua-do` | *"Không còn năng lực nào chưa đo"* |
+  | `sagent flow validate` | 0 lỗi · 2 cảnh báo (xem dưới) |
+  | `sagent plugin quyen` | cột `[chặn]` in **✗** cho `thu-muc-lam-viec` và `ghi-thu-muc-lam-viec` — đúng sự thật đã đo sáng nay |
+
+- **HAI CẢNH BÁO CÒN LẠI, và chúng nằm ở FLOW MẪU DỰNG SẴN** — tức thứ người
+  dùng mới gặp **đầu tiên**: `fanout.chon` và `squad.duyet` là bước `approve`
+  **không chặn bước nào** (không bước nào khai `needs` trỏ tới chúng), nên
+  *"nó sẽ dừng luồng nhưng các bước khác VẪN CHẠY song song với nó"*. Hai trên
+  ba flow mẫu ship kèm một rào duyệt mắc sai dây.
+  **CHƯA SỬA** — `internal/flow/builtin.go` đang thuộc một phiên chạy song song.
+  Ghi ra đây để lượt sau đóng; đây là ô chạm thẳng vào chuẩn *"non-tech dùng
+  được trong 5 phút"*.
+- **Dashboard đang chạy là bản CŨ 16,5 tiếng**: PID 16368 giữ cổng 8788, bật lúc
+  **21/08 22:39**, tức trước toàn bộ việc hôm nay. Assets nhúng trong binary nên
+  nó vẫn phục vụ giao diện cũ: **không có** panel quyền plugin, panel artifact,
+  panel suy luận, bảng năng lực nửa API. Bằng chứng theo đúng luật của dự án —
+  **PID giữ cổng + giờ bật tiến trình**, không phải mã HTTP.
+  Muốn thấy việc hôm nay thì phải **dừng và bật lại** `sagent dash`; chưa làm vì
+  đó là thứ chủ dự án đang xem từ điện thoại.
