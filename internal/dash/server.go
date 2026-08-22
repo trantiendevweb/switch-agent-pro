@@ -9,6 +9,7 @@
 package dash
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -77,6 +78,8 @@ func New(a *api.API) *Server {
 	m.HandleFunc("/api/route/kiem", s.guard(s.handleRouteKiem))
 	m.HandleFunc("/api/tele", s.guard(s.handleTele))
 	m.HandleFunc("/api/nang-luc", s.guard(s.handleNangLuc))
+	m.HandleFunc("/api/nang-luc-api", s.guard(s.handleNangLucAPI))
+	m.HandleFunc("/api/nang-luc-api/do", s.guard(s.handleNangLucAPIDo))
 	m.HandleFunc("/api/nhat-ky", s.guard(s.handleNhatKy))
 	m.HandleFunc("/api/plugins", s.guard(s.handlePlugins))
 
@@ -1129,6 +1132,112 @@ func (s *Server) handleNangLuc(w http.ResponseWriter, r *http.Request) {
 	// so_chua_do là con số người vận hành cần liếc: nó đếm những chỗ hệ thống
 	// đang phải đoán. Để mặt web tự cộng thì mỗi mặt cộng một kiểu.
 	writeJSON(w, map[string]any{"provider": out, "so_chua_do": soChuaDo})
+}
+
+// handleNangLucAPI — action "api.nang-luc". Bảng năng lực của NỬA API.
+//
+// Song song với `handleNangLuc` ở trên và cố ý vẽ bằng chung một bộ lớp CSS:
+// hai bảng trả lời cùng một câu ("thứ này làm được gì") cho hai đường của dự
+// án, nên chúng phải TRÔNG giống nhau. Ba trạng thái, ba màu, y hệt.
+//
+// KHÔNG chạm mạng và KHÔNG tốn token — xem `api.NangLucAPI`. Nhờ vậy khối này
+// nạp được lúc tải trang như mọi khối chỉ-đọc khác, khác hẳn `/api/route/kiem`
+// (chạm mạng nên phải bấm) và khác hẳn đường `/do` bên dưới (tốn tiền).
+//
+// DTO liệt kê tường minh từng trường. Mang ĐỦ CẢ BA cặp (kết luận, phần khách,
+// phần nhà cung cấp): rút xuống còn kết luận thì mặt web mất đúng câu đáng giá
+// nhất — "họ làm được, ta chưa gửi" — và người đọc sẽ đi đổi nhà cung cấp cho
+// một chỗ hỏng nằm trong repo này.
+func (s *Server) handleNangLucAPI(w http.ResponseWriter, r *http.Request) {
+	ds, err := s.api.NangLucAPI(strings.TrimSpace(r.URL.Query().Get("route")))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	type mucDTO struct {
+		Khoa           string `json:"khoa"`
+		Mo             string `json:"mo"`
+		TrangThai      string `json:"trang_thai"`
+		BangChung      string `json:"bang_chung"`
+		Cho            string `json:"cho"`
+		NhanCho        string `json:"nhan_cho"`
+		Khach          string `json:"khach"`
+		BangChungKhach string `json:"bang_chung_khach"`
+		NCC            string `json:"ncc"`
+		BangChungNCC   string `json:"bang_chung_ncc"`
+	}
+	type routeDTO struct {
+		Ten     string   `json:"ten"`
+		BaseURL string   `json:"base_url"`
+		Model   string   `json:"model"`
+		Muc     []mucDTO `json:"muc"`
+		Lech    []string `json:"lech"`
+	}
+	out := make([]routeDTO, 0, len(ds))
+	var soChuaDo int
+	for _, b := range ds {
+		d := routeDTO{Ten: b.Ten, BaseURL: b.BaseURL, Model: b.Model,
+			Muc: make([]mucDTO, 0, len(b.Muc)), Lech: b.Lech}
+		if d.Lech == nil {
+			d.Lech = []string{}
+		}
+		for _, m := range b.Muc {
+			if m.TrangThai == aiapi.ChuaDo {
+				soChuaDo++
+			}
+			d.Muc = append(d.Muc, mucDTO{m.Khoa, m.Mo, string(m.TrangThai), m.BangChung,
+				m.Cho, aiapi.NhanCho(m.Cho), string(m.Khach), m.BangChungKhach,
+				string(m.NCC), m.BangChungNCC})
+		}
+		out = append(out, d)
+	}
+	// so_chua_do là con số người vận hành cần liếc — để mặt web tự cộng thì mỗi
+	// mặt cộng một kiểu, y như ghi chú ở `handleNangLuc`.
+	writeJSON(w, map[string]any{"route": out, "so_chua_do": soChuaDo})
+}
+
+// handleNangLucAPIDo — action "api.nang-luc-do". CHẠM MẠNG THẬT và TIÊU TOKEN.
+//
+// ĐÒI POST, khác mọi đường đọc bảng ở trên. Không phải để cho đúng lễ nghi REST:
+// một GET tiêu tiền là một GET mà trình duyệt, bộ nạp trước, hay một lần bấm
+// F5 nhầm đều có quyền gọi lại. Cùng lý do `/api/stop` đòi POST khi giết tiến
+// trình — xem handleStop.
+//
+// Hạn chót nằm ở đây chứ không ở từng lời gọi: 7 phép đo × N route, mỗi cái tự
+// chờ 90 giây thì một route treo giữ kết nối web hơn mười phút.
+func (s *Server) handleNangLucAPIDo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, errors.New("phép đo này TIÊU TOKEN nên phải dùng POST — "+
+			"xem bảng miễn phí ở /api/nang-luc-api"))
+		return
+	}
+	ctx, huy := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer huy()
+
+	ds, err := s.api.NangLucAPIDo(ctx, strings.TrimSpace(r.URL.Query().Get("route")))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	type dto struct {
+		Route     string `json:"route"`
+		Khoa      string `json:"khoa"`
+		TrangThai string `json:"trang_thai"`
+		Chi       string `json:"chi"`
+		Status    int    `json:"status,omitempty"`
+		Token     int    `json:"token"`
+		MatMs     int64  `json:"matMs"`
+	}
+	out := make([]dto, 0, len(ds))
+	var tongToken int
+	for _, k := range ds {
+		tongToken += k.Usage.Tong
+		out = append(out, dto{k.Route, k.Khoa, string(k.TrangThai), k.Chi,
+			k.Status, k.Usage.Tong, k.Mat.Milliseconds()})
+	}
+	// Nói ra lượt này vừa tiêu bao nhiêu. Một nút tiêu tiền mà không báo giá
+	// sau khi bấm là một nút người ta bấm lần thứ hai cho chắc.
+	writeJSON(w, map[string]any{"muc": out, "tong_token": tongToken})
 }
 
 // handleNhatKy — action "session.nhat-ky". Nhật ký của phiên fleet.

@@ -169,6 +169,13 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		// Bảng plugin: plugin nào đã cài, xin quyền gì, host chặn được tới đâu.
 		// Chỉ ĐỌC — chạy plugin thì đi qua flow.run như mọi node khác.
 		"plugin.list": "/api/plugins",
+		// Bảng năng lực NỬA API: route nào gọi được tool, đọc được ảnh, trả
+		// JSON có cấu trúc, có reasoning. Chỉ đọc, KHÔNG tốn token.
+		"api.nang-luc": "/api/nang-luc-api",
+		// Phép đo THẬT của bảng trên. Tách endpoint riêng chứ không làm một cờ
+		// của đường trên, vì nó chạm mạng và tiêu token — và mặt web phải cho
+		// người dùng thấy sự khác biệt đó TRƯỚC khi họ bấm.
+		"api.nang-luc-do": "/api/nang-luc-api/do",
 	}
 	// Miễn trừ CÓ LÝ DO — không phải danh sách để nhét cho qua test.
 	mienTru := map[string]string{

@@ -100,6 +100,24 @@ var Actions = []string{
 	// câu hỏi người vận hành hỏi TRƯỚC khi bấm một lượt flow dài: route chập chờn
 	// mà không hỏi được thì cách duy nhất để biết là chạy tới giữa chừng rồi hỏng.
 	"route.kiem",
+	// Bảng năng lực của NỬA API — đối xứng với `provider.nang-luc` ở nửa CLI.
+	//
+	// Nằm trong hợp đồng vì nó là câu hỏi phải trả lời được TRƯỚC khi chạy, chứ
+	// không phải sau khi hỏng: một flow dùng node `model` trỏ vào route không
+	// gọi được tool hỏng LÚC CHẠY, sau khi các bước trước đã tiêu token. Nửa
+	// CLI trả lời được câu này từ lâu, nửa API thì không — và chỗ trống đó là ô
+	// [~] của Pha 0.
+	//
+	// KHÔNG tốn token: bảng ghép phép đo mã nguồn (miễn phí) với sổ số đo đã
+	// chạy trước đó. Phép đo THẬT là hành động riêng bên dưới.
+	"api.nang-luc",
+	// Chạy phép đo THẬT: chạm mạng bằng key thật và TIÊU TOKEN.
+	//
+	// Tách khỏi `api.nang-luc` chứ không làm một cờ của nó, vì hai hành động
+	// khác nhau về thứ đắt nhất: một cái đọc bảng, một cái tiêu tiền. Gộp lại
+	// thì mặt web không có cách nào cho người dùng thấy sự khác biệt đó trước
+	// khi họ bấm — và đây đúng là kiểu nút mà người ta bấm hai lần cho chắc.
+	"api.nang-luc-do",
 	// Quét tiến trình mồ côi: phiên tự chết thì `session.list` không còn thấy nó,
 	// nhưng đám con nó đẻ ra có thể vẫn chạy và vẫn tiêu hạn mức. Không có hành
 	// động này thì không mặt nào nhìn ra chúng.
@@ -1900,3 +1918,68 @@ func currentConfigDir(ad provider.Adapter) string {
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 const pathSep = os.PathSeparator
+
+// ---------------------------- bảng năng lực nửa API ----------------------------
+
+// NangLucAPI — action "api.nang-luc". route rỗng = mọi route đã cấu hình.
+//
+// KHÔNG chạm mạng và KHÔNG tốn token, cố ý: bảng này được gọi ở chỗ nóng —
+// mỗi lần vẽ dashboard, và (khi nối vào) mỗi bước `flow validate`. Một phép
+// kiểm có tính tiền thì người ta sẽ thôi chạy nó, đúng lý do `route.kiem` đi
+// bằng `GET /models`.
+//
+// Thứ tự giữ nguyên thứ tự route trong cấu hình — không sắp lại theo tên như
+// `NangLuc` ở nửa CLI. Ở đó thứ tự map là ngẫu nhiên nên phải sắp; ở đây thứ tự
+// cấu hình LÀ thông tin: route đầu là `default_route`, và người đọc bảng cần
+// thấy đúng thứ tự sẽ được thử.
+func (a *API) NangLucAPI(route string) ([]aiapi.NangLucRoute, error) {
+	ds := a.AIRoutes()
+	if len(ds) == 0 {
+		return nil, fmt.Errorf("chưa cấu hình route nào — xem: sagent api ds")
+	}
+	if route != "" {
+		for _, r := range ds {
+			if r.Ten == route {
+				return aiapi.BangNangLucNhieu([]aiapi.Route{r}), nil
+			}
+		}
+		// Tên lạ phải BÁO LỖI chứ không trả rỗng: gõ nhầm tên route mà nhận một
+		// bảng trống thì trông y hệt "route này chưa đo gì cả".
+		return nil, fmt.Errorf("không có route %q — xem: sagent api ds", route)
+	}
+	return aiapi.BangNangLucNhieu(ds), nil
+}
+
+// NangLucAPIDo — action "api.nang-luc-do". CHẠM MẠNG THẬT và TIÊU TOKEN.
+//
+// route rỗng = đo MỌI route. Chạy tuần tự từng route, và bên trong mỗi route
+// `aiapi.DoMoiNangLuc` cũng chạy tuần tự — xem ghi chú ở đó: bắn song song vào
+// một nhà cung cấp là cách nhanh nhất để ăn HTTP 429 rồi phải đoán xem route
+// "không làm được" hay chỉ bị chặn tốc độ.
+//
+// KHÔNG tự ghi kết quả vào bảng. Đường từ phép đo tới bảng đi qua một lần dán
+// tay có chủ ý (xem `aiapi.GhiSoDo`): số đo là thứ được ĐỌC và duyệt, không
+// phải thứ tự bò vào mã nguồn sau lưng người ta.
+func (a *API) NangLucAPIDo(ctx context.Context, route string) ([]aiapi.KetQuaDo, error) {
+	ds := a.AIRoutes()
+	if len(ds) == 0 {
+		return nil, fmt.Errorf("chưa cấu hình route nào — xem: sagent api ds")
+	}
+	if route != "" {
+		var loc []aiapi.Route
+		for _, r := range ds {
+			if r.Ten == route {
+				loc = append(loc, r)
+			}
+		}
+		if len(loc) == 0 {
+			return nil, fmt.Errorf("không có route %q — xem: sagent api ds", route)
+		}
+		ds = loc
+	}
+	var ra []aiapi.KetQuaDo
+	for _, r := range ds {
+		ra = append(ra, aiapi.DoMoiNangLuc(ctx, r)...)
+	}
+	return ra, nil
+}
