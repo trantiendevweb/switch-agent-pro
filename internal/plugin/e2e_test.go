@@ -339,6 +339,81 @@ func TestKhongKhaiThuMucThiKhongThayThuMucDuAn(t *testing.T) {
 	}
 }
 
+// ĐÂY LÀ PHÉP ĐO của dòng thu-muc-lam-viec trong quyen.go — và nó đo thứ mà
+// TestKhongKhaiThuMucThiKhongThayThuMucDuAn ở trên KHÔNG đo.
+//
+// Bài trên khẳng định: host không ĐƯA đường dẫn dự án cho plugin không khai
+// quyền. Đúng, và vẫn đúng. Nhưng "không đưa" khác "chặn", và khoảng cách giữa
+// hai chữ đó là toàn bộ nội dung của bài này: nếu plugin biết đường dẫn bằng
+// cách khác — nhúng sẵn lúc build, đọc từ file cấu hình của chính nó, hay đoán
+// `C:\Users\...` — thì hàng rào có còn gì không?
+//
+// VÌ SAO BÀI NÀY KHÔNG KHẲNG ĐỊNH "CÓ LỖ HỔNG". Viết `if !docDuoc { t.Fatal }`
+// thì bài kiểm chỉ xanh chừng nào lỗ còn đó, và ngày ai đó dựng hàng rào thật
+// nó sẽ đỏ — phạt đúng người đi vá. Repo này đã dính đúng lỗi ấy một lần
+// (TestBaTrangThaiDiRaToiHopDong chỉ xanh khi bảng năng lực còn ô ChuaDo, phải
+// viết lại). Nên bài này ĐO trước, rồi đối chiếu số đo với LỜI KHAI trong
+// quyen.go, và đỏ khi hai thứ lệch nhau — theo CẢ HAI chiều:
+//
+//	đo: chạm được  · khai: chan-that       -> đỏ, bảng đang hứa hộ host
+//	đo: chạm không được · khai: khong-chan-duoc -> đỏ, hàng rào đã có mà bảng chưa ghi công
+//
+// Cách nào cũng buộc bảng quyền đi theo thực tế, không cách nào phạt việc vá.
+func TestBangQuyenThuMucPhaiKhopVoiThucTeChamDuoc(t *testing.T) {
+	duAn := duAnCoDauMoc(t)
+
+	// Một file có nội dung dài biết trước, đóng vai "thứ đáng lẽ plugin không
+	// được đọc". Độ dài là bằng chứng đọc THẬT: plugin chỉ báo số byte, không
+	// báo nội dung.
+	const noiDung = "mat-khau-dash-gia-cho-phep-do-nay"
+	fileKin := filepath.Join(duAn, "kho-key-gia.txt")
+	if err := os.WriteFile(fileKin, []byte(noiDung), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// KHÔNG khai quyền nào cả.
+	m := datPlugin(t, t.TempDir(), tenMau, nil, nil)
+	kq := chay(t, m, TuyChon{ThuMuc: duAn}, "x", map[string]string{
+		"duong-dan-thu": fileKin,
+	})
+
+	// Phần này là hàng rào THẬT và phải giữ: host không tự đưa đường dẫn, và
+	// tiến trình con không đứng sẵn trong thư mục dự án.
+	if !strings.Contains(kq.GhiChu, "thu-muc=(khong-cap)") {
+		t.Errorf("không khai quyền mà host vẫn đưa đường dẫn dự án: %s", kq.GhiChu)
+	}
+	if !strings.Contains(kq.GhiChu, "cwd-thay-dau-moc=khong") {
+		t.Errorf("không khai quyền mà tiến trình con vẫn đứng trong thư mục dự án: %s", kq.GhiChu)
+	}
+
+	docDuoc := strings.Contains(kq.GhiChu, fmt.Sprintf("thu-doc=duoc:%d", len(noiDung)))
+	ghiDuoc := strings.Contains(kq.GhiChu, "thu-ghi=duoc")
+	lietKeDuoc := strings.Contains(kq.GhiChu, "thu-liet-ke=duoc:")
+	chamDuoc := docDuoc || ghiDuoc || lietKeDuoc
+
+	khaiChanThat := ChanDuocThat(QuyenThuMuc)
+
+	switch {
+	case chamDuoc && khaiChanThat:
+		t.Fatalf("quyen.go khai %s = %q, nhưng plugin KHÔNG khai quyền nào vẫn chạm "+
+			"tới thư mục dự án khi biết đường dẫn (đọc=%v ghi=%v liệt-kê=%v).\n"+
+			"Ghi chú của plugin: %s\n\n"+
+			"\"Host không đưa đường dẫn\" là KHÔNG CẤP, không phải CHẶN. Hạ dòng đó "+
+			"xuống %q kèm bằng chứng, hoặc dựng hàng rào thật (ACL/Job Object/"+
+			"AppContainer) rồi mới khai %q.",
+			QuyenThuMuc, ChanThat, docDuoc, ghiDuoc, lietKeDuoc, kq.GhiChu,
+			KhongChanDuoc, ChanThat)
+	case !chamDuoc && !khaiChanThat:
+		t.Fatalf("đo được: plugin không khai quyền KHÔNG chạm tới thư mục dự án nữa "+
+			"(đọc=%v ghi=%v liệt-kê=%v) — tức đã có hàng rào thật.\n"+
+			"Ghi chú của plugin: %s\n\n"+
+			"Nhưng quyen.go vẫn khai %s = %q. Nâng lên %q và trỏ bằng chứng vào "+
+			"bài kiểm này. Một hàng rào có thật mà bảng không ghi công thì lần "+
+			"sau sẽ có người dựng lại nó.",
+			docDuoc, ghiDuoc, lietKeDuoc, kq.GhiChu, QuyenThuMuc, KhongChanDuoc, ChanThat)
+	}
+}
+
 // ĐÂY LÀ PHÉP ĐO của dòng bien-moi-truong trong quyen.go.
 func TestKhongKhaiMoiTruongThiKhongThayBienCuaCha(t *testing.T) {
 	t.Setenv(tenBien, "1")

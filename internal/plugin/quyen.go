@@ -57,11 +57,19 @@ var MoiQuyen = []MoTaQuyen{
 	{
 		Khoa: QuyenThuMuc,
 		Mo:   "thấy thư mục làm việc của dự án",
-		Chan: ChanThat,
-		BangChung: "host chỉ đặt cmd.Dir vào thư mục dự án khi plugin KHAI quyền này; " +
-			"không khai thì cmd.Dir là một thư mục tạm RỖNG do host tạo. Đo bằng " +
-			"TestKhongKhaiThuMucThiKhongThayThuMucDuAn (e2e_test.go) — chạy CÙNG một " +
-			"binary hai lần, chỉ khác manifest, và plugin báo lại hai thư mục khác nhau.",
+		Chan: KhongChanDuoc,
+		BangChung: "ĐÃ ĐO 22/08 và kết luận là KHÔNG chặn được. Thứ host làm được, và " +
+			"làm thật: không khai quyền thì cmd.Dir là một thư mục tạm RỖNG chứ không " +
+			"phải thư mục dự án — đo bằng TestKhongKhaiThuMucThiKhongThayThuMucDuAn " +
+			"(e2e_test.go). Nhưng đó là KHÔNG CẤP ĐƯỜNG DẪN, không phải dựng hàng rào: " +
+			"plugin biết đường dẫn bằng cách khác (nhúng sẵn lúc build, đọc file cấu " +
+			"hình của chính nó, hoặc đoán C:\\Users\\...) thì vẫn đọc, ghi và liệt kê " +
+			"được như thường. Đo bằng TestBangQuyenThuMucPhaiKhopVoiThucTeChamDuoc " +
+			"(e2e_test.go): plugin KHÔNG khai quyền nào, host báo thu-muc=(khong-cap), " +
+			"vậy mà plugin vẫn đọc đúng 33 byte của một file trong thư mục dự án, ghi " +
+			"được file mới, và liệt kê được thư mục. Muốn khai ChanThat thì phải có " +
+			"ACL riêng cho từng lượt chạy, Job Object, hoặc AppContainer — chưa cái nào " +
+			"được làm. Cho tới lúc đó, dòng này là lời cảnh báo chứ không phải lời hứa.",
 	},
 	{
 		Khoa: QuyenGhi,
@@ -70,8 +78,11 @@ var MoiQuyen = []MoTaQuyen{
 		BangChung: "ĐÃ ĐO và kết luận là không: một khi tiến trình con thấy được đường dẫn " +
 			"thì nó ghi được, host không có cách nào chặn ghi mà không dựng ACL riêng cho " +
 			"từng lần chạy (chưa làm). Quyền này CHỈ để KHAI BÁO — đọc manifest thì biết " +
-			"plugin định ghi, chứ không phải host đã chặn. Cách chặn thật đang có: không " +
-			"khai " + QuyenThuMuc + " thì plugin không có đường dẫn để mà ghi vào.",
+			"plugin định ghi, chứ không phải host đã chặn. LƯU Ý 22/08: dòng này từng kết " +
+			"lại bằng câu \"cách chặn thật đang có: không khai " + QuyenThuMuc + " thì " +
+			"plugin không có đường dẫn để mà ghi vào\" — câu đó ĐÃ BỊ PHÉP ĐO BÁC BỎ. " +
+			"Không có đường dẫn do host cấp không có nghĩa là không có đường dẫn; xem " +
+			"bằng chứng ở dòng " + QuyenThuMuc + ".",
 	},
 	{
 		Khoa: QuyenMoiTruong,
@@ -93,7 +104,12 @@ var MoiQuyen = []MoTaQuyen{
 			"TestKhongKhaiSecretThiKhongNhanDuocGiaTri (e2e_test.go), bài này khẳng định cả " +
 			"chuyện host KHÔNG mở kho key khi plugin không xin. Giá trị đi qua stdio trong " +
 			"lượt bắt tay: CỐ Ý không qua argv (mọi tiến trình trên máy đọc được dòng lệnh) " +
-			"và không qua biến môi trường (con cháu của plugin thừa hưởng hết).",
+			"và không qua biến môi trường (con cháu của plugin thừa hưởng hết). " +
+			"ĐỌC KÈM DÒNG " + QuyenThuMuc + ", đừng đọc rời. ChanThat ở đây nói host " +
+			"không ĐƯA secret cho plugin không xin — nó KHÔNG nói plugin không lấy được " +
+			"secret. Plugin chạy cùng quyền hệ điều hành với host và không có hàng rào " +
+			"tệp nào, nên plugin nào biết đường tới kho key vẫn đọc thẳng file được. " +
+			"Hai câu đó khác nhau, và người đọc lướt sẽ gộp chúng làm một.",
 	},
 	{
 		Khoa: QuyenMang,

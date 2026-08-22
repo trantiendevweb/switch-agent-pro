@@ -21,6 +21,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,6 +39,23 @@ const SoDongMacDinh = 5
 // host. Chỉ dùng cho phép đo hàng rào quyền (xem baoCaoQuyen) — plugin không đọc
 // nội dung file, và không có nó thì plugin vẫn chạy bình thường.
 const TenDauMoc = "sagent-dau-moc.txt"
+
+// ThamSoThuDuongDan là tham số dùng CHỈ để đo hàng rào, không phải tính năng.
+//
+// Nó trả lời một câu mà `TenDauMoc` ở trên không trả lời được: host không ĐƯA
+// đường dẫn dự án cho plugin — nhưng nếu plugin biết đường dẫn đó bằng cách
+// khác (nhúng sẵn lúc build, đọc từ file cấu hình của chính nó, hoặc đoán
+// `C:\Users\...`), thì nó có chạm tới nơi không?
+//
+// Vì sao đi qua THAM SỐ chứ không qua biến môi trường: biến môi trường CÓ hàng
+// rào thật (không khai `bien-moi-truong` thì host dựng lại env từ danh sách
+// trắng), nên dùng nó thì phép đo lẫn hai hàng rào vào nhau và không kết luận
+// được gì. Tham số đi trong bản tin JSON-RPC, không hàng rào nào đụng tới — đó
+// đúng là thứ cần cho một phép đo về hàng rào.
+const ThamSoThuDuongDan = "duong-dan-thu"
+
+// TenFileThuGhi là tên file plugin thử tạo trong thư mục được dò.
+const TenFileThuGhi = "sagent-plugin-thu-ghi.tmp"
 
 type mau struct{}
 
@@ -83,7 +101,55 @@ func (mau) Chay(moi plugin.MoiTruongChay, ts plugin.ThamSoChay) (plugin.KetQuaCh
 	fmt.Fprintf(&sb, "--- %d dòng cuối ---\n", len(cuoi))
 	sb.WriteString(strings.Join(cuoi, "\n"))
 
-	return plugin.KetQuaChay{Ra: sb.String(), GhiChu: baoCaoQuyen(moi)}, nil
+	ghiChu := baoCaoQuyen(moi)
+	if d := strings.TrimSpace(ts.ThamSo[ThamSoThuDuongDan]); d != "" {
+		ghiChu += " " + thuChamDuongDan(d)
+	}
+	return plugin.KetQuaChay{Ra: sb.String(), GhiChu: ghiChu}, nil
+}
+
+// thuChamDuongDan thử ĐỌC, GHI và LIỆT KÊ một đường dẫn plugin được cho biết,
+// rồi kể lại kết quả. Không phải tính năng — đây là dụng cụ đo.
+//
+// Vì sao dụng cụ này nằm trong plugin mẫu chứ không trong một binary "plugin
+// xấu" riêng: cả hai hàng rào đáng đo (thư mục, biến môi trường) đều chỉ hiện
+// ra khi chạy CÙNG MỘT binary với hai manifest khác nhau — thêm một binary thứ
+// hai là thêm một biến số vào phép so, và bảng quyen.go sẽ lại được chấm bằng
+// thứ khác với thứ nó nói về.
+//
+// KHÔNG in nội dung đọc được, chỉ in độ dài. Đường dẫn đem đi đo có thể là kho
+// key thật; một plugin mẫu in nội dung ra ghi_chu là dạy sai ngay ở ví dụ đầu
+// tiên, và ghi_chu thì đi thẳng vào log lẫn mặt web.
+func thuChamDuongDan(duong string) string {
+	phan := []string{"thu-duong-dan=" + duong}
+
+	if b, err := os.ReadFile(duong); err == nil {
+		phan = append(phan, fmt.Sprintf("thu-doc=duoc:%d", len(b)))
+	} else {
+		phan = append(phan, "thu-doc=khong")
+	}
+
+	// Ghi vào THƯ MỤC chứa đường dẫn được cho, không đè lên chính nó: phép đo
+	// không được phá thứ nó đang đo.
+	thuMuc := duong
+	if st, err := os.Stat(duong); err == nil && !st.IsDir() {
+		thuMuc = filepath.Dir(duong)
+	}
+	dich := filepath.Join(thuMuc, TenFileThuGhi)
+	if err := os.WriteFile(dich, []byte("sagent do hang rao quyen"), 0o644); err == nil {
+		phan = append(phan, "thu-ghi=duoc")
+		_ = os.Remove(dich) // dọn ngay: dụng cụ đo không để lại rác
+	} else {
+		phan = append(phan, "thu-ghi=khong")
+	}
+
+	if muc, err := os.ReadDir(thuMuc); err == nil {
+		phan = append(phan, fmt.Sprintf("thu-liet-ke=duoc:%d", len(muc)))
+	} else {
+		phan = append(phan, "thu-liet-ke=khong")
+	}
+
+	return strings.Join(phan, " ")
 }
 
 // baoCaoQuyen kể lại thứ host THẬT SỰ cấp cho lượt chạy này.

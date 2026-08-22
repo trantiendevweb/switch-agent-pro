@@ -3383,3 +3383,38 @@ với cây làm việc.
   Lượt trộn 22/08 có kiểm vạch xung đột, nhưng chỉ trên **ba file nó biết là sẽ
   đụng**. Vạch này nằm ở file thứ tư nên lọt. Bài canh mới không hỏi file nào
   vừa bị đụng — nó quét cả repo.
+
+## 22/08 — Ô quyền plugin `thu-muc-lam-viec` khai `chan-that` trong khi KHÔNG chặn được
+
+- **Đo lúc nào**: 22/08/2026, sau khi trộn nhánh plugin vào `main`.
+- **Ô nợ**: `internal/plugin/quyen.go:60` khai `QuyenThuMuc: Chan = ChanThat`.
+- **Vì sao đáng đo**: cột `[chặn]` là thứ người vận hành đọc để quyết định có
+  cắm một plugin lạ vào hay không. Chính file đó mở đầu bằng câu *"gộp hai cột
+  lại là chỗ mọi hệ thống quyền nói dối"* — rồi tự vấp ở dòng 60.
+- **Con số / Bằng chứng**: dựng plugin **không khai quyền nào**, cho biết đường
+  dẫn một file trong thư mục dự án **qua tham số JSON-RPC** (kênh duy nhất
+  không hàng rào nào chạm tới), chạy qua host thật:
+
+  ```
+  thu-muc=(khong-cap)  cwd-thay-dau-moc=khong        <- hàng rào THẬT, vẫn đúng
+  thu-doc=duoc:33  thu-ghi=duoc  thu-liet-ke=duoc:2  <- và vẫn chạm tới được
+  ```
+
+  Host **không đưa** đường dẫn (hai cột đầu), nhưng plugin biết đường dẫn bằng
+  cách khác thì **đọc đúng 33 byte**, **ghi được** file mới, **liệt kê được**
+  thư mục. *"Không cấp đường dẫn"* không phải *"chặn"*.
+- **Đã sửa hay chưa**: **ĐÃ SỬA** — hạ `ChanThat` → `KhongChanDuoc` kèm bằng
+  chứng. Sửa luôn dòng `ghi-thu-muc-lam-viec`: nó kết bằng câu *"cách chặn thật
+  đang có: không khai thu-muc thì plugin không có đường dẫn để mà ghi vào"* —
+  câu đó vừa bị chính phép đo này bác bỏ. Dòng `secret` **giữ nguyên `ChanThat`**
+  (lời khai của nó hẹp và đúng: host không ĐƯA secret) nhưng thêm dẫn chiếu, vì
+  người đọc lướt sẽ gộp nó thành *"plugin không lấy được secret"* — sai.
+- **Bài canh**: `TestBangQuyenThuMucPhaiKhopVoiThucTeChamDuoc` (`e2e_test.go`).
+  Nó **không** khẳng định lỗ hổng tồn tại — nó đo rồi **đối chiếu số đo với lời
+  khai**, và đỏ theo **cả hai chiều**: khai `chan-that` mà chạm được thì đỏ,
+  chạm không được nữa mà vẫn khai `khong-chan-duoc` cũng đỏ. Viết kiểu
+  `if !docDuoc { t.Fatal }` thì bài kiểm chỉ xanh chừng nào lỗ còn đó và sẽ phạt
+  đúng người đi vá — repo này đã dính lỗi ấy một lần với
+  `TestBaTrangThaiDiRaToiHopDong`.
+- **Còn CHƯA ĐO**: hàng rào thật (ACL từng lượt chạy / Job Object /
+  AppContainer) có dựng được trên Windows không. Chưa ai thử.
