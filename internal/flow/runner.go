@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/trantiendevweb/switch-agent-pro/internal/events"
+	"github.com/trantiendevweb/switch-agent-pro/internal/fleet"
 	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
@@ -86,7 +87,27 @@ type Runner struct {
 	Route RouteChon
 
 	// MaxParallel là trần số bước/agent chạy cùng lúc, lấy từ policy của dự án.
+	//
+	// Đây là trần BỀ RỘNG CỦA ĐỢT, và nó chỉ đếm TỔNG. Nó không phân biệt được
+	// bốn bước cùng đợt khai chung `profile = "claude:tns"` với bốn bước trải
+	// trên bốn tài khoản — hai thứ tiêu hạn mức khác hẳn nhau. Chiều đó là việc
+	// của Cong ngay dưới.
 	MaxParallel int
+
+	// Cong là CỔNG trần đồng thời theo bốn chiều (chung · harness · provider ·
+	// hồ sơ) cho bước `agent`.
+	//
+	// Vì sao phải có ở ĐÂY chứ không chỉ ở FleetStart: bốn trần kia đã có từ
+	// sáng nay, nhưng chúng canh cửa `fleet.start` — nơi một CON NGƯỜI đang
+	// đứng ở terminal, nên từ chối ngay là đúng. Cửa flow thì ngược lại: bốn
+	// bước `agent` cùng đợt gọi FleetStart gần như cùng lúc, mỗi lượt đọc sổ
+	// TRƯỚC khi các lượt kia kịp ghi phiên vào — nên cả bốn cùng qua và dồn vào
+	// một tài khoản; còn khi không đua thì bước thứ ba bị từ chối và cả lượt
+	// flow chết. Hai kết cục đều sai, cùng một nguyên nhân: xét trần không có
+	// hàng đợi.
+	//
+	// nil = không áp trần, hỏng theo hướng cũ chứ không panic.
+	Cong *fleet.Cong
 
 	// Commands là các lệnh khai trong .sagent/project.toml (test, lint, build…),
 	// để node `test`/`lint` không phải lặp lại lệnh trong từng flow.

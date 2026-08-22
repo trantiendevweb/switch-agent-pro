@@ -225,11 +225,14 @@ func (a *API) Config() config.Config { return a.cfg }
 // Addr là địa chỉ hồ sơ "provider:account"; thiếu provider thì mặc định claude.
 type Addr struct{ Provider, Account string }
 
+// ParseAddr tách "claude:tns" thành Addr.
+//
+// Uỷ THẲNG cho fleet.PhienTu chứ không giữ bản chép thứ hai: cổng trần đồng thời
+// của đường flow phải đếm đúng cái địa chỉ mà chỗ chạy thật sẽ dùng, và hai cách
+// tách lệch nhau một chút là trần đi canh một tài khoản không ai chạy.
 func ParseAddr(s string) Addr {
-	if i := strings.IndexByte(s, ':'); i >= 0 {
-		return Addr{s[:i], s[i+1:]}
-	}
-	return Addr{"claude", s}
+	p := fleet.PhienTu(s)
+	return Addr{p.Provider, p.Account}
 }
 
 func (ad Addr) String() string { return ad.Provider + ":" + ad.Account }
@@ -1075,6 +1078,16 @@ func (a *API) xetTran(addr Addr, muon int) (fleet.KetTran, bool) {
 		len(tr.Harness) == 0 && len(tr.Provider) == 0 && len(tr.HoSo) == 0 {
 		return fleet.KetTran{}, false
 	}
+	return fleet.XetTran(tr, a.PhienDangChay(), fleet.Phien{Provider: addr.Provider, Account: addr.Account}, muon), true
+}
+
+// PhienDangChay đọc sổ và trả các phiên đang chạy ở dạng gói fleet hiểu được.
+//
+// MỘT chỗ đọc cho CẢ HAI cửa xét trần — cửa `fleet.start` (xetTran) và cổng có
+// hàng đợi của đường flow (fleet.MoCong). Hai bản đọc song song sẽ lệch nhau
+// trong im lặng ở đúng chỗ khó thấy nhất: một bên lọc phiên mồ côi, bên kia
+// không, và không ai biết con số nào đúng.
+func (a *API) PhienDangChay() []fleet.Phien {
 	running, err := a.db.Running()
 	if err != nil {
 		// Đếm hụt thì trần NỚI RA chứ không siết vào — tức hỏng theo hướng tốn
@@ -1088,7 +1101,7 @@ func (a *API) xetTran(addr Addr, muon int) (fleet.KetTran, bool) {
 	for _, s := range running {
 		dang = append(dang, fleet.Phien{Provider: s.Provider, Account: s.Account})
 	}
-	return fleet.XetTran(tr, dang, fleet.Phien{Provider: addr.Provider, Account: addr.Account}, muon), true
+	return dang
 }
 
 // FleetRequest là yêu cầu bật hạm đội.
@@ -1688,6 +1701,16 @@ func (a *API) runner(defaultProfile Addr, dir string) *flow.Runner {
 		Plugin:         &plugin.BoChay{Dir: dir, Ghi: func(m string) { a.bus.Infof("%s", m) }},
 		DefaultProfile: mac,
 		MaxParallel:    a.cfg.Policy.MaxParallelSessions,
+		// BỐN trần chứ không còn một. `MaxParallel` ngay trên chỉ là bề rộng của
+		// một đợt và chỉ đếm TỔNG — nó cho qua đúng cái ca đắt nhất: bốn bước
+		// `agent` cùng đợt cùng khai `profile = "claude:tns"`, đốt sạch hạn mức
+		// một tài khoản trong khi các tài khoản khác ngồi không.
+		//
+		// Cổng dùng ĐÚNG bộ đếm của internal/fleet/tran.go mà `fleet.start` đang
+		// dùng — cùng một XetTran, cùng một cách đọc sổ (PhienDangChay). Khác duy
+		// nhất là ở cửa này trần chật thì bước CHỜ chứ không bị từ chối: một lượt
+		// flow đêm dài bị giết vì trần là tệ hơn là chạy chậm.
+		Cong: fleet.MoCong(a.TranDongThoi(), a.PhienDangChay, func(m string) { a.bus.Warnf("%s", m) }),
 		// Node `test`/`lint` lấy lệnh từ .sagent/project.toml, khỏi lặp lại
 		// trong từng flow.
 		Commands: map[string][]string{
