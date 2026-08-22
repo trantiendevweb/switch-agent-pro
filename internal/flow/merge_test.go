@@ -87,13 +87,24 @@ func TestMergeHaiLuotXongNguocThuTuVanRaGiongNhau(t *testing.T) {
 		return steps["gop"].Output, ag.xong()
 	}
 
+	// ĐỘ TRỄ 0 / 200 / 400ms chứ không phải 0 / 60 / 120.
+	//
+	// Chính bài này tự nói ra cách sửa ở câu báo lỗi bên dưới ("cần tăng độ trễ"),
+	// và đây là lúc phải nghe: đo thật 22/08, chạy `go test ./...` năm lượt liền thì
+	// một lượt đỏ với thuTu1 == thuTu2 == [p-cam p-banh p-an] — tức lượt 2 xong
+	// theo ĐÚNG chiều ngược với độ trễ đặt ra, vì chênh lệch 120ms nhỏ hơn độ giật
+	// của bộ lập lịch trên máy đang tải.
+	//
+	// KHÔNG nới khẳng định nào — vẫn đòi hai lượt xong theo hai thứ tự khác nhau,
+	// chỉ làm cho điều kiện đó xảy ra thật.
+
 	// Lượt 1: cam xong trước, rồi banh, rồi an.
 	gop1, thuTu1 := chay(map[string]time.Duration{
-		"p-an": 120 * time.Millisecond, "p-banh": 60 * time.Millisecond, "p-cam": 0,
+		"p-an": 400 * time.Millisecond, "p-banh": 200 * time.Millisecond, "p-cam": 0,
 	})
 	// Lượt 2: ĐẢO NGƯỢC.
 	gop2, thuTu2 := chay(map[string]time.Duration{
-		"p-an": 0, "p-banh": 60 * time.Millisecond, "p-cam": 120 * time.Millisecond,
+		"p-an": 0, "p-banh": 200 * time.Millisecond, "p-cam": 400 * time.Millisecond,
 	})
 
 	// Bằng chứng rằng bài test này có kiểm được cái nó nói: hai lượt phải XONG

@@ -62,6 +62,17 @@ type KetQuaAgent struct {
 	ChiPhiUSD float64 // 0 nếu provider không cho biết chi phí
 	TokenVao  int
 	TokenRa   int
+
+	// SuyLuan là phần NGHĨ của model, tách hẳn khỏi Output.
+	//
+	// CỐ Ý LÀ MỘT TRƯỜNG RIÊNG, không nối vào Output: Output là đường truyền sang
+	// bước sau, còn phần nghĩ là thứ để NGƯỜI ĐỌC. Trộn hai cái vào nhau làm
+	// `phai_co` gật đầu vì đọc được ý nghĩ, làm trần `MaxInject` ăn mất chỗ của câu
+	// trả lời thật, và làm khoá idempotency của bước sau không bao giờ ổn định.
+	// Xem migration v12 trong store.
+	//
+	// Chỉ node `model` có — đường agent không tách phần nghĩ ra khỏi bản ghi.
+	SuyLuan string
 }
 
 // Runner thực thi một flow.

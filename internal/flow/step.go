@@ -187,26 +187,25 @@ func (r *Runner) taiKhoan(s Step) string {
 //
 // Kết quả gộp lại có đánh dấu từng mục, để bước sau đọc `{{steps.x.output}}`
 // vẫn biết mục nào ra kết quả gì.
+//
+// BA THỨ CHẠY THEO TỪNG LƯỢT LẶP, không theo cả bước — và cả ba đều là chỗ dễ
+// làm sai theo kiểu im lặng:
+//
+//   - THƯ MỤC ARTIFACT. Mỗi lượt một thư mục con `<bước>/<index>/`, nên các lượt
+//     chạy song song không ghi đè lên nhau. Xem foreach_artifact.go.
+//   - HỢP ĐỒNG ĐẦU RA (`phai_co` và `artifact`). Kiểm từng lượt: 49 lượt giao
+//     hàng và 1 lượt câm thì đó là một MỤC bị mất, không phải một bước "gần xong".
+//   - KHOÁ IDEMPOTENCY. Tính trên env của TỪNG lượt (đã có `{{item}}`), nên thêm
+//     một mục mới vào danh sách chỉ chạy lại đúng mục mới đó.
 func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 	vars map[string]string, outs, arts map[string]string, items []string) (state, msg, output string) {
 
-	// `artifact` + `foreach` là một cái bẫy: mọi lượt lặp chạy song song trong
-	// CÙNG một thư mục artifact và ghi đè lên nhau, rồi `{{artifacts.<tên>}}` chỉ
-	// trỏ được tới một file — tức là bước sau đọc kết quả của một mục ngẫu nhiên
-	// và tưởng đó là kết quả của cả bước. Validate đã chặn ở lúc lưu; chặn thêm ở
-	// đây vì Flow còn dựng được thẳng bằng mã Go và bằng file chưa qua `validate`.
-	// Cả `idempotent` cũng chưa dùng chung với `foreach` được: khoá phải tính
-	// trên TỪNG lượt lặp, còn một khoá chung cho cả bước sẽ bỏ qua luôn những mục
-	// MỚI xuất hiện trong danh sách. Nói ra chứ không im lặng bỏ qua cái cờ —
-	// một cờ bị lờ đi trong im lặng là một tính năng người dùng tưởng đang bật.
+	// Hai loại node vẫn KHÔNG lặp được, và lý do không phải là "chưa làm": lặp
+	// chúng là chạy đúng một việc N lần rồi vứt N-1 kết quả. Validate đã chặn ở
+	// lúc lưu; chặn thêm ở đây vì Flow còn dựng được thẳng bằng mã Go và bằng
+	// file chưa qua `validate`.
 	var lyDoChan string
 	switch {
-	case len(s.Artifact) > 0:
-		lyDoChan = "không dùng `artifact` chung với `foreach` — các lượt lặp chạy song song " +
-			"trong cùng một thư mục và sẽ ghi đè lên nhau"
-	case s.Idempotent:
-		lyDoChan = "chưa dùng `idempotent` chung với `foreach` được — một khoá chung cho cả bước " +
-			"sẽ bỏ qua cả những mục MỚI trong danh sách"
 	case s.Type == TypeMerge:
 		lyDoChan = "không dùng `foreach` với `merge` — mỗi lượt lặp sẽ gộp lại đúng cùng một tập nguồn"
 	case s.Type == TypeRoute:
@@ -216,6 +215,17 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, lyDoChan, 1)
 		r.baoBuocHong(runID, f, s, lyDoChan)
 		return store.StepFailed, lyDoChan, ""
+	}
+
+	// Dọn thư mục artifact của CẢ BƯỚC đúng MỘT LẦN, ở đây, TRƯỚC khi phát các
+	// lượt. Không dọn trong từng lượt: các lượt chạy song song, và một
+	// `RemoveAll` trên thư mục cha sẽ ăn mất file của lượt bên cạnh đúng lúc nó
+	// đang ghi. (Bước lặp không có retry, nên không có chuyện "dọn trước mỗi lần
+	// thử" như runStep.)
+	if _, err := ChuanBiArtifact(runID, s); err != nil {
+		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, err.Error(), 1)
+		r.baoBuocHong(runID, f, s, err.Error())
+		return store.StepFailed, err.Error(), ""
 	}
 
 	r.Bus.Infof("%s.%s lặp trên %d mục", f.Name, s.ID, len(items))
@@ -230,9 +240,11 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 	var mu sync.Mutex
 
 	results := make([]string, len(items))
+	nghi := make([]string, len(items)) // phần nghĩ của từng lượt, gom RIÊNG khỏi results
 	var firstErr string
 	var chiPhi float64
 	var tokVao, tokRa int // cộng dồn chi phí mọi lượt của bước lặp
+	var boQua int         // số lượt trúng cache idempotency
 
 	for i, item := range items {
 		i, item := i, item
@@ -244,9 +256,47 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 			if ctx.Err() != nil {
 				return
 			}
+			chiSo := i + 1 // 1-based, ĐÚNG con số của {{index}} và của tên thư mục
 			env := WithOutputs(itemVars(vars, item, i), outs)
 			for k, v := range arts {
 				env[k] = v
+			}
+
+			// `artifact_dir` của LƯỢT NÀY, đè lên giá trị cả-bước mà
+			// MoiTruongArtifact đã đặt. Không đè thì mọi lượt cùng ghi vào một
+			// chỗ và lượt chạy chậm nhất thắng — đúng cái bẫy #199 nêu ra.
+			lapDir, err := ChuanBiArtifactLap(runID, s, chiSo)
+			if err != nil {
+				mu.Lock()
+				if firstErr == "" {
+					firstErr = fmt.Sprintf("mục %d (%s): %v", chiSo, short(item, 40), err)
+				}
+				mu.Unlock()
+				return
+			}
+			if lapDir != "" {
+				env[KhoaArtifactDir] = lapDir
+			}
+
+			// IDEMPOTENCY THEO TỪNG LƯỢT LẶP. Khoá tính từ env của lượt này, mà
+			// env đã có `{{item}}` — nên hai mục khác nhau là hai khoá khác nhau,
+			// và một mục MỚI xuất hiện trong danh sách không bao giờ trúng cache
+			// của mục khác. Đó là toàn bộ lý do mảnh này cần một dòng sổ riêng
+			// cho mỗi lượt thay vì dùng lại cột `idem_key` của cả bước.
+			khoa := KhoaIdem(s, env)
+			if khoa != "" {
+				if out, xong := r.thuDungLaiMucCu(runID, f, s, chiSo, item, khoa); xong {
+					mu.Lock()
+					// GIỮ NGUYÊN dạng kết quả, không thêm chữ "bỏ qua" vào đây:
+					// khối này đi thẳng sang bước sau qua `{{steps.x.output}}`, và
+					// một dòng chú thích thêm vào sẽ làm khoá của bước SAU đổi
+					// theo — tức là trúng cache ở bước này lại bắt bước sau chạy
+					// lại. Việc bỏ qua được nói ở `msg` và ở nhật ký.
+					results[i] = "=== " + item + " ===\n" + out
+					boQua++
+					mu.Unlock()
+					return
+				}
 			}
 
 			stepCtx := ctx
@@ -259,16 +309,42 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 				cancel()
 			}
 
+			// HỢP ĐỒNG ĐẦU RA, kiểm theo TỪNG LƯỢT.
+			//
+			// `phai_co` trước đây không được kiểm ở nhánh lặp một lần nào: bước
+			// khai nó, bảng `validate` không kêu, và nó không làm gì cả. Cùng lớp
+			// với mọi cái cờ bị lờ đi trong im lặng — người viết flow tưởng cổng
+			// kiểm đang bật.
+			if err == nil {
+				if thieu := ThieuPhaiCo(s, kq.Output); thieu != "" {
+					err = fmt.Errorf("%s", thieu)
+				}
+			}
+			if err == nil {
+				if thieu := ThieuArtifactLap(runID, s, chiSo, item); thieu != "" {
+					err = fmt.Errorf("%s", thieu)
+				}
+			}
+
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
 				if firstErr == "" {
-					firstErr = fmt.Sprintf("mục %d (%s): %v", i+1, short(item, 40), err)
+					firstErr = fmt.Sprintf("mục %d (%s): %v", chiSo, short(item, 40), err)
 				}
 				results[i] = "=== " + item + " === LỖI: " + err.Error()
 				return
 			}
 			results[i] = "=== " + item + " ===\n" + kq.Output
+			if kq.SuyLuan != "" {
+				nghi[i] = "=== " + item + " ===\n" + kq.SuyLuan
+			}
+			// Ghi sổ SAU KHI lượt đã xong và đã qua cả hai hợp đồng — cùng luật
+			// với SetStepIdemKey ở runStep: một dòng trong sổ nghĩa là "đã làm
+			// XONG", không phải "đã bắt đầu".
+			if khoa != "" {
+				_ = r.DB.SetStepItem(runID, s.ID, chiSo, khoa, kq.Output)
+			}
 			chiPhi += kq.ChiPhiUSD
 			tokVao += kq.TokenVao
 			tokRa += kq.TokenRa
@@ -277,6 +353,12 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 	wg.Wait()
 
 	combined := strings.TrimSpace(strings.Join(results, "\n"))
+	// Phần nghĩ gộp lại đi vào CỘT RIÊNG, đánh dấu theo mục y như results — nhưng
+	// KHÔNG bao giờ nối vào `combined`, vì `combined` là thứ đi sang bước sau.
+	// Lưu trước cả nhánh hỏng: lúc hỏng mới là lúc cần đọc nó nhất.
+	if nghiGop := strings.TrimSpace(strings.Join(nghi, "\n")); nghiGop != "" {
+		_ = r.DB.SetStepSuyLuan(runID, s.ID, nghiGop)
+	}
 	if firstErr != "" {
 		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, firstErr, 1)
 		if combined != "" {
@@ -285,14 +367,59 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 		r.baoBuocHong(runID, f, s, firstErr)
 		return store.StepFailed, firstErr, combined
 	}
-	_ = r.DB.SetStep(runID, s.ID, store.StepDone, fmt.Sprintf("xong %d mục", len(items)), 1)
+
+	// BẢN KÊ chỉ sinh khi MỌI lượt đã giao đủ hàng. Sinh sớm hơn là phát ra một
+	// danh sách trỏ tới file của một lượt vừa hỏng.
+	if err := GhiDanhSachArtifact(runID, s, len(items)); err != nil {
+		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, err.Error(), 1)
+		_ = r.DB.SetStepOutput(runID, s.ID, combined)
+		r.baoBuocHong(runID, f, s, err.Error())
+		return store.StepFailed, err.Error(), combined
+	}
+
+	xong := fmt.Sprintf("xong %d mục", len(items))
+	if boQua > 0 {
+		// Nói ra ở ĐÂY vì đây là chỗ người ta đọc trạng thái bước. Một bước lặp
+		// 30 mục mà 28 mục không tốn gì thì con số đó là thứ đáng biết nhất về
+		// lượt chạy, và nó không được phép chỉ nằm trong nhật ký cuộn qua mất.
+		xong += fmt.Sprintf(" (bỏ qua %d mục — idempotent)", boQua)
+	}
+	_ = r.DB.SetStep(runID, s.ID, store.StepDone, xong, 1)
 	_ = r.DB.SetStepOutput(runID, s.ID, combined)
 	if chiPhi > 0 || tokVao > 0 || tokRa > 0 {
 		_ = r.DB.SetStepCost(runID, s.ID, chiPhi, tokVao, tokRa)
 	}
 	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
-		SessionID: runID, Msg: fmt.Sprintf("xong %d mục", len(items))})
+		SessionID: runID, Msg: xong})
 	return store.StepDone, "", combined
+}
+
+// thuDungLaiMucCu tra sổ xem MỘT LƯỢT LẶP này đã có lượt chạy trước làm xong
+// chưa, và nếu có thì dựng lại kết quả cho lượt chạy NÀY.
+//
+// Song song từng dòng với thuDungLaiViecCu (bước thường), kể cả nguyên tắc quan
+// trọng nhất của nó: KHÔNG có nhánh nào trả về "xong" mà thiếu thứ gì. Chép
+// artifact hụt một file thì coi như KHÔNG trúng và chạy lại thật.
+//
+// `cu.Idx` là chỉ số của lượt lặp ở lượt chạy CŨ, và nó có thể KHÁC chỉ số bây
+// giờ: khoá bám `{{item}}` chứ không bám vị trí, nên một mục đổi chỗ trong danh
+// sách vẫn trúng cache. Chép artifact phải đi từ đúng thư mục cũ đó — chép từ
+// `<chỉ số bây giờ>` là chép nhầm file của một mục khác, im lặng.
+func (r *Runner) thuDungLaiMucCu(runID int64, f Flow, s Step, chiSo int,
+	item, khoa string) (output string, xong bool) {
+
+	cu, co, err := r.DB.TimMucDaLam(khoa, runID)
+	if err != nil || !co {
+		return "", false
+	}
+	if err := chepArtifactMucCu(cu, runID, s, chiSo); err != nil {
+		r.Bus.Warnf("%s.%s mục %d: lượt #%d đã làm việc này nhưng %v — chạy lại",
+			f.Name, s.ID, chiSo, cu.RunID, err)
+		return "", false
+	}
+	_ = r.DB.SetStepItem(runID, s.ID, chiSo, khoa, cu.Output)
+	r.Bus.Infof("%s.%s mục %d (%s): %s", f.Name, s.ID, chiSo, short(item, 40), MoTaIdemMuc(cu))
+	return cu.Output, true
 }
 
 func short(s string, n int) string {
@@ -431,6 +558,12 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 			if kq.Output != "" {
 				_ = r.DB.SetStepOutput(runID, s.ID, kq.Output)
 			}
+			// PHẦN NGHĨ đi vào CỘT RIÊNG, không nối vào output — xem KetQuaAgent.SuyLuan
+			// và migration v12. Lưu ngay cạnh output để hai thứ không bao giờ lệch nhau
+			// về lượt chạy.
+			if kq.SuyLuan != "" {
+				_ = r.DB.SetStepSuyLuan(runID, s.ID, kq.SuyLuan)
+			}
 			if kq.ChiPhiUSD > 0 || kq.TokenVao > 0 || kq.TokenRa > 0 {
 				_ = r.DB.SetStepCost(runID, s.ID, kq.ChiPhiUSD, kq.TokenVao, kq.TokenRa)
 			}
@@ -462,6 +595,11 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	// antigravity trả status ERROR. Bằng chứng phải còn lại ở chỗ người ta tìm.
 	if kqCuoi.Output != "" {
 		_ = r.DB.SetStepOutput(runID, s.ID, kqCuoi.Output)
+	}
+	// Giữ cả phần nghĩ khi hỏng, cùng lý do với output ngay trên: đúng lúc cần biết
+	// model đã nghĩ gì nhất thì không được để không còn gì để đọc.
+	if kqCuoi.SuyLuan != "" {
+		_ = r.DB.SetStepSuyLuan(runID, s.ID, kqCuoi.SuyLuan)
 	}
 	r.baoBuocHong(runID, f, s, emsg)
 	return store.StepFailed, emsg, ""
@@ -670,6 +808,16 @@ func cauHoi(s Step, vars map[string]string) string {
 		// Bước plugin cũng là tiếng nói của MÁY: ghi lại ĐÚNG thứ đã gửi đi, vì
 		// đó là thứ duy nhất giải thích được vì sao plugin trả về cái nó trả về.
 		return ExpandChay(s.Vao, vars)
+	// Node `model` gửi đi ĐÚNG prompt này, y như node `agent`. Thiếu nhánh này thì
+	// hai thứ hỏng cùng lúc, và cả hai đều im:
+	//
+	//   1. Sổ không lưu câu hỏi nào cho bước `model` — đọc lại lượt chạy thì thấy câu
+	//      trả lời mà không thấy đã hỏi gì.
+	//   2. Khoá idempotency của bước `model` KHÔNG cuốn prompt vào (KhoaIdem băm
+	//      `cauHoi`), nên HAI bước `model` cùng route mà khác hẳn câu hỏi sẽ ra cùng
+	//      một khoá — và lượt sau dùng lại câu trả lời của một câu hỏi khác.
+	case TypeModel:
+		return ExpandChay(s.Prompt, vars)
 	// Với `merge`, "câu hỏi" là ĐÚNG khối chữ nó gộp được. Không phải một câu
 	// tóm tắt kiểu "gộp a, b, c": khối chữ ấy chính là toàn bộ đầu vào quyết
 	// định kết quả bước, nên nó phải nằm trong khoá idempotency (KhoaIdem đọc

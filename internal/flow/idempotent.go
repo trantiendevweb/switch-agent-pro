@@ -66,6 +66,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/trantiendevweb/switch-agent-pro/internal/store"
 )
 
 // KhoaIdem dựng khoá "việc này đã làm rồi hay chưa" cho một bước.
@@ -121,6 +123,23 @@ func KhoaIdem(s Step, env map[string]string) string {
 	}
 	for _, ten := range tenArtifactSapXep(s) {
 		ghi("artifact."+ten, s.Artifact[ten])
+	}
+	// LƯỢT LẶP `foreach`: băm thẳng MỤC, không chỉ dựa vào việc `cauHoi` đã thay
+	// `{{item}}` vào prompt. Hai lý do:
+	//
+	//   - Phòng xa. Hôm nay mọi loại node đều để `{{item}}` đi qua `cauHoi`, nhưng
+	//     một trường mới quên nối vào đó sẽ làm MọI lượt lặp chung một khoá —
+	//     tức 49 mục bị bỏ qua theo kết quả của mục đầu tiên, đúng cái lỗ mất việc
+	//     im lặng mà cả mảnh này đi đường vòng để tránh.
+	//   - Rẻ. Thêm một chuỗi vào băm không tốn gì, còn bỏ sót thì không cứu được.
+	//
+	// CỐ Ý KHÔNG băm `{{index}}`: vị trí trong danh sách KHÔNG phải danh tính của
+	// việc. Một mục đổi chỗ vì danh sách được sắp lại thì vẫn là đúng việc đó, và bắt
+	// nó chạy lại là làm cache vô dụng đúng lúc nó cần có ích nhất. (Prompt có gõ
+	// `{{index}}` thì `cauHoi` đã cuốn nó vào rồi — lúc đó vị trí thật sự là một phần
+	// của câu hỏi, và chạy lại mới đúng.)
+	if v, co := env["item"]; co {
+		ghi("foreach.item", v)
 	}
 	// 128 bit là quá đủ để không đụng nhau trong một cái sổ vài nghìn dòng, và
 	// ngắn thì đọc bằng mắt trong sổ vẫn được.
@@ -245,6 +264,40 @@ func chepFile(tu, den string) error {
 	return dst.Close()
 }
 
+// chepArtifactMucCu chép artifact của MỘT LƯỢT LẶP cũ sang lượt chạy này.
+//
+// Cùng luật với chepArtifactCu, khác đúng một chỗ và chỗ đó quan trọng: nguồn là
+// thư mục của lượt lặp `cu.Idx` ở lượt chạy cũ, đích là thư mục của lượt lặp
+// `chiSo` bây giờ. Hai con số này KHÔNG nhất thiết bằng nhau — khoá bám nội dung
+// mục chứ không bám vị trí, nên một mục đổi chỗ trong danh sách vẫn trúng cache.
+func chepArtifactMucCu(cu store.StepItem, runID int64, s Step, chiSo int) error {
+	if len(s.Artifact) == 0 {
+		return nil
+	}
+	if _, err := ChuanBiArtifactLap(runID, s, chiSo); err != nil {
+		return err
+	}
+	for _, ten := range tenArtifactSapXep(s) {
+		rel := s.Artifact[ten]
+		tu := DuongDanArtifactLap(cu.RunID, cu.StepID, cu.Idx, rel)
+		den := DuongDanArtifactLap(runID, s.ID, chiSo, rel)
+		if err := chepFile(tu, den); err != nil {
+			return fmt.Errorf("artifact %q của lượt #%d (mục %d) không còn: %w", ten, cu.RunID, cu.Idx, err)
+		}
+	}
+	return nil
+}
+
+// MoTaIdemMuc là câu mô tả ngắn cho một LƯỢT LẶP bị bỏ qua.
+//
+// Có dẫn cả chỉ số cũ chứ không chỉ số lượt chạy: khi hai con số lệch nhau thì
+// đó là bằng chứng cache đang bám nội dung mục — và khi chép sai thì cũng chính
+// hai con số đó chỉ ra chỗ sai.
+func MoTaIdemMuc(cu store.StepItem) string {
+	return fmt.Sprintf("bỏ qua — việc này lượt chạy #%d (mục %d) đã làm xong (idempotent)",
+		cu.RunID, cu.Idx)
+}
+
 // VanDeIdempotent soi phần `idempotent` của cả flow.
 //
 // LỖI chỉ ở những chỗ chắc chắn hỏng; còn lại là CẢNH BÁO, vì "cái gì quyết định
@@ -269,10 +322,6 @@ func VanDeIdempotent(f Flow) []Problem {
 			canh(s.ID, "bộ chạy KHÔNG nhìn thấy cây mã trên đĩa, HEAD của git hay đồng hồ, nên khoá "+
 				"của bước này không đổi khi những thứ đó đổi. Bước sẽ bị bỏ qua kể cả sau khi mã nguồn "+
 				"đã khác. Chỉ bật nếu kết quả bước phụ thuộc HOÀN TOÀN vào dòng lệnh và biến")
-		}
-		if s.ForEach != "" {
-			loi(s.ID, "chưa dùng `idempotent` chung với `foreach` được: khoá phải tính trên TỪNG lượt lặp "+
-				"mới đúng, còn bỏ qua cả bước theo một khoá chung sẽ bỏ qua cả những mục MỚI trong danh sách")
 		}
 	}
 	return ps

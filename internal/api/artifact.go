@@ -166,10 +166,10 @@ func (a *API) FlowArtifacts(runID int64) (KhoArtifact, error) {
 	// Bản đồ TÊN: cần định nghĩa flow, mà định nghĩa có thể đã đổi hoặc mất kể
 	// từ lượt chạy đó. Mất thì bảng vẫn ra, chỉ là không có tên — xem
 	// ThieuDinhNghia.
-	ten := map[string]string{}
+	ten := func(string) string { return "" }
 	if flows, _, err := flow.Load(run.Dir); err == nil {
 		if f, co := flows[run.Flow]; co {
-			ten = flow.TenTheoDuong(f)
+			ten = flow.BanDoTenArtifact(f)
 		} else {
 			kho.ThieuDinhNghia = true
 		}
@@ -199,7 +199,7 @@ func (a *API) FlowArtifacts(runID int64) (KhoArtifact, error) {
 		f := FileArtifact{
 			Duong: slash,
 			Buoc:  buocCuaDuong(slash),
-			Ten:   ten[slash],
+			Ten:   ten(slash),
 			Byte:  info.Size(),
 			Sua:   info.ModTime().UTC().Format(time.RFC3339),
 		}

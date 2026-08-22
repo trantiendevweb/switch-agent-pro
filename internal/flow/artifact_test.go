@@ -121,6 +121,44 @@ func TestTroGiupTienTrinh(t *testing.T) {
 		}
 		fmt.Print("đã ghi")
 
+	// ghi-tru <file> <chuỗi> <trừ>: ghi <chuỗi> ra <file>, TRỪ khi nó đúng bằng
+	// <trừ> — lúc đó thoát 0 mà không để lại gì. Dùng để dựng đúng cảnh "49 lượt
+	// giao hàng, 1 lượt câm".
+	case "ghi-tru":
+		if args[2] == args[3] {
+			fmt.Print("tôi bỏ qua mục này (và không ghi file)")
+			break
+		}
+		if err := os.WriteFile(args[1], []byte(args[2]), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Print("đã ghi " + args[2])
+
+	// gop-ke <bản kê>: đọc FILE BẢN KÊ của một bước `foreach`, mở từng file
+	// được liệt kê rồi in nội dung theo thứ tự. Đây chính là câu trả lời cho
+	// "argv không có vòng lặp": argv nhận MỘT đường dẫn, chương trình tự lặp.
+	case "gop-ke":
+		b, err := os.ReadFile(args[1])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "không đọc được bản kê:", err)
+			os.Exit(1)
+		}
+		var phan []string
+		for _, d := range strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n") {
+			d = strings.TrimSpace(d)
+			if d == "" {
+				continue
+			}
+			noi, err := os.ReadFile(d)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "bản kê trỏ tới file không mở được:", err)
+				os.Exit(1)
+			}
+			phan = append(phan, string(noi))
+		}
+		fmt.Printf("so=%d gop=%s", len(phan), strings.Join(phan, "+"))
+
 	default:
 		fmt.Fprintln(os.Stderr, "trợ giúp: không hiểu lệnh "+args[0])
 		os.Exit(2)
@@ -622,11 +660,35 @@ func TestValidateChanArtifactKhaiHong(t *testing.T) {
 				Artifact: map[string]string{"x": "x.md"}}),
 			"không có đường nào ghi ra file",
 		},
+		// `foreach` + `artifact` KHÔNG còn bị chặn — xem foreach_artifact.go. Cái
+		// bị chặn bây giờ là tên TRẦN trỏ tới artifact của một bước lặp: bước đó
+		// để lại N file nên tên trần không trỏ được tới cái nào.
 		{
-			"foreach + artifact",
-			buoc(Step{ID: "a", ForEach: "vars.ds", Run: []string{"go", "version"},
-				Artifact: map[string]string{"x": "x.md"}}),
-			"foreach",
+			"tên trần trỏ tới artifact của bước lặp",
+			Flow{Name: "t", Steps: []Step{
+				{ID: "a", Type: TypeShell, ForEach: "vars.ds", Run: []string{"go", "version"},
+					Artifact: map[string]string{"x": "x.md"}},
+				{ID: "b", Type: TypeShell, Needs: []string{"a"}, Run: []string{"cat", "{{artifacts.x}}"}},
+			}},
+			"danh_sach",
+		},
+		{
+			"bản kê trỏ tới artifact của bước KHÔNG lặp",
+			Flow{Name: "t", Steps: []Step{
+				{ID: "a", Type: TypeShell, Run: []string{"go", "version"},
+					Artifact: map[string]string{"x": "x.md"}},
+				{ID: "b", Type: TypeShell, Needs: []string{"a"}, Run: []string{"cat", "{{artifacts.x.danh_sach}}"}},
+			}},
+			"KHÔNG có `foreach`",
+		},
+		{
+			"hậu tố gõ sai",
+			Flow{Name: "t", Steps: []Step{
+				{ID: "a", Type: TypeShell, ForEach: "vars.ds", Run: []string{"go", "version"},
+					Artifact: map[string]string{"x": "x.md"}},
+				{ID: "b", Type: TypeShell, Needs: []string{"a"}, Run: []string{"cat", "{{artifacts.x.danhsach}}"}},
+			}},
+			"hậu tố",
 		},
 		{
 			"đọc artifact không ai sản xuất",

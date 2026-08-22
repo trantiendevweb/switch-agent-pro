@@ -1343,6 +1343,13 @@ func (b modelBridge) GoiModel(ctx context.Context, route, prompt string) (flow.K
 		Output:   kq.NoiDung,
 		TokenVao: kq.Usage.Vao,
 		TokenRa:  kq.Usage.Ra,
+		// Phần NGHĨ đi theo một trường RIÊNG, không nối vào NoiDung.
+		//
+		// Trước dòng này, một bước `model` chạy xong là phần nghĩ biến mất: cả
+		// `aiapi.KetQua` lẫn CLI lẫn dashboard đều đã có nó từ chiều 22/08, riêng
+		// cái cầu này vứt đi. Đo thật với deepseek-v4-flash: câu trả lời 91 ký tự,
+		// phần nghĩ 477 — người dùng đã trả tiền cho cả hai.
+		SuyLuan: kq.SuyLuan,
 	}, nil
 }
 

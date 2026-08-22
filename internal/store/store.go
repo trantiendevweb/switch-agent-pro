@@ -363,6 +363,62 @@ var migrations = []string{
 	// chạy nào TRƯỚC đây làm XONG đúng việc này chưa".
 	`ALTER TABLE flow_steps ADD COLUMN idem_key TEXT NOT NULL DEFAULT '';
 	 CREATE INDEX IF NOT EXISTS idx_flow_steps_idem ON flow_steps(idem_key, state);`,
+
+	// v11 — KHOÁ IDEMPOTENCY của TỪNG LƯỢT LẶP `foreach`.
+	//
+	// VÌ SAO KHÔNG DÙNG LẠI CỘT `idem_key` của v10: cột đó nằm trên dòng
+	// (run_id, step_id), tức MỘT khoá cho cả bước. Một bước `foreach` làm N việc
+	// khác nhau, và một khoá chung cho N việc chỉ còn hai cách hiểu, cả hai đều sai:
+	//
+	//   - Khoá băm cả danh sách: thêm MỘT mục mới vào danh sách thì khoá đổi và cả
+	//     N mục chạy lại. Không mất việc, nhưng 30 lần gọi agent bị làm lại để xử
+	//     lý 1 mục mới — đúng thứ idempotency sinh ra để tránh.
+	//   - Khoá băm riêng một mục nào đó: bỏ qua cả bước theo một mục, tức bỏ qua
+	//     luôn những mục MỚI. Đây là lỗ MẤT VIỆC IM LẶNG, và nó là lý do #199 CHẶN
+	//     thẳng `foreach` + `idempotent` thay vì làm bừa.
+	//
+	// Nên mỗi lượt lặp phải có dòng của riêng nó. Bảng này KHÔNG phải một cái cache
+	// độc lập — nó là phần CHI TIẾT của một dòng flow_steps đã có sẵn: cùng run_id,
+	// cùng step_id, chỉ thêm chỉ số. Dòng nào biến mất khỏi lịch sử lượt chạy thì
+	// mục của nó biến mất theo, đúng nguyên tắc đã ghi ở v10.
+	//
+	// Chỉ ghi khi bước bật `idempotent`. Bước không bật thì bảng này không có một
+	// dòng nào — không ai phải trả giá cho một tính năng mình không dùng.
+	`CREATE TABLE IF NOT EXISTS flow_step_items (
+		run_id   INTEGER NOT NULL,
+		step_id  TEXT    NOT NULL,
+		idx      INTEGER NOT NULL,
+		idem_key TEXT    NOT NULL DEFAULT '',
+		output   TEXT    NOT NULL DEFAULT '',
+		PRIMARY KEY (run_id, step_id, idx)
+	);
+	CREATE INDEX IF NOT EXISTS idx_flow_step_items_idem ON flow_step_items(idem_key);`,
+
+	// v12 — PHẦN SUY LUẬN của một bước `model`.
+	//
+	// Cột RIÊNG, KHÔNG nối vào `output`, và đây là toàn bộ quyết định của mảnh
+	// này. `output` không phải một ô hiển thị — nó là ĐƯỜNG TRUYỀN sang bước
+	// sau (`{{steps.x.output}}`), đi qua trần `flow.MaxInject` 6.000 ký tự, và
+	// là thứ `phai_co` soi để quyết định bước có đạt hợp đồng đầu ra hay không.
+	// Trộn phần nghĩ vào đó làm hỏng cả ba:
+	//
+	//   - HỢP ĐỒNG. `phai_co = ["NÊN TRỘN"]` sẽ đạt khi model chỉ NGHĨ tới chuỗi
+	//     đó mà không NÓI ra. Một cổng kiểm gật đầu vì đọc được ý nghĩ — đúng
+	//     lớp hỏng mà `phai_co` sinh ra để chặn (lượt #46).
+	//   - TRẦN NHÉT. Đo thật deepseek-v4-flash 22/08: câu trả lời 91 ký tự, phần
+	//     nghĩ 477 — gấp 5,2 lần. Nhét cả hai vào một đường 6.000 ký tự là lấy
+	//     chỗ của câu trả lời để chứa bản nháp.
+	//   - KHOÁ IDEMPOTENCY. Output của bước này là đầu vào của bước sau, nên nó
+	//     nằm trong khoá của bước sau. Phần nghĩ KHÔNG ổn định giữa hai lượt
+	//     gọi, nên trộn vào là làm khoá bước sau đổi mỗi lượt và cache không bao
+	//     giờ trúng.
+	//
+	// Nên: phần nghĩ là thứ để NGƯỜI ĐỌC, không phải để bước sau ăn. Nó được
+	// lưu, được hiện ra, và CỐ Ý không có placeholder nào trỏ tới nó.
+	//
+	// Cắt theo cùng trần với `output` và `prompt`: phần nghĩ của một model suy
+	// luận dài có thể vượt hẳn câu trả lời.
+	`ALTER TABLE flow_steps ADD COLUMN suy_luan TEXT NOT NULL DEFAULT '';`,
 }
 
 // cotPhien là danh sách cột đọc ra một Session, dùng chung cho mọi truy vấn để
@@ -435,6 +491,12 @@ type StepRun struct {
 	// IdemKey là khoá "việc này đã làm rồi hay chưa" của bước, rỗng khi bước
 	// không bật idempotency. Xem internal/flow/idempotent.go.
 	IdemKey string
+
+	// SuyLuan là phần NGHĨ của model ở bước `model`, tách hẳn khỏi `Output`.
+	//
+	// RỖNG không có nghĩa là "model không nghĩ gì": nhiều nhà cung cấp không trả
+	// phần này về. Xem aiapi.DocSuyLuan cho câu phân biệt hai nghĩa đó.
+	SuyLuan string
 }
 
 // CreateRun mở một lần chạy mới.
@@ -538,6 +600,19 @@ func (d *DB) SetStepPrompt(runID int64, stepID, prompt string) error {
 	return err
 }
 
+// SetStepSuyLuan lưu PHẦN NGHĨ của một bước `model`.
+//
+// Tách khỏi SetStepOutput chứ không nối chuỗi — xem migration v12 cho ba thứ sẽ
+// hỏng nếu trộn hai cái vào một cột.
+func (d *DB) SetStepSuyLuan(runID int64, stepID, suyLuan string) error {
+	if len(suyLuan) > MaxStepOutput {
+		suyLuan = "…(đã cắt bớt phần đầu)…\n" + suyLuan[len(suyLuan)-MaxStepOutput:]
+	}
+	_, err := d.db.Exec(`UPDATE flow_steps SET suy_luan=? WHERE run_id=? AND step_id=?`,
+		suyLuan, runID, stepID)
+	return err
+}
+
 // SetStepCost ghi chi phí và token của một bước. Tách khỏi SetStepOutput vì
 // output đến từ bản ghi còn chi phí đến từ dòng result có cấu trúc — hai nguồn,
 // và không phải provider nào cũng cho được chi phí (chỉ ghi khi > 0).
@@ -552,12 +627,12 @@ func (d *DB) SetStepCost(runID int64, stepID string, costUSD float64, tokIn, tok
 // hai chỗ không thể lệch nhau — cùng lý do với cotPhien.
 const cotBuoc = `run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,''),
 	COALESCE(cost_usd,0),COALESCE(tokens_in,0),COALESCE(tokens_out,0),
-	COALESCE(prompt,''),COALESCE(idem_key,'')`
+	COALESCE(prompt,''),COALESCE(idem_key,''),COALESCE(suy_luan,'')`
 
 func quetBuoc(sc interface{ Scan(...any) error }) (StepRun, error) {
 	var s StepRun
 	err := sc.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output,
-		&s.CostUSD, &s.TokensIn, &s.TokensOut, &s.Prompt, &s.IdemKey)
+		&s.CostUSD, &s.TokensIn, &s.TokensOut, &s.Prompt, &s.IdemKey, &s.SuyLuan)
 	return s, err
 }
 
@@ -614,6 +689,89 @@ func (d *DB) TimBuocDaLam(key string, truNoiChay int64) (StepRun, bool, error) {
 		return StepRun{}, false, err
 	}
 	return s, true, nil
+}
+
+// ---------------------------------------------------------------------------
+// TỪNG LƯỢT LẶP của một bước `foreach` — xem migration v11.
+// ---------------------------------------------------------------------------
+
+// StepItem là một LƯỢT LẶP đã làm xong của một bước `foreach`.
+//
+// Idx là chỉ số 1-based, ĐÚNG con số mà `{{index}}` mang trong lượt lặp đó — và
+// cũng đúng tên thư mục artifact của lượt (`run-<id>/<bước>/<idx>/`). Ba thứ đó
+// phải là MỘT con số: lệch nhau thì một lượt trúng cache sẽ chép artifact của
+// lượt khác sang, và không có gì báo lỗi.
+type StepItem struct {
+	RunID   int64
+	StepID  string
+	Idx     int
+	IdemKey string
+	Output  string
+}
+
+// SetStepItem ghi một lượt lặp ĐÃ LÀM XONG.
+//
+// Gọi SAU KHI lượt lặp xong, cùng luật với SetStepIdemKey: một dòng ở đây nghĩa
+// là "việc này đã làm XONG", không phải "đang làm".
+//
+// Cắt output theo đúng trần của bước (MaxStepOutput). Không cắt thì một bước lặp
+// 50 mục, mỗi mục vài trăm KB, sẽ nhét vài chục MB vào sổ trong một lượt chạy —
+// và bản gộp trong cột `output` của bước đã bị cắt ở đúng trần đó rồi.
+func (d *DB) SetStepItem(runID int64, stepID string, idx int, key, output string) error {
+	if len(output) > MaxStepOutput {
+		output = "…(đã cắt bớt phần đầu)…\n" + output[len(output)-MaxStepOutput:]
+	}
+	_, err := d.db.Exec(`INSERT OR REPLACE INTO flow_step_items
+		(run_id, step_id, idx, idem_key, output) VALUES (?,?,?,?,?)`,
+		runID, stepID, idx, key, output)
+	return err
+}
+
+// TimMucDaLam tìm LƯỢT LẶP đã làm xong gần nhất mang đúng khoá này.
+//
+// Song song hoàn toàn với TimBuocDaLam, kể cả `truNoiChay`: trong cùng một lượt
+// chạy, hai lượt lặp trùng khoá là hai mục GIỐNG HỆT nhau trong danh sách, và
+// cho mục thứ hai mượn kết quả của mục thứ nhất là một cái cache nội-lượt mà
+// không ai xin — nó biến một danh sách có mục trùng thành một danh sách ngắn
+// hơn, im lặng.
+func (d *DB) TimMucDaLam(key string, truNoiChay int64) (StepItem, bool, error) {
+	if key == "" {
+		return StepItem{}, false, nil
+	}
+	var it StepItem
+	err := d.db.QueryRow(`SELECT run_id, step_id, idx, idem_key, COALESCE(output,'')
+		FROM flow_step_items WHERE idem_key=? AND run_id<>?
+		ORDER BY run_id DESC LIMIT 1`, key, truNoiChay).
+		Scan(&it.RunID, &it.StepID, &it.Idx, &it.IdemKey, &it.Output)
+	if err == sql.ErrNoRows {
+		return StepItem{}, false, nil
+	}
+	if err != nil {
+		return StepItem{}, false, err
+	}
+	return it, true, nil
+}
+
+// StepItems đọc mọi lượt lặp đã ghi của một bước, theo thứ tự chỉ số.
+//
+// Có mặt vì bảng liệt kê và người gỡ lỗi cần trả lời "lượt lặp nào bị bỏ qua,
+// lượt nào chạy thật" — bản gộp trong cột `output` không nói được điều đó.
+func (d *DB) StepItems(runID int64, stepID string) ([]StepItem, error) {
+	rows, err := d.db.Query(`SELECT run_id, step_id, idx, idem_key, COALESCE(output,'')
+		FROM flow_step_items WHERE run_id=? AND step_id=? ORDER BY idx`, runID, stepID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StepItem
+	for rows.Next() {
+		var it StepItem
+		if err := rows.Scan(&it.RunID, &it.StepID, &it.Idx, &it.IdemKey, &it.Output); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
 }
 
 // migrate đưa schema lên phiên bản mới nhất, chạy trong transaction để không
