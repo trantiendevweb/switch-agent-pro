@@ -1016,6 +1016,50 @@ func (a *API) SessionSweep(giet bool) ([]MoCoi, error) {
 	return out, nil
 }
 
+// TranDongThoi dựng bộ trần của dự án ở dạng dữ liệu thuần cho gói fleet.
+//
+// Xuất ra ngoài để mặt nào cũng hỏi được cùng một bộ số — CLI in nó trong
+// `sagent config`, và test dựng lại được đúng phép tính mà FleetStart dùng.
+func (a *API) TranDongThoi() fleet.Tran {
+	t := a.cfg.Policy.Tran
+	return fleet.Tran{
+		Chung:           a.cfg.Policy.MaxParallelSessions,
+		HarnessMacDinh:  t.HarnessMacDinh,
+		ProviderMacDinh: t.ProviderMacDinh,
+		HoSoMacDinh:     t.HoSoMacDinh,
+		Harness:         t.Harness,
+		Provider:        t.Provider,
+		HoSo:            t.HoSo,
+		ThuocHarness:    t.ThuocHarness,
+	}
+}
+
+// xetTran hỏi sổ xem đang chạy những gì rồi xét bốn trần.
+//
+// ok=false chỉ khi KHÔNG có trần nào bật — lúc đó không có gì để nói, và nói
+// thừa mỗi lượt chạy thì người vận hành sẽ học cách bỏ qua cảnh báo.
+func (a *API) xetTran(addr Addr, muon int) (fleet.KetTran, bool) {
+	tr := a.TranDongThoi()
+	if tr.Chung <= 0 && tr.HarnessMacDinh <= 0 && tr.ProviderMacDinh <= 0 && tr.HoSoMacDinh <= 0 &&
+		len(tr.Harness) == 0 && len(tr.Provider) == 0 && len(tr.HoSo) == 0 {
+		return fleet.KetTran{}, false
+	}
+	running, err := a.db.Running()
+	if err != nil {
+		// Đếm hụt thì trần NỚI RA chứ không siết vào — tức hỏng theo hướng tốn
+		// hạn mức. Đường cũ nuốt lỗi này (`running, _ :=`); nuốt xong thì lượt
+		// chạy vẫn qua và không ai biết trần vừa được tính trên một con số hụt.
+		a.bus.Warnf("sổ phiên trả lỗi (%v) — trần đồng thời lượt này tính trên %d phiên đọc được, "+
+			"có thể HỤT so với thật, tức cho qua nhiều hơn mức đáng cho. Đối chiếu bằng `sagent status`.",
+			err, len(running))
+	}
+	dang := make([]fleet.Phien, 0, len(running))
+	for _, s := range running {
+		dang = append(dang, fleet.Phien{Provider: s.Provider, Account: s.Account})
+	}
+	return fleet.XetTran(tr, dang, fleet.Phien{Provider: addr.Provider, Account: addr.Account}, muon), true
+}
+
 // FleetRequest là yêu cầu bật hạm đội.
 type FleetRequest struct {
 	Addr     Addr
@@ -1047,19 +1091,19 @@ func (a *API) FleetStart(req FleetRequest) (fleet.Result, error) {
 	}
 	// Trần cứng: chặn cả --copies lẫn TỔNG số phiên đang chạy, tránh lỡ tay
 	// bật fleet nhiều lần rồi đốt hạn mức.
-	if m := a.cfg.Policy.MaxParallelSessions; m > 0 {
-		running, _ := a.db.Running()
-		room := m - len(running)
-		if room < 0 {
-			room = 0
+	//
+	// BỐN chiều chứ không còn một: chung (`max_parallel_sessions`), harness,
+	// provider, hồ sơ. Trần chung không phân biệt được phiên nào thuộc tài
+	// khoản nào, nên nó cho qua đúng cái ca đắt nhất — bốn phiên dồn vào một
+	// tài khoản claude, đốt sạch hạn mức của tài khoản đó trong khi các tài
+	// khoản khác ngồi không. Xem internal/fleet/tran.go.
+	if k, ok := a.xetTran(req.Addr, req.Copies); ok {
+		if k.Cap == 0 {
+			return fleet.Result{}, k.LoiHetCho()
 		}
-		if req.Copies > room {
-			a.bus.Warnf("policy.max_parallel_sessions=%d, đang chạy %d — hạ %d xuống %d.",
-				m, len(running), req.Copies, room)
-			req.Copies = room
-		}
-		if req.Copies == 0 {
-			return fleet.Result{}, fmt.Errorf("đã đạt trần %d phiên đang chạy — dừng bớt rồi thử lại (sagent stop all)", m)
+		if !k.Du() {
+			a.bus.Warnf("%s", k.LoiCatBot())
+			req.Copies = k.Cap
 		}
 	}
 	// Cảnh báo nếu token sắp hết hạn: hạm đội chạy dài sẽ vượt mốc refresh, và

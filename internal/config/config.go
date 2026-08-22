@@ -69,6 +69,16 @@ type Config struct {
 	Policy struct {
 		MaxParallelSessions int      `toml:"max_parallel_sessions"`
 		RequireApprovalFor  []string `toml:"require_approval_for"`
+
+		// Tran là các trần đồng thời THEO TỪNG CHIỀU, cộng dồn với
+		// MaxParallelSessions chứ không thay thế nó.
+		//
+		// Vì sao phải tách ra: `max_parallel_sessions` chỉ đếm TỔNG, nên bốn
+		// phiên rơi hết vào một tài khoản claude vẫn qua được — chúng đốt sạch
+		// hạn mức của đúng tài khoản đó trong khi tài khoản khác ngồi không.
+		// Hạn mức thuê bao tính theo TÀI KHOẢN, còn RAM và tiến trình con tính
+		// theo HARNESS; một con số không đo được cả hai.
+		Tran TranDongThoi `toml:"tran"`
 	} `toml:"policy"`
 
 	// UI là hợp đồng của Pha 5d: hai project khác nhau mở ra hai bố cục khác
@@ -116,6 +126,32 @@ type Config struct {
 	Sources []string `toml:"-"`
 }
 
+// TranDongThoi là khối `[policy.tran]`.
+//
+// Mọi số 0 nghĩa là TẮT chiều đó — cùng quy ước với `max_parallel_sessions`
+// (`m > 0` mới áp). Không khai gì thì các số mặc định ở `Default()` có hiệu
+// lực: tính năng này phải chạy được ngay, không bắt ai cấu hình mới dùng được.
+type TranDongThoi struct {
+	// Ba số mặc định áp cho MỌI harness / provider / hồ sơ chưa có mục riêng.
+	HarnessMacDinh  int `toml:"harness_mac_dinh"`
+	ProviderMacDinh int `toml:"provider_mac_dinh"`
+	HoSoMacDinh     int `toml:"ho_so_mac_dinh"`
+
+	// Ba bảng đè lên số mặc định, theo tên. Khoá của HoSo là địa chỉ đầy đủ
+	// dạng "claude:tns" (không kèm số bản clone: các bản clone của cùng một
+	// tài khoản dùng chung hạn mức nên phải đếm chung).
+	Harness  map[string]int `toml:"harness"`
+	Provider map[string]int `toml:"provider"`
+	HoSo     map[string]int `toml:"ho_so"`
+
+	// ThuocHarness gộp nhiều provider vào một harness, ví dụ
+	// `codex = "node"` và `grok = "node"` để hai CLI npm chung một trần máy.
+	// Không khai thì harness của một provider chính là tên provider — đo được
+	// 22/08: năm provider trên máy này ra năm binary khác nhau (claude.exe,
+	// codex, cursor-agent, agy.exe, grok).
+	ThuocHarness map[string]string `toml:"thuoc_harness"`
+}
+
 // Default là cấu hình khi không có file nào.
 func Default() Config {
 	var c Config
@@ -123,6 +159,23 @@ func Default() Config {
 	c.Project.Workspace = "dir"
 	c.Project.DefaultBranch = "main"
 	c.Policy.MaxParallelSessions = 4
+	// Ba số mặc định. Chọn để bộ bốn trần MẶC ĐỊNH đã ngăn được đúng cái sự cố
+	// đã đẻ ra tính năng này — bốn phiên dồn vào một tài khoản — mà không phải
+	// sửa file nào:
+	//
+	//   chung 4 · harness 3 · provider 3 · hồ sơ 2
+	//
+	// Tức muốn chạy đủ 4 phiên thì buộc phải trải ra ít nhất HAI tài khoản.
+	// Hai là số thấp nhất còn giữ được ý nghĩa của `fleet` (chạy song song),
+	// nên hạ tiếp xuống 1 sẽ vô hiệu hoá lệnh đó cho mọi người dùng đang có.
+	//
+	// Ba số này là LỰA CHỌN chứ không phải số đo: không có phép đo nào nói
+	// "claude chịu được đúng 3 tiến trình". Trần harness ở đây chỉ là hàng rào
+	// mặc định để một lượt lỡ tay không kéo sập máy; ai đo được máy mình chịu
+	// bao nhiêu thì khai đè trong .sagent/project.toml.
+	c.Policy.Tran.HarnessMacDinh = 3
+	c.Policy.Tran.ProviderMacDinh = 3
+	c.Policy.Tran.HoSoMacDinh = 2
 	c.UI.DefaultSurface = "tui"
 	c.UI.Theme = "dark"
 	c.UI.Enable3D = true
@@ -208,6 +261,44 @@ func (c Config) validate() error {
 	if c.Policy.MaxParallelSessions < 0 {
 		return fmt.Errorf("policy.max_parallel_sessions không được âm")
 	}
+	// Số âm ở trần đồng thời phải kêu ngay lúc đọc file. Nếu để lọt, `Con()`
+	// vẫn kẹp về 0 nên lượt chạy bị TỪ CHỐI HẲN — và người dùng gõ `-1` với ý
+	// "bỏ giới hạn" sẽ nhận đúng điều ngược lại mà không hiểu vì sao. Muốn tắt
+	// một chiều thì khai 0, và câu lỗi phải nói ra điều đó.
+	for _, x := range []struct {
+		khoa string
+		v    int
+	}{
+		{"policy.tran.harness_mac_dinh", c.Policy.Tran.HarnessMacDinh},
+		{"policy.tran.provider_mac_dinh", c.Policy.Tran.ProviderMacDinh},
+		{"policy.tran.ho_so_mac_dinh", c.Policy.Tran.HoSoMacDinh},
+	} {
+		if x.v < 0 {
+			return fmt.Errorf("%s = %d — không được âm; khai 0 nếu muốn TẮT trần này", x.khoa, x.v)
+		}
+	}
+	for _, b := range []struct {
+		bang string
+		m    map[string]int
+	}{
+		{"policy.tran.harness", c.Policy.Tran.Harness},
+		{"policy.tran.provider", c.Policy.Tran.Provider},
+		{"policy.tran.ho_so", c.Policy.Tran.HoSo},
+	} {
+		for ten, v := range b.m {
+			if v < 0 {
+				return fmt.Errorf("%s.%q = %d — không được âm; khai 0 nếu muốn TẮT trần này", b.bang, ten, v)
+			}
+		}
+	}
+	// Khoá của bảng ho_so phải là địa chỉ đầy đủ "provider:tài_khoản". Gõ thiếu
+	// (chỉ "tns") thì bảng vẫn decode được, trần vẫn im lặng không khớp phiên
+	// nào, và người dùng tưởng đã siết xong. Sai kiểu đó thì phải kêu.
+	for ten := range c.Policy.Tran.HoSo {
+		if !strings.Contains(ten, ":") {
+			return fmt.Errorf("policy.tran.ho_so có khoá %q — phải là địa chỉ đầy đủ dạng \"provider:tài_khoản\", ví dụ \"claude:tns\"", ten)
+		}
+	}
 	return nil
 }
 
@@ -231,6 +322,17 @@ workspace      = "worktree"   # "dir" = dùng chung thư mục | "worktree" = m�
 [policy]
 max_parallel_sessions = 4
 require_approval_for  = ["merge", "deploy"]
+
+# Trần đồng thời theo từng chiều, CỘNG DỒN với max_parallel_sessions ở trên.
+# Trần chung chỉ đếm tổng, nên nó cho qua cả 4 phiên dồn vào MỘT tài khoản —
+# đốt sạch hạn mức của tài khoản đó trong khi tài khoản khác ngồi không.
+# Bỏ trống cũng được: mặc định đã là 3/3/2. Số 0 = TẮT chiều đó.
+[policy.tran]
+harness_mac_dinh  = 3   # tài nguyên máy: mấy tiến trình CLI cùng lúc
+provider_mac_dinh = 3   # trần nhà cung cấp, tính trên TỔNG các tài khoản
+ho_so_mac_dinh    = 2   # hạn mức thuê bao: mấy phiên trên MỘT tài khoản
+# [policy.tran.ho_so]
+# "claude:tns" = 1      # khoá phải là địa chỉ đầy đủ "provider:tài_khoản"
 
 [ui]
 default_surface = "tui"       # tui | dashboard | workflow | 3d

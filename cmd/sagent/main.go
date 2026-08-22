@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -702,6 +703,11 @@ func cmdConfig() {
 	if len(c.Policy.RequireApprovalFor) > 0 {
 		fmt.Printf("  policy.require_approval %v\n", c.Policy.RequireApprovalFor)
 	}
+	// Ba trần dưới đây CỘNG DỒN với max_parallel ở trên. In cả khi không ai
+	// khai: chúng có mặc định và đang siết thật, mà một trần siết thật nhưng
+	// không hiện ở `sagent config` thì đúng là thứ khiến người vận hành lúc
+	// hai giờ sáng nghi công cụ hỏng.
+	inTran(c.Policy.Tran)
 	fmt.Printf("  ui.default_surface      %s\n", c.UI.DefaultSurface)
 	fmt.Printf("  ui.theme                %s\n", c.UI.Theme)
 	// Ba khoá dưới đây thường KHÔNG được khai. In "(mặc định: …)" thay vì bỏ
@@ -719,6 +725,53 @@ func cmdConfig() {
 	}
 	fmt.Printf("  ui.enable_3d            %v\n", c.UI.Enable3D)
 	fmt.Printf("\n  api version             %d · event schema %d\n\n", api.Version, events.SchemaVersion)
+}
+
+// inTran in ba trần đồng thời theo chiều, kèm các mục khai riêng.
+//
+// Số 0 in ra chữ "TẮT" chứ không in "0": người đọc lướt qua một cột số sẽ hiểu
+// 0 là "cấm chạy" — ngược hẳn nghĩa thật.
+func inTran(t config.TranDongThoi) {
+	so := func(v int) string {
+		if v <= 0 {
+			return "TẮT"
+		}
+		return strconv.Itoa(v)
+	}
+	fmt.Printf("  policy.tran.harness     %s   (mấy tiến trình CLI cùng lúc)\n", so(t.HarnessMacDinh))
+	fmt.Printf("  policy.tran.provider    %s   (tổng các tài khoản của một nhà cung cấp)\n", so(t.ProviderMacDinh))
+	fmt.Printf("  policy.tran.ho_so       %s   (mấy phiên trên MỘT tài khoản — hạn mức thuê bao)\n", so(t.HoSoMacDinh))
+	for _, b := range []struct {
+		nhan string
+		m    map[string]int
+	}{
+		{"harness", t.Harness}, {"provider", t.Provider}, {"ho_so", t.HoSo},
+	} {
+		for _, ten := range khoaSapXep(b.m) {
+			fmt.Printf("    · %s %-18s %s\n", b.nhan, ten, so(b.m[ten]))
+		}
+	}
+	for _, p := range khoaSapXepChuoi(t.ThuocHarness) {
+		fmt.Printf("    · provider %s tính vào harness %q\n", p, t.ThuocHarness[p])
+	}
+}
+
+func khoaSapXep(m map[string]int) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func khoaSapXepChuoi(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ---------------------------- cờ & lặt vặt ----------------------------
