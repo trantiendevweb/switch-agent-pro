@@ -3555,3 +3555,44 @@ với cây làm việc.
   `json` của `flow.Step` rồi in ra những trường `flow.html` **không hề nhắc
   tên** — hiện là **3**: `thamSo`, `docDuoc`, `phaiCo`. Đã chứng minh **ĐỎ**
   bằng cách gỡ đúng phép trải ra rồi chạy lại.
+
+## 22/08 — Chốt liên động: bài kiểm không mở được sổ trạng thái THẬT nữa
+
+- **Đo lúc nào**: 22/08/2026, đóng nợ tự ghi ở mục trên ("các gói khác có bài
+  kiểm nào chạm kho thật không — chưa quét").
+- **Cách làm, và vì sao không đi soi từng file**: soi tay thì chỉ trả lời được
+  về **những file đang có**. Thay vào đó đặt một chốt ở `store.OpenAt` — **nút
+  thắt** mà mọi đường mở sổ đều đi qua — rồi cho cả bộ test tự khai ra.
+- **Cơ chế**: chụp kho hồ sơ thật **lúc nạp gói** (`var khoThat =
+  paths.AccountsRoot()`). Thời điểm này quan trọng: `t.Setenv("HOME", …)` và
+  `TestMain` đều chạy **sau** khi gói được nạp, nên giá trị chụp được luôn là
+  kho thật, kể cả trong một bài kiểm đã cô lập đúng cách. Đọc muộn hơn thì nó
+  trỏ vào thư mục tạm và chốt **tự vô hiệu hoá trong im lặng**.
+- **Nhận ra đang chạy dưới test bằng hậu tố `.test` / `.test.exe` của
+  `os.Args[0]`**, cố ý **không** dùng `testing.Testing()` — hàm đó buộc gói sản
+  phẩm import `testing`, kéo cờ dòng lệnh của bộ test vào mọi binary phát hành.
+- **Kết quả khảo sát**: chạy `go test ./...` sau khi cắm chốt → **xanh, 0 gói
+  vi phạm**. Tức `internal/api` là gói **duy nhất** từng chạm kho thật, và nó
+  đã được vá. Đây là câu trả lời cho nợ ghi ở mục trên.
+- **Nhưng xanh không tự chứng minh chốt hoạt động** — một bộ test xanh không
+  phân biệt được *"không ai vi phạm"* với *"chốt hỏng"*. Nên có
+  `TestChotChanKhoThatNoThat`, và nó kiểm cả mắt xích dễ gãy nhất: `duoiTest()`
+  phải trả `true` ngay trong một bài kiểm. Go đổi cách đặt tên binary test thì
+  chốt tắt ở **mọi gói**, im lặng — dòng đó là thứ duy nhất báo.
+- **Bằng chứng mạnh nhất, chạy thật**: gỡ `TestMain` của `internal/api` ra rồi
+  chạy lại đúng bài kiểm đã gây sự cố:
+
+  ```
+  --- FAIL: TestBoChayFlowCoDuCaHaiDuong
+      bài kiểm đang mở SỔ TRẠNG THÁI THẬT của máy (…\.ai-accounts\state.db) — từ chối.
+      Cách sửa: đổi HOME sang thư mục tạm TRƯỚC khi mở sổ (xem TestMain trong internal/api)…
+  ```
+
+  Chốt bắt **đúng** sự cố sáng nay, ở **đúng** dòng, kèm câu chỉ cách sửa.
+- **Cửa thoát có chủ ý**: `SAGENT_CHO_PHEP_KHO_THAT=1`. Cấm tuyệt đối sẽ khiến
+  người ta đi vòng bằng cách tệ hơn — gọi thẳng `sql.Open`, bỏ qua cả
+  `migrate`. Cửa thoát phải **lộ ra trong mã của bài kiểm**, chỗ người rà thấy.
+- **Còn CHƯA CHE, nói thẳng**: bài kiểm nào **chạy binary `sagent` đã build**
+  như tiến trình con thì chốt không thấy — tiến trình đó không phải binary
+  test. Chưa có bài kiểm nào như vậy trong repo, nhưng chốt này **không** ngăn
+  được kiểu đó nếu mai có người viết.

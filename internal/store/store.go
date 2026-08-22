@@ -153,6 +153,11 @@ func Open() (*DB, error) { return OpenAt(Path()) }
 
 // OpenAt mở cơ sở dữ liệu ở một đường dẫn cụ thể (test dùng đường dẫn tạm).
 func OpenAt(path string) (*DB, error) {
+	// Chốt liên động: bài kiểm không được mở sổ THẬT. Đặt trước MkdirAll để
+	// một lần lọt cũng không kịp tạo thư mục nào trong kho thật.
+	if err := kiemKhoThat(path); err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
