@@ -3470,3 +3470,44 @@ với cây làm việc.
   (kèm khẳng định thời gian), `TestPluginChetGiuaChungThiHostNoiRoKemStderr`
   (khẳng định cả lời trăng trối ở stderr đi kèm — thiếu nó thì mọi lỗi plugin
   đều hiện ra là *"đóng ống trước khi trả lời"*, đúng mà vô dụng).
+
+## 22/08 — Một bài kiểm mở `state.db` THẬT, và nó làm chết mặt điều khiển của cả máy
+
+- **Đo lúc nào**: 22/08/2026 ~11:07, khi `sagent status` đột nhiên không chạy.
+- **Triệu chứng**: mọi lệnh `sagent` đều trả
+  `state.db ở schema v10, bản sagent này chỉ biết tới v9`.
+- **Chuỗi nhân quả, đo được từng mắt**:
+
+  1. `internal/api/phientrangthai_test.go` gọi `New(t.TempDir())` và **trông
+     như đã cô lập**. Nhưng tham số đó là thư mục **DỰ ÁN**; sổ trạng thái nằm
+     ở `paths.AccountsRoot()` = `<HOME>/.ai-accounts`, tính từ **HOME**. Bài
+     kiểm quên gọi `homeGiaAPI(t)` — helper cô lập HOME **đã có sẵn trong cùng
+     gói** (`fallback_test.go:24`).
+  2. Agent #199 đang thêm bản di trú **v10** (`ALTER TABLE flow_steps ADD COLUMN
+     idem_key` + index). Nó chạy `go test ./...` trong worktree của nó.
+  3. Bài kiểm ở bước 1 mở `state.db` **THẬT**, `migrate()` chạy, sổ của máy lên
+     v10 lúc **11:01** (dấu vết: `state.db.bak-v9` sinh đúng lúc đó).
+  4. Từ giây đó, mọi binary dựng từ `main` (v9) — kể cả `sagent` đang cài —
+     **từ chối** mở sổ. Toàn bộ mặt điều khiển của người vận hành chết, vì một
+     dòng thiếu trong một file test, và **nhánh gây ra chuyện đó còn chưa trộn**.
+
+- **Hai thứ làm ĐÚNG, ghi lại để không ai đi vá nhầm chỗ**: chốt hạ cấp
+  (`store.go:564`) từ chối chạy thay vì ghi chéo phiên bản trong im lặng, và
+  `migrate()` tự sao lưu trước khi nâng. Không có hai thứ đó thì bản v9 sẽ ghi
+  vào file v10 và hỏng lộ ra muộn hơn, ở chỗ khác. Thứ hỏng là **ranh giới**:
+  một bài kiểm không được chạm vào trạng thái sản phẩm của máy đang chạy.
+- **Đã sửa hay chưa**: **ĐÃ SỬA, ở tầng GÓI** — thêm `TestMain` cho
+  `internal/api` (`home_tam_test.go`) đẩy cả gói sang HOME tạm trước khi chạy
+  bài kiểm nào, đặt **cả** `HOME` lẫn `USERPROFILE`, và **kiểm ngay** rằng phép
+  đổi có tác dụng (`paths.AccountsRoot()` phải nằm trong thư mục tạm) — không
+  có thì thoát ồn ào thay vì lặng lẽ quay lại ghi vào kho thật.
+
+  Vì sao không chỉ thêm một dòng `homeGiaAPI(t)` vào đúng bài kiểm đó: thêm một
+  dòng chỉ vá **bài kiểm đã biết**. Bài kiểm tiếp theo ai đó viết vẫn quên được,
+  và lần quên sau lại là một lần cả máy chết. `TestMain` là chỗ duy nhất bao
+  được cả bài kiểm chưa ai viết.
+- **Nghiệm thu**: trước khi vá, `go test ./internal/api/` đỏ trên **cả `main`
+  lẫn nhánh đang rà** — chứng minh lỗi là môi trường chứ không phải do nhánh
+  nào. Sau khi vá: `go build` · `go vet` · `go test ./...` xanh cả ba.
+- **Còn CHƯA ĐO**: các gói khác có bài kiểm nào chạm kho thật không. Gói `api`
+  đã bịt; chưa quét toàn repo.
