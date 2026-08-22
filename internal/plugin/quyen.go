@@ -69,7 +69,14 @@ var MoiQuyen = []MoTaQuyen{
 			"vậy mà plugin vẫn đọc đúng 33 byte của một file trong thư mục dự án, ghi " +
 			"được file mới, và liệt kê được thư mục. Muốn khai ChanThat thì phải có " +
 			"ACL riêng cho từng lượt chạy, Job Object, hoặc AppContainer — chưa cái nào " +
-			"được làm. Cho tới lúc đó, dòng này là lời cảnh báo chứ không phải lời hứa.",
+			"được làm. ĐO THÊM 22/08 15:45: một DACL thường (`icacls /deny`) CHẶN THẬT " +
+			"được tiến trình con dù nó chạy cùng tài khoản Administrator — nhưng nó chặn " +
+			"LUÔN CẢ HOST: tiến trình vừa tạo thư mục sau đó không xoá nổi thư mục của " +
+			"chính nó. Plugin và host dùng chung một danh tính, nên DENY không phân biệt " +
+			"được ai là ai. Hàng rào chỉ dùng được nếu plugin chạy dưới DANH TÍNH KHÁC " +
+			"(token hạn chế / tài khoản riêng / AppContainer) — thay đổi kiến trúc, không " +
+			"phải một dòng mã. Và CHƯA ĐO được plugin thù địch có tự `takeown` gỡ rào " +
+			"không, nên chưa ai được khai đây là hàng rào. Xem docs/DO-LUONG.md 22/08.",
 	},
 	{
 		Khoa: QuyenGhi,

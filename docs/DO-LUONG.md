@@ -3853,3 +3853,53 @@ hoạch chạy MỘT MÌNH, hoặc chạy sau cùng.
 
   Hai chuỗi đó chỉ có trong bản mới, nên bản đang phục vụ đúng là bản mang việc
   hôm nay.
+
+## 22/08 — Hàng rào ACL cho plugin: chặn được, nhưng chặn cả HOST
+
+- **Đo lúc nào**: 22/08/2026 ~15:45. Đóng một phần dòng **CHƯA ĐO** ghi sáng nay:
+  *"hàng rào thật (ACL từng lượt chạy / Job Object / AppContainer) có dựng được
+  trên Windows không — chưa ai thử"*.
+- **Vì sao đáng đo**: ô `thu-muc-lam-viec` trong `internal/plugin/quyen.go` sáng
+  nay bị hạ từ `ChanThat` xuống `KhongChanDuoc` vì host chỉ **không cấp đường
+  dẫn** chứ không dựng hàng rào. Câu tiếp theo là: dựng được không?
+
+### Đo được (1) — DACL CHẶN THẬT tiến trình con cùng tài khoản quản trị
+
+Dựng thư mục tạm có file, đặt `icacls /inheritance:r /grant:r "SYSTEM:(OI)(CI)F"
+/deny "<tài khoản>:(OI)(CI)F"`, rồi cho một **tiến trình con riêng** (cùng tài
+khoản `Administrator`, `IsInRole(Administrator) = True`) đọc file:
+
+```
+ket qua doc = BI CHAN: UnauthorizedAccessException
+```
+
+Đây là kết quả **khả quan hơn dự đoán**: không cần AppContainer hay token hạn
+chế, một DACL thường đã chặn được đọc thẳng.
+
+### Đo được (2) — và nó chặn luôn HOST, đây mới là chỗ khó
+
+Tiến trình **đã tạo ra thư mục** sau đó **không xoá được nó**:
+
+```
+KHONG xoa duoc sagent-do-acl-80ee968f : UnauthorizedAccessException
+```
+
+Phải `icacls /grant` cấp lại quyền cho chính mình rồi mới dọn được. Lý do hiển
+nhiên khi nhìn lại: plugin và host **chạy dưới cùng một danh tính**, nên một
+DENY nhắm vào "tài khoản đó" không phân biệt được ai là ai.
+
+**Hệ quả thiết kế — đây là giá trị thật của phép đo này**: thêm một lời gọi ACL
+vào `chay.go` là **không đủ**, và còn tự bắn vào chân (host mất quyền dọn thư
+mục tạm của chính nó). Hàng rào chỉ dùng được khi plugin chạy dưới **danh tính
+KHÁC** — token hạn chế, tài khoản cục bộ riêng, hoặc AppContainer. Đó là thay
+đổi kiến trúc, không phải một dòng mã.
+
+### CHƯA ĐO, và nói rõ vì sao chưa
+
+Plugin thù địch có tự gỡ rào được không (`takeown` + `icacls /reset`, quyền mà
+một tài khoản quản trị **có**)? **Chưa đo.** Đã định đo, nhưng bộ lọc quyền của
+môi trường chạy chặn lệnh đó và tôi **không đi vòng**. Đừng suy ra câu trả lời
+từ mục (1): (1) chỉ nói đọc THẲNG bị chặn, không nói không có đường khác.
+
+Cho tới khi đo được nửa này, `thu-muc-lam-viec` **giữ nguyên `KhongChanDuoc`** —
+một hàng rào chưa biết có gỡ được hay không thì chưa được khai là hàng rào.
