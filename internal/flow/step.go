@@ -198,12 +198,23 @@ func (r *Runner) runForEach(ctx context.Context, runID int64, f Flow, s Step,
 	// trỏ được tới một file — tức là bước sau đọc kết quả của một mục ngẫu nhiên
 	// và tưởng đó là kết quả của cả bước. Validate đã chặn ở lúc lưu; chặn thêm ở
 	// đây vì Flow còn dựng được thẳng bằng mã Go và bằng file chưa qua `validate`.
-	if len(s.Artifact) > 0 {
-		ly := "không dùng `artifact` chung với `foreach` — các lượt lặp chạy song song " +
+	// Cả `idempotent` cũng chưa dùng chung với `foreach` được: khoá phải tính
+	// trên TỪNG lượt lặp, còn một khoá chung cho cả bước sẽ bỏ qua luôn những mục
+	// MỚI xuất hiện trong danh sách. Nói ra chứ không im lặng bỏ qua cái cờ —
+	// một cờ bị lờ đi trong im lặng là một tính năng người dùng tưởng đang bật.
+	var lyDoChan string
+	switch {
+	case len(s.Artifact) > 0:
+		lyDoChan = "không dùng `artifact` chung với `foreach` — các lượt lặp chạy song song " +
 			"trong cùng một thư mục và sẽ ghi đè lên nhau"
-		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, ly, 1)
-		r.baoBuocHong(runID, f, s, ly)
-		return store.StepFailed, ly, ""
+	case s.Idempotent:
+		lyDoChan = "chưa dùng `idempotent` chung với `foreach` được — một khoá chung cho cả bước " +
+			"sẽ bỏ qua cả những mục MỚI trong danh sách"
+	}
+	if lyDoChan != "" {
+		_ = r.DB.SetStep(runID, s.ID, store.StepFailed, lyDoChan, 1)
+		r.baoBuocHong(runID, f, s, lyDoChan)
+		return store.StepFailed, lyDoChan, ""
 	}
 
 	r.Bus.Infof("%s.%s lặp trên %d mục", f.Name, s.ID, len(items))
@@ -309,6 +320,19 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 	for k, v := range arts {
 		env[k] = v
 	}
+	// IDEMPOTENCY: trước khi tốn một đồng nào, hỏi sổ xem việc CHÍNH XÁC NÀY đã
+	// có lượt chạy nào làm xong chưa. Khoá tính từ env ĐÃ THAY BIẾN ở trên, nên
+	// nó cuốn theo cả kết quả các bước trước — xem idempotent.go.
+	//
+	// Bước không bật `idempotent` thì KhoaIdem trả rỗng, và cả khối này không
+	// chạm vào sổ một lần nào.
+	khoa := KhoaIdem(s, env)
+	if khoa != "" {
+		if state, out, xong := r.thuDungLaiViecCu(runID, f, s, env, khoa); xong {
+			return state, "", out
+		}
+	}
+
 	tries := s.Retry + 1
 	if tries < 1 {
 		tries = 1
@@ -375,6 +399,12 @@ func (r *Runner) runStep(ctx context.Context, runID int64, f Flow, s Step,
 
 		if err == nil {
 			_ = r.DB.SetStep(runID, s.ID, store.StepDone, "", attempt)
+			// Ghi khoá SAU KHI xong, không phải trước: khoá trong sổ nghĩa là
+			// "việc này đã làm XONG". Ghi trước là hứa trước khi làm, và bước
+			// hỏng giữa chừng sẽ khiến lượt sau bỏ qua một việc chưa ai làm.
+			if khoa != "" {
+				_ = r.DB.SetStepIdemKey(runID, s.ID, khoa)
+			}
 			if kq.Output != "" {
 				_ = r.DB.SetStepOutput(runID, s.ID, kq.Output)
 			}
@@ -560,4 +590,49 @@ func cauHoi(s Step, vars map[string]string) string {
 		return strings.Join(args, " ")
 	}
 	return ""
+}
+
+// thuDungLaiViecCu tra sổ xem việc này đã có lượt chạy trước làm xong chưa, và
+// nếu có thì dựng lại kết quả cho lượt chạy NÀY.
+//
+// Trả về xong=false nghĩa là "cứ chạy thật" — cả khi không trúng, cả khi trúng
+// nhưng không dựng lại được. KHÔNG có nhánh nào trả về done mà thiếu thứ gì:
+// một bước `done` nửa vời là bước sau đọc phải một artifact rỗng và tưởng đó là
+// kết quả thật.
+func (r *Runner) thuDungLaiViecCu(runID int64, f Flow, s Step, env map[string]string,
+	khoa string) (state, output string, xong bool) {
+
+	cu, co, err := r.DB.TimBuocDaLam(khoa, runID)
+	if err != nil || !co {
+		return "", "", false
+	}
+	da := KetQuaCu{RunID: cu.RunID, StepID: cu.StepID, Output: cu.Output}
+
+	// Artifact phải được CHÉP sang lượt này. Trúng cache mà file cũ đã bị dọn thì
+	// coi như KHÔNG trúng — thà chạy lại tốn tiền còn hơn báo xong rồi để bước
+	// sau mở một file không tồn tại.
+	if err := chepArtifactCu(da, runID, s); err != nil {
+		r.Bus.Warnf("%s.%s: lượt #%d đã làm việc này nhưng %v — chạy lại", f.Name, s.ID, cu.RunID, err)
+		return "", "", false
+	}
+
+	_ = r.DB.SetStep(runID, s.ID, store.StepDone, MoTaIdem(da), 0)
+	_ = r.DB.SetStepPrompt(runID, s.ID, cauHoi(s, env))
+	_ = r.DB.SetStepIdemKey(runID, s.ID, khoa)
+	if da.Output != "" {
+		_ = r.DB.SetStepOutput(runID, s.ID, da.Output)
+	}
+	// CỐ Ý KHÔNG chép chi phí của lượt cũ sang. Lượt này không tiêu một token
+	// nào, và ghi lại con số cũ sẽ làm bảng cộng dồn theo ngày đếm cùng một
+	// khoản hai lần — đúng cái sổ chi phí sinh ra để chống.
+	r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
+		SessionID: runID, Msg: MoTaIdem(da),
+		Detail: map[string]string{
+			"run": fmt.Sprint(runID), "step": s.ID,
+			"state": store.StepDone, "type": s.Type,
+			// Nói rõ ĐÃ MƯỢN CỦA AI. Không có khoá này thì bảng hiện một bước
+			// `done` không tốn gì và không ai lần ngược được về việc thật.
+			"idem_tu_run": fmt.Sprint(cu.RunID),
+		}})
+	return store.StepDone, da.Output, true
 }

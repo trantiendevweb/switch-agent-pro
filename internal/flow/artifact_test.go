@@ -90,6 +90,10 @@ func TestTroGiupTienTrinh(t *testing.T) {
 		}
 		fmt.Print("lần thử 2 chạy trót lọt nhưng không ghi file nào")
 
+	// in <chuoi>: in đúng chuỗi được đưa ra màn hình, không đụng vào đĩa.
+	case "in":
+		fmt.Print(args[1])
+
 	// ghi <file> <chuoi>: ghi đúng chuỗi được đưa.
 	case "ghi":
 		if err := os.WriteFile(args[1], []byte(args[2]), 0o644); err != nil {

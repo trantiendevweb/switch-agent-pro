@@ -229,6 +229,24 @@ type Step struct {
 	// lời mời ghi đè file bất kỳ của họ. Xem artifact.go.
 	Artifact map[string]string `toml:"artifact,omitempty" json:"artifact,omitempty"`
 
+	// Idempotent: chạy lại thì KHÔNG làm lại việc lượt trước đã làm xong.
+	//
+	//	idempotent = true
+	//
+	// "Đã làm rồi" = có một lượt chạy TRƯỚC đây làm XONG một bước có cùng KHOÁ,
+	// mà khoá là băm của toàn bộ thứ quyết định kết quả bước — id, loại, câu hỏi
+	// ĐÃ THAY BIẾN, tài khoản, model, tham số, hợp đồng đầu ra. Sửa prompt là đổi
+	// khoá, và bước chạy lại.
+	//
+	// TẮT MẶC ĐỊNH, và cố ý không có cách bật cho cả flow một lượt: bộ chạy
+	// KHÔNG nhìn thấy cây mã trên đĩa, HEAD của git hay đồng hồ, nên với bước
+	// `shell`/`test`/`lint` thì "khoá không đổi" KHÔNG có nghĩa là "kết quả không
+	// đổi". Bật nhầm ở đó là tin rằng test hôm nay vẫn xanh vì hôm qua nó xanh.
+	//
+	// Xem idempotent.go — ở đó có cả ba cách định nghĩa khoá đã cân nhắc và hậu
+	// quả của từng cách.
+	Idempotent bool `toml:"idempotent,omitempty" json:"idempotent,omitempty"`
+
 	// Route là route API cho node `model`. Rỗng = `default_route` rồi tới route
 	// dự phòng, y như `sagent api "câu hỏi"`. Không dùng cho node khác.
 	Route string `toml:"route,omitempty" json:"route,omitempty"`
@@ -477,6 +495,9 @@ func Validate(f Flow) []Problem {
 
 	// `artifact` — xem artifact.go. Cũng cần thứ tự đợt, cùng lý do.
 	ps = append(ps, VanDeArtifact(f)...)
+
+	// `idempotent` — xem idempotent.go.
+	ps = append(ps, VanDeIdempotent(f)...)
 
 	return ps
 }

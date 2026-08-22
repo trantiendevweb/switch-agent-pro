@@ -338,6 +338,26 @@ var migrations = []string{
 	// mang giá trị rỗng đúng nghĩa "không đo được".
 	`ALTER TABLE sessions ADD COLUMN state_ly_do TEXT NOT NULL DEFAULT '';
 	 ALTER TABLE sessions ADD COLUMN han_muc_den_lai INTEGER NOT NULL DEFAULT 0;`,
+
+	// v10 — KHOÁ IDEMPOTENCY của mỗi bước: "việc này đã làm rồi hay chưa".
+	//
+	// Vì sao là một CỘT trên flow_steps chứ không phải một bảng cache riêng:
+	//
+	//  1. Một bảng cache riêng là một thứ phải tự dọn. Ở đây, dòng nào biến mất
+	//     khỏi lịch sử lượt chạy thì mục cache của nó biến mất theo — không có
+	//     đường nào để cache sống lâu hơn bằng chứng sinh ra nó.
+	//  2. Người vận hành đọc "vì sao bước này bị bỏ qua" ở ĐÚNG chỗ họ đã đọc
+	//     mọi thứ khác về bước đó. Cache nằm ở bảng thứ hai là một chỗ nữa phải
+	//     nhớ mà mở ra xem.
+	//
+	// Cột chứa một chuỗi băm (sha256 rút gọn), KHÔNG chứa prompt gốc — prompt đã
+	// nằm ở cột `prompt` từ v6 rồi, và chép thêm một bản thứ hai chỉ để so sánh
+	// là tự nhân đôi kho dữ liệu khách mà không đổi lại được gì.
+	//
+	// Chỉ số nằm trên (idem_key, state): mọi câu hỏi ở đây đều có dạng "có lượt
+	// chạy nào TRƯỚC đây làm XONG đúng việc này chưa".
+	`ALTER TABLE flow_steps ADD COLUMN idem_key TEXT NOT NULL DEFAULT '';
+	 CREATE INDEX IF NOT EXISTS idx_flow_steps_idem ON flow_steps(idem_key, state);`,
 }
 
 // cotPhien là danh sách cột đọc ra một Session, dùng chung cho mọi truy vấn để
@@ -406,6 +426,10 @@ type StepRun struct {
 	// Prompt là câu hỏi ĐÃ THAY BIẾN gửi cho agent. Rỗng với bước không hỏi ai
 	// (shell/notify lưu lệnh hoặc lời nhắn).
 	Prompt string
+
+	// IdemKey là khoá "việc này đã làm rồi hay chưa" của bước, rỗng khi bước
+	// không bật idempotency. Xem internal/flow/idempotent.go.
+	IdemKey string
 }
 
 // CreateRun mở một lần chạy mới.
@@ -519,27 +543,72 @@ func (d *DB) SetStepCost(runID int64, stepID string, costUSD float64, tokIn, tok
 	return err
 }
 
+// cotBuoc là danh sách cột đọc ra một StepRun, dùng chung cho mọi truy vấn để
+// hai chỗ không thể lệch nhau — cùng lý do với cotPhien.
+const cotBuoc = `run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,''),
+	COALESCE(cost_usd,0),COALESCE(tokens_in,0),COALESCE(tokens_out,0),
+	COALESCE(prompt,''),COALESCE(idem_key,'')`
+
+func quetBuoc(sc interface{ Scan(...any) error }) (StepRun, error) {
+	var s StepRun
+	err := sc.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output,
+		&s.CostUSD, &s.TokensIn, &s.TokensOut, &s.Prompt, &s.IdemKey)
+	return s, err
+}
+
 // Steps đọc trạng thái mọi bước của một lần chạy.
 func (d *DB) Steps(runID int64) (map[string]StepRun, error) {
-	rows, err := d.db.Query(
-		`SELECT run_id,step_id,state,attempt,COALESCE(msg,''),COALESCE(output,''),
-		        COALESCE(cost_usd,0),COALESCE(tokens_in,0),COALESCE(tokens_out,0),
-		        COALESCE(prompt,'')
-		   FROM flow_steps WHERE run_id=?`, runID)
+	rows, err := d.db.Query(`SELECT `+cotBuoc+` FROM flow_steps WHERE run_id=?`, runID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := map[string]StepRun{}
 	for rows.Next() {
-		var s StepRun
-		if err := rows.Scan(&s.RunID, &s.StepID, &s.State, &s.Attempt, &s.Msg, &s.Output,
-			&s.CostUSD, &s.TokensIn, &s.TokensOut, &s.Prompt); err != nil {
+		s, err := quetBuoc(rows)
+		if err != nil {
 			return nil, err
 		}
 		out[s.StepID] = s
 	}
 	return out, rows.Err()
+}
+
+// SetStepIdemKey ghi khoá idempotency của một bước.
+//
+// Ghi SAU KHI bước xong, không phải trước: khoá trong sổ có nghĩa là "việc này
+// đã làm XONG", và ghi trước là hứa trước khi làm. Bước hỏng giữa chừng mà đã
+// ghi khoá thì lượt chạy sau sẽ bỏ qua một việc chưa ai làm.
+func (d *DB) SetStepIdemKey(runID int64, stepID, key string) error {
+	_, err := d.db.Exec(`UPDATE flow_steps SET idem_key=? WHERE run_id=? AND step_id=?`,
+		key, runID, stepID)
+	return err
+}
+
+// TimBuocDaLam tìm bước ĐÃ LÀM XONG gần nhất mang đúng khoá này.
+//
+// `truNoiChay` loại chính lượt chạy đang chạy ra: trong một lượt, việc "bước đã
+// xong thì bỏ qua" đã do Resume lo rồi, và tự soi mình sẽ biến một bước đang
+// chạy lại (sau khi người ta xoá trạng thái) thành một bước tự sao chép kết quả
+// cũ của chính nó.
+//
+// Lấy lượt chạy MỚI NHẤT (run_id lớn nhất): nếu vì lý do gì đó có nhiều dòng
+// cùng khoá thì bản gần đây nhất là bản có nhiều khả năng còn artifact trên đĩa.
+func (d *DB) TimBuocDaLam(key string, truNoiChay int64) (StepRun, bool, error) {
+	if key == "" {
+		return StepRun{}, false, nil
+	}
+	row := d.db.QueryRow(`SELECT `+cotBuoc+`
+		FROM flow_steps WHERE idem_key=? AND state=? AND run_id<>?
+		ORDER BY run_id DESC LIMIT 1`, key, StepDone, truNoiChay)
+	s, err := quetBuoc(row)
+	if err == sql.ErrNoRows {
+		return StepRun{}, false, nil
+	}
+	if err != nil {
+		return StepRun{}, false, err
+	}
+	return s, true, nil
 }
 
 // migrate đưa schema lên phiên bản mới nhất, chạy trong transaction để không
