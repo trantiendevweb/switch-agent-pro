@@ -4021,3 +4021,32 @@ một hàng rào chưa biết có gỡ được hay không thì chưa được k
 - **Kịch bản 2 không đụng con số nào của kịch bản 1** (6 nhân vật · 6 đường nối
   · 6 nhãn): `addr` của phiên đang chạy cố ý trùng profile `claude:phu` của một
   bước flow nên đi qua đường **dedup**.
+
+## 22/08 — Soát NGƯỢC: đối chiếu kế hoạch với sổ đo lường, chiều chưa ai đi
+
+- **Vì sao soát**: hai lượt soát kế hoạch trước (21/08 và #203 hôm nay) đều đi
+  **từ kế hoạch xuống mã** — bắt được những ô đã làm mà chưa tick. Chiều ngược
+  lại bắt loại lỗi khác: **những chỗ dự án ĐÃ KẾT LUẬN rồi mà kế hoạch vẫn để
+  ngỏ**. Chiều đó vừa làm lộ ra vụ ACP.
+- **Cách soát**: liệt kê mọi ô còn mở trong kế hoạch — ba bullet `**CHƯA —**`
+  và bảy dòng `⬜` — rồi tra từng ô ngược lại `docs/DO-LUONG.md` xem đã có phép
+  đo nào trả lời chưa.
+- **Kết quả: 1 mâu thuẫn / 10 ô. Đã sửa ô đó (ACP), chín ô còn lại nói đúng.**
+
+  | Ô còn mở | Sổ có câu trả lời chưa | Phán quyết |
+  |---|---|---|
+  | ACP | **CÓ** — 18/08 đã bác bỏ hướng này | ✗ kế hoạch SAI, **đã sửa** |
+  | resume/cancel ở tầng harness | không có dòng nào | ✓ đúng là chưa đo |
+  | nhật ký chạm file theo pha login/refresh/exit | không có dòng nào | ✓ đúng là chưa đo |
+  | Anthropic Messages | có, và là **401 ở endpoint gốc** | ✓ đúng là **bị chặn**, không phải nợ |
+  | 429 thật | có, và là *"nhà bán lại không gửi header hạn mức nào"* | ✓ đúng là chưa đo được |
+  | route theo capability/giá | có, và kế hoạch dẫn đúng `internal/api/api.go:1943,1950` | ✓ mô tả khớp mã hiện tại |
+  | OpenRouter / Ollama | có — thiếu key, chưa cài Ollama | ✓ đúng là bị chặn |
+
+- **Giá trị của một kết quả ÂM**: sau lượt này, "kế hoạch còn nói sai chỗ nào
+  nữa không" **không còn là một nỗi lo mơ hồ** — nó là một câu đã tra, với cách
+  tra ghi lại được. Chỉ có vụ ACP, và nó đã đóng.
+- **Việc còn lại của engine flow rút về ĐÚNG MỘT mảnh**: `route theo capability
+  / giá`. Nguyên liệu đã có từ hôm nay (`aiapi.BangNangLuc`) nhưng bộ chọn
+  đường vẫn đi theo **tên** (`Step.Route`, `flow.go:184`), và chi phí vẫn chỉ
+  được ghi **sau khi gọi**. Đây là ứng viên rõ ràng nhất cho lượt kế.
