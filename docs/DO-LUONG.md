@@ -3596,3 +3596,47 @@ với cây làm việc.
   như tiến trình con thì chốt không thấy — tiến trình đó không phải binary
   test. Chưa có bài kiểm nào như vậy trong repo, nhưng chốt này **không** ngăn
   được kiểu đó nếu mai có người viết.
+
+## 22/08 — Ba mảnh flow chạy thật qua `sagent flow run`, không tốn hạn mức nào
+
+- **Đo lúc nào**: 22/08/2026 11:53–11:57, đóng nợ chính báo cáo `#199` tự ghi:
+  *"chưa đo trên một lượt chạy thật — tất cả bằng chứng là từ test đầu-cuối"*.
+- **Cách đo, và vì sao nó rẻ**: dựng một dự án tạm ở `C:\Users\Administrator\do-flow-that`
+  với flow chỉ gồm bước **`shell`**. Bước `shell` đi qua **đúng** bộ chạy, đúng
+  sổ trạng thái, đúng đường artifact như bước `agent` — chỉ khác là không gọi
+  model nào. Sáu lượt chạy thật (#53–#58) tốn **0 token, 0 đồng**.
+- **ARTIFACT — số đo dứt khoát**: bước sinh một file **60.094 byte / 1200 dòng**,
+  bước sau đọc qua `{{artifacts.to}}`.
+
+  | Đường truyền | Tới được bước sau |
+  |---|---|
+  | Artifact | **1200 / 1200 dòng** (60.094 byte, đọc từ đĩa) |
+  | Đầu ra đã lưu (`{{steps.x.output}}`) | **651 / 1200 dòng** |
+
+  **Mất 549 dòng — 45,75% — ngay ở tầng LƯU** (`MaxStepOutput = 32.768`), tức
+  trước cả tầng nhét (`MaxInject = 6.000`). Và phần mất là phần **cuối**, đúng
+  chỗ mọi báo cáo để kết luận. Đây là con số biện minh cho cả mảnh artifact.
+- **IDEMPOTENT — bỏ qua thật, và chép artifact sang lượt mới**:
+  - Lượt **#54**: `sinh` chạy, ghi `run-54/sinh/bao-cao.txt` (5.092 byte).
+  - Lượt **#55**: `sinh` in *"bỏ qua — việc này lượt chạy #54 đã làm xong
+    (idempotent)"*, **dẫn đích danh lượt cũ**. Bước `doc` vẫn đọc đủ 5.092 byte
+    vì artifact được **chép sang** `run-55/sinh/` — kiểm bằng `ls`, file có
+    thật, đúng kích thước.
+  - Lượt **#56**: đổi đúng một chỗ trong dòng lệnh (`1..400` → `1..401`) thì
+    bước **chạy lại**, không bỏ qua. Khoá bám nội dung thật, không bám id bước.
+- **COMPENSATE — chạy bước gỡ lại rồi vẫn dừng**: lượt **#58**, bước `dat-cho`
+  tạo một file "chỗ đã đặt", bước `hong` thoát 1, engine in *"do-compensate.hong
+  hỏng — chạy bước gỡ lại go-lai"*. Bước gỡ lại xác nhận **`cho da dat ton
+  tai=True`** rồi xoá; kiểm trên đĩa sau đó: file **không còn**. Lượt chạy kết
+  thúc `failed` — đúng: `compensate` **gỡ lại**, không phải **cứu**.
+- **Một cái bẫy gặp thật khi soạn flow**, ghi lại vì nó tốn một lượt chạy hỏng
+  (#53): `run` là **argv**, không phải chuỗi shell. Viết `for /L %i … >> "…"`
+  với đường dẫn trộn `/` và `\` cho `The filename, directory name, or volume
+  label syntax is incorrect`. Và trong TOML **chuỗi cơ bản** thì `\t` là ký tự
+  TAB, nên `{{artifact_dir}}\to.txt` hỏng im lặng — phải dùng `/` trong đường
+  dẫn hoặc chuỗi literal. Cảnh báo của `sagent flow validate` về `idempotent`
+  thì nói **đúng** cái bẫy của nó ngay từ đầu.
+- **Còn CHƯA ĐO**: cùng ba mảnh này với bước **`agent`** thật (tốn hạn mức), và
+  con số đáng giá nhất còn thiếu — bước gộp báo cáo tốn bao nhiêu token vào
+  trước/sau khi chuyển sang artifact (lượt #34 từng là 10.998 token cho một
+  bước gộp).
