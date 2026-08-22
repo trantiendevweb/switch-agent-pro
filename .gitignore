@@ -29,3 +29,7 @@ __pycache__/
 # Log cua `sagent dash` khi chay nen (tao 21/08 luc dung lai dash sau reboot)
 .dash.out.log
 .dash.err.log
+
+# binary của plugin mẫu, build tại chỗ (bản .exe đã bị luật *.exe ở trên bắt)
+.sagent/plugins/*/sagent-plugin-*
+!.sagent/plugins/*/plugin.toml

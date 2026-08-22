@@ -91,6 +91,9 @@ func init() {
 		"__apils": {"api.history", "lịch sử lời gọi API (tiêu bao nhiêu, ở đâu)", nil},
 		"version": {"config.version", "phiên bản của binary này", func(a []string) { cmdVersion() }},
 		"tele":    {"tele.notify", "báo Telegram khi lượt chạy có sự cố", cmdTele},
+		// Plugin: mã của người khác chạy trên máy mình — bảng này nói plugin nào
+		// đã cài, nó xin quyền gì, và host CHẶN được quyền đó tới đâu.
+		"plugin":  {"plugin.list", "plugin đã cài + quyền chúng xin", cmdPlugin},
 		"flow":    {"flow.list", "liệt kê workflow", cmdFlow},
 		"__show":  {"flow.show", "xem chi tiết một workflow", nil},
 		"__val":   {"flow.validate", "kiểm tra workflow", nil},

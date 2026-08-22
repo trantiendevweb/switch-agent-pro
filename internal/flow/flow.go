@@ -36,6 +36,7 @@ const (
 	TypeLint    = "lint"    // chạy commands.lint
 	TypeReview  = "review"  // agent đọc kết quả bước trước
 	TypeMerge   = "merge"   // gộp nhánh — hành động nguy hiểm, mặc định cần duyệt
+	TypePlugin  = "plugin"  // gọi một plugin ngoài (executable riêng, JSON-RPC/stdio)
 )
 
 // implemented đánh dấu loại nào chạy được ở phiên bản hiện tại.
@@ -51,6 +52,12 @@ var implemented = map[string]bool{
 	TypeModel: true,
 	// còn chờ cơ chế merge an toàn
 	TypeMerge: false,
+	// plugin = gọi một executable ngoài qua JSON-RPC/stdio (internal/plugin).
+	// Bật vì đã chạy THẬT đầu-cuối, không phải vì đã viết xong mã: xem
+	// TestFlowChayPluginThat trong internal/plugin/e2e_test.go — nó build plugin
+	// mẫu, dựng flow.Runner thật, và khẳng định output của bước đến từ tiến trình
+	// con. Bộ chạy chưa cắm thì bước báo lỗi rõ ràng chứ không im lặng bỏ qua.
+	TypePlugin: true,
 }
 
 // Chính sách khi một bước hỏng.
@@ -132,6 +139,27 @@ type Step struct {
 
 	// approve / notify
 	Message string `toml:"message,omitempty" json:"message,omitempty"`
+
+	// plugin: TÊN plugin đã cài (<kho>/plugins/<ten> hoặc <dự án>/.sagent/plugins/<ten>).
+	//
+	// Chỉ là cái tên, cố ý không phải đường dẫn tới executable: flows.toml là
+	// file người ta gửi cho nhau, và một đường dẫn trong đó là một lời mời chạy
+	// binary tuỳ ý. Thứ chạy được phải nằm trong một thư mục plugin có manifest
+	// đã khai quyền — xem internal/plugin.
+	Plugin string `toml:"plugin,omitempty" json:"plugin,omitempty"`
+
+	// Vao là ĐẦU VÀO gửi cho plugin; hỗ trợ {{bien}} và {{steps.x.output}}.
+	//
+	// Không dùng lại `prompt` vì hai thứ khác bản chất: prompt là chữ gửi cho một
+	// mô hình, còn đây là dữ liệu gửi cho một chương trình. Trộn tên thì bảng
+	// tóm tắt lượt chạy sẽ hiện "prompt" cho một bước không hỏi ai câu nào.
+	Vao string `toml:"vao,omitempty" json:"vao,omitempty"`
+
+	// ThamSo là tham số TĨNH cho plugin (`tham_so = { so_dong = "10" }`).
+	//
+	// Chuỗi hết, không phải kiểu tuỳ ý: giá trị đi qua JSON tới một chương trình
+	// khác, và mỗi kiểu thêm vào là một chỗ hai bên hiểu khác nhau.
+	ThamSo map[string]string `toml:"tham_so,omitempty" json:"thamSo,omitempty"`
 
 	// ForEach cho phép MỘT bước chạy lặp trên một danh sách:
 	//
@@ -350,6 +378,20 @@ func Validate(f Flow) []Problem {
 			if s.Message == "" {
 				warn(s.ID, "nên có `message` để người đọc biết đang duyệt/báo cái gì")
 			}
+		case TypePlugin:
+			if s.Plugin == "" {
+				add(s.ID, "bước plugin cần `plugin` là TÊN plugin đã cài, ví dụ plugin = \"tom-luoc\"")
+			} else if !idRe.MatchString(s.Plugin) {
+				add(s.ID, fmt.Sprintf("plugin = %q không phải một tên hợp lệ — chỉ chữ thường, số, - và _ "+
+					"(đây là TÊN plugin, không phải đường dẫn)", s.Plugin))
+			}
+		}
+
+		// Khai `plugin` ở một bước KHÔNG phải type plugin là một dòng chết: nó
+		// nằm đó trông như có tác dụng, và người viết flow sẽ tưởng bước đang gọi
+		// plugin. Cùng lớp hỏng với khoá lạ trong manifest, nên cùng cách xử lý.
+		if s.Plugin != "" && s.Type != TypePlugin {
+			add(s.ID, fmt.Sprintf("khai `plugin` nhưng type = %q — chỉ bước type = \"plugin\" mới gọi plugin", s.Type))
 		}
 
 		if s.ForEach != "" {

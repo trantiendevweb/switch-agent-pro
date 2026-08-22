@@ -439,6 +439,20 @@ func (r *Runner) do(ctx context.Context, s Step, vars map[string]string) (KetQua
 		}
 		return KetQuaAgent{Output: strings.TrimRight(string(raw), "\r\n")}, nil
 
+	case TypePlugin:
+		if r.Plugin == nil {
+			return KetQuaAgent{}, fmt.Errorf("bước %s gọi plugin %q nhưng bộ chạy plugin chưa được cắm "+
+				"— đây là lỗi của phần dựng Runner, không phải của flow", s.ID, s.Plugin)
+		}
+		// ExpandChay chứ không phải Expand: {{steps.x.output}} của một bước không
+		// để lại gì phải thành một câu NÓI RÕ là thiếu, chứ không phải chuỗi thô
+		// lọt nguyên vào đầu vào của plugin rồi được đếm như dữ liệu thật.
+		out, err := r.Plugin.GoiPlugin(ctx, s.Plugin, ExpandChay(s.Vao, vars), s.ThamSo)
+		if err != nil {
+			return KetQuaAgent{}, err
+		}
+		return KetQuaAgent{Output: out}, nil
+
 	case TypeNotify:
 		m := ExpandChay(s.Message, vars)
 		r.Bus.Infof("%s", m)
@@ -477,6 +491,10 @@ func cauHoi(s Step, vars map[string]string) string {
 		return ExpandChay(s.Prompt, vars)
 	case TypeNotify:
 		return ExpandChay(s.Message, vars)
+	case TypePlugin:
+		// Bước plugin cũng là tiếng nói của MÁY: ghi lại ĐÚNG thứ đã gửi đi, vì
+		// đó là thứ duy nhất giải thích được vì sao plugin trả về cái nó trả về.
+		return ExpandChay(s.Vao, vars)
 	case TypeShell, TypeTest, TypeLint:
 		if len(s.Run) == 0 {
 			return ""

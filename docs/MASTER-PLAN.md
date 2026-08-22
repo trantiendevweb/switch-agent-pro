@@ -317,7 +317,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
   `legacy/v1-powershell/`; `design-system/switch-agent-pro/`; 3 trang HTML sạch tên cũ.
 
-### Pha 0 — Đo giả định & lập hợp đồng  **64%** (2 xong · 5 một phần)
+### Pha 0 — Đo giả định & lập hợp đồng  **71%** (3 xong · 4 một phần)
 🎯 Chứng minh cơ chế của **cả hai đường** trước khi khoá interface.
 - [~] Test harness không chứa credential trong repo; mọi output **redaction**.
   - **Xong — không credential trong repo**: giàn test chạy trên HOME giả
@@ -419,24 +419,35 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   - **CHƯA — nửa API**: `sagent nang-luc` chỉ in 5 nhóm harness. Không có bảng năng
     lực nào cho nhà cung cấp API; `grep -rni "experimental" internal/` ra 0 dòng.
     Câu "route này hỗ trợ tool/vision/reasoning không" hiện không ai trả lời được.
-- [~] **Threat model** cho subscription credential, API key, dashboard, command exec.
-  - **CHƯA — không có tài liệu gộp.** `docs/security/THREAT-MODEL.md` **không tồn
-    tại**; artifact mà mục này hứa vẫn thiếu.
-  - **Xong — nhưng nằm rải, và là bằng chứng chứ không phải lời hứa**: cả bốn mặt
-    đều đã có phân tích tấn công + bản vá **đo được**, ghi trong `docs/DO-LUONG.md`:
-    subscription credential (junction-attack đi xuyên `os.ReadDir`, path-traversal
-    **đã nổ thật một lần và xoá mất `~/.claude`**, Windows ACL: `0o600` và `0o644`
-    có ACL y hệt trên Windows) · API key (chỉ tham chiếu bằng `key_id`, **không có
-    cột secret trong DB**, có test chặn key rò ra lỗi) · dashboard (loopback ·
-    băm mật khẩu · chặn Host lạ chống DNS-rebind · chặn Origin lạ chống CSRF ·
-    `docs/DO-LUONG.md:1005` ghi lỗi thật `/login` từng nằm ngoài `guard`) ·
-    command exec (`internal/flow/flow.go` — node `shell` chỉ nhận **argv**, cố ý
-    không nhận chuỗi shell).
-  - Việc còn lại là **gom lại thành một tài liệu có sườn** (tài sản → kẻ tấn công →
-    đường vào → biện pháp), không phải đi đo lại từ đầu.
+- [x] **Threat model** cho subscription credential, API key, dashboard, command exec.
+  ✅ **VIẾT XONG 21/08 — [`docs/MO-HINH-DE-DOA.md`](MO-HINH-DE-DOA.md)** (tên tiếng
+  Việt, thay cho `docs/security/THREAT-MODEL.md` mà artifact cũ hứa).
+  - **Có sườn, không phải bài luận**: tài sản → **sáu vị trí đứng của kẻ tấn công
+    (K1–K6)** → mỗi mối đe doạ nói rõ *làm được gì · đứng ở đâu · hiện có gì chặn*,
+    kèm `file:dòng` thật. Bốn nhãn trạng thái, **không có nhãn "có vẻ ổn"**:
+    ✅ ĐÃ CÓ · 🟡 CÓ MỘT PHẦN · 🔴 KHÔNG CÓ GÌ · ⬜ CHƯA ĐO ĐƯỢC (kèm lý do).
+  - **Đo trên máy THẬT, không phải máy dev sạch** (21/08 23:45): dash đang chạy
+    `--host 0.0.0.0 --port 8788` (PID 16368, bind `::`), firewall `sagent-dash-8788`
+    = **Allow**, `4625` **157 lượt/giờ** (sáng ~3.900, 14:20 là 1.867), rule chặn
+    đang giữ **61 IP** (14:20 là 53). Kho: **4** `.credentials.json` trong `.clones`,
+    **2** file `.key`, **90** worktree.
+  - **Nói thẳng 11 chỗ đang hở**, xếp theo hậu quả. Ba dòng đầu: (1) mật khẩu dash
+    là hàng rào **duy nhất VÀ cuối cùng** — sau nó không còn tầng nào, mà sau cửa đó
+    là `POST /api/fleet` + `/api/flow/save` = **thực thi mã tuỳ ý dưới
+    `Administrator`**; (2) agent chạy trong `~/.ai-accounts/.worktrees/…` tức **cách
+    kho bí mật đúng ba cấp `..`**, không hộp cát; (3) **không ghi lại lần đăng nhập
+    sai nào của dash** — đang bị dò cũng không biết, trong khi RDP thì đếm được
+    tới từng lượt.
+  - **Không đo được thì ghi là không đo được**: cổng 8788 chưa thử từ máy ngoài;
+    chưa chạy phép đo "agent có thật sự đọc được `api-keys/*.key` từ worktree
+    không" (tốn một lượt hạn mức thật); `lsass` vẫn **chưa có dump** nên
+    brute-force vẫn là **nghi phạm**.
+  - **Có lưới an toàn**: mục K liệt kê **18 bài kiểm** đang ghim từng bản vá được
+    dẫn trong tài liệu — gỡ bản vá là đỏ, nên tài liệu không trôi thành văn bia.
 - **Artifact:** `docs/research/phase0/*` (ENVIRONMENT, CLAUDE, CODEX, GEMINI, CURSOR,
-  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), `docs/security/THREAT-MODEL.md`,
-  `docs/adr/0001-domain-boundaries.md`, `docs/OPEN_SOURCE_LEDGER.md`.
+  ANTHROPIC-API, OPENAI-API, …, CAPABILITY-MATRIX), **`docs/MO-HINH-DE-DOA.md`** (thay
+  cho `docs/security/THREAT-MODEL.md` — cùng nội dung, tên tiếng Việt như mọi tài liệu
+  khác của dự án), `docs/adr/0001-domain-boundaries.md`, `docs/OPEN_SOURCE_LEDGER.md`.
 - **DoD:** mỗi kết luận có command/OS/output-redacted; **không token thật** ở đâu;
   capability chưa đo = `unknown`; interface nháp suy ra từ **≥2 harness và ≥2 API protocol**.
 - ⚠ **Blocker cần bạn:** **API key** thật (local-only, redaction) cho phần API path.
@@ -447,6 +458,15 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   là artifact của chính pha này. Đếm lại theo mã: **2 xong · 5 xong một phần ·
   0 chưa làm → 4,5/7 = 64%**. Ba thứ còn thiếu thật
   là: tầng redaction chung, bảng năng lực cho nửa API, và tài liệu threat model.
+- **Cập nhật 21/08 tối:** ô **threat model** đóng — `docs/MO-HINH-DE-DOA.md`. Đếm lại:
+  **3 xong · 4 xong một phần · 0 chưa làm → 5/7 = 71%**. Còn đúng **hai** thứ thiếu:
+  tầng redaction chung và bảng năng lực cho nửa API.
+  **Và ô này đóng bằng một kết luận khó chịu, ghi ra đây để không ai đọc lướt:**
+  gom bốn mặt lại một chỗ mới thấy thứ mà từng mặt riêng lẻ giấu được — **mật khẩu
+  dashboard và cờ `--tu-duyet-quyen` gặp nhau ở `POST /api/fleet`**, nên một mật khẩu
+  6 ký tự trên một cổng đang phơi ra internet là **thực thi mã tuỳ ý dưới
+  `Administrator`**. Không mặt nào trong bốn mặt tự nói ra được điều đó; **chỉ có cái
+  sườn mới nói ra**. Đó là lý do ô này đáng làm chứ không phải thủ tục giấy tờ.
 
 ### Pha 1 — Storage + Claude slice + 1 API slice  **95%** (9 xong · 1 một phần)
 🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và **hai lát cắt dọc**.
@@ -647,13 +667,50 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   `:56` (`agents`) — dùng ngay không cần file. Đây là **bản trùng** của dòng
   "3 flow mẫu dựng sẵn" đã tick bên dưới; giữ cả hai thì kế hoạch tự nói sai về
   mình, nên tick luôn. Chạy 21/08: `sagent flow list` in **11 flow**, gồm cả ba mẫu.
-- [ ] Plugin model: TOML chỉ manifest/config tĩnh; logic động là **executable riêng** qua
+- [x] Plugin model: TOML chỉ manifest/config tĩnh; logic động là **executable riêng** qua
   JSON-RPC/stdio versioned; secret trong TOML chỉ là reference; plugin chạy capability tối thiểu.
-  **CHƯA LÀM THẬT** — đã kiểm chứ không đoán: `grep -rni "plugin\|json-rpc" internal/
-  cmd/ --include=*.go` chỉ ra **một** dòng, và đó là chuỗi `"pluginUsage"` trong
-  `internal/provider/claude.go:210` (một khoá JSON của Claude, không liên quan).
-  Không có manifest, không có tiến trình con nói JSON-RPC, không có hộp quyền.
-  Xếp `[ ]` chứ không `[!]`: không thiếu gì bên ngoài cả.
+  Làm 22/08 ở `internal/plugin` (manifest · quyen · rpc · chay · bochay), plugin mẫu
+  `cmd/sagent-plugin-mau`, node `plugin` trong `internal/flow`, lệnh `sagent plugin`
+  và `/api/plugins`. Bốn ràng buộc, và chỗ ĐO được từng cái:
+  - **TOML chỉ tĩnh** — lược đồ không có trường nào nhận biểu thức/script/lệnh, và
+    bộ đọc **TỪ CHỐI KHOÁ LẠ** (`Doc` soi `md.Undecoded()`). Đây là phần đáng kể:
+    thư viện TOML mặc định **bỏ qua** khoá không khai, nên `gia_tri = "sk-..."` hay
+    `[hook] truoc_khi_chay = "..."` sẽ nằm im trong file — người viết tưởng nó chạy,
+    người soi tưởng nó đã được xử lý. `TestManifestTuChoiKhoaLa` bắt cả ba ca đó.
+  - **Executable riêng, JSON-RPC/stdio, có số phiên bản** — `GiaoThuc = 1`, bắt tay
+    bằng `sagent.bat_tay` NGAY trong `Mo()`, trước khi có ai kịp gửi dữ liệu (kể cả
+    secret) cho tiến trình con. Lệch số thì **dừng ở lượt bắt tay**, không phải nổ
+    giữa một lượt flow đang chạy. Khung bản tin dùng CHUNG cho hai phía (`PhucVu`
+    cho plugin, `Client` cho host), nên hai bên không có đường nào lệch nhau về khung.
+  - **Secret chỉ là tham chiếu** — manifest chỉ có `key_id`; giá trị nằm ở
+    `~/.ai-accounts/api-keys/<id>.key` và đọc qua đúng `aiapi.DocKey` (một bản duy
+    nhất của luật "kho ở đâu, tên thế nào là hợp lệ"). Giá trị đi qua **stdio** lúc
+    bắt tay — cố ý KHÔNG qua argv (mọi tiến trình trên máy đọc được dòng lệnh) và
+    KHÔNG qua biến môi trường (con cháu của plugin thừa hưởng hết).
+  - **Capability tối thiểu** — plugin không khai thì KHÔNG có. Đo bằng cách chạy
+    **cùng một binary** hai lần, chỉ khác mấy dòng TOML, rồi so hai câu trả lời:
+    `TestKhongKhaiThuMucThiKhongThayThuMucDuAn`,
+    `TestKhongKhaiMoiTruongThiKhongThayBienCuaCha`,
+    `TestKhongKhaiSecretThiKhongNhanDuocGiaTri`. Cả ba đã được thử ngược (bỏ hàng
+    rào đi thì test đỏ), trừ ca secret — hàng rào thật của nó nằm ở tầng đọc
+    manifest (`TestKhaiSecretMaKhongKhaiQuyenThiTuChoi`), nhánh trong `docSecret`
+    chỉ là lớp thứ hai.
+  Bảng quyền (`sagent plugin quyen`) có **HAI cột chứ không phải một**: plugin KHAI
+  gì, và host **CHẶN được tới đâu** — ba trạng thái y như bảng năng lực provider.
+  Gộp hai cột lại là chỗ mọi hệ thống quyền nói dối, nên hai chỗ này phải nói thẳng:
+  - `ghi-thu-muc-lam-viec`: **KHÔNG CHẶN ĐƯỢC** (đã đo, là kết luận chứ không phải
+    khoảng trống). Thấy được đường dẫn thì ghi được; chặn ghi đòi ACL riêng cho từng
+    lần chạy, chưa làm. Cách chặn thật đang có là không cấp `thu-muc-lam-viec`.
+  - `mang`: **CHƯA ĐO**. Host hiện KHÔNG chặn tiến trình con mở socket. Còn đường
+    WFP/AppContainer trên Windows nhưng chưa ai thử, chưa có phép đo nào trên máy
+    thật. **Không khai quyền `mang` KHÔNG có nghĩa là plugin bị chặn** — CLI in
+    cảnh báo đúng câu đó, để không ai đọc bảng rồi yên tâm nhầm.
+  Node `plugin` bật `implemented = true` vì đã chạy THẬT đầu-cuối
+  (`TestFlowChayPluginThat`: build binary → `flow.Runner` thật → tiến trình con →
+  kết quả chuyền sang bước sau), không phải vì đã viết xong mã. Nó là ĐƯỜNG THỨ BA
+  bên cạnh agent và model API, và cắm vào đúng `internal/flow` để dùng lại DAG,
+  retry, `on_failure`, `{{bien}}`, `doc_duoc`, `phai_co` — chứ không mọc thành hệ
+  thứ hai bắt người dùng học hai bộ luật cho cùng một câu "bước này hỏng thì sao".
 - [x] `internal/flow`: schema `flows.toml`, tầng đọc (mẫu dựng sẵn → global →
   dự án), **kiểm tra DAG** (chu trình, phụ thuộc ma, id trùng/xấu, type lạ),
   thứ tự chạy topo **ổn định**, `{{bien}}`.
@@ -939,7 +996,7 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
 | Pha | `[x]` | `[~]` | `[ ]` | `[!]` | Điểm | % |
 |---|---|---|---|---|---|---|
 | Bước 0 — Đổi tên | 3 | 0 | 1 | 0 | 3,0/4 | **75%** |
-| Pha 0 — Đo giả định | 2 | 5 | 0 | 0 | 4,5/7 | **64%** |
+| Pha 0 — Đo giả định | 3 | 4 | 0 | 0 | 5/7 | **71%** |
 | Pha 1 — Storage + slice | 9 | 1 | 0 | 0 | 9,5/10 | **95%** |
 | Pha 2 — Song song + Workspace | 22 | 0 | 0 | 0 | 22,0/22 | **100%** |
 | Pha 2.5 — Codex + OpenAI-compat | 8 | 0 | 0 | 0 | 8,0/8 | **100%** |
