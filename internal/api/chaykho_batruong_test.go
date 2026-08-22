@@ -137,3 +137,54 @@ func timBuocKho(t *testing.T, kh KeHoachKho, id string) BuocKho {
 	t.Fatalf("kế hoạch không có bước %q", id)
 	return BuocKho{}
 }
+
+// Bảng chạy khan phải nói ra CẢ bước CHẠY THAY, không chỉ bước gỡ lại.
+//
+// Hai vai giống nhau ở chỗ quan trọng nhất — chúng KHÔNG chạy trong lượt suôn
+// sẻ — nên bảng nào nói được vai này mà im về vai kia là bảng nói sai đúng một
+// nửa. Đây là cùng lớp lỗi mà mục 1.4 của báo cáo #199 ghi lại: hai nhánh tự
+// đếm riêng thì sớm muộn cũng lệch.
+func TestChayKhoNoiRoCaBuocChayThay(t *testing.T) {
+	khoTam(t)
+	dungHoSoClaude(t, "tns", 2*time.Hour)
+	dir := t.TempDir()
+	f := flow.Flow{Name: "co-du-phong", Desc: "flow có hàng dự phòng", Steps: []flow.Step{
+		{ID: "hoi-chinh", Type: flow.TypeAgent, Profile: "claude:tns", Prompt: "hỏi một câu",
+			OnFailure: flow.OnFailFallback, Fallback: "hoi-du-phong"},
+		// Bước chạy thay: KHÔNG có `needs`, tức một GỐC của DAG. Chính vì thế nó
+		// nổi lên ngay đợt đầu và bảng cũ hiện nó như một bước sắp chạy.
+		{ID: "hoi-du-phong", Type: flow.TypeAgent, Profile: "claude:tns",
+			Prompt: "làm lại việc của {{buoc_hong}}"},
+	}}
+	if _, err := flow.Save(dir, f); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &API{}
+	kh, err := a.FlowChayKho(dir, "co-du-phong", nil, Addr{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	thay := timBuocKho(t, kh, "hoi-du-phong")
+	if len(thay.ThayTheCho) == 0 {
+		t.Fatal("bước `hoi-du-phong` KHÔNG được đánh dấu là bước chạy thay — bảng chạy khan " +
+			"đang nói nó sẽ chạy, trong khi nó chỉ chạy khi có sự cố")
+	}
+	if thay.ThayTheCho[0] != "hoi-chinh" {
+		t.Errorf("chạy thay cho %v, muốn [hoi-chinh]", thay.ThayTheCho)
+	}
+	if kh.SoBuocThayThe != 1 {
+		t.Errorf("SoBuocThayThe = %d, muốn 1", kh.SoBuocThayThe)
+	}
+	// Chiều ngược lại: bước hỏng phải nói ra hàng dự phòng của nó.
+	if got := timBuocKho(t, kh, "hoi-chinh").Fallback; got != "hoi-du-phong" {
+		t.Errorf("bước `hoi-chinh` không nói ra bước chạy thay của nó: %q", got)
+	}
+	// Số agent: chỉ `hoi-chinh` được đếm. Đếm cả hàng dự phòng vào là trả lời
+	// sai câu "sắp đốt bao nhiêu phiên" — theo hướng THỪA, tức là người đọc yên
+	// tâm nhầm về giá.
+	if kh.SoAgent != 1 {
+		t.Fatalf("tổng số agent = %d, muốn 1 — bước chạy thay KHÔNG chạy trong lượt suôn sẻ", kh.SoAgent)
+	}
+}

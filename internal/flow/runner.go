@@ -186,8 +186,17 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		}
 	}
 
-	// Bước nào đang làm nhiệm vụ GỠ LẠI cho bước khác — tính một lần cho cả lượt.
-	goLai := BuocGoLai(f)
+	// Lượt này có thể là lượt CHẠY LẠI của một lượt đã dừng ở rào duyệt sau khi
+	// một bước chạy thay đã làm xong việc. Bảng biến trong bộ nhớ thì mất, nhưng
+	// hai dòng sổ ("bước A failed", "bước chạy thay của A done") đủ để suy ra —
+	// xem fallback.go. Gọi ở đây, ngay sau khi nạp sổ và TRƯỚC vòng chạy, để
+	// bước sau tìm thấy kết quả ở đúng chỗ nó đang tìm.
+	ganKetQuaThayThe(f, st)
+
+	// Bước nào bị LOẠI khỏi lịch chạy thường — bước gỡ lại (`compensate`) và
+	// bước chạy thay (`fallback`). Tính một lần cho cả lượt, ở MỘT chỗ duy nhất
+	// dùng chung với `flow show` và bảng chạy khan.
+	ngoaiLich := BuocNgoaiLichThuong(f)
 
 	for {
 		if ctx.Err() != nil {
@@ -207,22 +216,23 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 
 		// Bước approve không chạy — nó dựng rào rồi trả quyền cho con người.
 		//
-		// Bước GỠ LẠI cũng không chạy ở đây, và lý do khác hẳn: nó thường không
-		// có `needs` nào, tức là một GỐC của DAG, nên để yên thì nó chạy ngay
-		// đợt đầu của MỌI lượt chạy — gỡ một việc chưa ai làm. Xem compensate.go.
+		// Bước GỠ LẠI và bước CHẠY THAY cũng không chạy ở đây, và lý do khác
+		// hẳn: chúng thường không có `needs` nào, tức là một GỐC của DAG, nên để
+		// yên thì chúng chạy ngay đợt đầu của MỌI lượt chạy — gỡ một việc chưa
+		// ai làm, hoặc chạy thay cho một bước chưa kịp hỏng. Xem compensate.go
+		// và fallback.go.
 		var work, choDuyet []Step
-		daDanhDauGoLai := false
+		daDanhDauNgoaiLich := false
 		for _, s := range ready {
 			if s.Type == TypeApprove {
 				choDuyet = append(choDuyet, s)
 				continue
 			}
-			if goLai[s.ID] {
-				daDanhDauGoLai = true
+			if ly, ngoai := ngoaiLich[s.ID]; ngoai {
+				daDanhDauNgoaiLich = true
 				// Ghi `skipped` kèm lời giải thích chứ không để trống: một ô
 				// trống trên bảng đọc là "chưa tới lượt", còn đây là "sẽ không
 				// chạy trừ khi có chuyện".
-				ly := MoTaChoGoLai(f, s.ID)
 				_ = r.DB.SetStep(runID, s.ID, store.StepSkipped, ly, 0)
 				st.set(s.ID, store.StepSkipped, "")
 				r.Bus.Publish(events.Event{Type: events.FlowStep, Addr: f.Name + "." + s.ID,
@@ -254,10 +264,10 @@ func (r *Runner) execute(ctx context.Context, runID int64, f Flow, vars map[stri
 		}
 
 		// Đợt này không có gì để chạy và cũng không có rào duyệt nào: chỉ vừa
-		// đánh dấu vài bước GỠ LẠI là `skipped`. Tính lại đợt — chúng sẽ không
-		// còn nổi lên nữa vì `skipped` tính là đã xong.
+		// đánh dấu vài bước NGOÀI LỊCH THƯỜNG là `skipped`. Tính lại đợt — chúng
+		// sẽ không còn nổi lên nữa vì `skipped` tính là đã xong.
 		if len(choDuyet) == 0 {
-			if daDanhDauGoLai {
+			if daDanhDauNgoaiLich {
 				continue
 			}
 			break // không còn gì chạy được, và không phải vì chờ ai

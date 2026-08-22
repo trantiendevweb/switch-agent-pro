@@ -71,7 +71,7 @@ type BuocKho struct {
 	ConSot string `json:"conSot,omitempty"`
 
 	// ---------------------------------------------------------------------
-	// BỐN TRƯỜNG DƯỚI ĐÂY TRẢ LỜI CÂU "BƯỚC NÀY CÓ THẬT SỰ CHẠY KHÔNG, VÀ NÓ
+	// CÁC TRƯỜNG DƯỚI ĐÂY TRẢ LỜI CÂU "BƯỚC NÀY CÓ THẬT SỰ CHẠY KHÔNG, VÀ NÓ
 	// ĐỂ LẠI GÌ" — thứ mà bản chạy khan trước đây KHÔNG nói được.
 	// ---------------------------------------------------------------------
 
@@ -90,6 +90,19 @@ type BuocKho struct {
 	// Compensate là id bước gỡ lại của bước NÀY (khi on_failure = "compensate").
 	// Chiều ngược của GoLaiCho.
 	Compensate string `json:"compensate,omitempty"`
+
+	// ThayTheCho là các bước mà bước NÀY làm nhiệm vụ chạy thay cho.
+	//
+	// Cùng ý nghĩa và cùng mức nghiêm trọng với GoLaiCho: khác rỗng nghĩa là
+	// BƯỚC NÀY SẼ KHÔNG CHẠY trong lượt chạy suôn sẻ. Hai trường chứ không một,
+	// vì hai vai khác nhau thật — bước gỡ lại chạy rồi cả lượt DỪNG, bước chạy
+	// thay chạy rồi lượt ĐI TIẾP — và gộp lại thì mặt web mất đúng chỗ khác
+	// nhau đó.
+	ThayTheCho []string `json:"thayTheCho,omitempty"`
+
+	// Fallback là id bước chạy thay của bước NÀY (khi on_failure = "fallback").
+	// Chiều ngược của ThayTheCho.
+	Fallback string `json:"fallback,omitempty"`
 
 	// Artifact là các FILE bước này hứa để lại: tên → đường dẫn tương đối.
 	//
@@ -150,6 +163,11 @@ type KeHoachKho struct {
 	// đó theo hướng THỪA, và thừa ở đây nghĩa là người ta tưởng có một bước dọn
 	// dẹp sẽ chạy trong khi nó chỉ chạy nếu hỏng.
 	SoBuocGoLai int `json:"soBuocGoLai,omitempty"`
+
+	// SoBuocThayThe là số bước trong kế hoạch CHỈ chạy khi một bước khác hỏng,
+	// để chạy THAY cho nó. Cùng lý do tồn tại với SoBuocGoLai: câu người đọc
+	// hỏi là "kế hoạch này có mấy bước, mấy cái sẽ chạy thật".
+	SoBuocThayThe int `json:"soBuocThayThe,omitempty"`
 }
 
 // VanDe là flow.Problem dưới dạng gửi đi được cho mặt web.
@@ -207,18 +225,24 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 	// `steps.<id>.output`, để còn chạy qua ĐÚNG bộ lọc quyền đọc mà bộ thực thi
 	// dùng (flow.LocDocDuoc). Chạy khan mà bỏ qua bộ lọc thì prompt in ra khác
 	// prompt gửi đi — đúng thứ tính năng này sinh ra để chống.
-	// Bước nào là bước GỠ LẠI — tính một lần, đúng cách bộ thực thi tính.
-	goLai := flow.BuocGoLai(f)
+	// Bước nào bị LOẠI khỏi lịch chạy thường — tính một lần, bằng ĐÚNG hàm bộ
+	// thực thi dùng (flow.BuocNgoaiLichThuong), chứ không đếm lại ở đây.
+	ngoaiLich := flow.BuocNgoaiLichThuong(f)
 
 	xong := map[string]string{}
 	for _, d := range dots {
 		dk := DotKho{So: d.So, ChoDuyet: d.ChoDuyet}
 		for _, s := range d.Buoc {
 			env := flow.WithOutputs(bien, flow.LocDocDuoc(s, xong))
-			b := a.buocKho(s, env, defaultProfile, &kh.SoAgent, goLai[s.ID])
-			if goLai[s.ID] {
-				b.GoLaiCho = flow.BuocDuocGoLaiBoi(f, s.ID)
+			_, laNgoaiLich := ngoaiLich[s.ID]
+			b := a.buocKho(s, env, defaultProfile, &kh.SoAgent, laNgoaiLich)
+			if goLaiCho := flow.BuocDuocGoLaiBoi(f, s.ID); len(goLaiCho) > 0 {
+				b.GoLaiCho = goLaiCho
 				kh.SoBuocGoLai++
+			}
+			if thayCho := flow.BuocDuocThayTheBoi(f, s.ID); len(thayCho) > 0 {
+				b.ThayTheCho = thayCho
+				kh.SoBuocThayThe++
 			}
 			dk.Buoc = append(dk.Buoc, b)
 			if s.ForEach != "" {
@@ -235,11 +259,11 @@ func (a *API) FlowChayKho(dir, name string, vars map[string]string, defaultProfi
 
 // buocKho mô tả một bước, cộng dồn số agent vào tong.
 //
-// laGoLai = bước này là bước GỠ LẠI của bước khác, tức nó KHÔNG chạy trong lượt
-// suôn sẻ. Khi đó số agent của nó KHÔNG được cộng vào tổng: cả lý do người ta
-// chạy khan là xem "sắp đốt bao nhiêu hạn mức", và đếm cả một bước chỉ chạy khi
-// hỏng vào đó là trả lời sai câu đang được hỏi.
-func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int, laGoLai bool) BuocKho {
+// laNgoaiLich = bước này là bước GỠ LẠI hoặc bước CHẠY THAY của bước khác, tức
+// nó KHÔNG chạy trong lượt suôn sẻ. Khi đó số agent của nó KHÔNG được cộng vào
+// tổng: cả lý do người ta chạy khan là xem "sắp đốt bao nhiêu hạn mức", và đếm
+// cả một bước chỉ chạy khi hỏng vào đó là trả lời sai câu đang được hỏi.
+func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int, laNgoaiLich bool) BuocKho {
 	// VaiTro gán cho MỌI loại bước, không riêng bước agent: `kiem-1` là bước
 	// shell nhưng vẫn là việc của tester.
 	b := BuocKho{ID: s.ID, Type: s.Type, Needs: s.Needs, Worktree: s.Worktree,
@@ -248,6 +272,12 @@ func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int, l
 		Route: flow.MoTaRoute(s)}
 	if s.OnFailure == flow.OnFailCompensate {
 		b.Compensate = s.Compensate
+	}
+	// Chỉ in khi nó THẬT SỰ có tác dụng: `fallback` là một trường có thể nằm
+	// trong file mà không đổi gì cả (on_failure khác "fallback"), và bảng kế
+	// hoạch nói nó có tác dụng thì người đọc yên tâm nhầm.
+	if s.OnFailure == flow.OnFailFallback {
+		b.Fallback = s.Fallback
 	}
 	if b.Needs == nil {
 		b.Needs = []string{}
@@ -263,7 +293,7 @@ func (a *API) buocKho(s flow.Step, env map[string]string, mac Addr, tong *int, l
 		if b.SoAgent < 1 {
 			b.SoAgent = 1
 		}
-		if !laGoLai {
+		if !laNgoaiLich {
 			*tong += b.SoAgent
 		}
 		b.Prompt = flow.Expand(s.Prompt, env)

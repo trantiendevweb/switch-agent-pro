@@ -99,6 +99,20 @@ func TestTroGiupTienTrinh(t *testing.T) {
 	case "in":
 		fmt.Print(args[1])
 
+	// doc-sang <nguon> <dich>: HỎNG nếu <nguon> chưa tồn tại, còn có thì chép
+	// tên nó sang <dich>. Dùng để đo THỨ TỰ giữa hai bước mà không đụng tới
+	// đồng hồ: "đọc được dấu vết của bước kia" = "chạy sau bước kia".
+	case "doc-sang":
+		if _, err := os.Stat(args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, "chưa có", args[1], "— tôi chạy TRƯỚC bước kia")
+			os.Exit(1)
+		}
+		if err := os.WriteFile(args[2], []byte(args[1]), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Print("đọc được")
+
 	// ghi <file> <chuoi>: ghi đúng chuỗi được đưa.
 	case "ghi":
 		if err := os.WriteFile(args[1], []byte(args[2]), 0o644); err != nil {

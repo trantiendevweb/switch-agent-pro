@@ -426,3 +426,72 @@ func (s *Server) handleFlowKho(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, kh)
 }
+
+// GET /api/flow/artifacts?id=<#> — LIỆT KÊ file một lượt chạy để lại.
+//
+// Không đọc nội dung file nào, nên nó rẻ và an toàn để trang tự gọi lúc mở.
+func (s *Server) handleFlowArtifacts(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if err != nil {
+		writeErr(w, fmt.Errorf("thiếu hoặc sai tham số id"))
+		return
+	}
+	kho, err := s.api.FlowArtifacts(id)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, kho)
+}
+
+// GET /api/flow/artifact?id=<#>&duong=<đường dẫn>[&tu=<byte>] — ĐỌC nội dung
+// một artifact.
+//
+// ============================================================================
+// ĐÂY LÀ ENDPOINT ĐỌC FILE TRÊN MỘT CỔNG CÓ THỂ ĐANG PHƠI RA INTERNET
+// ============================================================================
+//
+// Dash tự biết mình có thể không nằm trên loopback (`s.exposed`). Một endpoint
+// nhận đường dẫn từ query string và trả về nội dung file là đúng hình dạng của
+// một lỗ đọc file tuỳ ý, nên nói thẳng ra nó được chặn ở đâu:
+//
+//   - `duong` KHÔNG được ghép vào đường dẫn ở đây. Nó đi thẳng xuống
+//     flow.DuongDanArtifactAnToan, và hàm đó từ chối đường dẫn tuyệt đối, `..`,
+//     tên ổ đĩa, và — lớp quan trọng nhất — mọi thứ giải liên kết mềm ra rồi
+//     nằm ngoài `artifacts/run-<id>/`.
+//   - Không có nhánh nào ở đây "sửa nhẹ" đường dẫn cho dễ dùng. Sửa hộ là cách
+//     mọi bộ lọc đường dẫn bị vượt.
+//   - Nội dung trả về ĐÃ QUA redaction.Che — cùng tầng che mà nhật ký phiên đi
+//     qua. Artifact là chữ do agent sinh ra; nó có đúng cơ hội dán khoá API vào
+//     như nhật ký.
+//
+// GET chứ không POST: đây là một lời hỏi, không đổi gì trên máy. Đổi lại thì
+// mất lớp chống CSRF của POST — nhưng guard đã canh phiên và Host, và một GET
+// chỉ-đọc bị gọi chéo trang thì kẻ gọi cũng không đọc được kết quả.
+func (s *Server) handleFlowArtifact(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	if err != nil {
+		writeErr(w, fmt.Errorf("thiếu hoặc sai tham số id"))
+		return
+	}
+	duong := r.URL.Query().Get("duong")
+	if duong == "" {
+		writeErr(w, fmt.Errorf("thiếu tham số duong — lấy nguyên chuỗi ở cột đường dẫn của /api/flow/artifacts"))
+		return
+	}
+	var tu int64
+	if q := r.URL.Query().Get("tu"); q != "" {
+		n, err := strconv.ParseInt(q, 10, 64)
+		if err != nil {
+			writeErr(w, fmt.Errorf("tham số tu phải là số byte, được %q", q))
+			return
+		}
+		tu = n
+	}
+	nd, err := s.api.FlowArtifactDoc(id, duong, tu)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, nd)
+}

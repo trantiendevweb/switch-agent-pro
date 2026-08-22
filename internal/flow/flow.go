@@ -547,6 +547,10 @@ func Validate(f Flow) []Problem {
 	// `compensate` — xem compensate.go. Cần cả flow vì nó soi cả quan hệ needs.
 	ps = append(ps, VanDeCompensate(f)...)
 
+	// `fallback` — xem fallback.go. Cùng lý do: bước chạy thay cũng bị loại khỏi
+	// lịch chạy thường, nên một `needs` trỏ vào nó là một bước treo vĩnh viễn.
+	ps = append(ps, VanDeFallback(f)...)
+
 	// `merge` — xem merge.go. Cần cả flow vì nó soi `on_failure` của các nguồn.
 	ps = append(ps, VanDeMerge(f)...)
 

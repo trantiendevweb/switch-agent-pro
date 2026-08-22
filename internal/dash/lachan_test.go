@@ -155,6 +155,10 @@ func TestMoiHanhDongDeuCoDuongVaoTuWeb(t *testing.T) {
 		"flow.runs":       "/api/state",
 		"flow.detail":     "/api/flow/detail",
 		"flow.tom-tat":    "/api/flow/tom-tat",
+		// FILE lượt chạy để lại. Hai endpoint (liệt kê + đọc nội dung), ghi ở
+		// đây cái LIỆT KÊ vì nó là cửa vào — đường dẫn để gọi cái thứ hai chỉ
+		// lấy được từ nó.
+		"flow.artifacts": "/api/flow/artifacts",
 		"flow.validate":   "/api/flow/def",
 		"config.show":     "/api/state",
 		"api.call":        "/api/ai",
