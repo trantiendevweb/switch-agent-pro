@@ -232,7 +232,9 @@ func TestBangKhongMangNoiDungKeyRaNgoai(t *testing.T) {
 // Mất mắt nào cũng đỏ, và mất mắt thứ ba là kiểu hỏng tệ nhất — bảng vẫn xanh
 // vì hai mắt đầu còn nguyên.
 //
-// `tinNhan.Content` vẫn là chuỗi thuần: đó là phép đo `dau-vao-anh`, chưa làm.
+// HAI Ô `dau-vao-anh` và `dau-ra-co-cau-truc` KHÔNG còn đo bằng reflect nữa —
+// chúng dựng thật một thân JSON rồi đọc lại. Bài kiểm riêng cho chúng là
+// `TestPhepDoAnhVaJSONDoThanJSONThatChuKhongDoKieu` ngay bên dưới.
 func TestPhepDoMaNguonSoiKieuThat(t *testing.T) {
 	if !coTruong(reflect.TypeOf(yeuCau{}), "tools") {
 		t.Fatal("aiapi.yeuCau mất trường `tools` — lời gọi của dự án này lại không mang " +
@@ -262,11 +264,131 @@ func TestPhepDoMaNguonSoiKieuThat(t *testing.T) {
 	if !coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", "tool_calls") {
 		t.Fatal("aiapi.phanHoi thôi đọc `tool_calls` — nhà cung cấp trả lời đúng, lõi vứt đi")
 	}
-	// Kiểu của trường cuối phải trả về đúng, không chỉ có/không.
+	// Kiểu của trường cuối phải trả về đúng, không chỉ có/không. `kieuTruong`
+	// vẫn được dùng ở nơi khác, nên nó vẫn phải chạy đúng.
 	tp, co := kieuTruong(reflect.TypeOf(tinNhan{}), "content")
 	if !co || tp.Kind() != reflect.String {
-		t.Fatalf("tinNhan.Content không còn là chuỗi thuần (%v) — phép đo `dau-vao-anh` "+
-			"phải được xem lại", tp)
+		t.Fatalf("kieuTruong không đọc ra kiểu của tinNhan.Content (%v) — phép đo hỏng", tp)
+	}
+}
+
+// VÌ SAO HAI Ô ẢNH/JSON THÔI ĐO BẰNG REFLECT (22/08, tối).
+//
+// Reflect trả lời đúng MỘT câu: "kiểu có trường đó không". Từ lúc `tinNhan` có
+// `MarshalJSON` riêng (anh.go), câu đó TRẢ LỜI SAI cho ô `dau-vao-anh`: kiểu Go
+// của `Content` vẫn là `string` thuần trong khi thân trên dây đã là MẢNG. Phép
+// đo cũ sẽ khai "không gửi được ảnh" cho một đường đang chạy — sai theo hướng
+// tệ nhất, vì nó lùa người ta đi sửa thứ không hỏng.
+//
+// Bài này canh rằng phép đo mới ĐO ĐÚNG THỨ NÓ HỨA: thân JSON thật, không phải
+// kiểu. Nó cố ý KHÔNG ghim câu chữ của bằng chứng — chỉ ghim rằng bằng chứng
+// phải nhắc tới thứ đo được.
+func TestPhepDoAnhVaJSONDoThanJSONThatChuKhongDoKieu(t *testing.T) {
+	// Phép đo phải LẬT được. Đây là chỗ một phép đo hỏng (luôn trả LamDuoc) đi
+	// lọt: mọi bài khác vẫn xanh, và cả bảng khai bừa.
+	for _, khoa := range []string{NLAPIDauVaoAnh, NLAPIDauRaCoCauTruc} {
+		do, co := phepDoMaNguon[khoa]
+		if !co {
+			t.Fatalf("%s: mất phép đo mã nguồn", khoa)
+		}
+		tt, bc := do()
+		if tt != LamDuoc {
+			t.Fatalf("%s: phía dự án khai %q — %s", khoa, tt, bc)
+		}
+		if strings.TrimSpace(bc) == "" {
+			t.Fatalf("%s: khai làm được mà không có bằng chứng", khoa)
+		}
+	}
+
+	// Bằng chứng của ô ảnh phải nói tới thân JSON, không nói tới kiểu Go: nếu
+	// có ai đó lặng lẽ đổi lại thành `coTruong(...)` thì câu chữ sẽ trôi.
+	_, bcAnh := phepDoMaNguon[NLAPIDauVaoAnh]()
+	if !strings.Contains(bcAnh, "MarshalJSON") || !strings.Contains(bcAnh, "image_url") {
+		t.Errorf("bằng chứng ô ảnh không nói mình đo thân JSON: %q", bcAnh)
+	}
+	_, bcJSON := phepDoMaNguon[NLAPIDauRaCoCauTruc]()
+	if !strings.Contains(bcJSON, "required") || !strings.Contains(bcJSON, "DocCoCauTruc") {
+		t.Errorf("bằng chứng ô JSON không nói mình kiểm schema nguyên vẹn và có người "+
+			"đọc lại: %q", bcJSON)
+	}
+
+	// `tinNhan.Content` VẪN là chuỗi thuần — và đó chính là lý do phép đo cũ
+	// không dùng được nữa. Ghim lại để bài này đỏ nếu ai đó đổi kiểu `Content`
+	// (hướng 1 ở đầu anh.go), vì lúc đó cái giá đã khác và phải cân lại.
+	tp, _ := kieuTruong(reflect.TypeOf(tinNhan{}), "content")
+	if tp == nil || tp.Kind() != reflect.String {
+		t.Fatalf("tinNhan.Content đã đổi kiểu (%v). Hướng đó có cái giá riêng — mọi chỗ "+
+			"ĐỌC câu trả lời phải ép kiểu, và ép hụt thì hỏng lúc chạy. Đọc lại phần "+
+			"\"BA HƯỚNG ĐÃ CÂN\" ở đầu anh.go trước khi giữ thay đổi này.", tp)
+	}
+}
+
+// BẢNG PHẢI CÒN PHÂN BIỆT ĐƯỢC HAI CHUYỆN KHÁC NHAU, SAU KHI PHÍA DỰ ÁN ĐÃ VÁ.
+//
+// Trước tối 22/08, hai ô `dau-vao-anh` và `dau-ra-co-cau-truc` cùng ✗ ở CẢ HAI
+// route — nhưng vì hai lý do ngược nhau:
+//
+//	grok-4.5          — nhà cung cấp LÀM ĐƯỢC, dự án chưa gửi → NỢ CỦA DỰ ÁN
+//	deepseek-v4-flash — nhà cung cấp KHÔNG làm được           → VƯỚNG PHÍA HỌ
+//
+// Vá phía dự án xong, hai ô đó phải TÁCH RA: grok xanh, deepseek vẫn ✗ nhưng
+// đổi chẩn đoán từ `ca-hai` sang `nha-cung-cap`. Nếu bảng gộp chúng lại — cùng
+// ✗, hoặc cùng ✓, hoặc cùng một chữ "vướng" — thì công vá vừa rồi trở nên vô
+// hình, và người đọc bảng sẽ đi sửa nhầm phía.
+//
+// Bài này ghim đúng chỗ đó, và nó là bài duy nhất trong file ghim DỮ LIỆU thay
+// vì cơ chế. Chấp nhận cái giá ấy vì thứ nó canh là KẾT LUẬN của cả một buổi
+// làm: khi nào deepseek nâng cấp model và số đo mới được ghi vào sổ, bài này sẽ
+// đỏ — và lúc đó đỏ là ĐÚNG, vì nó bắt người ta đọc lại xem bảng còn phân biệt
+// được gì nữa không.
+func TestHaiOAnhVaJSONVanPhanBietDuocNoDuAnVoiVuongNhaCungCap(t *testing.T) {
+	grok := Route{Ten: "grok", BaseURL: "https://modelapi.vn/v1", Model: "grok-4.5", KeyID: "grok"}
+	bGrok, bDeep := BangNangLuc(grok), BangNangLuc(routeThu)
+
+	tim := func(b NangLucRoute, khoa string) NangLucAPI {
+		t.Helper()
+		for _, m := range b.Muc {
+			if m.Khoa == khoa {
+				return m
+			}
+		}
+		t.Fatalf("%s: không có ô %q trong bảng", b.Ten, khoa)
+		return NangLucAPI{}
+	}
+
+	for _, khoa := range []string{NLAPIDauVaoAnh, NLAPIDauRaCoCauTruc} {
+		// PHÍA DỰ ÁN: một câu trả lời duy nhất cho cả hai route — mã nguồn có
+		// một bản, không phụ thuộc route. Lệch nhau ở đây là phép đo hỏng.
+		g, d := tim(bGrok, khoa), tim(bDeep, khoa)
+		if g.Khach != LamDuoc || d.Khach != LamDuoc {
+			t.Fatalf("%s: phía dự án khai grok=%q deepseek=%q — phải LÀM ĐƯỢC ở cả hai, "+
+				"vì đó là câu hỏi về MÃ NGUỒN, không về route", khoa, g.Khach, d.Khach)
+		}
+
+		// grok: hết nợ ở cả hai vế → xanh, không vướng bên nào.
+		if g.TrangThai != LamDuoc {
+			t.Errorf("%s/grok: kết luận %q — nhà cung cấp đã đo được là LÀM ĐƯỢC (22/08) "+
+				"và phía dự án vừa vá xong, ô này phải xanh. Bằng chứng: %s",
+				khoa, g.TrangThai, g.BangChung)
+		}
+		if g.Cho != ChoKhongVuong {
+			t.Errorf("%s/grok: cho=%q, chờ %q", khoa, g.Cho, ChoKhongVuong)
+		}
+
+		// deepseek: vẫn ✗, nhưng chẩn đoán phải DỜI từ `ca-hai` sang nhà cung cấp.
+		if d.TrangThai != KhongLamDuoc {
+			t.Errorf("%s/deepseek: kết luận %q — nhà cung cấp trả HTTP 400 (đo 22/08), "+
+				"ô này không được xanh chỉ vì phía dự án đã vá", khoa, d.TrangThai)
+		}
+		if d.Cho != ChoNCC {
+			t.Errorf("%s/deepseek: cho=%q, chờ %q — sửa thêm ở phía dự án KHÔNG cứu được "+
+				"ô này, và nói sai chỗ là lùa người ta đi sửa nhầm phía", khoa, d.Cho, ChoNCC)
+		}
+		// Và kết luận phải mang nguyên văn lời từ chối của nhà cung cấp, không
+		// phải một câu tóm tắt của ta.
+		if !strings.Contains(d.BangChung, "HTTP 400") {
+			t.Errorf("%s/deepseek: kết luận mất nguyên văn thân lỗi: %q", khoa, d.BangChung)
+		}
 	}
 }
 
@@ -322,15 +444,25 @@ func TestLamDuocTraVeLyDoDocDuoc(t *testing.T) {
 	if ok, ly := b.LamDuoc(NLAPIGoiTool); !ok {
 		t.Fatalf("goi-tool phải làm được sau khi có GoiTool: %s", ly)
 	}
-	// `dau-vao-anh` là ô còn vướng ở phía dự án (Content vẫn là chuỗi thuần),
-	// nên nó là chỗ kiểm rằng lời từ chối vẫn nói được ROUTE NÀO và VƯỚNG GÌ.
+	// `dau-vao-anh` của deepseek-v4-flash: phía dự án nay GỬI ĐƯỢC (anh.go), nhà
+	// cung cấp thì KHÔNG (đo 22/08, HTTP 400). Nên ô vẫn ✗ — và đó chính là chỗ
+	// kiểm rằng lời từ chối nói được ROUTE NÀO, THIẾU NĂNG LỰC GÌ, và ĐO Ở ĐÂU.
+	//
+	// Cái neo được DỜI chứ không gỡ: bản trước neo vào "`tinNhan.Content` vẫn là
+	// chuỗi thuần" và nó đã đỏ đúng lúc phải đỏ — lúc anh.go ra đời. Neo vào một
+	// món nợ thì bài kiểm chỉ xanh chừng nào dự án còn nợ, và nó phạt đúng người
+	// đi trả nợ. Neo mới nằm ở HÌNH DẠNG của lời từ chối, thứ phải đúng mãi.
 	ok, ly := b.LamDuoc(NLAPIDauVaoAnh)
 	if ok {
-		t.Fatal("dau-vao-anh đang KHÔNG làm được (tinNhan.Content vẫn là chuỗi thuần) " +
-			"mà bảng nói được")
+		t.Fatal("dau-vao-anh của deepseek-v4-flash đang KHÔNG làm được (nhà cung cấp trả " +
+			"HTTP 400, đo 22/08) mà bảng nói được")
 	}
-	if !strings.Contains(ly, "content") || !strings.Contains(ly, routeThu.Ten) {
-		t.Fatalf("lý do từ chối không nói được route nào và vướng gì: %q", ly)
+	if !strings.Contains(ly, routeThu.Ten) || !strings.Contains(ly, moTaNangLucAPI(NLAPIDauVaoAnh)) {
+		t.Fatalf("lý do từ chối không nói được route nào và thiếu năng lực gì: %q", ly)
+	}
+	if !coQuanSat(ly) {
+		t.Fatalf("lý do từ chối không mang quan sát nào (con số, mã HTTP) — nghe như "+
+			"một lời khai chứ không phải một phép đo: %q", ly)
 	}
 	if _, ly := b.LamDuoc("nang-luc-khong-co-that"); !strings.Contains(ly, "không có năng lực") {
 		t.Fatalf("hỏi một năng lực lạ phải nói rõ là lạ, được: %q", ly)

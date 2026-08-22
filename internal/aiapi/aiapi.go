@@ -98,6 +98,16 @@ type KetQua struct {
 	// thấy một lượt đột nhiên mất 15 giây thay vì 2,3 giây mà không có gì giải
 	// thích. `Mat` đo được độ trễ nhưng không nói được vì sao.
 	ChoLai []LanChoLai
+
+	// CanhBaoTruocKhiGui là những câu SOÁT RA TRƯỚC khi chạm mạng: bảng năng
+	// lực chưa đo route này, ảnh nhỏ hơn ngưỡng đã đo được, người dùng ép gửi
+	// dù bảng nói không. Rỗng ở lượt bình thường.
+	//
+	// Nằm trong KetQua chứ không chỉ in ra ở CLI, vì đúng lý do của `ChoLai`:
+	// mặt web gọi cùng một hàm và phải nói được cùng một câu. Và nó được gắn
+	// vào KetQua KỂ CẢ khi lượt gọi hỏng — câu "ảnh chỉ có 64 điểm ảnh" chính
+	// là thứ giải thích cái HTTP 400 vừa nhận về.
+	CanhBaoTruocKhiGui []string
 }
 
 // DaChuyenRoute cho biết câu trả lời này đến từ route dự phòng.
@@ -198,10 +208,29 @@ type yeuCau struct {
 	// `tool_choice=required`, đo 22/08).
 	Tools      []Tool `json:"tools,omitempty"`
 	ToolChoice string `json:"tool_choice,omitempty"`
+
+	// DangTraLoi là `response_format` — ép câu trả lời theo JSON schema.
+	//
+	// Con trỏ + `omitempty` vì đúng lý do của `Tools` ngay trên: lượt gọi
+	// thường phải gửi thân JSON y HỆT như trước. Khai giá trị thường thì mọi
+	// lượt bỗng mang `"response_format":{"type":""}` — và deepseek-v4-flash đã
+	// trả HTTP 400 chỉ vì `tool_choice=required` (đo 22/08).
+	//
+	// Cách dùng và cách ĐỌC LẠI câu trả lời: cocautruc.go.
+	DangTraLoi *DangTraLoi `json:"response_format,omitempty"`
 }
 type tinNhan struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+
+	// Phan là nội dung NHIỀU MẨU — đường duy nhất gửi ảnh đi được, vì giao thức
+	// đòi `content` dạng mảng {type, text|image_url}.
+	//
+	// `json:"-"` vì trường này KHÔNG lên dây dưới tên đó: `MarshalJSON` bên
+	// dưới ghép nó vào chính khoá `content`. Luật hợp nhất giữa `Content` và
+	// `Phan` — cái nào thắng, cái nào bị vứt — khai ở đầu anh.go, và
+	// `TestAnhDiHetDuongToiThanJSON` canh nó.
+	Phan []PhanNoiDung `json:"-"`
 
 	// SuyLuan là phần NGHĨ của model, nhà cung cấp trả tách khỏi câu trả lời.
 	//
@@ -220,6 +249,35 @@ type tinNhan struct {
 	ToolCalls []LoiGoiTool `json:"tool_calls,omitempty"`
 }
 
+// MarshalJSON dựng thân của MỘT tin nhắn, và đây là chỗ luật hợp nhất
+// `Content` + `Phan` được thi hành. Đọc ghi chú đầu anh.go trước khi sửa.
+//
+// Hai nhánh, và nhánh đầu quan trọng hơn nhánh sau: KHÔNG có phần nào thì thân
+// JSON phải giống HỆT thời chưa có file anh.go. Mọi lượt gọi của cả dự án đi
+// qua đây, và một khoá lạ mọc thêm là thứ deepseek-v4-flash đã từ chối vì
+// những cớ nhỏ hơn thế.
+func (t tinNhan) MarshalJSON() ([]byte, error) {
+	// `tran` là kiểu TRẦN cùng bố cục nhưng KHÔNG mang phương thức này — thiếu
+	// nó thì json.Marshal gọi lại chính hàm đang chạy và đệ quy tới hết stack.
+	type tran tinNhan
+	if len(t.Phan) == 0 {
+		return json.Marshal(tran(t))
+	}
+	phan := t.Phan
+	// `Content` KHÔNG bị vứt: nó vào làm mẩu `text` ĐẦU TIÊN. Đây là cả điểm
+	// của luật hợp nhất — hai trường ghép lại chứ không tranh nhau, nên không
+	// có ca nào người gọi mất chữ mà không được báo.
+	if s := strings.TrimSpace(t.Content); s != "" {
+		phan = append([]PhanNoiDung{PhanChu(s)}, phan...)
+	}
+	return json.Marshal(struct {
+		Role      string        `json:"role"`
+		Content   []PhanNoiDung `json:"content"`
+		SuyLuan   string        `json:"reasoning_content,omitempty"`
+		ToolCalls []LoiGoiTool  `json:"tool_calls,omitempty"`
+	}{Role: t.Role, Content: phan, SuyLuan: t.SuyLuan, ToolCalls: t.ToolCalls})
+}
+
 type phanHoi struct {
 	Model   string `json:"model"`
 	Choices []struct {
@@ -236,16 +294,30 @@ type phanHoi struct {
 // Mọi lỗi trả về đều là *LoiAPI, để tầng trên phân biệt được "thử route khác có
 // thể cứu" với "thử route khác chỉ tốn thêm tiền" — xem LoiNguoiDung.
 func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
-	return goiThat(ctx, r, prompt, nil, "")
+	return goiThat(ctx, r, prompt, themVao{})
 }
 
-// goiThat là thân thật của `Goi`, có thêm chỗ nhận định nghĩa tool.
+// themVao gom MỌI thứ có thể thêm vào một lượt gọi ngoài prompt.
+//
+// Là struct chứ không phải bốn tham số rời, và đó là bài học của chính file
+// này: `goiThat` ra đời với ba tham số, lên năm khi có tool, và sẽ lên bảy khi
+// có ảnh + schema. Một hàm bảy tham số mà bốn cái là zero value ở hầu hết chỗ
+// gọi là chỗ người ta gõ nhầm thứ tự — mà gõ nhầm `tools` với `chonTool` thì
+// không có lỗi biên dịch nào, chỉ có một yêu cầu sai gửi lên mạng và tính tiền.
+type themVao struct {
+	Tools      []Tool
+	ChonTool   string
+	Phan       []PhanNoiDung
+	DangTraLoi *DangTraLoi
+}
+
+// goiThat là thân thật của `Goi`, có thêm chỗ nhận tool / ảnh / schema.
 //
 // Tách ra chứ không thêm tham số vào `Goi`: `Goi(ctx, r, prompt)` là chữ ký mà
-// cả `internal/api`, CLI và mặt web đang gọi, và đổi nó chỉ để mang thêm hai
-// trường mà hầu hết chỗ gọi truyền nil là bắt cả dự án trả giá cho một tính
-// năng ít dùng. `GoiTool` (tool.go) là cửa cho ai cần.
-func goiThat(ctx context.Context, r Route, prompt string, tools []Tool, chonTool string) (KetQua, error) {
+// cả `internal/api`, CLI và mặt web đang gọi, và đổi nó chỉ để mang thêm mấy
+// trường mà hầu hết chỗ gọi bỏ trống là bắt cả dự án trả giá cho một tính năng
+// ít dùng. `GoiTool` (tool.go) và `GoiKem` (goikem.go) là cửa cho ai cần.
+func goiThat(ctx context.Context, r Route, prompt string, them themVao) (KetQua, error) {
 	var kq KetQua
 	// Prompt rỗng chặn TRƯỚC khi chạm mạng: nhà cung cấp sẽ trả 400, và một lượt
 	// gọi hỏng vẫn có thể bị tính tiền. Đây cũng là lỗi của người dùng, nên route
@@ -266,9 +338,10 @@ func goiThat(ctx context.Context, r Route, prompt string, tools []Tool, chonTool
 
 	body, err := json.Marshal(yeuCau{
 		Model:      r.Model,
-		Messages:   []tinNhan{{Role: "user", Content: prompt}},
-		Tools:      tools,
-		ToolChoice: chonTool,
+		Messages:   []tinNhan{{Role: "user", Content: prompt, Phan: them.Phan}},
+		Tools:      them.Tools,
+		ToolChoice: them.ChonTool,
+		DangTraLoi: them.DangTraLoi,
 	})
 	if err != nil {
 		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())

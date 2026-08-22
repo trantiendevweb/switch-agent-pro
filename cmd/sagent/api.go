@@ -232,6 +232,13 @@ func apiGoi(args []string) {
 	xemSuyLuan, args := boolFlag(args, "--suy-luan")
 	fileTool, args := strFlag(args, "--tool", "")
 	chonTool, args := strFlag(args, "--tool-chon", aiapi.ChonToolTuDo)
+	// `--anh` lặp lại được: một câu hỏi có thể chỉ vào nhiều ảnh ("so hai cái
+	// biểu đồ này"). Cờ chỉ nhận một giá trị thì người dùng phải gộp ảnh bằng
+	// tay trước khi hỏi — mà lúc đó model không phân biệt được đâu là ảnh nào.
+	anhFile, args := strFlagNhieu(args, "--anh")
+	fileSoDo, args := strFlag(args, "--so-do", "")
+	// `--cu-gui`: bỏ qua lời chặn của bảng năng lực. Xem đầu internal/aiapi/goikem.go.
+	cuGui, args := boolFlag(args, "--cu-gui")
 	if len(args) == 0 {
 		fail(fmt.Errorf("thiếu prompt: sagent api [<route>] \"câu hỏi\""))
 	}
@@ -246,8 +253,28 @@ func apiGoi(args []string) {
 		fail(fmt.Errorf("--stream và --tool chưa đi chung được: đường stream chưa mang " +
 			"định nghĩa tool. Bỏ --stream đi."))
 	}
+	kemAnhHoacSoDo := len(anhFile) > 0 || fileSoDo != ""
+	// Cùng một luật cho ba cặp cờ dưới đây, và nó là luật của cả file: KHÔNG
+	// im lặng bỏ một cờ người dùng đã gõ. Bỏ đi thì lượt gọi vẫn chạy, vẫn tính
+	// tiền, và trả về một kết quả trông đúng cho một câu hỏi khác câu đã hỏi.
+	if stream && kemAnhHoacSoDo {
+		fail(fmt.Errorf("--stream chưa đi chung được với --anh/--so-do: đường stream chưa " +
+			"mang ảnh lẫn schema. Bỏ --stream đi."))
+	}
+	if fileTool != "" && kemAnhHoacSoDo {
+		fail(fmt.Errorf("--tool chưa đi chung được với --anh/--so-do: nhánh tool đi đường " +
+			"riêng (aiapi.GoiTool). Tách thành hai lượt gọi."))
+	}
+	if cuGui && !kemAnhHoacSoDo {
+		fail(fmt.Errorf("--cu-gui chỉ có nghĩa khi đi kèm --anh hoặc --so-do: nó bỏ qua " +
+			"lời chặn của bảng năng lực cho HAI năng lực đó. Xem: sagent nang-luc-api"))
+	}
 	if fileTool != "" {
 		apiGoiTool(ten, strings.Join(args, " "), fileTool, chonTool, xemSuyLuan)
+		return
+	}
+	if kemAnhHoacSoDo {
+		apiGoiKem(ten, strings.Join(args, " "), anhFile, fileSoDo, cuGui, xemSuyLuan)
 		return
 	}
 	a, done := open()
