@@ -181,31 +181,40 @@ func apiGoiKem(ten, prompt string, anhFile []string, fileSoDo string, cuGui, xem
 	}
 
 	fmt.Println()
-	for _, d := range dongCanhBaoTruocKhiGui(kq.CanhBaoTruocKhiGui) {
+	for _, d := range manHinhKem(kq, anh, dang, routes, xemSuyLuan) {
 		fmt.Println(d)
 	}
+}
+
+// manHinhKem dựng TOÀN BỘ chữ in ra sau một lượt `--anh`/`--so-do`.
+//
+// VÌ SAO GOM CẢ MÀN HÌNH VÀO MỘT HÀM THUẦN, chứ không để `apiGoiKem` gọi lần
+// lượt từng hàm dựng chữ rồi tự `fmt.Println`: bản trước làm thế, và một phép
+// thử phá hoại tối 22/08 đã đi lọt — bỏ hẳn vòng lặp in khối ảnh ra khỏi
+// `apiGoiKem` mà KHÔNG bài kiểm nào đỏ. `dongAnhGuiDi` có bài kiểm riêng và nó
+// vẫn xanh, vì bài đó gọi thẳng hàm; không ai hỏi tầng trên có gọi nó không.
+//
+// Đó đúng là hình dạng "có ở mọi tầng trừ tầng cuối", lần này nằm trong chính
+// bản vá dựng lên để chống nó. Gom lại thành một hàm thuần thì bài kiểm đọc
+// được đúng thứ người dùng thấy, và bỏ sót một khối là đỏ ngay.
+func manHinhKem(kq aiapi.KetQua, anh []aiapi.Anh, dang *aiapi.DangTraLoi,
+	routes []aiapi.Route, xemSuyLuan bool) []string {
+	out := dongCanhBaoTruocKhiGui(kq.CanhBaoTruocKhiGui)
 	if s := strings.TrimSpace(kq.NoiDung); s != "" && dang == nil {
 		// Có schema thì câu trả lời được in trong khối JSON bên dưới — in hai
 		// lần là bắt người đọc tự so hai cục chữ xem có khác nhau không.
-		fmt.Println(s)
-		fmt.Println()
+		out = append(out, s, "")
 	}
-	for _, d := range dongAnhGuiDi(anh) {
-		fmt.Println(d)
-	}
+	out = append(out, dongAnhGuiDi(anh)...)
 	if dang != nil {
-		for _, d := range dongCoCauTruc(aiapi.DocCoCauTruc(kq, dang)) {
-			fmt.Println(d)
-		}
+		out = append(out, dongCoCauTruc(aiapi.DocCoCauTruc(kq, dang))...)
 	}
-	for _, d := range dongSuyLuan(aiapi.DocSuyLuan(kq, routes), xemSuyLuan) {
-		fmt.Println(d)
-	}
+	out = append(out, dongSuyLuan(aiapi.DocSuyLuan(kq, routes), xemSuyLuan)...)
 	if canh := aiapi.CanhBaoThieuUsage(kq); canh != "" {
-		fmt.Printf("  ⚠ %s\n", canh)
+		out = append(out, "  ⚠ "+canh)
 	}
-	fmt.Printf("  %s · %s · vào %d, ra %d, tổng %d token · %.1fs\n",
-		kq.Route, kq.Model, kq.Usage.Vao, kq.Usage.Ra, kq.Usage.Tong, kq.Mat.Seconds())
-	fmt.Println("  ! lượt này đi ĐÍCH DANH route trên, KHÔNG nhảy route dự phòng " +
+	out = append(out, fmt.Sprintf("  %s · %s · vào %d, ra %d, tổng %d token · %.1fs",
+		kq.Route, kq.Model, kq.Usage.Vao, kq.Usage.Ra, kq.Usage.Tong, kq.Mat.Seconds()))
+	return append(out, "  ! lượt này đi ĐÍCH DANH route trên, KHÔNG nhảy route dự phòng "+
 		"(đường dự phòng chưa mang ảnh/schema đi được).")
 }

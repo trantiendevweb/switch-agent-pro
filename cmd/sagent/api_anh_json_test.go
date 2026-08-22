@@ -188,6 +188,113 @@ func TestStrFlagNhieuGiuDuNhieuGiaTriVaDungThuTu(t *testing.T) {
 	}
 }
 
+// CẢ MÀN HÌNH PHẢI CÓ ĐỦ MỌI KHỐI — không khối nào được rơi ở tầng cuối.
+//
+// Bài này ra đời từ một phép thử phá hoại tối 22/08: bỏ hẳn vòng lặp in khối
+// ảnh ra khỏi `apiGoiKem` mà KHÔNG bài kiểm nào đỏ. `dongAnhGuiDi` có bài kiểm
+// riêng và nó vẫn xanh, vì bài đó gọi thẳng hàm — không ai hỏi tầng trên có gọi
+// nó không. Đúng lại hình dạng lỗi mà cả bản vá này dựng lên để chống.
+//
+// Nên bài này gọi `manHinhKem` — hàm dựng TOÀN BỘ chữ người dùng thấy — và đòi
+// đủ từng khối. Xoá một khối khỏi hàm đó là đỏ ngay.
+func TestManHinhKemKhongDeRotKhoiNao(t *testing.T) {
+	dang := aiapi.SoDoNghiem("mau_sac", map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"mau": map[string]any{"type": "string"}},
+		"required":   []any{"mau"},
+	})
+	a := anhThu(t, 32, 32)
+	kq := aiapi.KetQua{
+		Route: "grok", Model: "grok-4.5", NoiDung: `{"mau":"đỏ"}`,
+		Usage:              aiapi.Usage{Vao: 700, Ra: 8, Tong: 708},
+		SuyLuan:            strings.Repeat("x", 120),
+		CanhBaoTruocKhiGui: []string{"CHƯA ai đo route này"},
+	}
+	ra := strings.Join(manHinhKem(kq, []aiapi.Anh{a}, dang, dsThu, false), "\n")
+
+	for _, can := range []struct{ chuoi, khoi string }{
+		{"CHƯA ai đo", "cảnh báo soát trước khi gửi — mất nó thì lượt thử nghiệm trông " +
+			"y hệt lượt chắc chắn"},
+		{a.Ten, "khối ảnh đã gửi — mất nó thì \"nhà cung cấp nuốt ảnh\" và \"sagent quên " +
+			"gắn ảnh\" trông giống hệt nhau"},
+		{"1024", "số điểm ảnh — thứ nhà cung cấp từ chối theo (HTTP 400, đo 22/08)"},
+		{"đỏ", "giá trị JSON — thứ bước sau của flow sẽ nhận"},
+		{"120", "số ký tự phần nghĩ đã trả tiền"},
+		{"708 token", "hoá đơn của lượt gọi"},
+		{"KHÔNG nhảy route dự phòng", "ranh giới: nhánh này không có dự phòng"},
+	} {
+		if !strings.Contains(ra, can.chuoi) {
+			t.Errorf("màn hình rơi mất %q:\n     → %s\n%s", can.chuoi, can.khoi, ra)
+		}
+	}
+
+	// Có schema thì câu trả lời KHÔNG được in hai lần: một lần thô, một lần
+	// trong khối JSON. In hai lần là bắt người đọc tự so hai cục chữ.
+	if strings.Count(ra, `"mau"`)+strings.Count(ra, `{"mau"`) > 2 {
+		t.Errorf("câu trả lời JSON bị in lặp:\n%s", ra)
+	}
+
+	// Không kèm gì thì các khối tương ứng phải BIẾN MẤT, không in khung rỗng.
+	tron := strings.Join(manHinhKem(aiapi.KetQua{Route: "grok", Model: "grok-4.5",
+		NoiDung: "chào"}, nil, nil, dsThu, false), "\n")
+	if strings.Contains(tron, "đã gửi kèm") {
+		t.Errorf("không gửi ảnh mà vẫn in khối ảnh:\n%s", tron)
+	}
+	if !strings.Contains(tron, "chào") {
+		t.Errorf("không có schema thì câu trả lời phải in thẳng ra:\n%s", tron)
+	}
+}
+
+// LUẬT CỜ phải được canh ở chính chỗ `apiGoi` dùng, không chỉ ở hàm rút cờ.
+//
+// `apiGoi` mở CSDL và gọi `os.Exit`, nên không bài kiểm nào chạm được vào nó —
+// mọi luật cờ vì thế mà từng không được canh bởi gì cả. Một phép thử phá hoại
+// tối 22/08 đổi `--anh` sang cờ chỉ-một-giá-trị (lặng lẽ vứt ảnh thứ hai) và
+// toàn bộ test vẫn xanh. `rutCoGoi`/`kiemCoGoi` tách ra là để đóng khe đó.
+func TestRutCoGoiVaKiemCoGoiCanhDungLuatCua_apiGoi(t *testing.T) {
+	co, con := rutCoGoi([]string{"--suy-luan", "--anh", "a.png", "grok",
+		"--anh", "b.png", "--so-do", "s.json", "--cu-gui", "so hai ảnh"})
+	if len(co.AnhFile) != 2 || co.AnhFile[0] != "a.png" || co.AnhFile[1] != "b.png" {
+		t.Fatalf("--anh không lặp lại được: %v — gõ hai lần mà chỉ một ảnh đi thì câu "+
+			"trả lời vẫn trôi chảy, vẫn tính tiền, và sai", co.AnhFile)
+	}
+	if co.FileSoDo != "s.json" || !co.CuGui || !co.XemSuyLuan {
+		t.Errorf("rút cờ sót: %+v", co)
+	}
+	if strings.Join(con, " ") != "grok so hai ảnh" {
+		t.Errorf("phần còn lại sai, tên route hoặc prompt bị nuốt: %v", con)
+	}
+	if !co.KemAnhHoacSoDo() {
+		t.Error("có --anh và --so-do mà không nhận là lượt đi đường GoiKem")
+	}
+
+	// Bốn tổ hợp cấm. Im lặng bỏ một cờ đã gõ là trả về kết quả trông đúng cho
+	// một câu hỏi khác câu đã hỏi.
+	for _, x := range []struct {
+		ten string
+		co  coGoi
+	}{
+		{"--stream + --tool", coGoi{Stream: true, FileTool: "t.json"}},
+		{"--stream + --anh", coGoi{Stream: true, AnhFile: []string{"a.png"}}},
+		{"--tool + --so-do", coGoi{FileTool: "t.json", FileSoDo: "s.json"}},
+		{"--cu-gui một mình", coGoi{CuGui: true}},
+	} {
+		if err := kiemCoGoi(x.co); err == nil {
+			t.Errorf("%s: tổ hợp cấm mà vẫn cho chạy — một cờ bị bỏ trong im lặng", x.ten)
+		}
+	}
+	// Và tổ hợp hợp lệ thì không được chặn nhầm.
+	for _, x := range []coGoi{
+		{}, {Stream: true}, {AnhFile: []string{"a.png"}, CuGui: true},
+		{FileSoDo: "s.json"}, {FileTool: "t.json", XemSuyLuan: true},
+		{AnhFile: []string{"a.png"}, FileSoDo: "s.json"},
+	} {
+		if err := kiemCoGoi(x); err != nil {
+			t.Errorf("tổ hợp hợp lệ %+v bị chặn: %v", x, err)
+		}
+	}
+}
+
 // anhThu dựng một `aiapi.Anh` thật từ ảnh PNG sinh tại chỗ.
 //
 // Sinh tại chỗ chứ không để file .png trong repo: git trên Windows với
