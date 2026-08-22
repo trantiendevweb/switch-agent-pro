@@ -287,20 +287,69 @@
   .nl .lech{margin:6px 13px;border:1px solid rgba(255,93,121,.4);
     background:rgba(255,93,121,.08);border-radius:8px;padding:7px 9px;
     font-size:11.5px;color:var(--error);line-height:1.45}
-  .nl-ct,.rk-ct{padding:2px 14px 13px;font-size:11.5px;color:var(--lo);line-height:1.9}
-  .nl-ct b,.rk-ct b{color:var(--mid);font-weight:600}
+  .nl-ct,.rk-ct,.pl-ct{padding:2px 14px 13px;font-size:11.5px;color:var(--lo);line-height:1.9}
+  .nl-ct b,.rk-ct b,.pl-ct b{color:var(--mid);font-weight:600}
   /* Chú giải dùng ĐÚNG chấm CSS của bảng chứ không phải một ký tự hình tròn:
      design system cấm ký tự làm icon (uxui_test.go), và chấm chép tay thì sửa
      token màu xong chú giải giữ màu cũ, im lặng.
      Hai bảng chú giải (năng lực, sức khoẻ route) dùng CHUNG luật vẽ chấm này —
      chép sang một bộ selector thứ hai là mở đúng cái khe lệch im lặng mà cả
      file token.css sinh ra để bịt. */
-  .nl-ct .ch,.rk-ct .ch{display:inline-block;width:7px;height:7px;border-radius:50%;
+  .nl-ct .ch,.rk-ct .ch,.pl-ct .ch{display:inline-block;width:7px;height:7px;border-radius:50%;
     background:var(--c);margin:0 3px 0 9px;vertical-align:baseline}
-  .nl-ct .ch:first-child,.rk-ct .ch:first-child{margin-left:0}
+  .nl-ct .ch:first-child,.rk-ct .ch:first-child,.pl-ct .ch:first-child{margin-left:0}
   .nl-ct .ch.duoc{--c:var(--run)}
   .nl-ct .ch.khong{--c:var(--idle)}
   .nl-ct .ch.chua{--c:var(--pending)}
+
+  /* ---- bảng QUYỀN PLUGIN (ô Tổng quan) ----
+     Khung dùng LẠI .nl ở trên: container mang cả hai lớp `nl pl`, nên hàng,
+     chấm, cột tên, cột bằng chứng đều là MỘT bộ luật. Chép .nl thành một bộ
+     selector thứ hai là mở đúng khe lệch im lặng mà token.css sinh ra để bịt.
+
+     Chỉ MÀU là riêng, và đó là chỗ phải đọc kỹ. Ở bảng năng lực, "provider
+     KHÔNG có thứ đó" là chuyện trung tính nên ăn xám --idle. Ở đây thì không:
+     "host KHÔNG chặn được" là một LỖ HỔNG đã đo. Đúng dòng đó vừa bị bắt nói
+     dối hôm 22/08 — `thu-muc-lam-viec` khai chan-that trong khi plugin không
+     xin quyền nào vẫn đọc được 33 byte, ghi được file, liệt kê được thư mục.
+     Tô xám thì lời thú nhận ấy đọc như "không có gì phải làm", tức là bảng lại
+     nói dối lần nữa, chỉ bằng màu thay vì bằng chữ. Nên nó ăn --error.
+
+     BA trạng thái, BA màu, và không màu nào dùng chung với màu nào. */
+  .pl .m.chan{--c:var(--run)}
+  .pl .m.khongchan{--c:var(--error)}
+  .pl .m.chuado{--c:var(--pending)}
+  /* Hai trạng thái CHƯA CÓ HÀNG RÀO đều được kéo mắt về bằng vạch trái, nhưng
+     bằng hai màu khác nhau — vì việc phải làm khác nhau: một cái là đi dựng
+     hàng rào, một cái là đi đo xem có dựng được không. */
+  .pl .m.khongchan{border-left-color:var(--error);background:rgba(255,93,121,.05)}
+  .pl .m.chuado{border-left-color:var(--pending);background:rgba(246,178,61,.05)}
+  /* Khoá quyền dài hơn tên năng lực (`ghi-thu-muc-lam-viec` = 21 ký tự mono),
+     nên cột tên phải rộng hơn, nếu không nó xuống dòng lệch với cột kế. */
+  .pl .m .ten{width:152px}
+  /* Cột [chặn] viết THÀNH CHỮ, không chỉ là cái chấm màu: chấm một mình thì
+     người mù màu và người in đen trắng đọc ra đúng hai trạng thái. */
+  .pl .m .tt{font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--c);flex:none;width:124px;margin-top:2px}
+  .pl .p{display:flex;align-items:baseline;gap:9px;padding:10px 13px 2px;
+    font-family:var(--font-mono);font-size:11.5px;color:var(--hi)}
+  .pl .p b{font-weight:600}
+  .pl .p .v{color:var(--lo)}
+  .pl .p .dm{margin-left:auto;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--lo)}
+  .pl .mota{padding:0 13px 6px;font-size:11.5px;color:var(--mid)}
+  .pl .sec{padding:3px 13px;font-size:11.5px;color:var(--mid)}
+  .pl .sec b{font-family:var(--font-mono);font-weight:600;color:var(--hi)}
+  /* Thiếu file chạy là chuyện "chưa xong", không phải chuyện an ninh — nên nó
+     đi màu --pending chứ không cướp sắc đỏ của cột [chặn]. */
+  .pl .canh{margin:6px 13px;border:1px solid rgba(246,178,61,.4);
+    background:rgba(246,178,61,.08);border-radius:8px;padding:7px 9px;
+    font-size:11.5px;color:var(--pending);line-height:1.45}
+  .pl .nguon{padding:7px 13px 3px;font-size:11px;color:var(--lo);
+    font-family:var(--font-mono);word-break:break-all}
+  .pl-ct .ch.chan{--c:var(--run)}
+  .pl-ct .ch.khongchan{--c:var(--error)}
+  .pl-ct .ch.chuado{--c:var(--pending)}
 
   /* ---- Sức khoẻ route: ba trạng thái, KHÔNG được gộp ----
      "Chết" và "sống nhưng model khai không có" trông giống nhau (đều là không
@@ -727,6 +776,31 @@
           Xem ở terminal: <code>sagent nang-luc --chua-do</code>
         </div>
       </div>
+
+      <!-- Plugin đã cài — action "plugin.list", cùng nguồn với `sagent plugin
+           list` và `sagent plugin quyen`. Đứng ngay dưới Năng lực provider vì
+           là cùng một loại câu hỏi hỏi TRƯỚC KHI bấm chạy: thứ này làm được gì
+           trên máy tôi, và tôi chặn được tới đâu. Khác một điểm quan trọng:
+           plugin chạy MÃ CỦA NGƯỜI KHÁC trên máy này.
+
+           Khối này chỉ ĐỌC. Cài, gỡ, chạy plugin đều không có nút ở đây — chạy
+           thì đi qua flow như mọi loại node khác, mở thêm một đường chạy riêng
+           từ trình duyệt là mở thêm một chỗ phải canh quyền. -->
+      <h2 style="margin-top:18px">Plugin đã cài <span class="dem" id="pl-dem">—</span></h2>
+      <div class="card" style="margin-top:0">
+        <div id="pl" class="empty">đang đọc…</div>
+        <div class="pl-ct">
+          <b>Khai một quyền trong manifest KHÔNG tự nó là một hàng rào.</b>
+          Cột <b>[chặn]</b> nói host có hàng rào THẬT hay không:
+          <span class="ch chan"></span> chặn thật, có phép đo
+          <span class="ch khongchan"></span> ĐÃ ĐO, host KHÔNG chặn được
+          <span class="ch chuado"></span> CHƯA ai đo.
+          Hai cái sau <b>khác nhau</b>: cái giữa là một kết luận đã đo xong, cái cuối
+          là việc còn phải làm. Và cả hai đều có nghĩa là plugin KHÔNG bị chặn ở
+          chỗ đó — không khai quyền cũng vậy.
+          Xem đầy đủ bằng chứng ở terminal: <code>sagent plugin quyen</code>
+        </div>
+      </div>
     </section>
 
   </div>
@@ -1069,6 +1143,131 @@ async function napNangLuc(){
       }
     }
     $('nl-dem').textContent = (d.so_chua_do|0) ? (d.so_chua_do|0) + ' chưa đo' : 'đo đủ';
+  }catch(e){ box.className='empty'; box.textContent = 'không đọc được: ' + e.message; }
+}
+
+// ------------------------------------------- bảng quyền plugin
+//
+// Action "plugin.list" qua /api/plugins. Chỉ đọc.
+//
+// Cột [chặn] là toàn bộ lý do khối này tồn tại, và nó có ĐÚNG BA giá trị. Hai
+// bảng tra dưới đây cố ý viết đủ ba dòng thay vì một biểu thức tam nguyên
+// `chan === 'chan-that' ? A : B`: viết kiểu đó là bẹp "đã đo, host KHÔNG chặn
+// được" vào chung ô với "chưa ai đo". Lúc ấy dòng `thu-muc-lam-viec` — đã đo
+// 22/08, kết luận là không chặn được, plugin không xin quyền nào vẫn đọc/ghi
+// /liệt kê được thư mục dự án — trông y hệt dòng `mang` mà chưa ai đo. Người
+// vận hành nhìn hai dòng giống nhau sẽ làm cùng một việc, trong khi việc phải
+// làm là ngược nhau: một cái đi dựng hàng rào, một cái đi đo.
+//
+// Câu chữ về NỘI DUNG (tên quyền, lý do plugin xin, bằng chứng) đều do server
+// gửi sang, không có bảng tra nào chép lại ở đây — cùng luật với bảng năng lực.
+// Trang chỉ quyết định màu và cách xếp.
+//
+// Giá trị lạ KHÔNG được rơi về "chặn thật": nó rơi về "chưa đo", đúng nhánh
+// default của handler. Chiều an toàn là chiều thú nhận mình không biết.
+const PL_LOP = {'chan-that':'chan', 'khong-chan-duoc':'khongchan', 'chua-do':'chuado'};
+const PL_DOC = {'chan-that':'chặn thật', 'khong-chan-duoc':'KHÔNG chặn được', 'chua-do':'chưa đo'};
+function plLop(c){ return PL_LOP[c] || 'chuado'; }
+function plDoc(c){ return PL_DOC[c] || 'chưa đo (host trả trạng thái lạ: ' + c + ')'; }
+
+// plDem: nhãn đếm. HAI số rời, không phải một tổng — gộp lại là bẹp đúng cái
+// ranh giới mà cả khối này dựng ra để giữ.
+function plDem(kcd, cd){
+  const p = [];
+  if(kcd) p.push(kcd + ' không chặn được');
+  if(cd)  p.push(cd + ' chưa đo');
+  return p.length ? p.join(' · ') : 'chặn thật cả';
+}
+
+async function napPlugin(){
+  const box = $('pl');
+  try{
+    const d = await api('/api/plugins');
+    const ds = d.muc || [];
+    box.className = 'nl pl';
+    box.innerHTML = '';
+    if(!ds.length){
+      // Không có plugin thì vẫn phải nói ra, và nói kèm chỗ đã tìm — "trống"
+      // vì chưa cài và "trống" vì đặt sai thư mục nhìn giống hệt nhau.
+      const t = document.createElement('div');
+      t.className = 'mota'; t.style.padding = '13px 13px 6px';
+      t.textContent = 'Chưa cài plugin nào.';
+      box.appendChild(t);
+    }
+    for(const m of ds){
+      let kcd = 0, cd = 0;
+      for(const q of (m.quyen || [])){
+        const l = plLop(q.chan);
+        if(l === 'khongchan') kcd++; else if(l === 'chuado') cd++;
+      }
+      const dau = document.createElement('div');
+      dau.className = 'p';
+      dau.innerHTML = '<b>' + esc(m.ten) + '</b>' +
+        '<span class="v">' + esc(m.phien_ban || CHUA_DO) + '</span>' +
+        '<span class="v">giao thức ' + (m.giao_thuc|0) + '</span>' +
+        '<span class="dm">' + esc(plDem(kcd, cd)) + '</span>';
+      box.appendChild(dau);
+
+      if(m.mo_ta){
+        const mt = document.createElement('div');
+        mt.className = 'mota'; mt.textContent = m.mo_ta;
+        box.appendChild(mt);
+      }
+      // "Viết sai TOML" và "quên build" hỏng theo hai kiểu và sửa bằng hai
+      // cách, nên chúng không được hiện ra như cùng một lỗi. Cái đầu nằm ở
+      // danh sách `loi` phía dưới; cái sau là dòng này.
+      if(!m.co_exec){
+        const c = document.createElement('div');
+        c.className = 'canh';
+        c.textContent = 'manifest khai exec nhưng không thấy file chạy trên đĩa — ' +
+          'plugin này chưa chạy được (thường là quên build).';
+        box.appendChild(c);
+      }
+      if(!(m.quyen || []).length){
+        const k = document.createElement('div');
+        k.className = 'mota';
+        k.textContent = 'không khai quyền nào. Đọc kèm chú thích dưới bảng: ' +
+          'không khai KHÔNG có nghĩa là host chặn được.';
+        box.appendChild(k);
+      }
+      for(const q of (m.quyen || [])){
+        const r = document.createElement('div');
+        r.className = 'm ' + plLop(q.chan);
+        r.innerHTML =
+          '<i role="img" aria-label="' + esc(plDoc(q.chan)) + '"></i>' +
+          '<span class="ten">' + esc(q.khoa) + '</span>' +
+          '<span class="tt">' + esc(plDoc(q.chan)) + '</span>' +
+          '<span class="mo">' + esc(q.mo || '') +
+            '<span class="bc">plugin xin để: ' + esc(q.ly_do || '(không nói lý do)') + '</span>' +
+            '<span class="bc">' + esc(q.bang_chung || '') + '</span></span>';
+        box.appendChild(r);
+      }
+      // Chuỗi này là TÊN + key_id do server ghép, không bao giờ là giá trị.
+      for(const t of (m.secret || [])){
+        const e1 = document.createElement('div');
+        e1.className = 'sec';
+        e1.innerHTML = 'secret <b>' + esc(t) + '</b> — THAM CHIẾU, không phải giá trị.';
+        box.appendChild(e1);
+      }
+    }
+    // Manifest hỏng KHÔNG được nuốt: một plugin nằm đúng chỗ mà không hiện
+    // trong bảng thì người vận hành không có cách nào đoán ra vì sao.
+    for(const l of (d.loi || [])){
+      const e1 = document.createElement('div');
+      e1.className = 'lech';
+      e1.textContent = 'manifest hỏng: ' + l;   // textContent: câu ghép từ dữ liệu đĩa
+      box.appendChild(e1);
+    }
+    if((d.nguon || []).length){
+      const n = document.createElement('div');
+      n.className = 'nguon';
+      n.textContent = 'tìm ở: ' + d.nguon.join(' · ');
+      box.appendChild(n);
+    }
+    // Số ở đầu khối cũng là HAI số rời, và lấy thẳng từ server — mặt web tự
+    // cộng thì mỗi mặt cộng một kiểu. Cố ý KHÔNG đọc so_chua_chan: nó là tổng
+    // của hai số này, và hiện mình nó lên màn hình đúng là cú bẹp ba-thành-hai.
+    $('pl-dem').textContent = plDem(d.so_khong_chan_duoc|0, d.so_chua_do|0);
   }catch(e){ box.className='empty'; box.textContent = 'không đọc được: ' + e.message; }
 }
 
@@ -1738,6 +1937,7 @@ napAILichSu();
 napDB();
 napTele();
 napNangLuc();
+napPlugin();
 setInterval(refresh, 5000); // đồng hồ "đang chạy bao lâu" + phòng khi lỡ event
 </script>
 </body>
