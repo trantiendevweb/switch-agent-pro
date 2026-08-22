@@ -53,21 +53,33 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 	}
 
 	url := strings.TrimRight(r.BaseURL, "/") + "/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())
+	taoReq := func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+key)
+		req.Header.Set("Accept", "text/event-stream")
+		return req, nil
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+key)
-	req.Header.Set("Accept", "text/event-stream")
 
 	bat := time.Now()
 	// KHÔNG đặt Timeout trên Client như `Goi`: ở đó 120 giây tính cho cả lời gọi,
 	// còn ở đây một stream dài hợp lệ có thể vượt mốc đó mà vẫn đang chảy đều.
 	// Hạn chót của cả lượt là việc của ctx — bên gọi quyết định, không phải bên này.
-	resp, err := (&http.Client{}).Do(req)
+	//
+	// 429 đi qua CÙNG lớp chờ-rồi-thử-lại với `Goi`, và ở đây nó an toàn vì một
+	// lý do cụ thể: 429 nằm ở DÒNG TRẠNG THÁI, tức trước mẩu SSE đầu tiên, nên
+	// lúc thử lại chưa có ký tự nào lọt qua `nhan`. Nếu stream đứt ở giữa thì
+	// tuyệt đối KHÔNG được thử lại kiểu này — sẽ phát lại từ đầu và người dùng
+	// nhận một câu trả lời ghép từ hai lượt khác nhau. Vòng đọc SSE bên dưới cố
+	// ý nằm NGOÀI lớp thử lại.
+	resp, choLai, err := goiCoChoLai(ctx, &http.Client{}, taoReq)
+	kq.ChoLai = choLai
 	if err != nil {
-		return kq, loiMay(r.Ten, 0, "gọi %s hỏng: %s", url, err.Error())
+		return kq, &LoiAPI{Route: r.Ten, Chi: fmt.Sprintf("gọi %s hỏng: %s%s",
+			url, err.Error(), themChoLai(choLai)), ChoLai: choLai}
 	}
 	defer resp.Body.Close()
 
@@ -75,8 +87,9 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 		// Lỗi thì thân KHÔNG phải SSE — đọc thẳng và giữ NGUYÊN VĂN, y như `Goi`:
 		// request id của nhà cung cấp nằm trong đó.
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-		e := loiMay(r.Ten, resp.StatusCode, "%s trả HTTP %d: %s",
-			r.Ten, resp.StatusCode, strings.TrimSpace(string(raw)))
+		e := loiMay(r.Ten, resp.StatusCode, "%s trả HTTP %d: %s%s",
+			r.Ten, resp.StatusCode, strings.TrimSpace(string(raw)), themChoLai(choLai))
+		e.ChoLai = choLai
 		e.Nguoi = resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden
 		return kq, e
 	}
@@ -128,7 +141,7 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 		// Đứt giữa chừng: trả phần đã nhận KÈM lỗi. Vứt đi phần đã tốn tiền để
 		// lấy một thông điệp gọn là đổi sai chiều.
 		kq = KetQua{NoiDung: chu.String(), Model: model, Usage: usage,
-			Mat: time.Since(bat), Route: r.Ten, DaThu: []string{r.Ten}}
+			Mat: time.Since(bat), Route: r.Ten, DaThu: []string{r.Ten}, ChoLai: choLai}
 		return kq, loiMay(r.Ten, resp.StatusCode, "%s: stream đứt giữa chừng sau %d ký tự: %s",
 			r.Ten, chu.Len(), err.Error())
 	}
@@ -142,6 +155,7 @@ func GoiStream(ctx context.Context, r Route, prompt string, nhan func(string)) (
 		DaThu:       []string{r.Ten},
 		ThieuUsage:  !coUsage,
 		DaStreaming: true,
+		ChoLai:      choLai,
 	}
 	if kq.Model == "" {
 		kq.Model = r.Model
