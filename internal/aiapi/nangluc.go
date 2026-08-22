@@ -212,9 +212,21 @@ var phepDoMaNguon = map[string]func() (TrangThaiNangLuc, string){
 	NLAPIGoiTool: func() (TrangThaiNangLuc, string) {
 		guiDuoc := coTruong(reflect.TypeOf(yeuCau{}), "tools")
 		docDuoc := coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", "tool_calls")
+		// Câu hỏi THỨ BA, và nó là chỗ điểm mù của cả bảng này: có chỗ nào CHỨA
+		// giá trị đọc được không. Hai câu trên chỉ hỏi "kiểu có trường đó
+		// không" — thêm `tools` vào `yeuCau` là ô này lật xanh NGAY, kể cả khi
+		// `Goi` không bao giờ gán gì. Hỏi thêm `KetQua` thu hẹp điểm mù được
+		// một nấc, chứ KHÔNG xoá được nó: bảng vẫn không trả lời được câu "có
+		// ai chép giá trị đi không". Câu đó chỉ có bài kiểm đi hết đường mới
+		// trả lời được — TestToolDiHetDuongTuDinhNghiaToiKetQua (tool_test.go).
+		coChoChua := coTruongGo(reflect.TypeOf(KetQua{}), "ToolCalls")
 		switch {
+		case guiDuoc && docDuoc && coChoChua:
+			return LamDuoc, "aiapi.yeuCau có trường `tools`, aiapi.phanHoi đọc `tool_calls`, " +
+				"và KetQua.ToolCalls mang nó ra tới người gọi (aiapi.GoiTool, tool.go)"
 		case guiDuoc && docDuoc:
-			return LamDuoc, "aiapi.yeuCau có trường `tools` và aiapi.phanHoi đọc được `tool_calls`"
+			return KhongLamDuoc, "aiapi đọc được `tool_calls` nhưng KetQua KHÔNG có chỗ chứa — " +
+				"lời gọi tool dừng lại trong lõi, không ai ngoài gói này thấy"
 		case guiDuoc:
 			// Gửi được mà không đọc được thì tool_call bay vào hư không: nhà
 			// cung cấp trả lời đúng, lõi vứt đi, người dùng thấy câu trả lời rỗng.
@@ -247,9 +259,19 @@ var phepDoMaNguon = map[string]func() (TrangThaiNangLuc, string){
 	},
 	NLAPIReasoning: func() (TrangThaiNangLuc, string) {
 		for _, ten := range []string{"reasoning_content", "reasoning"} {
-			if coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", ten) {
-				return LamDuoc, "aiapi.phanHoi đọc được trường `" + ten + "`"
+			if !coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", ten) {
+				continue
 			}
+			// Cùng câu hỏi thứ ba như `goi-tool` ở trên: đọc được mà không có
+			// chỗ chứa thì phần nghĩ vẫn bị vứt, và ô này vẫn xanh. Đó đúng là
+			// trạng thái của gói suốt chiều 22/08 — `tinNhan.SuyLuan` có mặt,
+			// `KetQua.SuyLuan` có mặt, mà không mặt nào đọc tới.
+			if !coTruongGo(reflect.TypeOf(KetQua{}), "SuyLuan") {
+				return KhongLamDuoc, "aiapi.phanHoi đọc `" + ten + "` nhưng KetQua KHÔNG có " +
+					"chỗ chứa — phần suy luận dừng trong lõi, không ai ngoài gói này thấy"
+			}
+			return LamDuoc, "aiapi.phanHoi đọc được trường `" + ten + "`, KetQua.SuyLuan mang nó " +
+				"ra tới người gọi, và aiapi.DocSuyLuan dựng câu cho cả CLI lẫn mặt web (suyluan.go)"
 		}
 		return KhongLamDuoc, "aiapi.phanHoi chỉ đọc `content` — phần suy luận nhà cung cấp trả về " +
 			"bị vứt trước khi ai nhìn thấy (aiapi.go, kiểu `phanHoi`)"
@@ -272,6 +294,23 @@ var phepDoMaNguon = map[string]func() (TrangThaiNangLuc, string){
 		}
 		return KhongLamDuoc, "aiapi.SucKhoe không giữ số model đọc được"
 	},
+}
+
+// coTruongGo tra một trường theo TÊN GO, không theo thẻ JSON.
+//
+// Cần riêng vì `KetQua` không có thẻ json nào — nó là kiểu trả cho người gọi
+// trong Go, không phải hình dạng trên dây. Dùng `coTruong` cho nó thì sẽ luôn
+// ra "không có", và ô nào hỏi tới sẽ khai KhongLamDuoc mãi mãi cho một thứ
+// đang chạy tốt.
+func coTruongGo(t reflect.Type, ten string) bool {
+	for t != nil && t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t == nil || t.Kind() != reflect.Struct {
+		return false
+	}
+	_, co := t.FieldByName(ten)
+	return co
 }
 
 // coTruong đi theo một ĐƯỜNG tên trường JSON trong một kiểu và nói có tới nơi

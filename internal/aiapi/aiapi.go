@@ -61,6 +61,11 @@ type KetQua struct {
 	// là chỗ trả lời câu đó cho từng route — đừng suy từ chuỗi rỗng này.
 	SuyLuan string
 
+	// ToolCalls là những lời gọi tool model ĐÒI chạy. Gói này KHÔNG chạy chúng
+	// — nó chỉ chuyển về cho người gọi. Vì sao là một quyết định chứ không phải
+	// một chỗ làm dở: xem đầu file tool.go.
+	ToolCalls []LoiGoiTool
+
 	Model string
 	Usage Usage // usage của route THẬT SỰ trả lời, không phải của route hỏng
 	Mat   time.Duration
@@ -183,6 +188,16 @@ func DocKey(id string) (string, error) { return docKey(id) }
 type yeuCau struct {
 	Model    string    `json:"model"`
 	Messages []tinNhan `json:"messages"`
+
+	// Tools là định nghĩa tool gửi kèm; ToolChoice là cách ép gọi.
+	//
+	// `omitempty` ở CẢ HAI, và đó là điều kiện để thêm hai trường này không đổi
+	// gì với lượt gọi thường: `Goi` truyền nil nên thân JSON gửi đi giống hệt
+	// trước. Bỏ `omitempty` thì mọi lượt bỗng mang `"tools":null` — và
+	// deepseek-v4-flash đã từ chối những thứ nhỏ hơn thế (HTTP 400 chỉ vì
+	// `tool_choice=required`, đo 22/08).
+	Tools      []Tool `json:"tools,omitempty"`
+	ToolChoice string `json:"tool_choice,omitempty"`
 }
 type tinNhan struct {
 	Role    string `json:"role"`
@@ -198,6 +213,11 @@ type tinNhan struct {
 	// đó tiêu 951 token và mất 20,3 giây — model CÓ nghĩ, nhà bán lại không trả
 	// phần nghĩ ra. Nên trường này rỗng KHÔNG có nghĩa là model không suy luận.
 	SuyLuan string `json:"reasoning_content,omitempty"`
+
+	// ToolCalls là lời gọi tool model trả về. `omitempty` vì kiểu này dùng cho
+	// CẢ hai chiều, y như `SuyLuan` ở trên: gửi đi thì không bao giờ mang, nhận
+	// về thì có thể có.
+	ToolCalls []LoiGoiTool `json:"tool_calls,omitempty"`
 }
 
 type phanHoi struct {
@@ -216,6 +236,16 @@ type phanHoi struct {
 // Mọi lỗi trả về đều là *LoiAPI, để tầng trên phân biệt được "thử route khác có
 // thể cứu" với "thử route khác chỉ tốn thêm tiền" — xem LoiNguoiDung.
 func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
+	return goiThat(ctx, r, prompt, nil, "")
+}
+
+// goiThat là thân thật của `Goi`, có thêm chỗ nhận định nghĩa tool.
+//
+// Tách ra chứ không thêm tham số vào `Goi`: `Goi(ctx, r, prompt)` là chữ ký mà
+// cả `internal/api`, CLI và mặt web đang gọi, và đổi nó chỉ để mang thêm hai
+// trường mà hầu hết chỗ gọi truyền nil là bắt cả dự án trả giá cho một tính
+// năng ít dùng. `GoiTool` (tool.go) là cửa cho ai cần.
+func goiThat(ctx context.Context, r Route, prompt string, tools []Tool, chonTool string) (KetQua, error) {
 	var kq KetQua
 	// Prompt rỗng chặn TRƯỚC khi chạm mạng: nhà cung cấp sẽ trả 400, và một lượt
 	// gọi hỏng vẫn có thể bị tính tiền. Đây cũng là lỗi của người dùng, nên route
@@ -234,7 +264,12 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 		return kq, loiMay(r.Ten, 0, "route %q thiếu base_url hoặc model", r.Ten)
 	}
 
-	body, err := json.Marshal(yeuCau{Model: r.Model, Messages: []tinNhan{{Role: "user", Content: prompt}}})
+	body, err := json.Marshal(yeuCau{
+		Model:      r.Model,
+		Messages:   []tinNhan{{Role: "user", Content: prompt}},
+		Tools:      tools,
+		ToolChoice: chonTool,
+	})
 	if err != nil {
 		return kq, loiMay(r.Ten, 0, "%s: %s", r.Ten, err.Error())
 	}
@@ -293,12 +328,16 @@ func Goi(ctx context.Context, r Route, prompt string) (KetQua, error) {
 	kq = KetQua{
 		NoiDung: ph.Choices[0].Message.Content,
 		SuyLuan: ph.Choices[0].Message.SuyLuan,
-		Model:   ph.Model,
-		Usage:   ph.Usage,
-		Mat:     time.Since(bat),
-		Route:   r.Ten,
-		DaThu:   []string{r.Ten},
-		ChoLai:  choLai,
+		// Lời gọi tool đi THẲNG ra KetQua, không bị nuốt: đây đúng là chỗ mà
+		// `reasoning_content` đã bị vứt suốt từ lúc có kiểu tới chiều 22/08 —
+		// trường có mặt ở mọi tầng, trừ tầng cuối cùng.
+		ToolCalls: ph.Choices[0].Message.ToolCalls,
+		Model:     ph.Model,
+		Usage:     ph.Usage,
+		Mat:       time.Since(bat),
+		Route:     r.Ten,
+		DaThu:     []string{r.Ten},
+		ChoLai:    choLai,
 	}
 	return kq, nil
 }

@@ -162,3 +162,157 @@ func TestE2ESuyLuanThatTuNhaCungCap(t *testing.T) {
 			"nó chỉ hỏi phía dự án. Đo lại bằng `sagent nang-luc-api --do deepseek`.")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// PHẦN THỨ HAI (22/08, chiều muộn): CÓ MẶT TRONG `KetQua` VẪN CHƯA LÀ TỚI NƠI.
+//
+// Ba bài trên canh đường từ nhà cung cấp tới `KetQua.SuyLuan`. Đường đó đã
+// xanh từ trưa 22/08 — và phần suy luận VẪN không tới được người dùng, vì
+// không mặt nào đọc `KetQua.SuyLuan`: không cờ CLI, không chỗ nào trên
+// dashboard. Đo thật: câu trả lời 91 ký tự, phần suy luận 477 ký tự — phần bị
+// vứt dài gấp 5,2 lần phần giữ lại, và người dùng đã trả tiền cho cả hai.
+//
+// Nhóm bài dưới đây canh nốt đoạn đường còn lại: `DocSuyLuan` là chỗ CẢ HAI
+// mặt lấy chữ để hiện ra, nên nó phải nói đúng ở cả ca "có" lẫn hai ca "rỗng".
+// ---------------------------------------------------------------------------
+
+// dsThu là danh sách route như `.sagent/project.toml` khai — khớp sổ số đo, để
+// `DocSuyLuan` tra được bảng năng lực mà không chạm mạng.
+var dsThu = []Route{
+	{Ten: "deepseek", BaseURL: "https://modelapi.vn/v1", Model: "deepseek-v4-flash", KeyID: "deepseek"},
+	{Ten: "grok", BaseURL: "https://modelapi.vn/v1", Model: "grok-4.5", KeyID: "grok"},
+}
+
+// Có phần suy luận thì khối phải mang nguyên nó ra, kèm số ký tự đếm bằng RUNE.
+//
+// Đếm bằng byte thì "477 ký tự" tiếng Việt hiện thành ~800 — một con số vô
+// nghĩa in ngay cạnh câu nói về tiền, và không ai kiểm lại được.
+func TestDocSuyLuanMangNguyenPhanNghiRaNgoai(t *testing.T) {
+	const nghi = "Bèo phủ gấp đôi mỗi ngày, nên ngày trước đó phủ nửa ao."
+	k := DocSuyLuan(KetQua{SuyLuan: nghi, Route: "deepseek"}, dsThu)
+	if !k.Co {
+		t.Fatal("có phần suy luận mà khối nói không")
+	}
+	if k.NoiDung != nghi {
+		t.Errorf("NoiDung = %q, chờ %q", k.NoiDung, nghi)
+	}
+	if k.SoKyTu != len([]rune(nghi)) {
+		t.Errorf("SoKyTu = %d, chờ %d (đếm bằng rune, không phải byte)", k.SoKyTu, len([]rune(nghi)))
+	}
+	if !strings.Contains(k.DanToi, "nang-luc-api") {
+		t.Errorf("không dẫn tới bảng năng lực: %q", k.DanToi)
+	}
+}
+
+// RỖNG MANG HAI NGHĨA, VÀ KHỐI PHẢI NÓI RÕ ĐANG Ở NGHĨA NÀO.
+//
+// Đây là bài quan trọng nhất của cả tính năng. Đo 22/08: grok-4.5 qua
+// modelapi.vn KHÔNG trả `reasoning_content` lẫn `reasoning`, dù lượt đó tiêu
+// 951 token và mất 20,3 giây — model CÓ nghĩ, nhà bán lại không trả phần nghĩ
+// ra. In một ô trống, hay tệ hơn là in "model không suy luận", biến chuyện của
+// nhà cung cấp thành chuyện của model ngay trước mắt người trả tiền.
+func TestSuyLuanRongPhaiNoiRoDangONghiaNao(t *testing.T) {
+	for _, c := range []struct {
+		ten    string
+		kq     KetQua
+		phaiCo []string
+	}{
+		{
+			// Ca (b): nhà cung cấp không trả. Phải đổ đúng chỗ, và phải nhắc
+			// rằng token của phần nghĩ vẫn nằm trong hoá đơn.
+			"nhà cung cấp không trả phần nghĩ",
+			KetQua{Route: "grok"},
+			[]string{"grok", "nhà cung cấp", "KHÔNG trả", "951"},
+		},
+		{
+			// Ca (a): route ĐÃ đo được là có trả, lượt này thì không.
+			"route có trả nhưng lượt này không nghĩ",
+			KetQua{Route: "deepseek"},
+			[]string{"deepseek", "ĐÃ đo được", "152"},
+		},
+		{
+			// Không tra được bảng thì phải NÓI là không tra được, chứ không
+			// tiện tay kết luận thay model.
+			"route lạ, không tra được bảng",
+			KetQua{Route: "route-la-hoac"},
+			[]string{"route-la-hoac", "CHƯA kết luận được"},
+		},
+	} {
+		t.Run(c.ten, func(t *testing.T) {
+			k := DocSuyLuan(c.kq, dsThu)
+			if k.Co {
+				t.Fatal("không có phần suy luận mà khối nói có")
+			}
+			if strings.TrimSpace(k.ViSaoRong) == "" {
+				t.Fatal("ô trống KHÔNG có câu giải thích — đây chính là thứ bị đọc " +
+					"thành \"model không nghĩ\"")
+			}
+			for _, can := range c.phaiCo {
+				if !strings.Contains(k.ViSaoRong, can) {
+					t.Errorf("câu giải thích thiếu %q:\n  %s", can, k.ViSaoRong)
+				}
+			}
+			// Câu chốt của cả bài: không mặt nào được nói câu này.
+			for _, cam := range []string{"model không nghĩ", "model không suy luận"} {
+				if strings.Contains(strings.ToLower(k.ViSaoRong), cam) {
+					t.Errorf("khối khẳng định %q — một chuyện KHÔNG đo được từ chuỗi rỗng:\n  %s",
+						cam, k.ViSaoRong)
+				}
+			}
+			// Và phải dẫn người đọc tới chỗ trả lời được câu hỏi.
+			if !strings.Contains(k.DanToi, "nang-luc-api") {
+				t.Errorf("không dẫn tới bảng năng lực: %q", k.DanToi)
+			}
+		})
+	}
+}
+
+// Phần nghĩ cũng phải đi hết đường Ở ĐƯỜNG STREAM — và đó KHÔNG phải chuyện phụ:
+// mặt web hỏi AI bằng stream, LUÔN LUÔN. Bỏ trống chỗ này thì mọi lượt trên
+// dashboard đều không có phần nghĩ, và `DocSuyLuan` sẽ đổ tội cho nhà cung cấp
+// về đúng một thứ mà chính ta không thèm đọc — một lời khai sai, tự tin, có bằng
+// chứng giả.
+func TestSuyLuanDiHetDuongOCaDuongStream(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fl, _ := w.(http.Flusher)
+		for _, m := range []string{
+			`{"model":"m","choices":[{"delta":{"reasoning_content":"Ngày 30 phủ kín. "}}]}`,
+			`{"model":"m","choices":[{"delta":{"reasoning_content":"Gấp đôi mỗi ngày."}}]}`,
+			`{"model":"m","choices":[{"delta":{"content":"Ngày "}}]}`,
+			`{"model":"m","choices":[{"delta":{"content":"29."}}]}`,
+			`{"model":"m","choices":[],"usage":{"prompt_tokens":30,"completion_tokens":12,"total_tokens":42}}`,
+		} {
+			fmt.Fprintf(w, "data: %s\n\n", m)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+
+	var chayRaManHinh strings.Builder
+	kq, err := GoiStream(context.Background(), Route{
+		Ten: "thu", BaseURL: srv.URL, Model: "m", KeyID: khoaThu(t),
+	}, "ngày nào phủ nửa ao", func(s string) { chayRaManHinh.WriteString(s) })
+	if err != nil {
+		t.Fatalf("GoiStream: %v", err)
+	}
+	if kq.NoiDung != "Ngày 29." {
+		t.Errorf("NoiDung = %q", kq.NoiDung)
+	}
+	if kq.SuyLuan != "Ngày 30 phủ kín. Gấp đôi mỗi ngày." {
+		t.Fatalf("KetQua.SuyLuan = %q — đường stream vứt phần nghĩ, nên dashboard sẽ "+
+			"trống trơn ở MỌI lượt", kq.SuyLuan)
+	}
+	// Phần nghĩ KHÔNG được chảy ra màn hình như câu trả lời: bước sau của một
+	// flow nhét `{{steps.x.output}}` sang bước kế, và trộn hai thứ là đưa bản
+	// nháp của model đi làm dữ liệu đầu vào.
+	if strings.Contains(chayRaManHinh.String(), "Ngày 30 phủ kín") {
+		t.Error("phần nghĩ chảy qua `nhan` lẫn vào câu trả lời — hai thứ này phải tách rời")
+	}
+	if kq.Usage.Tong != 42 {
+		t.Errorf("usage = %d, chờ 42 — thêm phần nghĩ không được làm rơi sổ chi phí", kq.Usage.Tong)
+	}
+}

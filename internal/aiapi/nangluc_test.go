@@ -225,14 +225,30 @@ func TestBangKhongMangNoiDungKeyRaNgoai(t *testing.T) {
 
 // Phép đo mã nguồn phải THẬT SỰ soi kiểu, không phải một bảng bool viết tay.
 //
-// Bài này neo vào SỰ THẬT hiện tại của gói: `yeuCau` chưa có `tools`, và
-// `tinNhan.Content` vẫn là chuỗi thuần. Ngày ai đó thêm hai thứ đó vào để làm
-// tool thật thì bài này đỏ — và đỏ ĐÚNG LÚC, vì lúc đó bảng phải được đo lại
-// chứ không được giữ nguyên lời khai cũ.
+// Bài này neo vào SỰ THẬT hiện tại của gói. Bản trước neo vào "`yeuCau` CHƯA có
+// `tools`" và nó đã đỏ đúng lúc phải đỏ — ngày 22/08, lúc `GoiTool` ra đời. Cái
+// neo được dời sang sự thật mới, chứ không bị gỡ: giờ nó canh rằng cả BA mắt
+// của đường tool đều còn (gửi được, đọc được, có chỗ chứa để mang ra ngoài).
+// Mất mắt nào cũng đỏ, và mất mắt thứ ba là kiểu hỏng tệ nhất — bảng vẫn xanh
+// vì hai mắt đầu còn nguyên.
+//
+// `tinNhan.Content` vẫn là chuỗi thuần: đó là phép đo `dau-vao-anh`, chưa làm.
 func TestPhepDoMaNguonSoiKieuThat(t *testing.T) {
-	if coTruong(reflect.TypeOf(yeuCau{}), "tools") {
-		t.Fatal("aiapi.yeuCau đã có trường `tools` — phép đo mã nguồn cho `goi-tool` " +
-			"phải được xem lại, và sổ số đo phải có dòng cho nó")
+	if !coTruong(reflect.TypeOf(yeuCau{}), "tools") {
+		t.Fatal("aiapi.yeuCau mất trường `tools` — lời gọi của dự án này lại không mang " +
+			"định nghĩa tool đi, mà bảng `goi-tool` thì phải đo lại")
+	}
+	if !coTruongGo(reflect.TypeOf(KetQua{}), "ToolCalls") {
+		t.Fatal("KetQua không còn chỗ chứa ToolCalls — lời gọi tool dừng trong lõi, " +
+			"đúng cái bẫy `SuyLuan` đã dính suốt chiều 22/08")
+	}
+	if !coTruongGo(reflect.TypeOf(KetQua{}), "SuyLuan") {
+		t.Fatal("KetQua không còn chỗ chứa SuyLuan")
+	}
+	// coTruongGo phải soi kiểu THẬT, không phải luôn trả true.
+	if coTruongGo(reflect.TypeOf(KetQua{}), "TruongKhongCoThat") {
+		t.Fatal("coTruongGo nói có một trường không tồn tại — phép đo hỏng, và một " +
+			"phép đo hỏng làm cả bảng khai bừa")
 	}
 	if !coTruong(reflect.TypeOf(yeuCau{}), "model") {
 		t.Fatal("coTruong không thấy trường `model` của chính yeuCau — phép đo hỏng, " +
@@ -243,8 +259,8 @@ func TestPhepDoMaNguonSoiKieuThat(t *testing.T) {
 	if !coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", "content") {
 		t.Fatal("coTruong không đi xuyên được choices[].message.content")
 	}
-	if coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", "tool_calls") {
-		t.Fatal("aiapi.phanHoi đã đọc `tool_calls` — bảng phải được đo lại")
+	if !coTruong(reflect.TypeOf(phanHoi{}), "choices", "message", "tool_calls") {
+		t.Fatal("aiapi.phanHoi thôi đọc `tool_calls` — nhà cung cấp trả lời đúng, lõi vứt đi")
 	}
 	// Kiểu của trường cuối phải trả về đúng, không chỉ có/không.
 	tp, co := kieuTruong(reflect.TypeOf(tinNhan{}), "content")
@@ -299,11 +315,21 @@ func TestLamDuocTraVeLyDoDocDuoc(t *testing.T) {
 	if ok, ly := b.LamDuoc(NLAPIStreaming); !ok {
 		t.Fatalf("streaming phải làm được: %s", ly)
 	}
-	ok, ly := b.LamDuoc(NLAPIGoiTool)
-	if ok {
-		t.Fatal("goi-tool đang KHÔNG làm được (yeuCau chưa có trường `tools`) mà bảng nói được")
+	// `goi-tool` của deepseek-v4-flash nay XANH ở cả hai vế: phía dự án đã gửi
+	// được `tools` (aiapi.GoiTool), phía nhà cung cấp đã đo 22/08. Trước 22/08
+	// đây là ô ✗ với chẩn đoán "vướng ở phía dự án" — bài này giữ lại chiều
+	// đúng của nó bằng cách hỏi một ô CHƯA làm được ngay bên dưới.
+	if ok, ly := b.LamDuoc(NLAPIGoiTool); !ok {
+		t.Fatalf("goi-tool phải làm được sau khi có GoiTool: %s", ly)
 	}
-	if !strings.Contains(ly, "tools") || !strings.Contains(ly, routeThu.Ten) {
+	// `dau-vao-anh` là ô còn vướng ở phía dự án (Content vẫn là chuỗi thuần),
+	// nên nó là chỗ kiểm rằng lời từ chối vẫn nói được ROUTE NÀO và VƯỚNG GÌ.
+	ok, ly := b.LamDuoc(NLAPIDauVaoAnh)
+	if ok {
+		t.Fatal("dau-vao-anh đang KHÔNG làm được (tinNhan.Content vẫn là chuỗi thuần) " +
+			"mà bảng nói được")
+	}
+	if !strings.Contains(ly, "content") || !strings.Contains(ly, routeThu.Ten) {
 		t.Fatalf("lý do từ chối không nói được route nào và vướng gì: %q", ly)
 	}
 	if _, ly := b.LamDuoc("nang-luc-khong-co-that"); !strings.Contains(ly, "không có năng lực") {

@@ -522,6 +522,19 @@
      và số token/giây của lần gọi API. Sans-serif thì cột số không thẳng hàng. */
   #dbinfo,#quetout,#ai-out,#ai-ls{font-family:var(--font-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
 
+  /* ---- Phần suy luận của model ----
+     Chữ nháp của model, không phải câu trả lời: để mono và màu phụ để mắt
+     không nhầm nó với thứ mình vừa hỏi. Cao tối đa rồi cuộn — phần nghĩ đo
+     được dài gấp 5,2 lần câu trả lời, thả tự do là nó chiếm cả trang. */
+  #ai-nghi{margin:0 14px 12px}
+  #ai-nghi-ct{padding:2px 12px 11px;font-family:var(--font-mono);font-size:12px;
+    line-height:1.6;color:var(--mid);white-space:pre-wrap;max-height:260px;overflow:auto}
+  /* Ô "không có phần nghĩ": đây là chỗ nói ra ô trống thuộc về ai. Nó KHÔNG
+     phải cảnh báo (không có gì hỏng), nên đơn sắc chứ không mượn màu trạng thái. */
+  .sl-trong{margin:0 14px 12px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:8px;background:var(--panel);color:var(--mid);font-size:11.5px;line-height:1.55}
+  .sl-trong code{font-family:var(--font-mono);font-size:11px;color:var(--hi)}
+
   /* ---- Sổ lời gọi API: bảng liếc, tô theo THÀNH/BẠI ---- */
   .ls-dau{display:flex;align-items:center;justify-content:space-between;gap:8px;
     padding:12px 14px 6px;font-size:12px;color:var(--lo);letter-spacing:.04em;text-transform:uppercase}
@@ -774,6 +787,26 @@
           <button class="go" type="submit">Gửi</button>
         </form>
         <div id="ai-out" class="empty">Chưa hỏi gì.</div>
+
+        <!-- PHẦN NGHĨ CỦA MODEL. Người bấm nút đã trả tiền cho nó: nó nằm
+             trong completion_tokens của chính lượt vừa chạy. Đo 22/08 với
+             deepseek-v4-flash: câu trả lời 91 ký tự, phần nghĩ 477 ký tự —
+             phần bị vứt dài gấp 5,2 lần phần giữ lại.
+
+             ĐÓNG SẴN, không mở: phần nghĩ dài hơn câu trả lời nhiều lần, mở
+             sẵn là đẩy câu trả lời ra khỏi màn hình. Nhưng đầu khối luôn nói
+             nó dài bao nhiêu — một thứ đã mua mà không ai nói là có thì coi
+             như không có. -->
+        <details class="xac" id="ai-nghi" hidden>
+          <summary><span id="ai-nghi-dau"></span></summary>
+          <div id="ai-nghi-ct"></div>
+        </details>
+        <!-- KHÔNG có phần nghĩ thì hiện Ô NÀY chứ không hiện ô trống. Chuỗi
+             rỗng mang HAI nghĩa ngược nhau — model không nghĩ, HOẶC nhà cung
+             cấp không trả phần nghĩ ra — và trang không tự phân biệt được.
+             Server đã tra bảng năng lực của route đã trả lời rồi gửi sẵn câu
+             giải thích (aiapi.DocSuyLuan), đúng câu mà CLI in ra. -->
+        <div id="ai-nghi-trong" class="sl-trong" hidden></div>
 
         <!-- Sức khoẻ route — action "route.kiem", cùng nguồn với `sagent route kiem`.
              Đặt ngay dưới form hỏi vì nó trả lời câu đứng TRƯỚC câu hỏi: route
@@ -1563,6 +1596,10 @@ let aiDo = {vao:0, ra:0};
 $('aiform').onsubmit = async ev => {
   ev.preventDefault();
   const out = $('ai-out'); out.className=''; out.style.padding='13px'; out.textContent = 'đang hỏi…';
+  // Dọn phần nghĩ của lượt TRƯỚC ngay khi bấm hỏi. Để nó nằm lại cạnh câu trả
+  // lời mới là nói dối về một thứ tính tiền: người đọc sẽ tưởng lượt này có
+  // phần nghĩ, trong khi đó là chữ của lượt đã trôi qua.
+  veSuyLuan(null);
   try{
     // Hỏi bằng STREAM: đo được một lượt grok-4.5 mất 31 giây. Không streaming
     // thì người bấm nút nhìn ô trống nửa phút, không phân biệt được "đang nghĩ"
@@ -1581,11 +1618,38 @@ $('aiform').onsubmit = async ev => {
       chan += '\nĐã chuyển route: "' + d.route_chinh + '" hỏng, câu trên do "' + d.route + '" trả lời.\n' + d.loi_chinh;
     }
     out.textContent = (d.noi_dung || out.textContent) + chan;
+    veSuyLuan(d.suy_luan);
     aiDo.vao += d.usage.vao||0; aiDo.ra += d.usage.ra||0;
     veTongQuan();
     napAILichSu();
   }catch(e){ out.textContent = 'lỗi: ' + e.message; }
 };
+
+// veSuyLuan vẽ PHẦN NGHĨ của model — thứ người bấm nút vừa trả tiền mà cho tới
+// 22/08 không mặt nào cho họ xem.
+//
+// Nhận CẢ KHỐI từ server (`suy_luan`), không phải một chuỗi: chuỗi rỗng mang
+// HAI nghĩa ngược nhau — model không nghĩ, HOẶC nhà cung cấp không trả phần
+// nghĩ ra — và trang không có cách nào tự phân biệt. Đo 22/08: grok-4.5 không
+// trả phần nghĩ dù lượt đó tiêu 951 token và mất 20,3 giây. Vẽ một ô trống ở
+// đây là để người đọc tự kết luận "model không nghĩ", một câu KHÔNG đo được.
+// Server đã tra bảng năng lực của route ĐÃ TRẢ LỜI rồi gửi sẵn câu giải thích.
+function veSuyLuan(k){
+  const hop = $('ai-nghi'), trong = $('ai-nghi-trong');
+  hop.hidden = true; hop.open = false; trong.hidden = true;
+  if(!k) return;
+  if(k.co){
+    $('ai-nghi-dau').textContent = 'Phần suy luận của model · ' + (k.so_ky_tu||0) + ' ký tự';
+    $('ai-nghi-ct').textContent = k.noi_dung || '';
+    hop.hidden = false;
+    return;
+  }
+  // Không có phần nghĩ: nói ra ô trống này thuộc về ai, và dẫn tới chỗ trả lời
+  // được câu đó — bảng `sagent nang-luc-api` là chỗ duy nhất trong dự án biết.
+  trong.innerHTML = esc(k.vi_sao_rong||'') +
+    (k.dan_toi ? ' Tra lại: <code>' + esc(k.dan_toi) + '</code>' : '');
+  trong.hidden = false;
+}
 
 // hoiAIStream gửi câu hỏi rồi VẼ DẦN câu trả lời, trả về mẩu tổng kết cuối.
 //

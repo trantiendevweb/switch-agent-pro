@@ -933,6 +933,13 @@ func cmdHelp() {
 
     sagent api "<câu hỏi>"      gọi thẳng AI API — đường THỨ HAI, đi theo khoá
                                 API chứ không tiêu hạn mức thuê bao
+                                --stream: chữ chảy về dần thay vì chờ cả cục
+                                --suy-luan: in kèm PHẦN NGHĨ của model (bạn đã
+                                trả tiền cho nó trong token ra). Không có phần
+                                nghĩ thì nói rõ vì sao — xem sagent nang-luc-api
+                                --tool <file.json> [--tool-chon auto|required|none]:
+                                gửi định nghĩa tool, in lời gọi tool model đòi
+                                chạy. sagent KHÔNG chạy tool hộ
     sagent api --lich-su        lịch sử lời gọi API: tiêu bao nhiêu, ở đâu
     sagent route                sổ route: cấu hình khai gì, đã gọi thật qua đâu
     sagent nang-luc-api         route API nào làm được gì: gọi tool, đọc ảnh,
