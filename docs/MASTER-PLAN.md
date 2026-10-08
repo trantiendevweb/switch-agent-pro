@@ -303,9 +303,11 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 
 > **ĐIỂM MỘT DÒNG (soát lại 22/08/2026):**
 > `92,0/99 = 93%` *(bảng cũ khai)* → `94,0/99 = 95%` *(đếm lại đúng bản `.md`
-> trước lượt này — bảng cũ đã trôi 2 điểm)* → **`98,0/100 = 98%`** *(sau lượt này)*.
-> Chi tiết: `96 [x] · 4 [~] · 0 [ ] · 0 [!]`. **5 ô đổi dấu · 1 ô mới thêm ·
-> 0 ô còn `[ ]`.** Bảng đầy đủ và danh sách thứ đang bị chặn ở cuối mục 7.
+> trước lượt này — bảng cũ đã trôi 2 điểm)* → `98,0/100 = 98%` *(sau lượt đó)*
+> → **`98,0/99 = 99%`** *(đối chiếu ba merge 22/08)*.
+> Chi tiết hiện tại: `97 [x] · 2 [~] · 0 [ ] · 1 [!]`. Hai ô cấp cao đổi dấu:
+> `Subscription` `[~]→[x]`, `API` `[~]→[!]`; route theo năng lực đóng nhưng ô
+> `Engine flow` vẫn `[~]` vì phần giá chưa đủ dữ liệu. Bảng đầy đủ ở cuối mục 7.
 
 
 
@@ -341,7 +343,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
 - [x] Rà tên toàn repo: README viết lại cho Switch-Agent-Pro; bộ PowerShell v1 chuyển vào
   `legacy/v1-powershell/`; `design-system/switch-agent-pro/`; 3 trang HTML sạch tên cũ.
 
-### Pha 0 — Đo giả định & lập hợp đồng  **86%** (5 xong · 2 một phần)
+### Pha 0 — Đo giả định & lập hợp đồng  **100%** (6 xong · 1 bị chặn)
 🎯 Chứng minh cơ chế của **cả hai đường** trước khi khoá interface.
 - [x] Test harness không chứa credential trong repo; mọi output **redaction**.
   - **Xong — không credential trong repo**: giàn test chạy trên HOME giả
@@ -386,7 +388,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     chứ không phải git hook (hook nằm trong `.git/`, không clone theo, tắt được
     bằng `--no-verify`). Kèm `quet_xungdot_test.go:34` chặn vạch xung đột git.
     Tính chất "repo sạch" nay là một **phép đo tự chạy**, không còn là kỷ luật.
-- [~] **Subscription** (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
+- [x] **Subscription** (Claude ✓Windows, Codex, Gemini CLI, Cursor · Win+Linux): config
   root override có bao trùm config/session/auth? token ở file/env/keyring? file nào
   đọc/ghi lúc login/prompt/refresh/exit? **concurrent refresh** khi 2 process chung
   credential? copy token có tạo session hợp lệ, bao lâu? headless/JSON/stream/ACP/
@@ -417,12 +419,16 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     khác**: `permission_denials`, `subtype = error_max_turns`, `api_error_status`,
     `rate_limit_event.resetsAt` — bốn kiểu hỏng từng phải đoán bằng chuỗi nay đọc
     thẳng ra trường. Cùng lệ với `~~symlink Linux~~` và `Gemini CLI đã bỏ`.
-  - **CHƯA — resume/cancel Ở TẦNG HARNESS**: `flow resume`/`flow huy` là resume và
-    cancel của **bộ thực thi flow** (`internal/flow/approve.go:65`), không phải cờ
-    `--resume`/hủy phiên của từng CLI. Chưa ai đo chúng.
-  - **CHƯA — nhật ký đọc/ghi file lúc login/prompt/refresh/exit**: mới đo được
-    file nào GIỮ danh tính, chưa đo được trình tự chạm file theo từng pha.
-- [~] **API** (Anthropic, OpenAI, Gemini, xAI/Grok, DeepSeek, OpenAI-compatible): auth
+  - ✅ **XONG 22/08 — resume/huỷ Ở TẦNG HARNESS** — commit `e234b45`:
+    đối chiếu cờ của năm CLI; chạy nối lại thật với Codex, Cursor và Antigravity;
+    đo huỷ giữa chừng cùng hiện vật còn lại. Claude được chốt bằng transcript trên
+    đĩa vì cả hai tài khoản đều đang bận; báo cáo giữ nguyên ranh giới chưa chạy
+    một lượt resume Claude thật. Xem [`docs/BAO-CAO-SUBSCRIPTION.md`](BAO-CAO-SUBSCRIPTION.md).
+  - ✅ **XONG 22/08 — nhật ký chạm file theo pha** — commit `e234b45`: đã tách
+    login/khởi động · prompt · exit cho Claude và ghi nhật ký tương ứng cho Codex,
+    Cursor, Antigravity, Grok. Pha refresh Claude chưa ép chạy vì sẽ xoay token của
+    phiên đang sống; đây là giới hạn được ghi rõ, không bị đọc thành số đo.
+- [!] **API** (Anthropic, OpenAI, Gemini, xAI/Grok, DeepSeek, OpenAI-compatible): auth
   mode, base URL, model naming, headers; protocol (Responses/Chat Completions/Anthropic
   Messages/Gemini native); streaming/tool/reasoning/vision/structured-output/usage;
   error+rate-limit schema, retry headers, health, model discovery.
@@ -443,9 +449,9 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     của chính nhà cung cấp** (`api.anthropic.com`, `generativelanguage.googleapis.com`,
     `api.openai.com`). Máy này chỉ có khoá của **nhà bán lại** `modelapi.vn`, và
     `docs/DO-LUONG.md` đã đo rằng khoá đó trả **401 ở `api.deepseek.com`** — tức
-    nó không đi được cả tới cổng gốc của nhà mà nó bán lại. Đây là lý do ô cha
-    vẫn là `[~]` chứ không phải `[!]`: phần **còn lại** của ô (tool/vision/…) là
-    nợ của chính dự án, không bị ai chặn.
+    nó không đi được cả tới cổng gốc của nhà mà nó bán lại. Sau khi bốn năng lực
+    phía dự án đã đóng, đây là lý do ô cha chuyển sang `[!]`: toàn bộ phần còn lại
+    đều thiếu thứ bên ngoài, nên không còn đúng khi giữ nó ở `[~]`.
   - ✅ **XONG 22/08 — rate-limit schema và retry header**: trước lượt này
     `grep -rn "429\|Retry-After" internal/aiapi internal/api` ra **0 dòng**; nay
     có `internal/aiapi/cholai.go` (đọc `Retry-After` **cả hai dạng**: số giây và
@@ -471,7 +477,7 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
       gateway `new-api` (`X-New-Api-Version`), và **chưa kiểm** new-api có gửi
       `Retry-After` kèm 429 hay không. Mã đường 429 hiện được canh bằng test, chưa
       bằng một phản hồi thật.
-  - 🟡 **ĐÃ ĐO — 4 ô nợ phía dự án, ĐÓNG 2 trong ngày**: trước đây dòng này là
+  - ✅ **ĐÃ ĐO — 4 ô nợ phía dự án, ĐÃ ĐÓNG CẢ 4**: trước đây dòng này là
     một khoảng trống; nay nó là một **kết luận có số**. Đo thật 22/08 bằng key
     thật, 14 phép đo (7 năng lực × 2 route, ~4.500 token) —
     [`docs/BAO-CAO-NANGLUC-API.md`](BAO-CAO-NANGLUC-API.md):
@@ -487,15 +493,17 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
       gì", và mở một đường chạy lệnh thứ hai không qua bảng quyền plugin. Có bài
       kiểm **đếm số lượt chạm mạng và đỏ nếu khác 1**.
       Xem [`docs/BAO-CAO-TOOLS-SUYLUAN.md`](BAO-CAO-TOOLS-SUYLUAN.md).
-    - 🟡 **`dau-vao-anh` còn nợ**: `tinNhan.Content` là `string` thuần, giao thức
-      đòi mảng `{type, image_url}` — **grok làm được**, deepseek thì không
-      (HTTP 400 "This model does not support image").
-    - 🟡 **`dau-ra-co-cau-truc` còn nợ**: không có `response_format` — **grok làm
-      được**, deepseek thì không (HTTP 400 "This response_format type is
-      unavailable now").
+    - ✅ **`dau-vao-anh` — ĐÓNG 22/08, commit `5f922c1`.** `GoiKem` dựng phần
+      `{type, image_url}`; grok đọc đúng ảnh PNG 32×32. Deepseek vẫn trả HTTP 400
+      "This model does not support image", nay được phân loại đúng là vướng ở
+      **nhà cung cấp**, không còn vướng phía dự án.
+    - ✅ **`dau-ra-co-cau-truc` — ĐÓNG 22/08, commit `5f922c1`.** Yêu cầu gửi
+      `response_format` với JSON Schema `strict`; grok trả JSON đúng schema.
+      Deepseek vẫn trả HTTP 400 "This response_format type is unavailable now",
+      cũng là giới hạn nhà cung cấp.
 
-    Hai ô còn lại vẫn là **nợ của dự án** cho route grok, và **vướng cả hai bên**
-    cho route deepseek — hai chuyện khác nhau, đừng gộp.
+    Xem [`docs/BAO-CAO-ANH-JSON.md`](BAO-CAO-ANH-JSON.md). Nửa API không còn nợ
+    trong repo; ba ô ✗ còn lại nằm ở phía nhà cung cấp.
 - [x] Junction Windows ✓ / ~~symlink Linux~~ từ Go, không admin. Đo ở
   `docs/DO-LUONG.md:112-122`: `sagent them claude:smoketest` (không quyền quản
   trị) nối **17 mục dùng chung**, PowerShell xác nhận `ReparsePoint = True` cho
@@ -608,14 +616,12 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   danh tính → 0) và **bảng năng lực cho nửa API** (`internal/aiapi/nangluc.go`,
   7 năng lực × 2 route, đo thật bằng key thật). Đếm lại: **5 xong · 2 xong một
   phần · 0 chưa làm → 6,0/7 = 86%**.
-  **Hai ô còn lại `[~]` không phải vì lười, và cần nói rõ chúng khác nhau ở đâu:**
-  ô **Subscription** thiếu ACP + resume/cancel ở tầng harness + trình tự chạm file
-  theo pha — đều là **nợ của dự án**, không ai cản. Ô **API** thì lai: phần "ba
-  giao thức còn lại" **bị chặn thật** vì thiếu khoá gốc của Anthropic / Google /
-  OpenAI, còn phần "tool · vision · structured-output · reasoning" thì lượt đo
-  22/08 vừa chứng minh là **lỗi nằm trong repo này** — bốn năng lực đó nhà cung
-  cấp làm được mà `aiapi.yeuCau`/`phanHoi` không có trường để gửi và đọc. Gộp hai
-  nửa ấy vào một chữ "chưa" là đúng cái bệnh mà bốn dấu sinh ra để chữa.
+  **Cập nhật sau ba merge 22/08:** `Subscription` đóng hai câu cuối ở commit
+  `e234b45`; ACP giữ nguyên quyết định **bỏ khỏi phạm vi**, nên ô chuyển `[~]→[x]`.
+  `API` đóng vision + structured-output ở commit `5f922c1`; cùng tool + reasoning
+  đã đóng trước đó, nửa API không còn nợ trong repo. Ba giao thức còn lại đều bị
+  chặn bởi khoá gốc bên ngoài, nên ô chuyển `[~]→[!]`. Đếm hiện tại: **6 xong ·
+  0 một phần · 0 chưa làm · 1 bị chặn → 6,0/6 = 100%**.
 
 ### Pha 1 — Storage + Claude slice + 1 API slice  **95%** (9 xong · 1 một phần)
 🎯 Thay chức năng v1 bằng lõi có ranh giới rõ, storage an toàn, và **hai lát cắt dọc**.
@@ -764,8 +770,9 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
   retry-backoff/cancel; concurrency limit (global/harness/provider/profile/project); route
   theo capability/model/giá/health/fallback; **approval gate**; **resume sau restart**;
   idempotency key; failure policy (stop/continue/fallback/compensate).
-  **Đếm từng mảnh — 14 xong / 1 chưa** (22/08: đóng artifact · idempotency ·
-  compensate, và concurrency limit lên đủ 5 nấc ở đường hạm đội). Dòng này từng
+  **Đếm từng mảnh — 15 xong / 1 chưa đủ dữ liệu** (22/08: đóng artifact ·
+  idempotency · compensate · route theo năng lực, và concurrency limit lên đủ
+  5 nấc ở đường hạm đội). Dòng này từng
   ghi `[ ]` trong khi engine đã chạy thật cả ngày:
   - ✅ **DAG + cycle validation** — `internal/flow/flow.go:417` (`Order`, topo ổn
     định) và `:476-516` (dò chu trình, trả về **đúng vòng lặp** chứ không chỉ nói
@@ -828,12 +835,15 @@ chấp nhận nghĩa vụ. Mọi mã port trực tiếp ghi vào `docs/OPEN_SOUR
     **không còn**; lượt chạy kết thúc `failed`. Đúng: `compensate` **gỡ lại**,
     không phải **cứu**. Bước gỡ lại bị cấm khai `idempotent = true` (`:175`) —
     khoá sẽ trùng với lần gỡ trước và lần gỡ thứ hai sẽ bị bỏ qua im lặng.
-  - ⬜ **route theo capability / giá** — **mảnh duy nhất còn lại**. Từ 22/08 đã có
-    bảng năng lực API (`aiapi.BangNangLuc`) và node `route` chọn theo **sức khoẻ**,
-    nhưng bộ chọn vẫn đi theo **tên** (`Step.Route`, `flow.go:184`) chứ không đọc
-    bảng năng lực hay bảng giá; `grep` cho thấy `BangNangLucNhieu` chỉ được gọi ở
-    `internal/api/api.go:1943,1950` (đường ĐỌC bảng) và ở CLI, **không** ở chỗ chọn
-    đường. Chi phí vẫn chỉ được ghi **sau khi gọi** (`api_calls.cost_usd`).
+  - ✅ **route theo capability — XONG 22/08, commit `2b437e4`.** `Step.Can` đi từ
+    TOML qua `flow.Validate`/`api.VanDeCanTheoBang` tới `routeBridge.ChonRoute`;
+    bộ chọn ưu tiên route đủ năng lực, giữ `ChuaDo` thành hạng riêng và loại route
+    đã đo là không làm được. `flow validate` chặn sai trước khi gọi model. Xem
+    [`docs/BAO-CAO-ROUTE-NANGLUC.md`](BAO-CAO-ROUTE-NANGLUC.md).
+  - 🟡 **route theo giá — CHƯA ĐỦ DỮ LIỆU, không giả vờ đã làm.** Cùng commit
+    `2b437e4` đo `api_calls`: 21 dòng nhưng **0 dòng có giá**, repo cũng có **0 bảng
+    giá**. Cách dựng bảng giá khai tay đã cân nhắc rồi bỏ vì không có phép đối
+    chiếu; ô `Engine flow` vì thế vẫn `[~]`.
 - [x] Node built-in: `agent · model · route · shell · test · lint · review · approve · merge · notify`.
   ✅ **10/10 chạy được từ 22/08**, khai ở `internal/flow/flow.go:30-40` và bảng
   `implemented` (`:42-55`) — nguyên tắc trung thực năng lực: loại chưa chạy được
@@ -1282,7 +1292,7 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
 | Pha | `[x]` | `[~]` | `[ ]` | `[!]` | Điểm | % | so với 21/08 |
 |---|---|---|---|---|---|---|---|
 | Bước 0 — Đổi tên | 4 | 0 | 0 | 0 | 4,0/4 | **100%** | ↑ 75% |
-| Pha 0 — Đo giả định | 5 | 2 | 0 | 0 | 6,0/7 | **86%** | ↑ 71% |
+| Pha 0 — Đo giả định | 6 | 0 | 0 | 1 | 6,0/6 | **100%** | ↑ 71% |
 | Pha 1 — Storage + slice | 9 | 1 | 0 | 0 | 9,5/10 | **95%** | = |
 | Pha 2 — Song song + Workspace | 22 | 0 | 0 | 0 | 22,0/22 | **100%** | = |
 | Pha 2.5 — Codex + OpenAI-compat | 8 | 0 | 0 | 0 | 8,0/8 | **100%** | = |
@@ -1291,17 +1301,19 @@ và cũng **điều khiển được**, không chỉ để ngắm (bấm orb →
 | Pha 5b — Dashboard 2D | 9 | 0 | 0 | 0 | 9,0/9 | **100%** | ↑ 94% |
 | Pha 5c — Workflow board | 7 | 0 | 0 | 0 | 7,0/7 | **100%** | ↑ 93% |
 | Pha 5d — Cấu hình theo project | 6 | 0 | 0 | 0 | 6,0/6 | **100%** | = |
-| **TỔNG** | **96** | **4** | **0** | **0** | **98,0/100** | **98%** | ↑ 93% |
+| **TỔNG** | **97** | **2** | **0** | **1** | **98,0/99** | **99%** | ↑ 93% |
 
 Pha 4, 6, 7 không dùng ô tick (viết bằng danh sách trạng thái ✅/⬜/🚫), nên không
 nằm trong bảng này — trạng thái của chúng đọc thẳng ở mục tương ứng.
 
-⚠ **98% nghĩa là 98% SỐ Ô TICK của mục 7, KHÔNG phải 98% dự án.** Mẫu số là 100 ô;
+⚠ **99% nghĩa là 99% SỐ Ô TICK của mục 7, KHÔNG phải 99% dự án.** Mẫu số là 99 ô
+(một ô `[!]` không vào mẫu số);
 Pha 4, 6, 7 không có mặt trong đó, và một ô `[~]` đáng nửa điểm có thể chứa khối
 lượng như "ba giao thức API còn lại". Một con số tròn trịa không kèm mẫu số là
 cách một tài liệu trung thực bắt đầu nói dối.
 
-**93% → 98%, và phải tách con số đó ra làm hai phần vì chúng khác hẳn nhau:**
+**93% → 98% ở lượt soát trước → 99% sau khi đối chiếu ba merge, và phải tách
+con số đó ra vì các thay đổi khác hẳn nhau:**
 
 1. **Bảng cũ đã sai sẵn 2 điểm trước khi ai làm gì hôm nay.** Bảng khai
    `87 · 10 · 2 = 92,0/99 = 93%`; đếm lại đúng bản `.md` **trước** lượt sửa này ra
@@ -1315,13 +1327,18 @@ cách một tài liệu trung thực bắt đầu nói dối.
    `[~]`→`[x]`; node built-in `[~]`→`[x]`; approval gate 5b `[~]`→`[x]`) và **1 ô
    mới thêm vào mẫu số** (bảng quyền plugin ra mặt web, Pha 5b) — nên mẫu số đi từ
    99 lên 100.
+3. **Ba merge 22/08 — 98% → 99%**: commit `e234b45` đóng phần còn lại trong repo
+   của `Subscription`, nên ô `[~]→[x]`; commit `5f922c1` đóng vision + structured
+   output, khiến phần còn lại của `API` chỉ còn blocker bên ngoài, nên `[~]→[!]`.
+   Điểm vẫn là 98,0 nhưng mẫu số đúng giảm từ 100 xuống 99. Commit `2b437e4` đóng
+   route theo năng lực; ô `Engine flow` vẫn `[~]` vì route theo giá chưa đủ dữ liệu.
 
 **KHÔNG CÒN ô `[ ]` nào.** Hai mục "thật sự chưa làm" mà lượt soát 21/08 chỉ đích
 danh — alias ở Bước 0 và plugin model ở Pha 3 — **đã đóng cả hai** trong ngày.
 
-**Ô `[!]` vẫn rỗng, và đây KHÔNG phải vì không có gì bị chặn.** Thứ bị chặn thật
-hôm nay nằm **bên trong** hai ô `[~]` và ở các dòng `⬜`/`🚫` của Pha 4, chứ không
-đứng riêng thành một ô tick:
+**Ô `[!]` nay có đúng một mục: API ở Pha 0.** Sau commit `5f922c1`, bốn năng lực
+phía dự án đã đóng; toàn bộ phần còn lại của ô là ba giao thức thiếu khoá gốc bên
+ngoài. Các dòng `⬜`/`🚫` của Pha 4 vẫn không nằm trong bảng tick:
 
 | Bị chặn ở đâu | Thiếu THỨ GÌ bên ngoài |
 |---|---|
@@ -1329,20 +1346,15 @@ hôm nay nằm **bên trong** hai ô `[~]` và ở các dòng `⬜`/`🚫` của
 | Pha 4 · OpenRouter | **Khoá API thật** của openrouter.ai |
 | Pha 4 · Ollama | **Khoá VÀ phần mềm** — `ollama` chưa được cài trên máy này, không có endpoint cục bộ nào để trỏ tới |
 
-Không nâng chúng thành `[!]` vì luật ở đầu mục 7 nói `[!]` là **cả ô** bị chặn.
-Ô API còn một nửa là **nợ của chính dự án** (tool · vision · structured-output ·
-reasoning — đo 22/08, nhà cung cấp làm được mà `aiapi.yeuCau`/`phanHoi` không có
-trường để gửi và đọc), nên nó là `[~]`. Nâng cả ô lên `[!]` là đổ cho bên ngoài
-một khoản nợ của mình — tô hồng, đúng chiều đắt hơn.
+API nay đủ điều kiện mang `[!]` theo đúng luật ở đầu mục 7: **cả phần còn lại** bị
+chặn. OpenRouter/Ollama vẫn là trạng thái của Pha 4, không phải ô tick cấp cao.
 
-**Bốn ô `[~]` còn lại, và mỗi ô còn thiếu đúng cái gì:**
+**Hai ô `[~]` còn lại, và mỗi ô còn thiếu đúng cái gì:**
 
 | Ô | Ở đâu | Phần chưa xong |
 |---|---|---|
-| Subscription | Pha 0 | ACP (chưa harness nào đo qua giao thức này) · resume/cancel **ở tầng harness** (`flow resume`/`flow huy` là của bộ chạy flow, không phải cờ `--resume` của từng CLI) · trình tự chạm file theo pha login/prompt/refresh/exit |
-| API | Pha 0 | 3/4 giao thức (**bị chặn**, xem bảng trên) · vision · structured-output (**nợ của dự án**; `tool` và `reasoning` đã đóng 22/08) |
 | 1 direct-API vertical slice | Pha 1 | xem chi tiết tại ô đó |
-| Engine flow | Pha 3 | **route theo capability/giá** — mảnh cuối cùng; bảng năng lực API đã có từ 22/08 nhưng bộ chọn đường vẫn đi theo TÊN, chưa đọc bảng đó và chưa đọc bảng giá |
+| Engine flow | Pha 3 | **route theo giá** — route theo capability đã đóng ở commit `2b437e4`; phần giá chỉ làm khi có dữ liệu và phép đối chiếu |
 
 ---
 
