@@ -141,7 +141,9 @@ func (s *slowAgent) RunAgents(_ context.Context, _, _, prompt string, copies int
 // Ba nhánh độc lập phải chạy CÙNG LÚC, không xếp hàng.
 func TestCacNhanhDocLapChaySongSong(t *testing.T) {
 	r, _, _ := newRunner(t)
-	sa := &slowAgent{}
+	sa := newAgentDo(0)
+	sa.ChoDu = 3
+	sa.DoiDuThat = true
 	r.Agent = sa
 	r.MaxParallel = 4
 
@@ -153,7 +155,9 @@ func TestCacNhanhDocLapChaySongSong(t *testing.T) {
 		{ID: "gop", Type: TypeNotify, Needs: []string{"a", "b", "c"}, Message: "gộp"},
 	}}
 
-	res, err := r.Start(context.Background(), f, t.TempDir(), nil)
+	ctx, huy := context.WithTimeout(context.Background(), 30*time.Second)
+	defer huy()
+	res, err := r.Start(ctx, f, t.TempDir(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,10 +166,11 @@ func TestCacNhanhDocLapChaySongSong(t *testing.T) {
 		t.Fatalf("phải xong, được %s", res.State)
 	}
 	// ĐÂY là phép đo chứng minh song song: đếm số bước CÙNG LÚC nằm trong
-	// RunAgents. maxSeen == 3 nghĩa là cả ba đã ở trong đó một lúc, không cách
+	// RunAgents. Đỉnh 3 nghĩa là cả ba đã ở trong đó một lúc, không cách
 	// nào giải thích khác.
-	if sa.maxSeen < 3 {
-		t.Fatalf("ba nhánh độc lập phải chạy cùng lúc; số bước chạy đồng thời tối đa chỉ %d", sa.maxSeen)
+	_, dinhTong, _, _ := sa.doc()
+	if dinhTong != 3 {
+		t.Fatalf("ba nhánh độc lập phải chạy cùng lúc; số bước chạy đồng thời tối đa chỉ %d", dinhTong)
 	}
 	// CỐ Ý BỎ phép đo bằng đồng hồ (trước đây: took > 600ms thì coi là tuần tự).
 	//

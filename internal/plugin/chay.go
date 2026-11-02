@@ -70,6 +70,23 @@ type Client struct {
 
 	mu  sync.Mutex
 	loi *dauCuoi // stderr của plugin, giữ phần cuối
+
+	// Wait chỉ được gọi MỘT lần và chỉ sau khi đã đọc xong stdout (tài liệu os/exec.StdoutPipe):
+	// khi stdout EOF, hoặc trong Dong(). waitXong đóng khi Wait trả về — lúc đó stderr đã copy xong.
+	waitMot  sync.Once
+	waitXong chan struct{}
+}
+
+// choThoat khởi cmd.Wait (một lần) và trả kênh đóng khi tiến trình đã thoát + stderr đã copy hết.
+func (c *Client) choThoat() <-chan struct{} {
+	c.waitMot.Do(func() {
+		c.waitXong = make(chan struct{})
+		go func() {
+			_ = c.cmd.Wait()
+			close(c.waitXong)
+		}()
+	})
+	return c.waitXong
 }
 
 // dauCuoi giữ N byte CUỐI của một luồng.
@@ -361,6 +378,12 @@ func (c *Client) docDong() ([]byte, error) {
 		phan, tiep, err := c.ra.ReadLine()
 		if err != nil {
 			if err == io.EOF {
+				// stdout EOF có thể tới trước khi os/exec copy xong stderr. Đọc stdout đã xong nên giờ
+				// gọi Wait là hợp lệ; đợi có hạn (tiến trình có thể đóng stdout mà chưa thoát).
+				select {
+				case <-c.choThoat():
+				case <-time.After(2 * time.Second):
+				}
 				return nil, fmt.Errorf("plugin %q đóng ống trước khi trả lời%s",
 					c.m.Plugin.Ten, c.themLoi())
 			}
@@ -404,17 +427,15 @@ func (c *Client) Dong() error {
 	if c.vao != nil {
 		_ = c.vao.Close() // EOF trên stdin = tín hiệu kết thúc bình thường
 	}
-	xong := make(chan error, 1)
-	go func() { xong <- c.cmd.Wait() }()
 	select {
-	case <-xong:
+	case <-c.choThoat():
 	case <-time.After(3 * time.Second):
 		// Không chịu chết thì giết. Ba giây là quá đủ cho một tiến trình chỉ phải
 		// thoát khỏi vòng lặp đọc.
 		if c.cmd.Process != nil {
 			_ = c.cmd.Process.Kill()
 		}
-		<-xong
+		<-c.choThoat()
 	}
 	if c.tmp != "" {
 		_ = os.RemoveAll(c.tmp)

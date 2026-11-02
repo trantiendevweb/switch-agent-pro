@@ -59,6 +59,10 @@ type agentDo struct {
 	// dài giấc ngủ chỉ làm con flake hiếm đi chứ không mất. Chốt hẹn thì dứt
 	// khoát: chặn được thì chốt KHÔNG BAO GIỜ đầy, và bài đỏ ngay.
 	ChoDu int
+
+	// DoiDuThat dùng cho phép đo cần chứng minh đủ N lượt đã cùng đi vào.
+	// Không tăng thời gian ngủ vì cách đó vẫn chập chờn; ctx bên ngoài làm watchdog.
+	DoiDuThat bool
 }
 
 func newAgentDo(lau time.Duration) *agentDo {
@@ -88,10 +92,17 @@ func (a *agentDo) RunAgents(ctx context.Context, profile, _ string, _ string, co
 	a.mu.Unlock()
 
 	if a.ChoDu > 0 {
-		select {
-		case <-rao:
-		case <-time.After(a.Lau):
-		case <-ctx.Done():
+		if a.DoiDuThat {
+			select {
+			case <-rao:
+			case <-ctx.Done():
+			}
+		} else {
+			select {
+			case <-rao:
+			case <-time.After(a.Lau):
+			case <-ctx.Done():
+			}
 		}
 	} else {
 		select {
@@ -439,13 +450,16 @@ func TestCopiesVuotTranThiCatXuongChuKhongTreo(t *testing.T) {
 func TestKhongCamCongThiKhongApTran(t *testing.T) {
 	r, ag, db := newRunner(t)
 	r.MaxParallel = 8
-	do := newAgentDo(3 * time.Second)
+	do := newAgentDo(0)
 	do.ChoDu = 4
+	do.DoiDuThat = true
 	r.Agent = do
 	_ = ag
 	_ = db
 	f := Flow{Name: "khong-cong", Steps: buocAgent(4, "claude:tns")}
-	if _, err := r.Start(context.Background(), f, t.TempDir(), nil); err != nil {
+	ctx, huy := context.WithTimeout(context.Background(), 30*time.Second)
+	defer huy()
+	if _, err := r.Start(ctx, f, t.TempDir(), nil); err != nil {
 		t.Fatal(err)
 	}
 	dinh, _, _, _ := do.doc()
