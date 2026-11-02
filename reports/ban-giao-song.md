@@ -12,6 +12,14 @@
 6. git status / commit / push:
 -->
 
+# 02/11/2026 16:43 — Claude (quan-ly-site-91, ca đêm toàn máy): vá 3 test chập chờn
+1. Đang làm: test `go test ./...` chập chờn (bàn giao cũ dòng 17). Không mã phiếu.
+2. Đã xong (ĐO RỒI): GPT điều tra d285 → 3 thất bại thật (2 test flow đỏ oan vì giàn dựa giờ thật; 1 race stderr sản phẩm ở internal/plugin/chay.go). Vá `945439a` (main, đã push): test flow dùng chốt thật; chay.go chỉ khởi cmd.Wait (sync.Once) khi stdout EOF hoặc trong Dong(). Kiểm: cấy lỗi đỏ đúng chỗ; đích -count=100/50 xanh; `go test ./... -count=2` exit 0; `go vet ./internal/...` sạch.
+3. Dở: không. Bước kế (một): theo dõi CI/lượt chạy tới — nếu còn flake khác thì giao GPT dieu-tra với output thật.
+4. Không đụng: `.rc-test-c.log` (rác log 26/08, chưa rõ chủ).
+5. Chờ chủ dự án: không.
+6. git: main 945439a đã push; worktree GPT đã gỡ.
+
 # 08/10/2026 17:19 — Codex: cập nhật SỔ theo ba merge 22/08
 1. Đang làm: đã hoàn tất cập nhật tài liệu, không đổi mã.
 2. Đã xong + lệnh kiểm + kết quả thật (ĐO RỒI / SUY TỪ MÃ / NHỚ LÀ CHẠY): ĐO RỒI — `git show` xác nhận 3 commit; kiểm đếm `97/2/0/1`; `git diff --check` = 0; `go test ./...` đỏ 1 bài deadline, chạy riêng 3 lần = `ok`.
